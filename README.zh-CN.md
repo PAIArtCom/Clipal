@@ -75,7 +75,7 @@ Clipal 现已将所有客户端入口统一规范到单一路由：`http://127.0
 ```
 
 ### 1. 下载安装
-前往 [Releases](https://github.com/lansespirit/Clipal/releases) 页面下载对应系统的二进制文件（当前稳定版：[`v0.11.7`](https://github.com/lansespirit/Clipal/releases/tag/v0.11.7)），并放入环境变量 `PATH` 中。
+前往 [Releases](https://github.com/lansespirit/Clipal/releases) 页面下载对应系统的二进制文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)。
 ```bash
 chmod +x clipal*
 ./clipal* --version

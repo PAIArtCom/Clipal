@@ -26,7 +26,8 @@ Edit `~/.claude/settings.json`:
 
 Notes:
 
-- The Web UI takeover only updates `ANTHROPIC_BASE_URL`
+- The Web UI takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`
+- It may also set `hasCompletedOnboarding = true` in `~/.claude.json` so Claude Code honors the user-level override
 - Your existing `ANTHROPIC_AUTH_TOKEN` is left untouched
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
 
@@ -126,6 +127,7 @@ Edit `~/.aider.conf.yml`:
 ```yaml
 model: openai/gpt-5.4
 openai-api-base: http://127.0.0.1:3333/clipal
+openai-api-key: clipal
 ```
 
 Notes:
@@ -133,6 +135,7 @@ Notes:
 - The Web UI takeover updates `openai-api-base` and a minimal `model` value in the home-level Aider config
 - Repo-local `.aider.conf.yml`, `.env`, current-directory config, and CLI flags can still override the home config
 - Existing `openai-api-key` values are left untouched
+- If `openai-api-key` is missing, Clipal writes a placeholder `clipal` key so the user-level config is immediately usable
 
 ## Goose
 

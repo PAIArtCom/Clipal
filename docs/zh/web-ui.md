@@ -15,13 +15,18 @@ http://127.0.0.1:3333/
 ### Providers
 
 - 按客户端分组查看 provider
-- 新增、编辑、删除 provider
+- 新增、编辑、删除 API-key provider
 - 启用或禁用 provider
 - 调整 `auto` / `manual` 模式
 - 在 `manual` 模式下固定某个 provider
 - 录入单个 `api_key` 或多行 `api_keys`
+- 配置 provider 级代理模式和自定义代理 URL
 - 配置 provider 级模型覆盖
 - 配置 provider 级 OpenAI `reasoning_effort` 或 Claude `thinking_budget_tokens`
+- 对支持的客户端 / 服务组合发起 OAuth 授权
+- 导入受支持的 OAuth JSON 凭据文件，并让 Clipal 自动复用或创建对应 provider
+- 在 provider 卡片上查看 OAuth 鉴权状态和最近刷新摘要
+- 为支持的 OAuth provider 加载套餐和限额详情（当前仅 Codex）
 
 ### Global Settings
 
@@ -58,11 +63,11 @@ http://127.0.0.1:3333/
 说明：
 
 - 当前阶段只修改用户级配置
-- `Claude Code` 的一键接管只会更新 `ANTHROPIC_BASE_URL`，不会覆盖 `ANTHROPIC_AUTH_TOKEN`
+- `Claude Code` 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`，必要时也会把 `~/.claude.json` 的 onboarding 标记补成完成；`ANTHROPIC_AUTH_TOKEN` 不会被覆盖
 - `OpenCode` 的一键接管会新增或更新 `provider.clipal`，并把当前 `model` 改写为 `clipal/<当前模型ID>`
 - `Gemini CLI` 的一键接管只会更新 `~/.gemini/.env` 里的 `GEMINI_API_BASE`
 - `Continue` 的一键接管会新增或更新用户级 `Clipal` 模型项
-- `Aider` 的一键接管会更新 home 级 `openai-api-base`，并补一个最小 OpenAI 兼容 `model`
+- `Aider` 的一键接管会更新 home 级 `openai-api-base`，并补一个最小 OpenAI 兼容 `model`；已有 `openai-api-key` 会保留，只有缺失时才自动补占位值 `clipal`
 - `Goose` 的一键接管会管理 `~/.config/goose/custom_providers/` 下的独立 custom provider 文件
 - 项目级、受管控或企业策略下发的配置仍可能覆盖最终生效结果
 - 对已经由 Clipal 接管的配置重复执行 apply 会尽量保持幂等，不覆盖最初备份
@@ -75,9 +80,9 @@ http://127.0.0.1:3333/
 ## 状态页里常见的 provider 状态
 
 - `disabled`：配置里手动禁用了
-- `deactivated`：因为鉴权、额度或冷却逻辑被临时跳过
-- `circuit_open`：熔断器处于打开状态
-- `keys_exhausted`：该 provider 当前没有可用 key
+- `unavailable`：当前因为鉴权、计费、额度问题，或没有可用 API Key 而不可用
+- `cooling_down`：因为可恢复错误或熔断打开而处于冷却期
+- `recovery_probe`：Clipal 正在用有限流量探测这个 provider 是否已经恢复
 
 ## 安全边界
 

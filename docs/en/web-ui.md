@@ -15,13 +15,18 @@ If you changed the port, replace `3333` with your actual port.
 ### Providers
 
 - View providers by client group
-- Add, edit, and delete providers
+- Add, edit, and delete API-key providers
 - Enable or disable providers
 - Switch between `auto` and `manual`
 - Pin a provider in `manual` mode
 - Enter either a single `api_key` or multi-line `api_keys`
+- Configure provider-level proxy mode and custom proxy URL
 - Configure provider-level model overrides
 - Configure provider-level OpenAI `reasoning_effort` or Claude `thinking_budget_tokens`
+- Start OAuth authorization for supported client/provider combinations
+- Import supported OAuth JSON credential files and let Clipal auto-link or create matching providers
+- View OAuth auth status and refresh summary on provider cards
+- Load OAuth plan and rate-limit details for supported providers (currently Codex)
 
 ### Global Settings
 
@@ -58,11 +63,11 @@ If you changed the port, replace `3333` with your actual port.
 Notes:
 
 - This feature currently edits user-level config only
-- `Claude Code` takeover only updates `ANTHROPIC_BASE_URL`; it does not overwrite `ANTHROPIC_AUTH_TOKEN`
+- `Claude Code` takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, may also mark `~/.claude.json` onboarding as complete, and does not overwrite `ANTHROPIC_AUTH_TOKEN`
 - `OpenCode` takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>`
 - `Gemini CLI` takeover only updates `GEMINI_API_BASE` in `~/.gemini/.env`
 - `Continue` takeover adds or updates a user-level `Clipal` model entry
-- `Aider` takeover updates the home-level `openai-api-base` and a minimal OpenAI-compatible `model`
+- `Aider` takeover updates the home-level `openai-api-base` and a minimal OpenAI-compatible `model`; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
 - `Goose` takeover manages a dedicated custom provider file under `~/.config/goose/custom_providers/`
 - Project-local, managed, or enterprise settings may still override the effective behavior
 - Re-applying an already managed integration is designed to be a no-op, so the original backup stays restorable
@@ -75,9 +80,9 @@ Notes:
 ## Common Provider States In The UI
 
 - `disabled`: manually disabled in config
-- `deactivated`: temporarily skipped because of auth, quota, or cooldown logic
-- `circuit_open`: blocked by the circuit breaker
-- `keys_exhausted`: no currently available API keys for that provider
+- `unavailable`: currently blocked by auth, billing, quota, or no usable API key
+- `cooling_down`: temporarily cooling down after a retryable failure or open circuit
+- `recovery_probe`: Clipal is sending limited traffic while probing whether the provider has recovered
 
 ## Security Boundary
 
