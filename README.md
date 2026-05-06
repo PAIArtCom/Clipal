@@ -30,7 +30,7 @@ No more hunting for hidden config files. With a single click in the Web UI, Clip
 Tired of hitting rate limits or empty balances mid-generation?
 - **Multi-Key Pool**: Configure multiple `.api_keys` for a single provider. Clipal rotates them automatically and retries locally before giving up.
 - **Priority Failover**: Fall back to secondary models or providers instantly with out-of-the-box circuit breaking and quota management.
-- **OAuth Upstreams**: Add Codex-authorized OAuth accounts as OpenAI `Responses` upstreams from the Web UI. They participate in the same ordering, pinning, enable/disable, and failover flow as API-key providers.
+- **OAuth Upstreams**: Authorize Codex, Claude, and Gemini accounts from the Web UI. They participate in the same ordering, pinning, enable/disable, and failover flow as API-key providers, and Clipal refreshes access tokens automatically when a refresh token is available.
 
 ### 🎛️ **Beautiful Local Web UI**
 Manage your AI workflows visually. Add, edit, enable, or disable providers, pin a specific model, and manage global settings with a modern dashboard. All changes are hot-reloaded—no restarts required.

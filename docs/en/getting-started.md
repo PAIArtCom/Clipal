@@ -48,16 +48,19 @@ http://127.0.0.1:3333/
 From the **Providers** page you can:
 
 - Add, edit, or remove API-key providers (Claude, OpenAI, Gemini, and any OpenAI-compatible endpoint)
-- Start `OAuth -> Codex` authorization for OpenAI and let Clipal append the provider automatically
+- Start `OAuth -> Codex` for OpenAI, `OAuth -> Claude` for Claude, or `OAuth -> Gemini` for Gemini and let Clipal append the provider automatically
 - Set `base_url`, `api_key` / `api_keys`, and routing weights for API-key providers
 - Reorder, pin, enable, or disable OAuth providers the same way as API-key providers
 
 Changes take effect immediately without a restart.
 
-Phase-1 note for OAuth upstreams:
+OAuth upstream notes:
 
-- Only OpenAI `Responses` requests are supported for `OAuth -> Codex`
+- `OAuth -> Codex` supports OpenAI `Responses` requests
+- `OAuth -> Claude` supports Claude `messages` and `count_tokens`
+- `OAuth -> Gemini` supports Gemini `generateContent`, `streamGenerateContent`, and `countTokens`
 - OAuth credentials are stored locally outside YAML under `~/.clipal/oauth/`
+- Clipal refreshes access tokens automatically before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh
 - OAuth providers are created by the authorization flow rather than the generic provider form
 
 > **Advanced / Optional — Manual YAML config**

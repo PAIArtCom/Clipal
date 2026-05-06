@@ -50,7 +50,7 @@ providers:
     enabled: true
 ```
 
-OAuth-backed providers are also supported in `openai.yaml` for phase 1. The recommended path is to create them from the Web UI authorization flow instead of typing them by hand.
+OAuth-backed providers are also supported in `openai.yaml`, `claude.yaml`, and `gemini.yaml`. The recommended path is to create them from the Web UI authorization flow instead of typing them by hand.
 
 ## Global Config `config.yaml`
 
@@ -181,10 +181,10 @@ providers:
 |-------|------|----------|-------|
 | `name` | string | yes | Provider name |
 | `auth_type` | string | no | `api_key` by default; set `oauth` for OAuth-backed providers |
-| `base_url` | string | API-key only | Upstream API base URL; not allowed for phase-1 OAuth providers |
+| `base_url` | string | API-key only | Upstream API base URL; not allowed for OAuth providers |
 | `api_key` | string | API-key only | Single API key |
 | `api_keys` | array | API-key only | Multiple API keys, used in order |
-| `oauth_provider` | string | OAuth only | Phase 1 supports only `codex`, and only in `openai.yaml` |
+| `oauth_provider` | string | OAuth only | Supported combinations are `codex` in `openai.yaml`, `claude` in `claude.yaml`, and `gemini` in `gemini.yaml` |
 | `oauth_ref` | string | OAuth only | Reference to the locally stored OAuth credential |
 | `proxy_mode` | string | no | Upstream proxy mode for this provider; `default` follows the global default |
 | `proxy_url` | string | no | Required when `proxy_mode: custom`; supports `http://`, `https://`, `socks5://`, and `socks5h://` proxy URLs |
@@ -196,14 +196,15 @@ providers:
 
 ### OAuth Providers
 
-Phase 1 keeps OAuth providers in the same `providers[]` list as API-key providers. They participate in the same ordering, pinning, enable/disable, and failover behavior.
+OAuth providers stay in the same `providers[]` list as API-key providers. They participate in the same ordering, pinning, enable/disable, and failover behavior.
 
-- Supported today: `openai.yaml` with `auth_type: oauth` and `oauth_provider: codex`
-- Current protocol scope: OpenAI `/v1/responses*` only
+- Supported today: `openai.yaml` with `auth_type: oauth` and `oauth_provider: codex`; `claude.yaml` with `auth_type: oauth` and `oauth_provider: claude`; `gemini.yaml` with `auth_type: oauth` and `oauth_provider: gemini`
+- Current protocol scope: Codex OAuth supports OpenAI `/v1/responses*`; Claude OAuth supports `/v1/messages` and `/v1/messages/count_tokens`; Gemini OAuth supports `generateContent`, `streamGenerateContent`, and `countTokens`
 - Do not set `base_url`, `api_key`, or `api_keys` on an OAuth provider
-- Create OAuth providers from the Web UI by choosing `Add Provider -> OAuth -> Codex`
-- The backend generates the internal provider `name` from the authorized email; the UI shows the email as the display label
-- OAuth credentials are stored outside YAML under `~/.clipal/oauth/codex/<email>--<oauth_ref>.json`
+- Create OAuth providers from the Web UI by choosing `Add Provider -> OAuth -> Codex`, `Claude`, or `Gemini` on the matching client page
+- The backend generates a stable internal provider `name` from the authorized account identity; the UI shows the account email as the display label
+- OAuth credentials are stored outside YAML under `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
+- Clipal refreshes access tokens automatically shortly before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh
 - Existing OAuth providers can be reordered, pinned, enabled, or disabled like normal providers, but credential edits go through re-authorization instead of the generic edit form
 
 ## Practical Defaults

@@ -30,7 +30,7 @@
 遇到并发限制、速率限制或者余额耗尽导致生成中断？
 - **多 Key 轮询**：为单个 provider 配置多个 API Key，Clipal 会在同 provider 内自动重试并轮换 Key，直至成功。
 - **优先级自动容灾**：当主模型/服务商不可用时，基于预设优先级秒级无缝切换到备用模型，自带断路器和并发阻断机制。
-- **OAuth 上游**：可以在 Web UI 里把 Codex 授权账号作为 OpenAI `Responses` 上游接入，并继续复用同一套排序、置顶、启停与 failover 逻辑。
+- **OAuth 上游**：可以在 Web UI 里授权接入 Codex、Claude 和 Gemini 账号，并继续复用同一套排序、置顶、启停与 failover 逻辑；只要有 `refresh_token`，Clipal 也会自动刷新 access token。
 
 ### 🎛️ **美观且强大的本地 Web UI**
 可视化管理你的 AI 工作流。在这里增删、停用 provider，或者在“手动模式”下置顶特定模型，亦或调整全局运行参数。所有更改**热重载**生效，无需重启服务。

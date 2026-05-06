@@ -50,7 +50,7 @@ providers:
     enabled: true
 ```
 
-`openai.yaml` 在第一期也支持 OAuth 上游。推荐通过 Web UI 的授权流程创建，而不是手写这些字段。
+`openai.yaml`、`claude.yaml`、`gemini.yaml` 都支持 OAuth 上游。推荐通过 Web UI 的授权流程创建，而不是手写这些字段。
 
 ## 全局配置 `config.yaml`
 
@@ -181,10 +181,10 @@ providers:
 |------|------|------|------|
 | `name` | string | 是 | provider 名称 |
 | `auth_type` | string | 否 | 默认为 `api_key`；OAuth 上游填 `oauth` |
-| `base_url` | string | 仅 API Key | 上游 API Base URL；第一期 OAuth provider 不允许设置 |
+| `base_url` | string | 仅 API Key | 上游 API Base URL；OAuth provider 不允许设置 |
 | `api_key` | string | 仅 API Key | 单个 API Key |
 | `api_keys` | array | 仅 API Key | 多个 API Key，按顺序使用 |
-| `oauth_provider` | string | 仅 OAuth | 第一期开启 `codex`，且仅允许出现在 `openai.yaml` |
+| `oauth_provider` | string | 仅 OAuth | 支持的组合是：`openai.yaml` 用 `codex`，`claude.yaml` 用 `claude`，`gemini.yaml` 用 `gemini` |
 | `oauth_ref` | string | 仅 OAuth | 指向本地 OAuth 凭据文件的引用 ID |
 | `proxy_mode` | string | 否 | 该 provider 的上游代理模式；`default` 表示使用全局默认代理 |
 | `proxy_url` | string | 否 | 当 `proxy_mode: custom` 时必填；支持 `http://`、`https://`、`socks5://` 和 `socks5h://` 代理 URL |
@@ -196,14 +196,15 @@ providers:
 
 ### OAuth Provider 说明
 
-第一期实现中，OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provider 使用相同的顺序、置顶、启停与 failover 逻辑。
+OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provider 使用相同的顺序、置顶、启停与 failover 逻辑。
 
-- 当前仅支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`
-- 当前协议范围：仅支持 OpenAI `/v1/responses*`
+- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: gemini`
+- 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Gemini OAuth 支持 `generateContent`、`streamGenerateContent`、`countTokens`
 - OAuth provider 不允许设置 `base_url`、`api_key`、`api_keys`
-- 推荐在 Web UI 里通过 `Add Provider -> OAuth -> Codex` 直接发起授权
-- 授权成功后，后端会根据邮箱自动生成内部 `name`，UI 里显示邮箱作为可读标签
-- OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/codex/<email>--<oauth_ref>.json`
+- 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Gemini` 直接发起授权
+- 授权成功后，后端会根据账号身份生成稳定的内部 `name`，UI 里显示邮箱作为可读标签
+- OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
+- 只要存在 `refresh_token`，Clipal 会在 access token 临近过期时自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
 - 已创建的 OAuth provider 可以像普通 provider 一样排序、置顶、启停，但凭据修改需要重新授权，不走通用编辑表单
 
 ## 使用建议

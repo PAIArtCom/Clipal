@@ -48,9 +48,20 @@ http://127.0.0.1:3333/
 在 **Providers** 页面你可以：
 
 - 添加、编辑或删除 provider（Claude、OpenAI、Gemini 及任意 OpenAI 兼容端点）
+- 在 OpenAI 页面发起 `OAuth -> Codex`，在 Claude 页面发起 `OAuth -> Claude`，或在 Gemini 页面发起 `OAuth -> Gemini`，让 Clipal 自动追加对应 provider
 - 设置 `base_url`、`api_key` / `api_keys` 和路由权重
+- 像管理普通 provider 一样对 OAuth provider 排序、置顶、启停
 
 所有改动**即时生效**，无需重启服务。
+
+OAuth 上游说明：
+
+- `OAuth -> Codex` 支持 OpenAI `Responses` 请求
+- `OAuth -> Claude` 支持 Claude `messages` 和 `count_tokens`
+- `OAuth -> Gemini` 支持 Gemini `generateContent`、`streamGenerateContent`、`countTokens`
+- OAuth 凭据保存在 YAML 之外的 `~/.clipal/oauth/`
+- 只要有 `refresh_token`，Clipal 会在 access token 过期前自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
+- OAuth provider 通过授权流程创建，不走通用 provider 编辑表单
 
 > **进阶 / 可选 — 手动编辑 YAML 配置**
 >
