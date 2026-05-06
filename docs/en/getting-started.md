@@ -61,7 +61,7 @@ OAuth upstream notes:
 - `OAuth -> Gemini` supports Gemini `generateContent`, `streamGenerateContent`, and `countTokens`
 - OAuth credentials are stored locally outside YAML under `~/.clipal/oauth/`
 - Clipal refreshes access tokens automatically before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh
-- OAuth providers are usually added through the authorization flow; if you already have supported OAuth JSON files, you can import them from the same Add Provider dialog
+- OAuth providers are usually added through the authorization flow; if you already have Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON, or a sub2api export JSON bundle, you can import it from the same Add Provider dialog
 
 > **Advanced / Optional — Manual YAML config**
 >

@@ -202,8 +202,11 @@ function app() {
                         oauthProvider: 'Service',
                         oauthProviderCodex: 'Codex',
                         oauthDirectHint: 'After authorization, Clipal will automatically link the account to an existing provider or create one if needed.',
-                        importFile: 'Import OAuth JSON',
-                        importFileHint: 'Select one or more OAuth JSON credential files. Clipal will import supported accounts and link or create providers automatically.',
+                        importFile: 'Import OAuth credential file',
+                        importFileHint: 'Supported files: CLIProxyAPI single-account OAuth JSON, Codex CLI auth.json, or sub2api export JSON. Clipal imports only accounts matching the selected service.',
+                        importFileHintCodex: 'Supported files: Codex CLI auth.json (~/.codex/auth.json), CLIProxyAPI single-account OAuth JSON, or sub2api export JSON. Clipal imports only Codex accounts from the selected files.',
+                        importFileHintClaude: 'Supported files: CLIProxyAPI single-account Claude OAuth JSON or sub2api export JSON. Clipal imports only Claude accounts from the selected files.',
+                        importFileHintGemini: 'Supported files: CLIProxyAPI single-account Gemini OAuth JSON or sub2api export JSON. Clipal imports only Gemini accounts from the selected files.',
                         name: 'Name *',
                         nameHint: 'Letters, numbers, dot (.), underscore (_), and hyphen (-).',
                         baseUrl: 'Base URL *',
@@ -572,8 +575,11 @@ function app() {
                         oauthProvider: '服务',
                         oauthProviderCodex: 'Codex',
                         oauthDirectHint: '授权完成后，Clipal 会自动关联到已有 Provider；如果没有，再创建一个。',
-                        importFile: '导入 OAuth JSON',
-                        importFileHint: '选择一个或多个 OAuth 凭据 JSON 文件。Clipal 会导入支持的账号，并自动关联或创建 Provider。',
+                        importFile: '导入 OAuth 授权文件',
+                        importFileHint: '支持：CLIProxyAPI 单账号 OAuth JSON、Codex CLI auth.json、sub2api 导出的 JSON。Clipal 只会导入与当前服务匹配的账号。',
+                        importFileHintCodex: '支持：Codex CLI 的 auth.json（通常在 ~/.codex/auth.json）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Codex 账号。',
+                        importFileHintClaude: '支持：CLIProxyAPI 单账号 Claude OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Claude 账号。',
+                        importFileHintGemini: '支持：CLIProxyAPI 单账号 Gemini OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Gemini 账号。',
                         name: '名称 *',
                         nameHint: '允许字母、数字、点号 (.)、下划线 (_) 和连字符 (-)。',
                         baseUrl: 'Base URL *',
@@ -2850,6 +2856,19 @@ function app() {
                     return 'Claude Code';
                 default:
                     return String(provider || '').trim();
+            }
+        },
+
+        oauthImportFileHint() {
+            switch (String(this.providerForm.oauth_provider || '').trim().toLowerCase()) {
+                case 'codex':
+                    return this.t('modal.provider.importFileHintCodex');
+                case 'claude':
+                    return this.t('modal.provider.importFileHintClaude');
+                case 'gemini':
+                    return this.t('modal.provider.importFileHintGemini');
+                default:
+                    return this.t('modal.provider.importFileHint');
             }
         },
 

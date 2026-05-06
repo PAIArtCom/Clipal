@@ -917,7 +917,7 @@
                             <input x-ref="oauthImportInput" type="file" style="display: none;" accept=".json,application/json"
                                 multiple @change="handleOAuthImportSelection($event)">
                             <span class="form-hint" style="margin: 0;"
-                                x-text="t('modal.provider.importFileHint')"></span>
+                                x-text="oauthImportFileHint()"></span>
                         </div>
                     </div>
 

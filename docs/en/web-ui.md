@@ -24,7 +24,7 @@ If you changed the port, replace `3333` with your actual port.
 - Configure provider-level model overrides
 - Configure provider-level OpenAI `reasoning_effort` or Claude `thinking_budget_tokens`
 - Start OAuth authorization for supported client/provider combinations
-- Import supported OAuth JSON credential files and let Clipal auto-link or create matching providers
+- Import OAuth credential files from the Add Provider dialog. Supported files are Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles; Clipal imports only accounts matching the selected service.
 - View OAuth auth status and refresh summary on provider cards
 - Load OAuth plan and rate-limit details for supported providers (currently Codex)
 

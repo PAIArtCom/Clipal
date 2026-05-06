@@ -61,7 +61,7 @@ OAuth 上游说明：
 - `OAuth -> Gemini` 支持 Gemini `generateContent`、`streamGenerateContent`、`countTokens`
 - OAuth 凭据保存在 YAML 之外的 `~/.clipal/oauth/`
 - 只要有 `refresh_token`，Clipal 会在 access token 过期前自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
-- OAuth provider 通常通过授权流程接入；如果你已经有受支持的 OAuth JSON，也可以在同一个 Add Provider 对话框里直接导入
+- OAuth provider 通常通过授权流程接入；如果你已经有 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，或 sub2api 导出的 JSON，也可以在同一个 Add Provider 对话框里直接导入
 
 > **进阶 / 可选 — 手动编辑 YAML 配置**
 >

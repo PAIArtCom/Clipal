@@ -417,6 +417,25 @@ test('loadOAuthProviders switches to the available oauth source for current clie
     assert.equal(state.providerForm.oauth_provider, 'gemini');
 });
 
+test('oauthImportFileHint names supported credential file types for the selected oauth provider', () => {
+    const state = loadApp();
+
+    state.providerForm.oauth_provider = 'codex';
+    assert.match(state.oauthImportFileHint(), /Codex CLI auth\.json/);
+    assert.match(state.oauthImportFileHint(), /~\/\.codex\/auth\.json/);
+    assert.match(state.oauthImportFileHint(), /CLIProxyAPI/);
+    assert.match(state.oauthImportFileHint(), /sub2api/);
+    assert.match(state.oauthImportFileHint(), /Codex accounts/);
+
+    state.providerForm.oauth_provider = 'claude';
+    assert.match(state.oauthImportFileHint(), /Claude OAuth JSON/);
+    assert.match(state.oauthImportFileHint(), /Claude accounts/);
+
+    state.providerForm.oauth_provider = 'gemini';
+    assert.match(state.oauthImportFileHint(), /Gemini OAuth JSON/);
+    assert.match(state.oauthImportFileHint(), /Gemini accounts/);
+});
+
 test('editProvider hydrates override fields directly into the form', () => {
     const state = loadApp();
 

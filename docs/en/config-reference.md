@@ -202,6 +202,7 @@ OAuth providers stay in the same `providers[]` list as API-key providers. They p
 - Current protocol scope: Codex OAuth supports OpenAI `/v1/responses*`; Claude OAuth supports `/v1/messages` and `/v1/messages/count_tokens`; Gemini OAuth supports `generateContent`, `streamGenerateContent`, and `countTokens`
 - Do not set `base_url`, `api_key`, or `api_keys` on an OAuth provider
 - Create OAuth providers from the Web UI by choosing `Add Provider -> OAuth -> Codex`, `Claude`, or `Gemini` on the matching client page
+- The Add Provider dialog can also import existing OAuth credential files: Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles. Imported accounts are filtered by the selected OAuth service.
 - The backend generates a stable internal provider `name` from the authorized account identity; the UI shows the account email as the display label
 - OAuth credentials are stored outside YAML under `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
 - Clipal refreshes access tokens automatically shortly before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh

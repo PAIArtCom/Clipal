@@ -202,6 +202,7 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Gemini OAuth 支持 `generateContent`、`streamGenerateContent`、`countTokens`
 - OAuth provider 不允许设置 `base_url`、`api_key`、`api_keys`
 - 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Gemini` 直接发起授权
+- Add Provider 对话框也可以导入已有 OAuth 授权文件：Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。导入时会按当前选择的 OAuth 服务过滤账号。
 - 授权成功后，后端会根据账号身份生成稳定的内部 `name`，UI 里显示邮箱作为可读标签
 - OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
 - 只要存在 `refresh_token`，Clipal 会在 access token 临近过期时自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
