@@ -5,6 +5,10 @@
 *.dylib
 /clipal
 
+# Local-only tools (not part of the project)
+/cmd/import_paiart_ams/
+/import_paiart_ams
+
 # Build output
 build/
 
