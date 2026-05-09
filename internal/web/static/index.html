@@ -265,6 +265,21 @@
                                     x-text="configuredKeyCountLabel(provider.key_count || 0)"></span>
                             </div>
                             <div class="provider-card__detail provider-card__detail--usage"
+                                x-show="providerSpendVisible(provider)">
+                                <div class="flex items-center gap-3 provider-card__usage-pair">
+                                    <span class="provider-card__detail-label" x-text="t('providers.spendToday')"></span>
+                                    <span class="provider-card__detail-value"
+                                        :title="providerSpendTodayTitle(provider)"
+                                        x-text="providerSpendToday(provider)"></span>
+                                </div>
+                                <div class="flex items-center gap-3 provider-card__usage-pair">
+                                    <span class="provider-card__detail-label" x-text="t('providers.spendWeek')"></span>
+                                    <span class="provider-card__detail-value"
+                                        :title="providerSpendWeekTitle(provider)"
+                                        x-text="providerSpendWeek(provider)"></span>
+                                </div>
+                            </div>
+                            <div class="provider-card__detail provider-card__detail--usage"
                                 x-show="provider.usage && provider.usage.has_usage">
                                 <div class="flex items-center gap-3 provider-card__usage-pair">
                                     <span class="provider-card__detail-label" x-text="t('providers.usageTotal')"></span>
@@ -277,6 +292,20 @@
                                     <span class="provider-card__detail-value"
                                         :title="providerUsageInOutTitle(provider)"
                                         x-text="providerUsageInOut(provider)"></span>
+                                </div>
+                                <div class="flex items-center gap-3 provider-card__usage-pair"
+                                    x-show="providerUsageReasoningVisible(provider)">
+                                    <span class="provider-card__detail-label" x-text="t('providers.usageReasoning')"></span>
+                                    <span class="provider-card__detail-value"
+                                        :title="providerUsageReasoningTitle(provider)"
+                                        x-text="providerUsageReasoning(provider)"></span>
+                                </div>
+                                <div class="flex items-center gap-3 provider-card__usage-pair"
+                                    x-show="providerUsageThoughtsVisible(provider)">
+                                    <span class="provider-card__detail-label" x-text="t('providers.usageThoughts')"></span>
+                                    <span class="provider-card__detail-value"
+                                        :title="providerUsageThoughtsTitle(provider)"
+                                        x-text="providerUsageThoughts(provider)"></span>
                                 </div>
                             </div>
                         </div>

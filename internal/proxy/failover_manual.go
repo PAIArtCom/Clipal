@@ -96,6 +96,7 @@ func (cp *ClientProxy) forwardManual(w http.ResponseWriter, req *http.Request, p
 		cp.setCurrentKeyIndexForScope(index, keyIndex, scope)
 	}
 	onSuccess := func(success streamSuccess) {
+		success.usage = applyUsageCostSnapshot(req, requestCtx, provider, payload, success.usage)
 		cp.recordCompletedUsage(req, provider.Name, resp.StatusCode, success.usage, time.Now())
 	}
 	allow := circuitAllowResult{}

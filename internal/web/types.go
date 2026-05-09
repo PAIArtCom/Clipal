@@ -204,13 +204,18 @@ type ProviderResponse struct {
 }
 
 type ProviderUsageResponse struct {
-	RequestCount int64  `json:"request_count,omitempty"`
-	SuccessCount int64  `json:"success_count,omitempty"`
-	InputTokens  int64  `json:"input_tokens,omitempty"`
-	OutputTokens int64  `json:"output_tokens,omitempty"`
-	TotalTokens  int64  `json:"total_tokens,omitempty"`
-	LastUsedAt   string `json:"last_used_at,omitempty"`
-	HasUsage     bool   `json:"has_usage,omitempty"`
+	RequestCount     int64  `json:"request_count,omitempty"`
+	SuccessCount     int64  `json:"success_count,omitempty"`
+	InputTokens      int64  `json:"input_tokens,omitempty"`
+	OutputTokens     int64  `json:"output_tokens,omitempty"`
+	TotalTokens      int64  `json:"total_tokens,omitempty"`
+	ReasoningTokens  int64  `json:"reasoning_tokens,omitempty"`
+	ThoughtsTokens   int64  `json:"thoughts_tokens,omitempty"`
+	SpendTodayMicros int64  `json:"spend_today_micros,omitempty"`
+	SpendWeekMicros  int64  `json:"spend_week_micros,omitempty"`
+	LastUsedAt       string `json:"last_used_at,omitempty"`
+	HasUsage         bool   `json:"has_usage,omitempty"`
+	HasCost          bool   `json:"has_cost,omitempty"`
 }
 
 type ProviderOAuthLimits struct {
@@ -566,21 +571,52 @@ func mapProviderUsageResponse(usage telemetry.ProviderUsage) *ProviderUsageRespo
 		usage.InputTokens == 0 &&
 		usage.OutputTokens == 0 &&
 		usage.TotalTokens == 0 &&
+		usage.ReasoningTokens == 0 &&
+		usage.ThoughtsTokens == 0 &&
+		usage.TotalCostMicros == 0 &&
+		!usage.HasCost &&
 		usage.LastUsedAt.IsZero() {
 		return nil
 	}
+	now := time.Now()
+	if !usage.LastUsedAt.IsZero() {
+		now = now.In(usage.LastUsedAt.Location())
+	}
+	spendTodayMicros := providerSpendForRecentDays(usage, now, 1)
+	spendWeekMicros := providerSpendForRecentDays(usage, now, 7)
 	resp := &ProviderUsageResponse{
-		RequestCount: usage.RequestCount,
-		SuccessCount: usage.SuccessCount,
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
-		TotalTokens:  usage.TotalTokens,
-		HasUsage:     usage.Usage != nil,
+		RequestCount:     usage.RequestCount,
+		SuccessCount:     usage.SuccessCount,
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		TotalTokens:      usage.TotalTokens,
+		ReasoningTokens:  usage.ReasoningTokens,
+		ThoughtsTokens:   usage.ThoughtsTokens,
+		SpendTodayMicros: spendTodayMicros,
+		SpendWeekMicros:  spendWeekMicros,
+		HasUsage:         usage.Usage != nil,
+		HasCost:          usage.HasCost,
 	}
 	if !usage.LastUsedAt.IsZero() {
 		resp.LastUsedAt = usage.LastUsedAt.Format(time.RFC3339)
 	}
 	return resp
+}
+
+func providerSpendForRecentDays(usage telemetry.ProviderUsage, now time.Time, days int) int64 {
+	if days <= 0 || len(usage.DailyCosts) == 0 {
+		return 0
+	}
+	var total int64
+	for offset := 0; offset < days; offset++ {
+		key := now.AddDate(0, 0, -offset).Format("2006-01-02")
+		bucket, ok := usage.DailyCosts[key]
+		if !ok || !bucket.HasCost {
+			continue
+		}
+		total += bucket.CostMicros
+	}
+	return total
 }
 
 func toClientConfigExport(cc config.ClientConfig) ClientConfigExport {

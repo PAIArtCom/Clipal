@@ -4,13 +4,16 @@ import "testing"
 
 func TestUsageExtractorJSON_OpenAI(t *testing.T) {
 	extractor := NewUsageExtractor("openai", "openai_responses", "application/json")
-	extractor.Append([]byte(`{"id":"r1","usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46,"input_tokens_details":{"cached_tokens":3}}}`))
+	extractor.Append([]byte(`{"id":"r1","usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46,"input_tokens_details":{"cached_tokens":3},"output_tokens_details":{"reasoning_tokens":5}}}`))
 	usage, ok := extractor.Finalize()
 	if !ok {
 		t.Fatalf("expected usage")
 	}
 	if usage.InputTokens != 12 || usage.OutputTokens != 34 || usage.TotalTokens != 46 {
 		t.Fatalf("usage = %#v", usage)
+	}
+	if usage.ReasoningTokens != 5 {
+		t.Fatalf("reasoning_tokens = %d", usage.ReasoningTokens)
 	}
 	if usage.Usage["input_tokens_details"] == nil {
 		t.Fatalf("expected raw usage payload to be preserved")
@@ -45,6 +48,9 @@ func TestUsageExtractorJSON_Gemini(t *testing.T) {
 	if usage.InputTokens != 5 || usage.OutputTokens != 7 || usage.TotalTokens != 12 {
 		t.Fatalf("usage = %#v", usage)
 	}
+	if usage.ThoughtsTokens != 2 {
+		t.Fatalf("thoughts_tokens = %d", usage.ThoughtsTokens)
+	}
 	if usage.Usage["thoughtsTokenCount"] == nil {
 		t.Fatalf("expected raw usage payload to be preserved")
 	}
@@ -63,6 +69,9 @@ func TestUsageExtractorSSEOpenAICompletedOnly(t *testing.T) {
 	}
 	if usage.TotalTokens != 25 || usage.OutputTokens != 15 {
 		t.Fatalf("usage = %#v", usage)
+	}
+	if usage.ReasoningTokens != 2 {
+		t.Fatalf("reasoning_tokens = %d", usage.ReasoningTokens)
 	}
 	if usage.Usage["output_tokens_details"] == nil {
 		t.Fatalf("expected raw usage payload to be preserved")
@@ -110,13 +119,16 @@ func TestUsageExtractorSSEClaudeRequiresMessageStop(t *testing.T) {
 func TestUsageExtractorSSEGeminiUsesFinishedChunk(t *testing.T) {
 	extractor := NewUsageExtractor("gemini", "gemini_stream_generate_content", "text/event-stream")
 	extractor.Append([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}],\"usageMetadata\":{\"promptTokenCount\":99,\"totalTokenCount\":99}}\n\n"))
-	extractor.Append([]byte("data: {\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\" world\"}]}}],\"usageMetadata\":{\"promptTokenCount\":17,\"candidatesTokenCount\":5,\"totalTokenCount\":22}}\n\n"))
+	extractor.Append([]byte("data: {\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\" world\"}]}}],\"usageMetadata\":{\"promptTokenCount\":17,\"candidatesTokenCount\":5,\"thoughtsTokenCount\":4,\"totalTokenCount\":26}}\n\n"))
 
 	usage, ok := extractor.Finalize()
 	if !ok {
 		t.Fatalf("expected usage")
 	}
-	if usage.InputTokens != 17 || usage.OutputTokens != 5 || usage.TotalTokens != 22 {
+	if usage.InputTokens != 17 || usage.OutputTokens != 5 || usage.TotalTokens != 26 {
 		t.Fatalf("usage = %#v", usage)
+	}
+	if usage.ThoughtsTokens != 4 {
+		t.Fatalf("thoughts_tokens = %d", usage.ThoughtsTokens)
 	}
 }

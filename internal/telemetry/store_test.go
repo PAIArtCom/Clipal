@@ -16,7 +16,14 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	}
 
 	now := time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
-	if err := store.RecordUsage("openai", "p1", UsageSnapshot{UsageDelta: UsageDelta{InputTokens: 10, OutputTokens: 20}, Usage: map[string]any{"input_tokens": 10.0, "output_tokens": 20.0}}, now); err != nil {
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{
+		UsageDelta:      UsageDelta{InputTokens: 10, OutputTokens: 20},
+		Usage:           map[string]any{"input_tokens": 10.0, "output_tokens": 20.0},
+		ReasoningTokens: 7,
+		ThoughtsTokens:  3,
+		CostMicros:      1_250_000,
+		HasCost:         true,
+	}, now); err != nil {
 		t.Fatalf("RecordUsage: %v", err)
 	}
 	if err := store.Flush(); err != nil {
@@ -33,6 +40,15 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	if got.Usage == nil {
 		t.Fatalf("expected raw usage to be preserved")
 	}
+	if got.ReasoningTokens != 7 || got.ThoughtsTokens != 3 {
+		t.Fatalf("expected reasoning/thought tokens to be preserved: %#v", got)
+	}
+	if !got.HasCost || got.TotalCostMicros != 1_250_000 {
+		t.Fatalf("expected spend to be preserved: %#v", got)
+	}
+	if bucket, ok := got.DailyCosts["2026-04-08"]; !ok || !bucket.HasCost || bucket.CostMicros != 1_250_000 {
+		t.Fatalf("expected daily spend bucket, got %#v", got.DailyCosts)
+	}
 
 	if err := store.RenameProvider("openai", "p1", "p2"); err != nil {
 		t.Fatalf("RenameProvider: %v", err)
@@ -40,7 +56,7 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	if _, ok := store.ProviderSnapshot("openai", "p1"); ok {
 		t.Fatalf("old provider snapshot should be gone")
 	}
-	if got, ok := store.ProviderSnapshot("openai", "p2"); !ok || got.TotalTokens != 30 {
+	if got, ok := store.ProviderSnapshot("openai", "p2"); !ok || got.TotalTokens != 30 || got.TotalCostMicros != 1_250_000 || got.ReasoningTokens != 7 || got.ThoughtsTokens != 3 {
 		t.Fatalf("renamed snapshot = %#v ok=%v", got, ok)
 	}
 
@@ -48,7 +64,7 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
-	if got, ok := reloaded.ProviderSnapshot("openai", "p2"); !ok || got.TotalTokens != 30 {
+	if got, ok := reloaded.ProviderSnapshot("openai", "p2"); !ok || got.TotalTokens != 30 || got.TotalCostMicros != 1_250_000 || got.ReasoningTokens != 7 || got.ThoughtsTokens != 3 {
 		t.Fatalf("reloaded snapshot = %#v ok=%v", got, ok)
 	}
 
@@ -266,6 +282,8 @@ func TestStoreDeleteProvidersWithRollbackRestoresDeletedUsage(t *testing.T) {
 	if err := store.RecordUsage("openai", "p1", UsageSnapshot{
 		UsageDelta: UsageDelta{InputTokens: 1, OutputTokens: 2},
 		Usage:      map[string]any{"prompt_tokens": 1.0, "completion_tokens": 2.0, "total_tokens": 3.0},
+		CostMicros: 1_250_000,
+		HasCost:    true,
 	}, older); err != nil {
 		t.Fatalf("RecordUsage: %v", err)
 	}
@@ -285,6 +303,8 @@ func TestStoreDeleteProvidersWithRollbackRestoresDeletedUsage(t *testing.T) {
 	if err := store.RecordUsage("openai", "p1", UsageSnapshot{
 		UsageDelta: UsageDelta{InputTokens: 10, OutputTokens: 20},
 		Usage:      map[string]any{"prompt_tokens": 10.0, "completion_tokens": 20.0, "total_tokens": 30.0},
+		CostMicros: 3_000_000,
+		HasCost:    true,
 	}, newer); err != nil {
 		t.Fatalf("RecordUsage after delete: %v", err)
 	}
@@ -299,6 +319,9 @@ func TestStoreDeleteProvidersWithRollbackRestoresDeletedUsage(t *testing.T) {
 	}
 	if got.RequestCount != 2 || got.SuccessCount != 2 || got.TotalTokens != 33 {
 		t.Fatalf("restored snapshot = %#v", got)
+	}
+	if !got.HasCost || got.TotalCostMicros != 4_250_000 {
+		t.Fatalf("restored spend = %#v", got)
 	}
 	if !got.LastUsedAt.Equal(newer) {
 		t.Fatalf("last_used_at = %v want %v", got.LastUsedAt, newer)

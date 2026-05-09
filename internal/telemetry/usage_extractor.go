@@ -107,6 +107,13 @@ func (e *UsageExtractor) Finalize() (UsageSnapshot, bool) {
 	}
 	switch e.mode {
 	case usageModeOpenAISSE, usageModeClaudeSSE, usageModeGeminiSSE:
+		if len(e.lineBuf) > 0 {
+			line := strings.TrimSuffix(string(e.lineBuf), "\r")
+			e.lineBuf = nil
+			if line != "" {
+				e.processSSELine(line)
+			}
+		}
 		e.flushPendingEvent()
 		if !e.completed {
 			return UsageSnapshot{}, false
@@ -244,13 +251,6 @@ func (e *UsageExtractor) processSSELine(line string) {
 }
 
 func (e *UsageExtractor) flushPendingEvent() {
-	if len(e.lineBuf) > 0 {
-		line := strings.TrimSuffix(string(e.lineBuf), "\r")
-		e.lineBuf = nil
-		if line != "" {
-			e.processSSELine(line)
-		}
-	}
 	if len(e.dataLines) == 0 {
 		e.eventName = ""
 		return
@@ -372,9 +372,12 @@ func snapshotFromKnownUsageObject(raw map[string]any, normalize func(map[string]
 	if usage == nil {
 		return UsageSnapshot{}, false
 	}
+	outputTokenDetails := nestedMap(usage, "output_tokens_details")
 	return UsageSnapshot{
-		UsageDelta: normalize(usage).normalized(),
-		Usage:      usage,
+		UsageDelta:      normalize(usage).normalized(),
+		Usage:           usage,
+		ReasoningTokens: int64Value(outputTokenDetails["reasoning_tokens"]),
+		ThoughtsTokens:  int64Value(usage["thoughtsTokenCount"]),
 	}, true
 }
 

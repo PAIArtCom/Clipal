@@ -38,6 +38,39 @@ const (
 
 const protocolScanWindow = 64 * 1024
 
+func isEventStreamContentType(contentType string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(contentType)), "text/event-stream")
+}
+
+func looksLikeSSEPrelude(chunk []byte) bool {
+	trimmed := bytes.TrimLeft(chunk, " \t\r\n")
+	if len(trimmed) == 0 {
+		return false
+	}
+	lower := bytes.ToLower(trimmed)
+	return bytes.HasPrefix(lower, []byte("event:")) || bytes.HasPrefix(lower, []byte("data:"))
+}
+
+func inferredResponseContentType(req *http.Request, resp *http.Response, firstChunk []byte) string {
+	if resp == nil {
+		return ""
+	}
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if isEventStreamContentType(contentType) || !looksLikeSSEPrelude(firstChunk) {
+		return contentType
+	}
+	requestCtx, ok := requestContextFromRequest(req)
+	if !ok {
+		return contentType
+	}
+	switch requestCtx.Family {
+	case ProtocolFamilyOpenAI, ProtocolFamilyClaude, ProtocolFamilyGemini:
+		return "text/event-stream; charset=utf-8"
+	default:
+		return contentType
+	}
+}
+
 type protocolTracker struct {
 	kind streamProtocolKind
 
@@ -50,8 +83,12 @@ func newProtocolTracker(clientType ClientType, req *http.Request, resp *http.Res
 	if resp == nil {
 		return &protocolTracker{kind: streamProtocolNone}
 	}
-	contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
-	if !strings.Contains(contentType, "text/event-stream") {
+	return newProtocolTrackerWithContentType(clientType, req, resp.Header.Get("Content-Type"))
+}
+
+func newProtocolTrackerWithContentType(clientType ClientType, req *http.Request, contentType string) *protocolTracker {
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if !isEventStreamContentType(contentType) {
 		return &protocolTracker{kind: streamProtocolNone}
 	}
 

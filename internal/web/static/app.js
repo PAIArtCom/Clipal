@@ -104,6 +104,10 @@ function app() {
                     apiKeys: 'API Keys',
                     usageTotal: 'Usage',
                     usageInOut: 'Input / Output',
+                    usageReasoning: 'Reasoning (in Output)',
+                    usageThoughts: 'Thoughts',
+                    spendToday: 'Spend Today',
+                    spendWeek: 'Spend 7d',
                     planAndLimits: 'Plan & Limits',
                     plan: 'Plan',
                     rateLimit: 'Limit',
@@ -477,6 +481,10 @@ function app() {
                     apiKeys: 'API Keys',
                     usageTotal: '用量',
                     usageInOut: '输入 / 输出',
+                    usageReasoning: '推理（含在输出中）',
+                    usageThoughts: '思考',
+                    spendToday: '今日消费',
+                    spendWeek: '近 7 天消费',
                     planAndLimits: '套餐与限额',
                     plan: '套餐',
                     rateLimit: '限额',
@@ -2368,6 +2376,83 @@ function app() {
             return `${sign}${numberText}${units[unitIndex]}`;
         },
 
+        formatUSDMicros(value, exact = false) {
+            const micros = Number(value || 0);
+            if (!Number.isFinite(micros)) {
+                return '$0';
+            }
+
+            const dollars = micros / 1_000_000;
+            const absDollars = Math.abs(dollars);
+            const locale = this.locale === 'zh-CN' ? 'zh-CN' : 'en-US';
+
+            if (exact) {
+                return new Intl.NumberFormat(locale, {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 6
+                }).format(dollars);
+            }
+
+            if (absDollars === 0) {
+                return '$0';
+            }
+
+            const displayRoundedValue = (amount, fractionDigits, threshold) => {
+                const scale = fractionDigits > 0 ? 10 ** fractionDigits : 1;
+                const rounded = fractionDigits > 0
+                    ? Math.round(amount * scale) / scale
+                    : Math.round(amount);
+                const truncated = fractionDigits > 0
+                    ? Math.floor((amount + Number.EPSILON) * scale) / scale
+                    : Math.floor(amount);
+                const chosen = threshold > 0 && amount < threshold && rounded >= threshold
+                    ? truncated
+                    : rounded;
+                return fractionDigits > 0 ? Number(chosen.toFixed(fractionDigits)) : chosen;
+            };
+
+            const sign = dollars < 0 ? '-' : '';
+            if (absDollars >= 1000) {
+                const units = ['', 'K', 'M', 'B', 'T', 'P', 'E', 'Z', 'Y'];
+                let scaled = absDollars;
+                let unitIndex = 0;
+
+                while (scaled >= 1000 && unitIndex < units.length - 1) {
+                    scaled /= 1000;
+                    unitIndex += 1;
+                }
+
+                let decimals = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+                const rounded = displayRoundedValue(scaled, decimals, 1000);
+
+                const numberText = rounded.toLocaleString(locale, {
+                    maximumFractionDigits: decimals
+                });
+                return `${sign}$${numberText}${units[unitIndex]}`;
+            }
+
+            let digits = 0;
+            if (absDollars < 100) {
+                digits = 1;
+            }
+            if (absDollars < 10) {
+                digits = 2;
+            }
+            if (absDollars < 1) {
+                digits = Math.min(6, Math.max(2, Math.ceil(-Math.log10(absDollars)) + 2));
+            }
+
+            const threshold = absDollars < 1 ? 1 : absDollars < 10 ? 10 : absDollars < 100 ? 100 : 1000;
+            const rounded = displayRoundedValue(absDollars, digits, threshold);
+            const numberText = rounded.toLocaleString(locale, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: digits
+            });
+            return `${sign}$${numberText}`;
+        },
+
         parseTimestamp(value) {
             const text = String(value || '').trim();
             if (!text) {
@@ -2443,6 +2528,74 @@ function app() {
                 return this.t('common.none');
             }
             return `${this.formatTokenCount(usage.input_tokens || 0)} / ${this.formatTokenCount(usage.output_tokens || 0)}`;
+        },
+
+        providerUsageReasoningVisible(provider) {
+            return !!(provider && provider.usage && Number(provider.usage.reasoning_tokens || 0) > 0);
+        },
+
+        providerUsageReasoning(provider) {
+            if (!this.providerUsageReasoningVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatCompactTokenCount(provider.usage.reasoning_tokens || 0);
+        },
+
+        providerUsageReasoningTitle(provider) {
+            if (!this.providerUsageReasoningVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatTokenCount(provider.usage.reasoning_tokens || 0);
+        },
+
+        providerUsageThoughtsVisible(provider) {
+            return !!(provider && provider.usage && Number(provider.usage.thoughts_tokens || 0) > 0);
+        },
+
+        providerUsageThoughts(provider) {
+            if (!this.providerUsageThoughtsVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatCompactTokenCount(provider.usage.thoughts_tokens || 0);
+        },
+
+        providerUsageThoughtsTitle(provider) {
+            if (!this.providerUsageThoughtsVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatTokenCount(provider.usage.thoughts_tokens || 0);
+        },
+
+        providerSpendVisible(provider) {
+            return !!(provider && provider.usage && provider.usage.has_cost);
+        },
+
+        providerSpendToday(provider) {
+            if (!this.providerSpendVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatUSDMicros(provider.usage.spend_today_micros || 0);
+        },
+
+        providerSpendTodayTitle(provider) {
+            if (!this.providerSpendVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatUSDMicros(provider.usage.spend_today_micros || 0, true);
+        },
+
+        providerSpendWeek(provider) {
+            if (!this.providerSpendVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatUSDMicros(provider.usage.spend_week_micros || 0);
+        },
+
+        providerSpendWeekTitle(provider) {
+            if (!this.providerSpendVisible(provider)) {
+                return this.t('common.none');
+            }
+            return this.formatUSDMicros(provider.usage.spend_week_micros || 0, true);
         },
 
         providerOAuthPlanRaw(provider) {
@@ -2914,7 +3067,8 @@ function app() {
                 return this.providerSupportsOAuthMetadata(provider)
                     || this.providerOAuthHasSummary(provider)
                     || !!(provider && provider.base_url)
-                    || this.normalizeProviderProxyMode(provider && provider.proxy_mode) !== 'default';
+                    || this.normalizeProviderProxyMode(provider && provider.proxy_mode) !== 'default'
+                    || !!(provider && provider.usage && (provider.usage.has_usage || provider.usage.has_cost));
             }
             if (provider && provider.base_url) {
                 return true;
@@ -2922,7 +3076,7 @@ function app() {
             if (this.normalizeProviderProxyMode(provider && provider.proxy_mode) !== 'default') {
                 return true;
             }
-            return !!(provider && provider.usage && provider.usage.has_usage);
+            return !!(provider && provider.usage && (provider.usage.has_usage || provider.usage.has_cost));
         },
 
         async loadProviderOAuthMetadata(provider) {

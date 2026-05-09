@@ -411,6 +411,7 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 				cp.clearProviderBusy(index)
 				now := time.Now()
 				cp.learnStickySuccessWithPayload(scope, requestCtx, requestKey, payload, success.responseBody, index, keyIndex, now)
+				success.usage = applyUsageCostSnapshot(req, requestCtx, provider, payload, success.usage)
 				cp.recordCompletedUsage(req, provider.Name, resp.StatusCode, success.usage, now)
 			}
 

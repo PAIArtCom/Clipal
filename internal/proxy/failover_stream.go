@@ -40,19 +40,36 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	if cp.upstreamIdle > 0 {
 		idleTimer = time.AfterFunc(cp.upstreamIdle, func() { cancelAttempt(errUpstreamIdleTimeout) })
 	}
-	tracker := newProtocolTracker(cp.clientType, originalReq, resp)
-	var capture bytes.Buffer
-	shouldCapture := !strings.Contains(strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type"))), "text/event-stream")
-	usageExtractor := usageExtractorFromRequest(originalReq, resp)
-	if usageExtractor != nil {
-		defer usageExtractor.Cleanup()
+	if resp == nil || resp.Body == nil {
+		err := errors.New("upstream response missing body")
+		stopTimer(idleTimer)
+		return streamResult{
+			kind:     streamRetryNext,
+			delivery: deliveryRetryNext,
+			protocol: protocolNotApplicable,
+			proto:    streamProtocolNone,
+			cause:    streamCause(protocolNotApplicable, err, attemptCtx, originalReq),
+			err:      err,
+		}
 	}
+	upstreamResp := resp
 
 	buf := make([]byte, 32*1024)
 	total := 0
-	firstN, firstErr := resp.Body.Read(buf)
+	firstN, firstErr := upstreamResp.Body.Read(buf)
 	if firstN > 0 && idleTimer != nil {
 		idleTimer.Reset(cp.upstreamIdle)
+	}
+	derivedContentType := inferredResponseContentType(originalReq, upstreamResp, buf[:firstN])
+	if strings.TrimSpace(derivedContentType) != "" {
+		upstreamResp.Header.Set("Content-Type", derivedContentType)
+	}
+	tracker := newProtocolTrackerWithContentType(cp.clientType, originalReq, derivedContentType)
+	var capture bytes.Buffer
+	shouldCapture := !isEventStreamContentType(derivedContentType)
+	usageExtractor := usageExtractorFromRequestWithContentType(originalReq, derivedContentType)
+	if usageExtractor != nil {
+		defer usageExtractor.Cleanup()
 	}
 	total += firstN
 	tracker.append(buf[:firstN])
@@ -64,15 +81,15 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	}
 
 	if firstN == 0 && firstErr != nil {
-		_ = resp.Body.Close()
+		_ = upstreamResp.Body.Close()
 		stopTimer(idleTimer)
 		if errors.Is(firstErr, io.EOF) {
 			// Legitimately empty body; pass through as-is.
 			if onCommit != nil {
 				onCommit()
 			}
-			copyHeaders(w.Header(), resp.Header)
-			w.WriteHeader(resp.StatusCode)
+			copyHeaders(w.Header(), upstreamResp.Header)
+			w.WriteHeader(upstreamResp.StatusCode)
 			protocol := tracker.finalStatus()
 			if protocol == protocolIncomplete {
 				cp.recordCircuitFailure(time.Now(), index, allow.usedProbe, "protocol_incomplete")
@@ -120,13 +137,13 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	if onCommit != nil {
 		onCommit()
 	}
-	copyHeaders(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
+	copyHeaders(w.Header(), upstreamResp.Header)
+	w.WriteHeader(upstreamResp.StatusCode)
 
-	fw := responseBodyWriter(w, originalReq, resp)
+	fw := responseBodyWriter(w, originalReq, upstreamResp)
 	if firstN > 0 {
 		if _, err := fw.Write(buf[:firstN]); err != nil {
-			_ = resp.Body.Close()
+			_ = upstreamResp.Body.Close()
 			stopTimer(idleTimer)
 			cp.releaseCircuitPermit(index, allow.usedProbe)
 			cancelAttempt(nil)
@@ -144,7 +161,7 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 
 	var copyErr error
 	for {
-		nr, er := resp.Body.Read(buf)
+		nr, er := upstreamResp.Body.Read(buf)
 		if nr > 0 {
 			if idleTimer != nil {
 				idleTimer.Reset(cp.upstreamIdle)
@@ -161,7 +178,7 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 				}
 			}
 			if _, ew := fw.Write(buf[:nr]); ew != nil {
-				_ = resp.Body.Close()
+				_ = upstreamResp.Body.Close()
 				stopTimer(idleTimer)
 				cp.releaseCircuitPermit(index, allow.usedProbe)
 				cancelAttempt(nil)
@@ -192,7 +209,7 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 		}
 	}
 
-	_ = resp.Body.Close()
+	_ = upstreamResp.Body.Close()
 	stopTimer(idleTimer)
 	if copyErr != nil && originalReq.Context().Err() != nil {
 		cp.releaseCircuitPermit(index, allow.usedProbe)
@@ -244,15 +261,15 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	}
 }
 
-func usageExtractorFromRequest(req *http.Request, resp *http.Response) *telemetry.UsageExtractor {
-	if req == nil || resp == nil {
+func usageExtractorFromRequestWithContentType(req *http.Request, contentType string) *telemetry.UsageExtractor {
+	if req == nil {
 		return nil
 	}
 	requestCtx, ok := requestContextFromRequest(req)
 	if !ok {
 		return nil
 	}
-	return telemetry.NewUsageExtractor(string(requestCtx.Family), string(requestCtx.Capability), resp.Header.Get("Content-Type"))
+	return telemetry.NewUsageExtractor(string(requestCtx.Family), string(requestCtx.Capability), contentType)
 }
 
 func buildStreamSuccess(responseBody []byte, extractor *telemetry.UsageExtractor) streamSuccess {
@@ -292,7 +309,7 @@ func responseBodyWriter(w http.ResponseWriter, req *http.Request, resp *http.Res
 }
 
 func shouldFlushResponse(req *http.Request, resp *http.Response) bool {
-	if resp != nil && strings.Contains(strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type"))), "text/event-stream") {
+	if resp != nil && isEventStreamContentType(resp.Header.Get("Content-Type")) {
 		return true
 	}
 	requestCtx, ok := requestContextFromRequest(req)

@@ -69,6 +69,7 @@ func (s *Store) Save(cred *Credential) error {
 		return err
 	}
 	if existingPath != "" && existingPath != targetPath {
+		// #nosec G703 -- existingPath is discovered from Clipal-managed oauth provider directories.
 		if err := os.Remove(existingPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -249,6 +250,7 @@ func (s *Store) resolveReadablePath(dir string, provider config.OAuthProvider, r
 }
 
 func (s *Store) loadFile(path string) (*Credential, error) {
+	// #nosec G703 -- path is derived from Clipal-managed oauth provider directories.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -456,6 +458,7 @@ func (s fileSnapshot) restore() error {
 
 func atomicWriteFile(path string, data []byte, perm fs.FileMode) error {
 	dir := filepath.Dir(path)
+	// #nosec G703 -- dir is derived from Clipal-managed oauth provider directories.
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -469,6 +472,7 @@ func atomicWriteFile(path string, data []byte, perm fs.FileMode) error {
 	defer func() {
 		_ = f.Close()
 		if !success {
+			// #nosec G703 -- tmp is created by os.CreateTemp under Clipal-managed oauth storage.
 			_ = os.Remove(tmp)
 		}
 	}()
@@ -485,7 +489,7 @@ func atomicWriteFile(path string, data []byte, perm fs.FileMode) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-
+	// #nosec G703 -- tmp and path are created under Clipal-managed oauth provider directories.
 	if err := os.Rename(tmp, path); err != nil {
 		return err
 	}

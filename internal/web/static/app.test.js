@@ -529,7 +529,9 @@ test('providerUsage labels use compact values and preserve exact hover text', ()
             has_usage: true,
             total_tokens: 724117614,
             input_tokens: 720473100,
-            output_tokens: 3644514
+            output_tokens: 3644514,
+            reasoning_tokens: 120045,
+            thoughts_tokens: 9876
         }
     };
 
@@ -537,6 +539,51 @@ test('providerUsage labels use compact values and preserve exact hover text', ()
     assert.equal(state.providerUsageTotalTitle(provider), '724,117,614');
     assert.equal(state.providerUsageInOut(provider), '720M / 3.64M');
     assert.equal(state.providerUsageInOutTitle(provider), '720,473,100 / 3,644,514');
+    assert.equal(state.providerUsageReasoning(provider), '120K');
+    assert.equal(state.providerUsageReasoningTitle(provider), '120,045');
+    assert.equal(state.providerUsageThoughts(provider), '9.88K');
+    assert.equal(state.providerUsageThoughtsTitle(provider), '9,876');
+});
+
+test('providerSpend labels format micros and preserve exact hover text', () => {
+    const state = loadApp();
+    const provider = {
+        usage: {
+            has_cost: true,
+            spend_today_micros: 12500,
+            spend_week_micros: 4250000
+        }
+    };
+
+    assert.equal(state.providerSpendToday(provider), '$0.0125');
+    assert.equal(state.providerSpendTodayTitle(provider), '$0.012500');
+    assert.equal(state.providerSpendWeek(provider), '$4.25');
+    assert.equal(state.providerSpendWeekTitle(provider), '$4.250000');
+});
+
+test('providerSpend labels compact large amounts and keep precise hover text', () => {
+    const state = loadApp();
+    const provider = {
+        usage: {
+            has_cost: true,
+            spend_today_micros: 1234567890,
+            spend_week_micros: 9876543210000
+        }
+    };
+
+    assert.equal(state.providerSpendToday(provider), '$1.23K');
+    assert.equal(state.providerSpendTodayTitle(provider), '$1,234.567890');
+    assert.equal(state.providerSpendWeek(provider), '$9.88M');
+    assert.equal(state.providerSpendWeekTitle(provider), '$9,876,543.210000');
+});
+
+test('formatUSDMicros does not round spend values into the next display tier', () => {
+    const state = loadApp();
+
+    assert.equal(state.formatUSDMicros(999999), '$0.999');
+    assert.equal(state.formatUSDMicros(9999500), '$9.99');
+    assert.equal(state.formatUSDMicros(999999000), '$999');
+    assert.equal(state.formatUSDMicros(999999000000), '$999K');
 });
 
 test('providerHasVisibleDetails keeps oauth plan summary visible without token usage', () => {
@@ -548,6 +595,22 @@ test('providerHasVisibleDetails keeps oauth plan summary visible without token u
         proxy_mode: 'default',
         usage: null,
         oauth_plan_type: 'free'
+    });
+
+    assert.equal(visible, true);
+});
+
+test('providerHasVisibleDetails keeps spend-only providers visible', () => {
+    const state = loadApp();
+
+    const visible = state.providerHasVisibleDetails({
+        auth_type: 'api_key',
+        base_url: '',
+        proxy_mode: 'default',
+        usage: {
+            has_cost: true,
+            spend_today_micros: 1
+        }
     });
 
     assert.equal(visible, true);

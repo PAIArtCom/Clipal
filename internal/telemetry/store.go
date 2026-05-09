@@ -13,7 +13,7 @@ import (
 
 const (
 	storeFilename          = "usage.json"
-	storeVersion           = 1
+	storeVersion           = 3
 	defaultPersistInterval = 3 * time.Second
 )
 
@@ -25,7 +25,11 @@ type UsageDelta struct {
 
 type UsageSnapshot struct {
 	UsageDelta
-	Usage map[string]any `json:"usage,omitempty"`
+	Usage           map[string]any `json:"usage,omitempty"`
+	ReasoningTokens int64          `json:"reasoning_tokens,omitempty"`
+	ThoughtsTokens  int64          `json:"thoughts_tokens,omitempty"`
+	CostMicros      int64          `json:"cost_micros,omitempty"`
+	HasCost         bool           `json:"has_cost,omitempty"`
 }
 
 type ProviderRef struct {
@@ -49,13 +53,23 @@ func (u UsageDelta) normalized() UsageDelta {
 }
 
 type ProviderUsage struct {
-	RequestCount int64          `json:"request_count,omitempty"`
-	SuccessCount int64          `json:"success_count,omitempty"`
-	InputTokens  int64          `json:"input_tokens,omitempty"`
-	OutputTokens int64          `json:"output_tokens,omitempty"`
-	TotalTokens  int64          `json:"total_tokens,omitempty"`
-	LastUsedAt   time.Time      `json:"last_used_at,omitempty"`
-	Usage        map[string]any `json:"usage,omitempty"`
+	RequestCount    int64                      `json:"request_count,omitempty"`
+	SuccessCount    int64                      `json:"success_count,omitempty"`
+	InputTokens     int64                      `json:"input_tokens,omitempty"`
+	OutputTokens    int64                      `json:"output_tokens,omitempty"`
+	TotalTokens     int64                      `json:"total_tokens,omitempty"`
+	ReasoningTokens int64                      `json:"reasoning_tokens,omitempty"`
+	ThoughtsTokens  int64                      `json:"thoughts_tokens,omitempty"`
+	TotalCostMicros int64                      `json:"total_cost_micros,omitempty"`
+	LastUsedAt      time.Time                  `json:"last_used_at,omitempty"`
+	Usage           map[string]any             `json:"usage,omitempty"`
+	DailyCosts      map[string]DailyCostBucket `json:"daily_costs,omitempty"`
+	HasCost         bool                       `json:"has_cost,omitempty"`
+}
+
+type DailyCostBucket struct {
+	CostMicros int64 `json:"cost_micros,omitempty"`
+	HasCost    bool  `json:"has_cost,omitempty"`
 }
 
 type clientUsage struct {
@@ -175,6 +189,20 @@ func (s *Store) Record(clientType string, provider string, snapshot UsageSnapsho
 	entry.InputTokens += delta.InputTokens
 	entry.OutputTokens += delta.OutputTokens
 	entry.TotalTokens += delta.TotalTokens
+	entry.ReasoningTokens += snapshot.ReasoningTokens
+	entry.ThoughtsTokens += snapshot.ThoughtsTokens
+	if snapshot.HasCost {
+		entry.TotalCostMicros += snapshot.CostMicros
+		entry.HasCost = true
+		if entry.DailyCosts == nil {
+			entry.DailyCosts = make(map[string]DailyCostBucket)
+		}
+		day := usageDayBucket(when)
+		bucket := entry.DailyCosts[day]
+		bucket.CostMicros += snapshot.CostMicros
+		bucket.HasCost = true
+		entry.DailyCosts[day] = bucket
+	}
 	entry.LastUsedAt = when
 	if snapshot.Usage != nil {
 		entry.Usage = cloneMap(snapshot.Usage)
@@ -205,10 +233,7 @@ func (s *Store) ProviderSnapshot(clientType string, provider string) (ProviderUs
 		return ProviderUsage{}, false
 	}
 	usage, ok := client.Providers[provider]
-	if usage.Usage != nil {
-		usage.Usage = cloneMap(usage.Usage)
-	}
-	return usage, ok
+	return cloneProviderUsage(usage), ok
 }
 
 func (s *Store) ProviderSnapshots(clientType string) map[string]ProviderUsage {
@@ -225,10 +250,7 @@ func (s *Store) ProviderSnapshots(clientType string) map[string]ProviderUsage {
 	}
 	out := make(map[string]ProviderUsage, len(client.Providers))
 	for name, usage := range client.Providers {
-		if usage.Usage != nil {
-			usage.Usage = cloneMap(usage.Usage)
-		}
-		out[name] = usage
+		out[name] = cloneProviderUsage(usage)
 	}
 	return out
 }
@@ -457,10 +479,7 @@ func cloneState(state storeState) storeState {
 			Providers: make(map[string]ProviderUsage, len(client.Providers)),
 		}
 		for providerName, usage := range client.Providers {
-			if usage.Usage != nil {
-				usage.Usage = cloneMap(usage.Usage)
-			}
-			nextClient.Providers[providerName] = usage
+			nextClient.Providers[providerName] = cloneProviderUsage(usage)
 		}
 		out.Clients[clientName] = nextClient
 	}
@@ -569,6 +588,13 @@ func cloneProviderUsage(usage ProviderUsage) ProviderUsage {
 	if usage.Usage != nil {
 		usage.Usage = cloneMap(usage.Usage)
 	}
+	if usage.DailyCosts != nil {
+		cloned := make(map[string]DailyCostBucket, len(usage.DailyCosts))
+		for key, bucket := range usage.DailyCosts {
+			cloned[key] = bucket
+		}
+		usage.DailyCosts = cloned
+	}
 	return usage
 }
 
@@ -579,6 +605,21 @@ func mergeProviderUsage(left ProviderUsage, right ProviderUsage) ProviderUsage {
 	out.InputTokens += right.InputTokens
 	out.OutputTokens += right.OutputTokens
 	out.TotalTokens += right.TotalTokens
+	out.ReasoningTokens += right.ReasoningTokens
+	out.ThoughtsTokens += right.ThoughtsTokens
+	out.TotalCostMicros += right.TotalCostMicros
+	out.HasCost = out.HasCost || right.HasCost
+	if len(right.DailyCosts) > 0 {
+		if out.DailyCosts == nil {
+			out.DailyCosts = make(map[string]DailyCostBucket, len(right.DailyCosts))
+		}
+		for day, bucket := range right.DailyCosts {
+			current := out.DailyCosts[day]
+			current.CostMicros += bucket.CostMicros
+			current.HasCost = current.HasCost || bucket.HasCost
+			out.DailyCosts[day] = current
+		}
+	}
 	if right.LastUsedAt.After(out.LastUsedAt) {
 		out.LastUsedAt = right.LastUsedAt
 		if right.Usage != nil {
@@ -589,6 +630,10 @@ func mergeProviderUsage(left ProviderUsage, right ProviderUsage) ProviderUsage {
 		out.Usage = cloneMap(right.Usage)
 	}
 	return out
+}
+
+func usageDayBucket(when time.Time) string {
+	return when.Format("2006-01-02")
 }
 
 func cloneMap(in map[string]any) map[string]any {

@@ -206,6 +206,48 @@ providers:
 	}
 }
 
+func TestMapProviderUsageResponse_IncludesSpendRollups(t *testing.T) {
+	now := time.Now().UTC()
+	resp := mapProviderUsageResponse(telemetry.ProviderUsage{
+		RequestCount:    2,
+		SuccessCount:    2,
+		ReasoningTokens: 11,
+		ThoughtsTokens:  22,
+		TotalCostMicros: 11_250_000,
+		HasCost:         true,
+		DailyCosts: map[string]telemetry.DailyCostBucket{
+			now.Format("2006-01-02"): {
+				CostMicros: 1_250_000,
+				HasCost:    true,
+			},
+			now.AddDate(0, 0, -6).Format("2006-01-02"): {
+				CostMicros: 3_000_000,
+				HasCost:    true,
+			},
+			now.AddDate(0, 0, -8).Format("2006-01-02"): {
+				CostMicros: 7_000_000,
+				HasCost:    true,
+			},
+		},
+		LastUsedAt: now,
+	})
+	if resp == nil {
+		t.Fatalf("expected usage response")
+	}
+	if !resp.HasCost {
+		t.Fatalf("expected has_cost=true: %#v", resp)
+	}
+	if resp.ReasoningTokens != 11 || resp.ThoughtsTokens != 22 {
+		t.Fatalf("expected reasoning/thought tokens: %#v", resp)
+	}
+	if resp.SpendTodayMicros != 1_250_000 {
+		t.Fatalf("spend_today_micros = %d", resp.SpendTodayMicros)
+	}
+	if resp.SpendWeekMicros != 4_250_000 {
+		t.Fatalf("spend_week_micros = %d", resp.SpendWeekMicros)
+	}
+}
+
 func TestHandleGetProviders_IncludesRequestOnlyUsageWithoutTokenUsage(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "openai.yaml"), []byte(`
