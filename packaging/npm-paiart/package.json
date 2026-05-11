@@ -1,0 +1,42 @@
+{
+  "name": "@paiart/clipal",
+  "version": "0.17.0",
+  "description": "Clipal CLI installer for the local LLM API gateway",
+  "license": "MIT",
+  "homepage": "https://github.com/PAIArtCom/Clipal",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PAIArtCom/Clipal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PAIArtCom/Clipal/issues"
+  },
+  "bin": {
+    "clipal": "bin/clipal.js"
+  },
+  "files": [
+    "bin/clipal.js",
+    "scripts/postinstall.js",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node ./scripts/postinstall.js"
+  },
+  "keywords": [
+    "clipal",
+    "llm",
+    "proxy",
+    "gateway",
+    "openai",
+    "claude",
+    "gemini",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

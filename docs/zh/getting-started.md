@@ -1,8 +1,14 @@
 # 快速开始
 
-## 1. 下载与安装
+## 1. 安装
 
-从 [Releases](https://github.com/lansespirit/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
+最快的方式是通过 npm：
+
+```bash
+npm install -g clipal
+```
+
+你也可以从 [Releases](https://github.com/lansespirit/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
 最新稳定版：[GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
 
 平台细节：
@@ -63,26 +69,7 @@ OAuth 上游说明：
 - 只要有 `refresh_token`，Clipal 会在 access token 过期前自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
 - OAuth provider 通常通过授权流程接入；如果你已经有 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，或 sub2api 导出的 JSON，也可以在同一个 Add Provider 对话框里直接导入
 
-> **进阶 / 可选 — 手动编辑 YAML 配置**
->
-> 如果你更习惯用代码管理配置，也可以继续直接编辑 YAML 文件。
-> 默认配置目录：
-> - macOS / Linux: `~/.clipal/`
-> - Windows: `%USERPROFILE%\\.clipal\\`
->
-> 从仓库模板初始化：
->
-> ```bash
-> mkdir -p ~/.clipal
-> cp examples/config.yaml ~/.clipal/config.yaml
-> cp examples/claude.yaml ~/.clipal/claude.yaml
-> cp examples/openai.yaml ~/.clipal/openai.yaml
-> cp examples/gemini.yaml ~/.clipal/gemini.yaml
-> ```
->
-> 模板链接：[config.yaml](../../examples/config.yaml) · [claude.yaml](../../examples/claude.yaml) · [openai.yaml](../../examples/openai.yaml) · [gemini.yaml](../../examples/gemini.yaml)
->
-> 详细字段说明见 [配置参考](config-reference.md)。
+如果你更习惯用代码管理配置，也可以继续直接编辑 YAML 文件。字段说明和模板链接保留在 [配置参考](config-reference.md)。
 
 ## 4. 验证运行状态
 

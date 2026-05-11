@@ -74,24 +74,22 @@ Clipal 现已将所有客户端入口统一规范到单一路由：`http://127.0
 安装完成后，再指导我在 Web UI 里完成一键接管，并添加第一个 provider。
 ```
 
-### 1. 下载安装
-前往 [Releases](https://github.com/lansespirit/Clipal/releases) 页面下载对应系统的二进制文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)。
+### 1. 安装 Clipal
+最快的方式是直接通过 npm 安装：
+
+```bash
+npm install -g clipal
+clipal --version
+```
+
+如果你更偏好独立二进制，也可以前往 [Releases](https://github.com/lansespirit/Clipal/releases) 页面下载对应系统的文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)。
+
 ```bash
 chmod +x clipal*
 ./clipal* --version
 ```
 
-### 2. 初始化配置
-```bash
-mkdir -p ~/.clipal
-cp examples/config.yaml ~/.clipal/config.yaml
-cp examples/claude.yaml ~/.clipal/claude.yaml
-cp examples/openai.yaml ~/.clipal/openai.yaml
-cp examples/gemini.yaml ~/.clipal/gemini.yaml
-```
-*根据需要编辑 `~/.clipal/*.yaml`，填入你的 API Key。*
-
-### 3. 运行与管理
+### 2. 运行与管理
 在前台直接启动：
 ```bash
 clipal
@@ -102,8 +100,8 @@ clipal service install
 clipal service start
 ```
 
-### 4. 访问管理后台
-打开浏览器访问 `http://127.0.0.1:3333/`，即可管理所有模型并为你的常用 AI 工具开启 **CLI Takeover**。
+### 3. 访问管理后台
+打开浏览器访问 `http://127.0.0.1:3333/`，即可管理所有模型并为你的常用 AI 工具开启 **CLI Takeover**。Provider 可以直接在 Web UI 里添加，不需要手动预先复制配置文件。
 
 ---
 

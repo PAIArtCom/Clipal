@@ -1,8 +1,14 @@
 # Getting Started
 
-## 1. Download and Install
+## 1. Install
 
-Download the right binary from [Releases](https://github.com/lansespirit/Clipal/releases) and place it on your `PATH`.
+The fastest path is npm:
+
+```bash
+npm install -g clipal
+```
+
+You can also download the right binary from [Releases](https://github.com/lansespirit/Clipal/releases) and place it on your `PATH`.
 Latest stable release: [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
 
 Platform-specific notes:
@@ -63,26 +69,7 @@ OAuth upstream notes:
 - Clipal refreshes access tokens automatically before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh
 - OAuth providers are usually added through the authorization flow; if you already have Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON, or a sub2api export JSON bundle, you can import it from the same Add Provider dialog
 
-> **Advanced / Optional — Manual YAML config**
->
-> If you prefer to manage configuration as code, you can still edit YAML files directly.
-> Default config directory:
-> - macOS / Linux: `~/.clipal/`
-> - Windows: `%USERPROFILE%\\.clipal\\`
->
-> Copy the example templates to get started:
->
-> ```bash
-> mkdir -p ~/.clipal
-> cp examples/config.yaml ~/.clipal/config.yaml
-> cp examples/claude.yaml ~/.clipal/claude.yaml
-> cp examples/openai.yaml ~/.clipal/openai.yaml
-> cp examples/gemini.yaml ~/.clipal/gemini.yaml
-> ```
->
-> Template links: [config.yaml](../../examples/config.yaml) · [claude.yaml](../../examples/claude.yaml) · [openai.yaml](../../examples/openai.yaml) · [gemini.yaml](../../examples/gemini.yaml)
->
-> For field details, see [Config Reference](config-reference.md).
+If you prefer to manage configuration as code, you can still edit YAML files directly. Field-level details and example templates live in [Config Reference](config-reference.md).
 
 ## 4. Verify It Is Running
 

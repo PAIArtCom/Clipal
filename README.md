@@ -75,24 +75,22 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
 ```
 
 ### 1. Install Clipal
-Download the standalone binary for your OS from [Releases](https://github.com/lansespirit/Clipal/releases) and put it on your `PATH`.
+The fastest way is npm:
+
+```bash
+npm install -g clipal
+clipal --version
+```
+
+Prefer a standalone binary? Download the right build from [Releases](https://github.com/lansespirit/Clipal/releases) and put it on your `PATH`.
 Latest stable release: [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
+
 ```bash
 chmod +x clipal*
 ./clipal* --version
 ```
 
-### 2. Initialize Configurations
-```bash
-mkdir -p ~/.clipal
-cp examples/config.yaml ~/.clipal/config.yaml
-cp examples/claude.yaml ~/.clipal/claude.yaml
-cp examples/openai.yaml ~/.clipal/openai.yaml
-cp examples/gemini.yaml ~/.clipal/gemini.yaml
-```
-*Edit the generated `~/.clipal/*.yaml` files to add your API keys.*
-
-### 3. Run & Manage
+### 2. Run & Manage
 Start Clipal in the foreground:
 ```bash
 clipal
@@ -103,8 +101,8 @@ clipal service install
 clipal service start
 ```
 
-### 4. Open the Web UI
-Visit `http://127.0.0.1:3333/` in your browser to manage providers and apply **CLI Takeover** for your favorite tools.
+### 3. Open the Web UI
+Visit `http://127.0.0.1:3333/` in your browser to manage providers and apply **CLI Takeover** for your favorite tools. You can add providers directly in the Web UI; no manual config-file bootstrap is required.
 
 ---
 

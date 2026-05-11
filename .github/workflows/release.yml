@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-and-release:
@@ -20,6 +21,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Sync npm package versions from tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm pkg set version="$VERSION" --prefix packaging/npm
+          npm pkg set version="$VERSION" --prefix packaging/npm-paiart
 
       - name: Build binaries
         shell: bash
@@ -69,3 +84,21 @@ jobs:
           fi
 
           gh release create "${release_args[@]}"
+
+      - name: Publish npm package clipal
+        working-directory: packaging/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm publish --provenance
+
+      - name: Publish npm package @paiart/clipal
+        working-directory: packaging/npm-paiart
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm publish --provenance --access public
