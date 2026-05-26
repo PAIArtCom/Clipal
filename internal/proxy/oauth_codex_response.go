@@ -249,7 +249,7 @@ func synthesizeCodexOAuthResponsesJSON(streamBody []byte) ([]byte, bool, error) 
 	if _, ok := response["status"]; !ok {
 		response["status"] = "completed"
 	}
-	if _, ok := response["output"]; !ok {
+	if codexOAuthResponseOutputEmpty(response) {
 		if len(outputItems) > 0 {
 			response["output"] = outputItems
 		} else if text.Len() > 0 {
@@ -281,6 +281,18 @@ func synthesizeCodexOAuthResponsesJSON(streamBody []byte) ([]byte, bool, error) 
 		return nil, false, fmt.Errorf("marshal synthesized codex oauth response: %w", err)
 	}
 	return body, sawComplete, nil
+}
+
+func codexOAuthResponseOutputEmpty(response map[string]any) bool {
+	if response == nil {
+		return true
+	}
+	output, ok := response["output"]
+	if !ok || output == nil {
+		return true
+	}
+	items, ok := output.([]any)
+	return ok && len(items) == 0
 }
 
 func codexOAuthResponseStreamError(eventType string, root map[string]any) error {

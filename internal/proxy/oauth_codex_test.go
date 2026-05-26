@@ -703,6 +703,66 @@ func TestSynthesizeCodexOAuthResponsesJSONBuildsOutputFromTextDone(t *testing.T)
 	}
 }
 
+func TestSynthesizeCodexOAuthResponsesJSONFillsEmptyCompletedOutputFromItemDone(t *testing.T) {
+	body := []byte("event: response.created\n" +
+		`data: {"type":"response.created","response":{"id":"resp_live","object":"response","created_at":1710000000,"model":"gpt-5.5","status":"in_progress","output":[]}}` +
+		"\n\n" +
+		"event: response.output_item.added\n" +
+		`data: {"type":"response.output_item.added","item":{"id":"msg_live","type":"message","status":"in_progress","content":[],"role":"assistant"},"output_index":0}` +
+		"\n\n" +
+		"event: response.content_part.added\n" +
+		`data: {"type":"response.content_part.added","content_index":0,"item_id":"msg_live","output_index":0,"part":{"type":"output_text","annotations":[],"text":""}}` +
+		"\n\n" +
+		"event: response.output_text.delta\n" +
+		`data: {"type":"response.output_text.delta","content_index":0,"delta":"CLIPAL","item_id":"msg_live","output_index":0}` +
+		"\n\n" +
+		"event: response.output_text.done\n" +
+		`data: {"type":"response.output_text.done","content_index":0,"item_id":"msg_live","output_index":0,"text":"CLIPAL_CODEX_NONSTREAM_OK"}` +
+		"\n\n" +
+		"event: response.content_part.done\n" +
+		`data: {"type":"response.content_part.done","content_index":0,"item_id":"msg_live","output_index":0,"part":{"type":"output_text","annotations":[],"text":"CLIPAL_CODEX_NONSTREAM_OK"}}` +
+		"\n\n" +
+		"event: response.output_item.done\n" +
+		`data: {"type":"response.output_item.done","item":{"id":"msg_live","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"CLIPAL_CODEX_NONSTREAM_OK"}],"role":"assistant"},"output_index":0}` +
+		"\n\n" +
+		"event: response.completed\n" +
+		`data: {"type":"response.completed","response":{"id":"resp_live","object":"response","created_at":1710000000,"model":"gpt-5.5","status":"completed","output":[],"usage":{"input_tokens":17,"output_tokens":11,"total_tokens":28}}}` +
+		"\n\n")
+	rewritten, completed, err := synthesizeCodexOAuthResponsesJSON(body)
+	if err != nil {
+		t.Fatalf("synthesizeCodexOAuthResponsesJSON: %v", err)
+	}
+	if !completed {
+		t.Fatalf("completed = false, want true")
+	}
+	root := decodeRawJSONMap(t, rewritten)
+	if got := root["id"]; got != "resp_live" {
+		t.Fatalf("id = %v", got)
+	}
+	if got := root["status"]; got != "completed" {
+		t.Fatalf("status = %v", got)
+	}
+	if _, ok := root["usage"].(map[string]any); !ok {
+		t.Fatalf("usage = %#v", root["usage"])
+	}
+	output, ok := root["output"].([]any)
+	if !ok || len(output) != 1 {
+		t.Fatalf("output = %#v", root["output"])
+	}
+	msg, ok := output[0].(map[string]any)
+	if !ok || msg["id"] != "msg_live" {
+		t.Fatalf("output[0] = %#v", output[0])
+	}
+	content, ok := msg["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("content = %#v", msg["content"])
+	}
+	part, ok := content[0].(map[string]any)
+	if !ok || part["text"] != "CLIPAL_CODEX_NONSTREAM_OK" {
+		t.Fatalf("content[0] = %#v", content[0])
+	}
+}
+
 func TestSynthesizeCodexOAuthResponsesJSONBuildsOutputFromItemDone(t *testing.T) {
 	body := []byte("event: response.output_item.done\n" +
 		`data: {"type":"response.output_item.done","item":{"id":"msg_123","type":"message","status":"completed","role":"assistant","content":[]}}` +
