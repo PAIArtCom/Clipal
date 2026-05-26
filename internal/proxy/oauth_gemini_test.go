@@ -70,10 +70,12 @@ func TestCreateProxyRequest_GeminiOAuthUsesBearerAuthAndProjectMetadata(t *testi
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 	cp.oauth = svc
 
-	body := []byte(`{"contents":[{"parts":[{"text":"hello"}]}],"generationConfig":{"temperature":0.4},"user_prompt_id":"prompt-123","customField":{"keep":"me"}}`)
-	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(body))
+	body := []byte(`{"contents":[{"parts":[{"text":"hello"}]}],"generationConfig":{"temperature":0.4},"user_prompt_id":"prompt-123","enabled_credit_types":["GOOGLE_ONE_AI"],"customField":{"keep":"me"}}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-flash:generateContent?alt=json&foo=bar", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
 	original.Header.Set("x-goog-api-key", "client-key")
+	original.Header.Set("X-Goog-Api-Client", "public-sdk")
+	original.Header.Set("Client-Metadata", `{"client":"public"}`)
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientGemini,
 		Family:         ProtocolFamilyGemini,
@@ -95,8 +97,14 @@ func TestCreateProxyRequest_GeminiOAuthUsesBearerAuthAndProjectMetadata(t *testi
 	if got := proxyReq.Header.Get("x-goog-api-key"); got != "" {
 		t.Fatalf("x-goog-api-key = %q, want empty", got)
 	}
-	if got := proxyReq.Header.Get("X-Goog-Api-Client"); got != geminiOAuthAPIClientHeader {
-		t.Fatalf("X-Goog-Api-Client = %q", got)
+	if got := proxyReq.Header.Get("User-Agent"); got != geminiOAuthUserAgent("gemini-2.5-flash") {
+		t.Fatalf("User-Agent = %q", got)
+	}
+	if got := proxyReq.Header.Get("X-Goog-Api-Client"); got != "" {
+		t.Fatalf("X-Goog-Api-Client = %q, want empty", got)
+	}
+	if got := proxyReq.Header.Get("Client-Metadata"); got != "" {
+		t.Fatalf("Client-Metadata = %q, want empty", got)
 	}
 	if got := proxyReq.Header.Get("Accept"); got != "application/json" {
 		t.Fatalf("Accept = %q", got)
@@ -112,6 +120,9 @@ func TestCreateProxyRequest_GeminiOAuthUsesBearerAuthAndProjectMetadata(t *testi
 	if got := root["user_prompt_id"]; got != "prompt-123" {
 		t.Fatalf("user_prompt_id = %v", got)
 	}
+	if got := root["enabled_credit_types"]; got == nil {
+		t.Fatalf("enabled_credit_types missing: %#v", root)
+	}
 	request, ok := root["request"].(map[string]any)
 	if !ok {
 		t.Fatalf("request = %#v, want object", root["request"])
@@ -125,6 +136,9 @@ func TestCreateProxyRequest_GeminiOAuthUsesBearerAuthAndProjectMetadata(t *testi
 	if _, ok := request["user_prompt_id"]; ok {
 		t.Fatalf("did not expect nested user_prompt_id in request: %#v", request)
 	}
+	if _, ok := request["enabled_credit_types"]; ok {
+		t.Fatalf("did not expect nested enabled_credit_types in request: %#v", request)
+	}
 	if _, ok := request["contents"]; !ok {
 		t.Fatalf("request.contents missing: %#v", request)
 	}
@@ -136,7 +150,7 @@ func TestCreateProxyRequest_GeminiOAuthUsesBearerAuthAndProjectMetadata(t *testi
 	}
 }
 
-func TestCreateProxyRequest_GeminiOAuthStreamDefaultsAltSSE(t *testing.T) {
+func TestCreateProxyRequest_GeminiOAuthStreamForcesAltSSE(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -163,7 +177,7 @@ func TestCreateProxyRequest_GeminiOAuthStreamDefaultsAltSSE(t *testing.T) {
 	cp.oauth = svc
 
 	body := []byte(`{"contents":[]}`)
-	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:streamGenerateContent", bytes.NewReader(body))
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=json&key=client-key", bytes.NewReader(body))
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientGemini,
 		Family:         ProtocolFamilyGemini,
@@ -199,7 +213,7 @@ func TestCreateProxyRequest_GeminiOAuthStreamDefaultsAltSSE(t *testing.T) {
 	}
 }
 
-func TestCreateProxyRequest_GeminiOAuthCountTokensPreservesRequestFields(t *testing.T) {
+func TestCreateProxyRequest_GeminiOAuthCountTokensUsesOfficialEnvelope(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -264,17 +278,17 @@ func TestCreateProxyRequest_GeminiOAuthCountTokensPreservesRequestFields(t *test
 	if _, ok := request["contents"]; !ok {
 		t.Fatalf("request.contents missing: %#v", request)
 	}
-	if _, ok := request["generationConfig"]; !ok {
-		t.Fatalf("request.generationConfig missing: %#v", request)
+	if _, ok := request["generationConfig"]; ok {
+		t.Fatalf("request.generationConfig should be omitted for Cloud Code countTokens: %#v", request)
 	}
-	if _, ok := request["systemInstruction"]; !ok {
-		t.Fatalf("request.systemInstruction missing: %#v", request)
+	if _, ok := request["systemInstruction"]; ok {
+		t.Fatalf("request.systemInstruction should be omitted for Cloud Code countTokens: %#v", request)
 	}
-	if _, ok := request["tools"]; !ok {
-		t.Fatalf("request.tools missing: %#v", request)
+	if _, ok := request["tools"]; ok {
+		t.Fatalf("request.tools should be omitted for Cloud Code countTokens: %#v", request)
 	}
-	if got := request["cachedContent"]; got != "cachedContents/123" {
-		t.Fatalf("request.cachedContent = %v", got)
+	if _, ok := request["cachedContent"]; ok {
+		t.Fatalf("request.cachedContent should be omitted for Cloud Code countTokens: %#v", request)
 	}
 }
 

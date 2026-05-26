@@ -56,6 +56,15 @@ func TestGeminiFetchUsage_ParsesQuotaBuckets(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
 			t.Fatalf("authorization = %q, want Bearer access-1", got)
 		}
+		if got := r.Header.Get("User-Agent"); got != geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel) {
+			t.Fatalf("user-agent = %q", got)
+		}
+		if got := r.Header.Get("X-Goog-Api-Client"); got != "" {
+			t.Fatalf("x-goog-api-client = %q, want empty", got)
+		}
+		if got := r.Header.Get("Client-Metadata"); got != "" {
+			t.Fatalf("client-metadata = %q, want empty", got)
+		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -117,6 +126,48 @@ func TestGeminiFetchUsage_ParsesQuotaBuckets(t *testing.T) {
 	wantReset, _ := time.Parse(time.RFC3339, resetTime)
 	if !bucket.ResetTime.Equal(wantReset) {
 		t.Fatalf("reset_time = %s, want %s", bucket.ResetTime.Format(time.RFC3339), wantReset.Format(time.RFC3339))
+	}
+}
+
+func TestGeminiFetchUsageRetriesTransientCloudCodeErrors(t *testing.T) {
+	var calls int32
+	var sleeps []time.Duration
+	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		call := atomic.AddInt32(&calls, 1)
+		if call == 1 {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, `{"error":{"status":"RESOURCE_EXHAUSTED"}}`, http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"buckets":[]}`)
+	}))
+	defer cloudCodeServer.Close()
+
+	client := &GeminiClient{
+		CloudCodeURL: cloudCodeServer.URL,
+		HTTPClient:   cloudCodeServer.Client(),
+		Sleep: func(d time.Duration) {
+			sleeps = append(sleeps, d)
+		},
+	}
+
+	_, err := client.FetchUsage(t.Context(), &Credential{
+		Ref:         "gemini-sean-example-com-project-123",
+		AccessToken: "access-1",
+		AccountID:   "project-123",
+		Metadata: map[string]string{
+			"project_id": "project-123",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FetchUsage: %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("calls = %d, want 2", got)
+	}
+	if len(sleeps) != 1 || sleeps[0] != time.Second {
+		t.Fatalf("sleeps = %#v, want [1s]", sleeps)
 	}
 }
 

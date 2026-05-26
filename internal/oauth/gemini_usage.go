@@ -169,38 +169,48 @@ func (c *GeminiClient) FetchUsage(ctx context.Context, cred *Credential) (*Gemin
 	}
 
 	endpoint := strings.TrimRight(c.cloudCodeURL(), "/") + "/" + strings.Trim(c.cloudCodeVersion(), "/") + ":retrieveUserQuota"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(reqBody)))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", defaultGeminiCloudCodeUserAgent)
-	req.Header.Set("X-Goog-Api-Client", defaultGeminiCloudCodeAPIClient)
-	req.Header.Set("Client-Metadata", defaultGeminiCloudCodeMetadataRaw)
+	var lastErr error
+	for attempt := 0; attempt < defaultGeminiCloudCodeRetryAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(reqBody)))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel))
 
-	resp, err := c.httpClient().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
+		resp, err := c.httpClient().Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt+1 < defaultGeminiCloudCodeRetryAttempts {
+				c.sleep(defaultGeminiCloudCodeRetryDelay)
+				continue
+			}
+			return nil, err
+		}
+
+		body, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-	}()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			lastErr = fmt.Errorf("gemini usage request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			if attempt+1 < defaultGeminiCloudCodeRetryAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
+				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
+				continue
+			}
+			return nil, lastErr
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		var payload geminiUsagePayload
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return nil, fmt.Errorf("decode gemini usage: %w", err)
+		}
+		return mapGeminiUsagePayload(payload), nil
 	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("gemini usage request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var payload geminiUsagePayload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("decode gemini usage: %w", err)
-	}
-	return mapGeminiUsagePayload(payload), nil
+	return nil, lastErr
 }
 
 func mapGeminiUsagePayload(payload geminiUsagePayload) *GeminiUsageDetails {

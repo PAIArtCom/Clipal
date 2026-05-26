@@ -44,12 +44,12 @@ func prepareGeminiOAuthResponse(original *http.Request, resp *http.Response) (*h
 
 	switch requestCtx.Capability {
 	case CapabilityGeminiGenerateContent:
-		if !geminiOAuthResponseHasContentType(resp, "application/json") {
+		if !geminiOAuthResponseShouldRewrite(resp, "application/json") {
 			return resp, nil
 		}
 		return rewriteGeminiOAuthJSONResponse(resp)
 	case CapabilityGeminiStreamGenerate:
-		if !geminiOAuthResponseHasContentType(resp, "text/event-stream") {
+		if !geminiOAuthResponseShouldRewrite(resp, "text/event-stream") {
 			return resp, nil
 		}
 		return rewriteGeminiOAuthStreamResponse(resp), nil
@@ -58,11 +58,12 @@ func prepareGeminiOAuthResponse(original *http.Request, resp *http.Response) (*h
 	}
 }
 
-func geminiOAuthResponseHasContentType(resp *http.Response, want string) bool {
+func geminiOAuthResponseShouldRewrite(resp *http.Response, want string) bool {
 	if resp == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type"))), strings.ToLower(want))
+	contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
+	return contentType == "" || strings.Contains(contentType, strings.ToLower(want))
 }
 
 func rewriteGeminiOAuthJSONResponse(resp *http.Response) (*http.Response, error) {

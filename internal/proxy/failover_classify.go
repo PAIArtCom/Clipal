@@ -75,9 +75,16 @@ func classify429(body []byte) (action failureAction, reason string) {
 		strings.Contains(msg, "invalid api key") {
 		return failureDeactivateAndRetryNext, "auth"
 	}
+
+	if action, reason, ok := classifyGoogleRPC429(v, msg); ok {
+		return action, reason
+	}
+
 	if inSet(code, "insufficient_quota", "billing_hard_limit_reached", "organization_quota_exceeded") ||
 		inSet(typ, "insufficient_quota", "billing_error") ||
 		strings.Contains(msg, "insufficient quota") ||
+		strings.Contains(msg, "quota exhausted") ||
+		strings.Contains(msg, "daily limit") ||
 		strings.Contains(msg, "billing") {
 		return failureDeactivateAndRetryNext, "quota"
 	}
@@ -99,6 +106,107 @@ func classify429(body []byte) (action failureAction, reason string) {
 
 	// Default: treat as rate limit.
 	return failureRetryNext, "rate_limit"
+}
+
+func classifyGoogleRPC429(v any, msg string) (failureAction, string, bool) {
+	errObj := googleRPCErrorObject(v)
+	if errObj == nil {
+		return failureReturnToClient, "", false
+	}
+
+	status := strings.ToUpper(strings.TrimSpace(stringFromAny(errObj["status"])))
+	if status == "PERMISSION_DENIED" || status == "UNAUTHENTICATED" {
+		return failureDeactivateAndRetryNext, "auth", true
+	}
+
+	var (
+		hasRetryInfo   bool
+		hasQuotaDetail bool
+	)
+	for _, detail := range anySlice(errObj["details"]) {
+		detailObj, ok := detail.(map[string]any)
+		if !ok {
+			continue
+		}
+		typeName := strings.ToLower(strings.TrimSpace(stringFromAny(detailObj["@type"])))
+		reason := strings.ToUpper(strings.TrimSpace(stringFromAny(detailObj["reason"])))
+		switch reason {
+		case "QUOTA_EXHAUSTED", "INSUFFICIENT_G1_CREDITS_BALANCE":
+			return failureDeactivateAndRetryNext, "quota", true
+		case "RATE_LIMIT_EXCEEDED":
+			hasRetryInfo = true
+		}
+
+		switch {
+		case strings.Contains(typeName, "google.rpc.retryinfo"):
+			hasRetryInfo = true
+		case strings.Contains(typeName, "google.rpc.quotafailure"):
+			hasQuotaDetail = true
+			for _, violation := range anySlice(detailObj["violations"]) {
+				if googleQuotaViolationIsTerminal(violation) {
+					return failureDeactivateAndRetryNext, "quota", true
+				}
+			}
+		}
+	}
+
+	if hasRetryInfo {
+		return failureRetryNext, "rate_limit", true
+	}
+	if hasQuotaDetail && (strings.Contains(msg, "daily") || strings.Contains(msg, "quota")) {
+		return failureDeactivateAndRetryNext, "quota", true
+	}
+	if status == "RESOURCE_EXHAUSTED" && (strings.Contains(msg, "quota exhausted") || strings.Contains(msg, "daily limit")) {
+		return failureDeactivateAndRetryNext, "quota", true
+	}
+	return failureReturnToClient, "", false
+}
+
+func googleRPCErrorObject(v any) map[string]any {
+	root, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	errObj, ok := root["error"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return errObj
+}
+
+func googleQuotaViolationIsTerminal(v any) bool {
+	violation, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(
+		stringFromAny(violation["quotaId"]) + " " +
+			stringFromAny(violation["subject"]) + " " +
+			stringFromAny(violation["description"]),
+	))
+	return strings.Contains(text, "perday") ||
+		strings.Contains(text, "per_day") ||
+		strings.Contains(text, "daily") ||
+		strings.Contains(text, "free-tier") ||
+		strings.Contains(text, "freetier")
+}
+
+func anySlice(v any) []any {
+	switch typed := v.(type) {
+	case []any:
+		return typed
+	default:
+		return nil
+	}
+}
+
+func stringFromAny(v any) string {
+	switch typed := v.(type) {
+	case string:
+		return typed
+	default:
+		return ""
+	}
 }
 
 func hasConcurrencySignal(code string, typ string, msg string) bool {

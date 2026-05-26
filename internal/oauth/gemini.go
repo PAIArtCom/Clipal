@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -23,9 +24,8 @@ const (
 	defaultGeminiCallbackHost             = "127.0.0.1"
 	defaultGeminiCallbackPort             = 0
 	defaultGeminiCallbackPath             = "/oauth2callback"
-	defaultGeminiCloudCodeUserAgent       = "google-api-nodejs-client/9.15.1"
-	defaultGeminiCloudCodeAPIClient       = "google-cloud-sdk vscode_cloudshelleditor/0.1"
-	defaultGeminiCloudCodeMetadataRaw     = `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`
+	defaultGeminiCloudCodeUserAgentModel  = "gemini-2.5-pro"
+	defaultGeminiCloudCodeVersionLabel    = "0.45.0-nightly.20260521.g854f811be"
 	defaultGeminiScopeCloudPlatform       = "https://www.googleapis.com/auth/cloud-platform"
 	defaultGeminiScopeUserInfoEmail       = "https://www.googleapis.com/auth/userinfo.email"
 	defaultGeminiScopeUserInfoProfile     = "https://www.googleapis.com/auth/userinfo.profile"
@@ -37,6 +37,8 @@ const (
 	defaultGeminiOperationPollDelay       = 5 * time.Second
 	defaultGeminiOperationPollTimeout     = 90 * time.Second
 	defaultGeminiOperationPollMaxAttempts = 18
+	defaultGeminiCloudCodeRetryAttempts   = 3
+	defaultGeminiCloudCodeRetryDelay      = 100 * time.Millisecond
 )
 
 var (
@@ -360,6 +362,9 @@ func (c *GeminiClient) fetchUserEmail(ctx context.Context, accessToken string) (
 
 func (c *GeminiClient) resolveProjectID(ctx context.Context, accessToken string, previous *Credential) (string, string, bool, error) {
 	requestedProject := c.requestedProjectID(previous)
+	if err := validateGeminiProjectID(requestedProject); err != nil {
+		return "", "", false, err
+	}
 
 	loadReqBody := map[string]any{
 		"metadata": geminiCloudCodeMetadataForProject(requestedProject, true),
@@ -375,11 +380,17 @@ func (c *GeminiClient) resolveProjectID(ctx context.Context, accessToken string,
 		}
 		return "", "", false, fmt.Errorf("load code assist: %w", err)
 	}
+	if err := geminiLoadCodeAssistValidationError(loadResp); err != nil {
+		return "", "", false, err
+	}
 
 	tierID := extractGeminiTierID(loadResp)
 	serverProjectID := extractGeminiProjectID(loadResp)
 	if hasGeminiCurrentTier(loadResp) {
 		projectID := firstNonEmpty(serverProjectID, requestedProject, previousGeminiMetadata(previous, "project_id"))
+		if strings.TrimSpace(projectID) == "" {
+			return "", tierID, false, fmt.Errorf("gemini oauth requires GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID for this account")
+		}
 		return strings.TrimSpace(projectID), tierID, false, nil
 	}
 
@@ -387,6 +398,9 @@ func (c *GeminiClient) resolveProjectID(ctx context.Context, accessToken string,
 	if err != nil {
 		if fallbackProject := strings.TrimSpace(previousGeminiMetadata(previous, "project_id")); fallbackProject != "" {
 			return fallbackProject, firstNonEmpty(tierID, previousGeminiMetadata(previous, "tier_id")), previousGeminiMetadata(previous, "auto_project") == "true", nil
+		}
+		if setupErr := geminiLoadCodeAssistProjectSetupError(loadResp, requestedProject); setupErr != nil {
+			return "", tierID, false, setupErr
 		}
 		return "", tierID, false, fmt.Errorf("onboard user: %w", err)
 	}
@@ -449,38 +463,48 @@ func (c *GeminiClient) callCloudCode(ctx context.Context, accessToken string, ac
 	}
 
 	endpoint := strings.TrimRight(c.cloudCodeURL(), "/") + "/" + strings.Trim(c.cloudCodeVersion(), "/") + ":" + strings.TrimSpace(action)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(rawBody)))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", defaultGeminiCloudCodeUserAgent)
-	req.Header.Set("X-Goog-Api-Client", defaultGeminiCloudCodeAPIClient)
-	req.Header.Set("Client-Metadata", defaultGeminiCloudCodeMetadataRaw)
+	var lastErr error
+	for attempt := 0; attempt < defaultGeminiCloudCodeRetryAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(rawBody)))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel))
 
-	resp, err := c.httpClient().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
+		resp, err := c.httpClient().Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt+1 < defaultGeminiCloudCodeRetryAttempts {
+				c.sleep(defaultGeminiCloudCodeRetryDelay)
+				continue
+			}
+			return nil, err
+		}
+
+		respBody, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-	}()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			lastErr = fmt.Errorf("request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+			if attempt+1 < defaultGeminiCloudCodeRetryAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
+				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
+				continue
+			}
+			return nil, lastErr
+		}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		var data map[string]any
+		if err := json.Unmarshal(respBody, &data); err != nil {
+			return nil, err
+		}
+		return data, nil
 	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-
-	var data map[string]any
-	if err := json.Unmarshal(respBody, &data); err != nil {
-		return nil, err
-	}
-	return data, nil
+	return nil, lastErr
 }
 
 func (c *GeminiClient) pollCloudCodeOperation(ctx context.Context, accessToken string, name string) (map[string]any, error) {
@@ -513,9 +537,7 @@ func (c *GeminiClient) pollCloudCodeOperation(ctx context.Context, accessToken s
 		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", defaultGeminiCloudCodeUserAgent)
-		req.Header.Set("X-Goog-Api-Client", defaultGeminiCloudCodeAPIClient)
-		req.Header.Set("Client-Metadata", defaultGeminiCloudCodeMetadataRaw)
+		req.Header.Set("User-Agent", geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel))
 
 		resp, err := c.httpClient().Do(req)
 		if err != nil {
@@ -528,6 +550,10 @@ func (c *GeminiClient) pollCloudCodeOperation(ctx context.Context, accessToken s
 			return nil, readErr
 		}
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			if attempt+1 < defaultGeminiOperationPollMaxAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
+				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
+				continue
+			}
 			return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 		}
 
@@ -693,6 +719,161 @@ func geminiCloudCodeMetadataForProject(projectID string, includeProject bool) ma
 	return metadata
 }
 
+func geminiLoadCodeAssistValidationError(payload map[string]any) error {
+	if payload == nil || hasGeminiCurrentTier(payload) {
+		return nil
+	}
+	ineligible, ok := payload["ineligibleTiers"].([]any)
+	if !ok || len(ineligible) == 0 {
+		return nil
+	}
+
+	for _, rawTier := range ineligible {
+		tier, ok := rawTier.(map[string]any)
+		if !ok {
+			continue
+		}
+		reasonCode := strings.TrimSpace(stringFromGeminiAny(tier["reasonCode"]))
+		if reasonCode == "VALIDATION_REQUIRED" {
+			validationURL := strings.TrimSpace(stringFromGeminiAny(tier["validationUrl"]))
+			if validationURL != "" {
+				return fmt.Errorf("gemini account validation required: %s", validationURL)
+			}
+			return fmt.Errorf("gemini account validation required")
+		}
+	}
+	return nil
+}
+
+func geminiLoadCodeAssistProjectSetupError(payload map[string]any, requestedProject string) error {
+	if payload == nil {
+		return nil
+	}
+	ineligible, ok := payload["ineligibleTiers"].([]any)
+	if !ok || len(ineligible) == 0 {
+		if strings.TrimSpace(requestedProject) == "" {
+			return fmt.Errorf("gemini oauth requires GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID for this account")
+		}
+		return nil
+	}
+	messages := make([]string, 0, len(ineligible))
+	for _, rawTier := range ineligible {
+		tier, ok := rawTier.(map[string]any)
+		if !ok {
+			continue
+		}
+		reasonCode := strings.TrimSpace(stringFromGeminiAny(tier["reasonCode"]))
+		reasonMessage := strings.TrimSpace(stringFromGeminiAny(tier["reasonMessage"]))
+		if reasonMessage != "" {
+			messages = append(messages, reasonMessage)
+		} else if reasonCode != "" {
+			messages = append(messages, reasonCode)
+		}
+	}
+	if len(messages) > 0 {
+		return fmt.Errorf("gemini account is not eligible for Code Assist: %s", strings.Join(messages, "; "))
+	}
+	if strings.TrimSpace(requestedProject) == "" {
+		return fmt.Errorf("gemini oauth requires GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID for this account")
+	}
+	return fmt.Errorf("gemini account is not eligible for Code Assist")
+}
+
+func validateGeminiProjectID(projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil
+	}
+	for _, r := range projectID {
+		if r < '0' || r > '9' {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid Google Cloud project ID %q: use the string project ID, not the numeric project number", projectID)
+}
+
+func geminiProjectIDFromOfficialEnv() string {
+	for _, key := range []string{"GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT_ID"} {
+		if v, ok := lookupNonEmptyEnv(key); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+func geminiCloudCodeShouldRetry(statusCode int) bool {
+	switch statusCode {
+	case http.StatusTooManyRequests, 499:
+		return true
+	default:
+		return statusCode >= http.StatusInternalServerError && statusCode <= 599
+	}
+}
+
+func geminiCloudCodeRetryDelay(hdr http.Header, now time.Time) time.Duration {
+	if d, ok := parseGeminiRetryAfter(hdr.Get("Retry-After"), now); ok && d > 0 {
+		return d
+	}
+	return defaultGeminiCloudCodeRetryDelay
+}
+
+func parseGeminiRetryAfter(value string, now time.Time) (time.Duration, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	if seconds, err := strconv.Atoi(value); err == nil {
+		if seconds < 0 {
+			return 0, false
+		}
+		return time.Duration(seconds) * time.Second, true
+	}
+	if parsed, err := http.ParseTime(value); err == nil {
+		if now.IsZero() {
+			now = time.Now()
+		}
+		return parsed.Sub(now), true
+	}
+	return 0, false
+}
+
+func stringFromGeminiAny(value any) string {
+	text, _ := value.(string)
+	return text
+}
+
+func geminiCloudCodeUserAgent(modelName string) string {
+	modelName = strings.TrimSpace(modelName)
+	if modelName == "" {
+		modelName = defaultGeminiCloudCodeUserAgentModel
+	}
+	return fmt.Sprintf(
+		"GeminiCLI/%s/%s (%s; %s; terminal)",
+		defaultGeminiCloudCodeVersionLabel,
+		modelName,
+		geminiCloudCodeOS(),
+		geminiCloudCodeArch(),
+	)
+}
+
+func geminiCloudCodeOS() string {
+	if runtime.GOOS == "windows" {
+		return "win32"
+	}
+	return runtime.GOOS
+}
+
+func geminiCloudCodeArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "x64"
+	case "386":
+		return "x86"
+	default:
+		return runtime.GOARCH
+	}
+}
+
 func previousGeminiMetadata(cred *Credential, key string) string {
 	if cred == nil || len(cred.Metadata) == 0 {
 		return ""
@@ -710,6 +891,9 @@ func previousValue(cred *Credential, field func(*Credential) string) string {
 func (c *GeminiClient) requestedProjectID(previous *Credential) string {
 	if c != nil && strings.TrimSpace(c.ProjectID) != "" {
 		return strings.TrimSpace(c.ProjectID)
+	}
+	if projectID := geminiProjectIDFromOfficialEnv(); projectID != "" {
+		return projectID
 	}
 	if previous != nil {
 		if projectID := previousGeminiMetadata(previous, "requested_project_id"); projectID != "" {
@@ -857,6 +1041,8 @@ func applyGeminiClientEnvOverrides(c *GeminiClient) {
 		c.ClientSecret = v
 	}
 	if v, ok := lookupNonEmptyEnv("CLIPAL_OAUTH_GEMINI_PROJECT_ID"); ok {
+		c.ProjectID = v
+	} else if v := geminiProjectIDFromOfficialEnv(); v != "" {
 		c.ProjectID = v
 	}
 	if v, ok := lookupNonEmptyEnv("CLIPAL_OAUTH_GEMINI_SCOPE"); ok {

@@ -140,6 +140,132 @@ func TestNewGeminiClient_AppliesEnvironmentOverrides(t *testing.T) {
 	}
 }
 
+func TestNewGeminiClient_UsesOfficialGoogleCloudProjectEnv(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "official-project")
+
+	client := NewGeminiClient()
+
+	if got := client.requestedProjectID(nil); got != "official-project" {
+		t.Fatalf("projectID = %q, want official-project", got)
+	}
+}
+
+func TestGeminiResolveProjectIDRejectsNumericProjectID(t *testing.T) {
+	client := &GeminiClient{ProjectID: "123456789"}
+
+	_, _, _, err := client.resolveProjectID(context.Background(), "access-1", nil)
+	if err == nil {
+		t.Fatalf("expected numeric project id error")
+	}
+	if !strings.Contains(err.Error(), "numeric project number") {
+		t.Fatalf("error = %q, want numeric project number", err.Error())
+	}
+}
+
+func TestGeminiResolveProjectIDValidationRequiredReturnsActionableError(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("GOOGLE_CLOUD_PROJECT_ID", "")
+
+	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/v1internal:loadCodeAssist" {
+			t.Fatalf("path = %q, want loadCodeAssist", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{
+			"ineligibleTiers": [
+				{
+					"reasonCode": "VALIDATION_REQUIRED",
+					"reasonMessage": "verification required",
+					"validationUrl": "https://example.com/verify"
+				}
+			]
+		}`)
+	}))
+	defer cloudCodeServer.Close()
+
+	client := &GeminiClient{
+		CloudCodeURL: cloudCodeServer.URL,
+		HTTPClient:   cloudCodeServer.Client(),
+		Sleep:        func(time.Duration) {},
+	}
+
+	_, _, _, err := client.resolveProjectID(context.Background(), "access-1", nil)
+	if err == nil {
+		t.Fatalf("expected validation required error")
+	}
+	if !strings.Contains(err.Error(), "validation required") || !strings.Contains(err.Error(), "https://example.com/verify") {
+		t.Fatalf("error = %q, want validation URL", err.Error())
+	}
+}
+
+func TestGeminiResolveProjectIDCurrentTierWithoutProjectRequiresProject(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("GOOGLE_CLOUD_PROJECT_ID", "")
+
+	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/v1internal:loadCodeAssist" {
+			t.Fatalf("path = %q, want loadCodeAssist", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"currentTier":{"id":"standard-tier"}}`)
+	}))
+	defer cloudCodeServer.Close()
+
+	client := &GeminiClient{
+		CloudCodeURL: cloudCodeServer.URL,
+		HTTPClient:   cloudCodeServer.Client(),
+		Sleep:        func(time.Duration) {},
+	}
+
+	_, _, _, err := client.resolveProjectID(context.Background(), "access-1", nil)
+	if err == nil {
+		t.Fatalf("expected project required error")
+	}
+	if !strings.Contains(err.Error(), "GOOGLE_CLOUD_PROJECT") {
+		t.Fatalf("error = %q, want project env guidance", err.Error())
+	}
+}
+
+func TestGeminiResolveProjectIDAllowsOnboardingWithNonValidationIneligibleTier(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("GOOGLE_CLOUD_PROJECT_ID", "")
+
+	var onboardCalls int
+	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1internal:loadCodeAssist":
+			_, _ = io.WriteString(w, `{
+				"allowedTiers":[{"id":"free-tier","isDefault":true}],
+				"ineligibleTiers":[{"reasonCode":"UNSUPPORTED_LOCATION","reasonMessage":"unsupported for another tier"}]
+			}`)
+		case "/v1internal:onboardUser":
+			onboardCalls++
+			_, _ = io.WriteString(w, `{"done":true,"response":{"cloudaicompanionProject":{"id":"auto-project"}}}`)
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer cloudCodeServer.Close()
+
+	client := &GeminiClient{
+		CloudCodeURL: cloudCodeServer.URL,
+		HTTPClient:   cloudCodeServer.Client(),
+		Sleep:        func(time.Duration) {},
+	}
+
+	projectID, tierID, autoProject, err := client.resolveProjectID(context.Background(), "access-1", nil)
+	if err != nil {
+		t.Fatalf("resolveProjectID: %v", err)
+	}
+	if got := onboardCalls; got != 1 {
+		t.Fatalf("onboard calls = %d, want 1", got)
+	}
+	if projectID != "auto-project" || tierID != defaultGeminiFreeTierID || !autoProject {
+		t.Fatalf("project=%q tier=%q auto=%v", projectID, tierID, autoProject)
+	}
+}
+
 func TestGeminiStartLogin_UsesLoopbackRedirectURIWithDynamicPort(t *testing.T) {
 	session, err := (&GeminiClient{
 		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
@@ -202,8 +328,14 @@ func TestGeminiExchangeCode(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
 			t.Fatalf("authorization = %q, want Bearer access-1", got)
 		}
-		if got := r.Header.Get("Client-Metadata"); got != defaultGeminiCloudCodeMetadataRaw {
-			t.Fatalf("client-metadata = %q", got)
+		if got := r.Header.Get("User-Agent"); got != geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel) {
+			t.Fatalf("user-agent = %q", got)
+		}
+		if got := r.Header.Get("X-Goog-Api-Client"); got != "" {
+			t.Fatalf("x-goog-api-client = %q, want empty", got)
+		}
+		if got := r.Header.Get("Client-Metadata"); got != "" {
+			t.Fatalf("client-metadata = %q, want empty", got)
 		}
 
 		body, err := io.ReadAll(r.Body)
@@ -678,6 +810,60 @@ func TestGeminiExchangeCodeAutoDiscoversProjectViaOnboarding(t *testing.T) {
 	}
 	if got := cred.Metadata["auto_project"]; got != "true" {
 		t.Fatalf("metadata auto_project = %q, want true", got)
+	}
+}
+
+func TestGeminiExchangeCodeStopsWhenAccountValidationRequired(t *testing.T) {
+	var onboardCalls int
+	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1internal:loadCodeAssist":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"ineligibleTiers":[{"reasonCode":"VALIDATION_REQUIRED","reasonMessage":"Validate account","validationUrl":"https://example.test/validate"}]}`)
+		case "/v1internal:onboardUser":
+			onboardCalls++
+			t.Fatalf("unexpected onboard call for validation-required account")
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer cloudCodeServer.Close()
+
+	userInfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"validate@example.com"}`)
+	}))
+	defer userInfoServer.Close()
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"access-validate","refresh_token":"refresh-validate","expires_in":1800,"token_type":"Bearer"}`)
+	}))
+	defer tokenServer.Close()
+
+	client := &GeminiClient{
+		TokenURL:     tokenServer.URL,
+		UserInfoURL:  userInfoServer.URL,
+		CloudCodeURL: cloudCodeServer.URL,
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		HTTPClient:   tokenServer.Client(),
+		Sleep:        func(time.Duration) {},
+	}
+
+	_, err := client.ExchangeCode(context.Background(), "auth-code", testGeminiRedirectURI, PKCECodes{
+		CodeVerifier:  "verifier-123",
+		CodeChallenge: "challenge-123",
+	})
+	if err == nil {
+		t.Fatalf("expected validation-required error")
+	}
+	if !strings.Contains(err.Error(), "gemini account validation required") ||
+		!strings.Contains(err.Error(), "https://example.test/validate") {
+		t.Fatalf("error = %q, want validation URL", err.Error())
+	}
+	if onboardCalls != 0 {
+		t.Fatalf("onboard calls = %d, want 0", onboardCalls)
 	}
 }
 

@@ -89,6 +89,60 @@ func TestClassifyUpstreamFailure_429AuthAndQuotaStillDeactivate(t *testing.T) {
 	}
 }
 
+func TestClassifyUpstreamFailure_GoogleCloudCodeQuotaAndRateLimit(t *testing.T) {
+	t.Parallel()
+
+	action, reason, _, _ := classifyUpstreamFailure(
+		http.StatusTooManyRequests,
+		nil,
+		[]byte(`{
+			"error": {
+				"code": 429,
+				"status": "RESOURCE_EXHAUSTED",
+				"message": "Quota exhausted for quota metric",
+				"details": [
+					{
+						"@type": "type.googleapis.com/google.rpc.ErrorInfo",
+						"reason": "QUOTA_EXHAUSTED",
+						"domain": "googleapis.com"
+					}
+				]
+			}
+		}`),
+		false,
+	)
+	if action != failureDeactivateAndRetryNext || reason != "quota" {
+		t.Fatalf("quota classification: action=%v reason=%q", action, reason)
+	}
+
+	action, reason, _, _ = classifyUpstreamFailure(
+		http.StatusTooManyRequests,
+		nil,
+		[]byte(`{
+			"error": {
+				"code": 429,
+				"status": "RESOURCE_EXHAUSTED",
+				"message": "Rate limit exceeded",
+				"details": [
+					{
+						"@type": "type.googleapis.com/google.rpc.ErrorInfo",
+						"reason": "RATE_LIMIT_EXCEEDED",
+						"domain": "googleapis.com"
+					},
+					{
+						"@type": "type.googleapis.com/google.rpc.RetryInfo",
+						"retryDelay": "60s"
+					}
+				]
+			}
+		}`),
+		false,
+	)
+	if action != failureRetryNext || reason != "rate_limit" {
+		t.Fatalf("rate classification: action=%v reason=%q", action, reason)
+	}
+}
+
 func TestMarkProviderBusy_MergesByMaxWindow(t *testing.T) {
 	t.Parallel()
 

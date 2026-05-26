@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -83,6 +84,34 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 	}
 }
 
+func TestPrepareGeminiOAuthResponse_UnwrapsGenerateResponseWithoutContentType(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:generateContent", nil)
+	req = withRequestContext(req, RequestContext{
+		ClientType:     ClientGemini,
+		Family:         ProtocolFamilyGemini,
+		Capability:     CapabilityGeminiGenerateContent,
+		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
+		UnifiedIngress: true,
+	})
+	resp := newResponse(http.StatusOK, nil, `{"response":{"candidates":[{"content":{"parts":[{"text":"hello"}]}}]},"traceId":"trace-1"}`)
+
+	rewritten, err := prepareGeminiOAuthResponse(req, resp)
+	if err != nil {
+		t.Fatalf("prepareGeminiOAuthResponse: %v", err)
+	}
+	body, err := io.ReadAll(rewritten.Body)
+	if err != nil {
+		t.Fatalf("io.ReadAll: %v", err)
+	}
+	bodyText := string(body)
+	if strings.Contains(bodyText, `"response":`) {
+		t.Fatalf("body still contains Cloud Code envelope: %s", bodyText)
+	}
+	if !strings.Contains(bodyText, `"responseId":"trace-1"`) {
+		t.Fatalf("body missing responseId: %s", bodyText)
+	}
+}
+
 func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
@@ -157,5 +186,48 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 	}
 	if !strings.Contains(bodyText, `"usageMetadata"`) {
 		t.Fatalf("stream missing usageMetadata chunk: %s", bodyText)
+	}
+}
+
+func TestPrepareGeminiOAuthResponse_RewritesStreamWithoutContentType(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
+	req = withRequestContext(req, RequestContext{
+		ClientType:     ClientGemini,
+		Family:         ProtocolFamilyGemini,
+		Capability:     CapabilityGeminiStreamGenerate,
+		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:streamGenerateContent",
+		UnifiedIngress: true,
+	})
+	streamBody := strings.Join([]string{
+		"id: 123",
+		`data: {"response":`,
+		`data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]},`,
+		`data: "traceId":"trace-1"}`,
+		"",
+		"data: [DONE]",
+		"",
+	}, "\n")
+	resp := newResponse(http.StatusOK, nil, streamBody)
+
+	rewritten, err := prepareGeminiOAuthResponse(req, resp)
+	if err != nil {
+		t.Fatalf("prepareGeminiOAuthResponse: %v", err)
+	}
+	body, err := io.ReadAll(rewritten.Body)
+	if err != nil {
+		t.Fatalf("io.ReadAll: %v", err)
+	}
+	bodyText := string(body)
+	if strings.Contains(bodyText, `"response":`) {
+		t.Fatalf("stream still contains Cloud Code envelope: %s", bodyText)
+	}
+	if !strings.Contains(bodyText, "id: 123") {
+		t.Fatalf("stream did not preserve id line: %s", bodyText)
+	}
+	if !strings.Contains(bodyText, `"responseId":"trace-1"`) {
+		t.Fatalf("stream missing responseId: %s", bodyText)
+	}
+	if !strings.Contains(bodyText, "data: [DONE]") {
+		t.Fatalf("stream did not preserve done event: %s", bodyText)
 	}
 }

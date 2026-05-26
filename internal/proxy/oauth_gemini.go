@@ -13,8 +13,7 @@ import (
 
 const (
 	defaultGeminiOAuthBaseURL  = "https://cloudcode-pa.googleapis.com"
-	geminiOAuthAPIClientHeader = "google-genai-sdk/1.41.0 gl-node/v22.19.0"
-	geminiOAuthVersion         = "0.31.0"
+	geminiOAuthVersion         = "0.45.0-nightly.20260521.g854f811be"
 	geminiOAuthProjectMetadata = "project_id"
 	geminiOAuthGeneratePath    = "/v1internal:generateContent"
 	geminiOAuthStreamPath      = "/v1internal:streamGenerateContent"
@@ -50,7 +49,7 @@ func (cp *ClientProxy) createGeminiOAuthRequestWithPayloadForProvider(original *
 		return nil, err
 	}
 
-	targetURL, err := buildTargetURL(defaultGeminiOAuthBaseURL, targetPath, original.URL.RawQuery)
+	targetURL, err := buildTargetURL(defaultGeminiOAuthBaseURL, targetPath, "")
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +132,9 @@ func buildGeminiOAuthGenerateEnvelope(root map[string]any, modelName string, pro
 	if userPromptID, ok := geminiOAuthStringField(root, "user_prompt_id"); ok {
 		envelope["user_prompt_id"] = userPromptID
 	}
+	if enabledCreditTypes, ok := root["enabled_credit_types"]; ok {
+		envelope["enabled_credit_types"] = enabledCreditTypes
+	}
 	return envelope
 }
 
@@ -144,12 +146,16 @@ func cloneGeminiOAuthRequestPayload(root map[string]any) map[string]any {
 	delete(request, "model")
 	delete(request, "project")
 	delete(request, "user_prompt_id")
+	delete(request, "enabled_credit_types")
 	return request
 }
 
 func buildGeminiOAuthCountTokensEnvelope(root map[string]any, modelName string) map[string]any {
-	request := cloneGeminiOAuthMap(root)
+	request := make(map[string]any, 2)
 	request["model"] = fmt.Sprintf("models/%s", strings.TrimSpace(modelName))
+	if contents, ok := root["contents"]; ok {
+		request["contents"] = contents
+	}
 	return map[string]any{
 		"request": request,
 	}
@@ -201,16 +207,15 @@ func applyGeminiOAuthHeaders(proxyReq *http.Request, modelName string, capabilit
 	}
 	proxyReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
 	proxyReq.Header.Set("User-Agent", geminiOAuthUserAgent(modelName))
-	proxyReq.Header.Set("X-Goog-Api-Client", geminiOAuthAPIClientHeader)
+	proxyReq.Header.Del("X-Goog-Api-Client")
+	proxyReq.Header.Del("Client-Metadata")
 	proxyReq.Header.Set("Content-Type", "application/json")
 
 	if capability == CapabilityGeminiStreamGenerate {
 		proxyReq.Header.Set("Accept", "text/event-stream")
 		query := proxyReq.URL.Query()
-		if strings.TrimSpace(query.Get("alt")) == "" {
-			query.Set("alt", "sse")
-			proxyReq.URL.RawQuery = query.Encode()
-		}
+		query.Set("alt", "sse")
+		proxyReq.URL.RawQuery = query.Encode()
 		return
 	}
 	proxyReq.Header.Set("Accept", "application/json")
@@ -220,7 +225,7 @@ func geminiOAuthUserAgent(modelName string) string {
 	if strings.TrimSpace(modelName) == "" {
 		modelName = "unknown"
 	}
-	return fmt.Sprintf("GeminiCLI/%s/%s (%s; %s)", geminiOAuthVersion, modelName, geminiOAuthOS(), geminiOAuthArch())
+	return fmt.Sprintf("GeminiCLI/%s/%s (%s; %s; terminal)", geminiOAuthVersion, modelName, geminiOAuthOS(), geminiOAuthArch())
 }
 
 func geminiOAuthOS() string {
