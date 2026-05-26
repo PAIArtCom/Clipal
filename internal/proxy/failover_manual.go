@@ -100,7 +100,13 @@ func (cp *ClientProxy) forwardManual(w http.ResponseWriter, req *http.Request, p
 		cp.recordCompletedUsage(req, provider.Name, resp.StatusCode, success.usage, time.Now())
 	}
 	allow := circuitAllowResult{}
-	result := cp.streamResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+	var result streamResult
+	if shouldSynthesizeCodexOAuthNonStreamingResponse(req, provider, path, payload) && resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		result = cp.synthesizeCodexOAuthNonStreamingResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+		cancelAttempt(nil)
+	} else {
+		result = cp.streamResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+	}
 	if result.kind == streamFinal {
 		cp.logRequestResult(req, provider.Name, resp.StatusCode, result, true)
 		return

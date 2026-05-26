@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,26 +14,47 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.118.0"
-	codexOAuthUserAgent      = "codex-tui/0.118.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9 (codex-tui; 0.118.0)"
-	codexOAuthOriginator     = "codex-tui"
+	codexOAuthVersion        = "0.133.0"
+	codexOAuthUserAgent      = "codex_cli_rs/0.133.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
+	codexOAuthOriginator     = "codex_cli_rs"
 )
 
 var codexOAuthAllowedHeaders = map[string]bool{
-	"accept":                true,
-	"accept-language":       true,
-	"content-type":          true,
-	"conversation-id":       true,
-	"conversation_id":       true,
-	"openai-beta":           true,
-	"user-agent":            true,
-	"originator":            true,
-	"session-id":            true,
-	"session_id":            true,
-	"x-codex-turn-state":    true,
-	"x-codex-turn-metadata": true,
-	"x-client-request-id":   true,
-	"x-request-id":          true,
+	"accept":                                true,
+	"accept-language":                       true,
+	"chatgpt-account-id":                    true,
+	"content-type":                          true,
+	"conversation-id":                       true,
+	"conversation_id":                       true,
+	"openai-beta":                           true,
+	"user-agent":                            true,
+	"originator":                            true,
+	"session-id":                            true,
+	"session_id":                            true,
+	"thread-id":                             true,
+	"thread_id":                             true,
+	"traceparent":                           true,
+	"tracestate":                            true,
+	"version":                               true,
+	"x-codex-beta-features":                 true,
+	"x-codex-installation-id":               true,
+	"x-codex-parent-thread-id":              true,
+	"x-codex-turn-state":                    true,
+	"x-codex-turn-metadata":                 true,
+	"x-codex-window-id":                     true,
+	"x-client-request-id":                   true,
+	"x-oai-attestation":                     true,
+	"x-openai-internal-codex-residency":     true,
+	"x-openai-memgen-request":               true,
+	"x-openai-subagent":                     true,
+	"x-responsesapi-include-timing-metrics": true,
+	"x-request-id":                          true,
+}
+
+type codexOAuthRequestContext struct {
+	sessionID      string
+	threadID       string
+	installationID string
 }
 
 func providerSupportsCapability(provider config.Provider, capability RequestCapability) bool {
@@ -122,6 +142,11 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	if err != nil {
 		return nil, err
 	}
+	codexCtx := codexOAuthRequestContextForRequest(original)
+	requestBody, err = applyCodexOAuthBodyContext(requestBody, stream, codexCtx)
+	if err != nil {
+		return nil, err
+	}
 	targetURL, err := buildTargetURL(defaultCodexOAuthBaseURL, targetPath, original.URL.RawQuery)
 	if err != nil {
 		return nil, err
@@ -132,11 +157,12 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 		return nil, err
 	}
 	copyCodexOAuthHeaders(proxyReq.Header, original.Header)
+	removeStaleCodexOAuthBetaHeader(proxyReq.Header)
 
 	addForwardedHeaders(proxyReq, original)
 	clearAuthCarriers(proxyReq)
 	proxyReq.Header.Set("Authorization", "Bearer "+accessToken)
-	applyCodexOAuthHeaders(proxyReq, cred, stream)
+	applyCodexOAuthHeaders(proxyReq, cred, stream, codexCtx)
 	proxyReq.ContentLength = int64(len(requestBody))
 	proxyReq.Header.Del("Content-Length")
 	return proxyReq, nil
@@ -168,15 +194,32 @@ func buildCodexOAuthRequestFromRoot(path string, root map[string]any, body []byt
 		if err != nil {
 			return "", false, nil, err
 		}
-		if stream {
-			return "/responses", true, rewritten, nil
+		if !stream {
+			rewritten, err = forceCodexOAuthStreamingBody(rewritten)
+			if err != nil {
+				return "", false, nil, err
+			}
 		}
-		return "/responses/compact", false, rewritten, nil
+		return "/responses", true, rewritten, nil
 	case pathMatchesPrefix(path, "/v1/responses/"):
 		return strings.TrimPrefix(path, "/v1"), false, body, nil
 	default:
 		return "", false, nil, fmt.Errorf("codex oauth does not support path %q", path)
 	}
+}
+
+func forceCodexOAuthStreamingBody(body []byte) ([]byte, error) {
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, fmt.Errorf("responses request body must be valid json: %w", err)
+	}
+	root["stream"] = true
+	root["store"] = false
+	rewritten, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("marshal codex oauth request: %w", err)
+	}
+	return rewritten, nil
 }
 
 func normalizeCodexOAuthResponsesRoot(root map[string]any, forceCompact bool) (bool, []byte, error) {
@@ -217,7 +260,7 @@ func normalizeCodexOAuthResponsesRoot(root map[string]any, forceCompact bool) (b
 	return stream, rewritten, nil
 }
 
-func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, stream bool) {
+func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, stream bool, codexCtx codexOAuthRequestContext) {
 	if proxyReq == nil {
 		return
 	}
@@ -228,9 +271,6 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	} else {
 		proxyReq.Header.Set("Accept", "application/json")
 	}
-	if strings.TrimSpace(proxyReq.Header.Get("OpenAI-Beta")) == "" {
-		proxyReq.Header.Set("OpenAI-Beta", "responses=experimental")
-	}
 	proxyReq.Header.Set("Connection", "Keep-Alive")
 	if strings.TrimSpace(proxyReq.Header.Get("User-Agent")) == "" {
 		proxyReq.Header.Set("User-Agent", codexOAuthUserAgent)
@@ -238,26 +278,141 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	if strings.TrimSpace(proxyReq.Header.Get("Originator")) == "" {
 		proxyReq.Header.Set("Originator", codexOAuthOriginator)
 	}
-	if !stream && strings.TrimSpace(proxyReq.Header.Get("Version")) == "" {
+	if strings.TrimSpace(proxyReq.Header.Get("Version")) == "" {
 		proxyReq.Header.Set("Version", codexOAuthVersion)
 	}
-	if !stream && strings.TrimSpace(proxyReq.Header.Get("Session_id")) == "" {
-		proxyReq.Header.Set("Session_id", newCodexSessionID())
+	if strings.TrimSpace(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+		proxyReq.Header.Set("Session-Id", codexCtx.sessionID)
+	}
+	proxyReq.Header.Del("Session_id")
+	proxyReq.Header.Del("Session_Id")
+	if strings.TrimSpace(proxyReq.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+		proxyReq.Header.Set("Thread-Id", codexCtx.threadID)
+	}
+	proxyReq.Header.Del("Thread_id")
+	proxyReq.Header.Del("Thread_Id")
+	if strings.TrimSpace(proxyReq.Header.Get("X-Client-Request-Id")) == "" && codexCtx.threadID != "" {
+		proxyReq.Header.Set("X-Client-Request-Id", codexCtx.threadID)
+	}
+	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+		proxyReq.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
 	}
 
 	if cred != nil && strings.TrimSpace(cred.AccountID) != "" {
-		proxyReq.Header.Set("Chatgpt-Account-Id", strings.TrimSpace(cred.AccountID))
+		proxyReq.Header.Set("ChatGPT-Account-ID", strings.TrimSpace(cred.AccountID))
 	} else {
 		proxyReq.Header.Del("Chatgpt-Account-Id")
 	}
 }
 
-func newCodexSessionID() string {
+func newCodexOAuthRequestContext(headers http.Header) codexOAuthRequestContext {
+	sessionID := firstNonEmptyHeader(headers, "Session-Id", "Session_id")
+	if sessionID == "" {
+		sessionID = newCodexUUID()
+	}
+	threadID := firstNonEmptyHeader(headers, "Thread-Id", "Thread_id")
+	if threadID == "" {
+		threadID = newCodexUUID()
+	}
+	installationID := firstNonEmptyHeader(headers, "X-Codex-Installation-Id")
+	if installationID == "" {
+		installationID = newCodexUUID()
+	}
+	return codexOAuthRequestContext{
+		sessionID:      sessionID,
+		threadID:       threadID,
+		installationID: installationID,
+	}
+}
+
+func codexOAuthRequestContextForRequest(req *http.Request) codexOAuthRequestContext {
+	if req == nil {
+		return newCodexOAuthRequestContext(nil)
+	}
+	codexCtx := newCodexOAuthRequestContext(req.Header)
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
+	if strings.TrimSpace(req.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+		req.Header.Set("Session-Id", codexCtx.sessionID)
+	}
+	if strings.TrimSpace(req.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+		req.Header.Set("Thread-Id", codexCtx.threadID)
+	}
+	if strings.TrimSpace(req.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+		req.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
+	}
+	return codexCtx
+}
+
+func firstNonEmptyHeader(headers http.Header, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(headers.Get(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func newCodexUUID() string {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return ""
 	}
-	return hex.EncodeToString(raw[:])
+	raw[6] = (raw[6] & 0x0f) | 0x40
+	raw[8] = (raw[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
+}
+
+func applyCodexOAuthBodyContext(body []byte, stream bool, codexCtx codexOAuthRequestContext) ([]byte, error) {
+	if len(bytes.TrimSpace(body)) == 0 || codexCtx.threadID == "" {
+		return body, nil
+	}
+
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, fmt.Errorf("responses request body must be valid json: %w", err)
+	}
+	if strings.TrimSpace(asString(root["prompt_cache_key"])) == "" {
+		root["prompt_cache_key"] = codexCtx.threadID
+	}
+	if stream && codexCtx.installationID != "" {
+		metadata, _ := root["client_metadata"].(map[string]any)
+		if metadata == nil {
+			metadata = make(map[string]any, 1)
+		}
+		if strings.TrimSpace(asString(metadata["x-codex-installation-id"])) == "" {
+			metadata["x-codex-installation-id"] = codexCtx.installationID
+		}
+		root["client_metadata"] = metadata
+	}
+	if _, ok := root["reasoning"].(map[string]any); stream && ok {
+		ensureCodexOAuthInclude(root, "reasoning.encrypted_content")
+	}
+
+	rewritten, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("marshal codex oauth request: %w", err)
+	}
+	return rewritten, nil
+}
+
+func asString(value any) string {
+	text, _ := value.(string)
+	return text
+}
+
+func ensureCodexOAuthInclude(root map[string]any, value string) {
+	if root == nil || value == "" {
+		return
+	}
+	include, _ := root["include"].([]any)
+	for _, item := range include {
+		if strings.TrimSpace(asString(item)) == value {
+			return
+		}
+	}
+	root["include"] = append(include, value)
 }
 
 func copyCodexOAuthHeaders(dst http.Header, src http.Header) {
@@ -268,6 +423,27 @@ func copyCodexOAuthHeaders(dst http.Header, src http.Header) {
 		for _, value := range values {
 			dst.Add(key, value)
 		}
+	}
+}
+
+func removeStaleCodexOAuthBetaHeader(headers http.Header) {
+	if headers == nil {
+		return
+	}
+	values := headers.Values("OpenAI-Beta")
+	if len(values) == 0 {
+		return
+	}
+	filtered := values[:0]
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), "responses=experimental") {
+			continue
+		}
+		filtered = append(filtered, value)
+	}
+	headers.Del("OpenAI-Beta")
+	for _, value := range filtered {
+		headers.Add("OpenAI-Beta", value)
 	}
 }
 

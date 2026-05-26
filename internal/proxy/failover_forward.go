@@ -415,7 +415,13 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 				cp.recordCompletedUsage(req, provider.Name, resp.StatusCode, success.usage, now)
 			}
 
-			result := cp.streamResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+			var result streamResult
+			if shouldSynthesizeCodexOAuthNonStreamingResponse(req, provider, path, payload) && resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+				result = cp.synthesizeCodexOAuthNonStreamingResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+				cancelAttempt(nil)
+			} else {
+				result = cp.streamResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
+			}
 			if result.kind == streamFinal {
 				if result.delivery != deliveryCommittedComplete && busyProbeHeld {
 					cp.releaseProviderBusyProbe(index)
