@@ -13,7 +13,8 @@ import (
 )
 
 var anthropicOAuthHosts = map[string]struct{}{
-	"api.anthropic.com": {},
+	"api.anthropic.com":   {},
+	"platform.claude.com": {},
 }
 
 type anthropicFallbackRoundTripper struct {

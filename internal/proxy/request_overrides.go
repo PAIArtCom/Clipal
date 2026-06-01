@@ -11,6 +11,7 @@ import (
 func hasProviderRequestOverrides(provider config.Provider) bool {
 	return provider.ModelOverride() != "" ||
 		provider.OpenAIReasoningEffort() != "" ||
+		provider.ClaudeEffort() != "" ||
 		provider.ClaudeThinkingBudgetTokens() > 0
 }
 
@@ -85,7 +86,20 @@ func applyClaudeProviderRequestOverrides(root map[string]any, requestCtx Request
 		changed = true
 	}
 
-	if thinkingBudgetTokens := provider.ClaudeThinkingBudgetTokens(); thinkingBudgetTokens > 0 {
+	if effort := provider.ClaudeEffort(); effort != "" {
+		outputConfig, _ := root["output_config"].(map[string]any)
+		if outputConfig == nil {
+			outputConfig = make(map[string]any)
+		}
+		outputConfig["effort"] = effort
+		root["output_config"] = outputConfig
+		root["thinking"] = map[string]any{
+			"type": "adaptive",
+		}
+		return true
+	}
+
+	if thinkingBudgetTokens := provider.ClaudeThinkingBudgetTokens(); thinkingBudgetTokens > 0 && !claudeModelUsesOutputConfigEffort(stringValue(root["model"])) {
 		root["thinking"] = map[string]any{
 			"type":          "enabled",
 			"budget_tokens": thinkingBudgetTokens,
@@ -94,6 +108,12 @@ func applyClaudeProviderRequestOverrides(root map[string]any, requestCtx Request
 	}
 
 	return changed
+}
+
+func claudeModelUsesOutputConfigEffort(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	return strings.Contains(normalized, "claude-opus-4-7") ||
+		strings.Contains(normalized, "claude-opus-4-8")
 }
 
 func isOpenAIGenerationCapability(capability RequestCapability) bool {

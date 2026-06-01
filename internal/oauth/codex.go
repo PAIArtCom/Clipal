@@ -23,6 +23,9 @@ const (
 	defaultCodexTokenURL     = "https://auth.openai.com/oauth/token"
 	defaultCodexUsageURL     = "https://chatgpt.com/backend-api/wham/usage"
 	defaultCodexClientID     = "app_EMoamEEZ73f0CkXaXp7hrann"
+	defaultCodexScope        = "openid profile email offline_access api.connectors.read api.connectors.invoke"
+	defaultCodexOriginator   = "codex_cli_rs"
+	defaultCodexUserAgent    = "codex_cli_rs/0.135.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
 	defaultCodexCallbackHost = "localhost"
 	defaultCodexCallbackPort = 1455
 	defaultCodexCallbackPath = "/auth/callback"
@@ -101,13 +104,13 @@ func (c *CodexClient) GenerateAuthURL(state string, redirectURI string, pkce PKC
 		"client_id":                  {c.clientID()},
 		"response_type":              {"code"},
 		"redirect_uri":               {strings.TrimSpace(redirectURI)},
-		"scope":                      {"openid email profile offline_access"},
+		"scope":                      {defaultCodexScope},
 		"state":                      {strings.TrimSpace(state)},
 		"code_challenge":             {pkce.CodeChallenge},
 		"code_challenge_method":      {"S256"},
-		"prompt":                     {"login"},
 		"id_token_add_organizations": {"true"},
 		"codex_cli_simplified_flow":  {"true"},
+		"originator":                 {defaultCodexOriginator},
 	}
 	return strings.TrimSpace(c.authURL()) + "?" + params.Encode(), nil
 }
@@ -152,16 +155,21 @@ func (c *CodexClient) Refresh(ctx context.Context, cred *Credential) (*Credentia
 	if strings.TrimSpace(cred.RefreshToken) == "" {
 		return cred.Clone(), nil
 	}
-	token, err := c.exchange(ctx, url.Values{
-		"client_id":     {c.clientID()},
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {strings.TrimSpace(cred.RefreshToken)},
-		"scope":         {"openid profile email"},
+	token, err := c.refreshExchange(ctx, codexRefreshRequest{
+		ClientID:     c.clientID(),
+		GrantType:    "refresh_token",
+		RefreshToken: strings.TrimSpace(cred.RefreshToken),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return c.credentialFromToken(token, cred), nil
+}
+
+type codexRefreshRequest struct {
+	ClientID     string `json:"client_id"`
+	GrantType    string `json:"grant_type"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type codexTokenResponse struct {
@@ -189,7 +197,7 @@ func (c *CodexClient) exchange(ctx context.Context, form url.Values) (*codexToke
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, fmt.Errorf("token exchange failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var token codexTokenResponse
@@ -199,21 +207,95 @@ func (c *CodexClient) exchange(ctx context.Context, form url.Values) (*codexToke
 	return &token, nil
 }
 
+func (c *CodexClient) refreshExchange(ctx context.Context, requestBody codexRefreshRequest) (*codexTokenResponse, error) {
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.tokenURL(), strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Originator", defaultCodexOriginator)
+	req.Header.Set("User-Agent", defaultCodexUserAgent)
+	resp, err := c.httpClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("token exchange failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	var token codexTokenResponse
+	if err := json.Unmarshal(respBody, &token); err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
 func (c *CodexClient) credentialFromToken(token *codexTokenResponse, previous *Credential) *Credential {
 	now := c.now()
-	email, accountID := parseCodexIdentityToken(token.IDToken)
+	idToken := strings.TrimSpace(token.IDToken)
+	accessToken := strings.TrimSpace(token.AccessToken)
+	refreshToken := strings.TrimSpace(token.RefreshToken)
+	if previous != nil {
+		if idToken == "" {
+			idToken = strings.TrimSpace(previous.Metadata["id_token"])
+		}
+		if accessToken == "" {
+			accessToken = strings.TrimSpace(previous.AccessToken)
+		}
+		if refreshToken == "" {
+			refreshToken = strings.TrimSpace(previous.RefreshToken)
+		}
+	}
+	idInfo := parseCodexIdentityTokenInfo(idToken)
+	email, accountID := idInfo.Email, idInfo.AccountID
+	accessInfo := parseCodexIdentityTokenInfo(accessToken)
+	if accessInfo.Email != "" || accessInfo.AccountID != "" {
+		if email == "" {
+			email = accessInfo.Email
+		}
+		if accountID == "" {
+			accountID = accessInfo.AccountID
+		}
+	}
+	expiresAt := time.Time{}
+	if token.ExpiresIn > 0 {
+		expiresAt = now.Add(time.Duration(token.ExpiresIn) * time.Second)
+	} else if parsed := parseJWTExpiresAt(accessToken); !parsed.IsZero() {
+		expiresAt = parsed
+	} else if previous != nil {
+		expiresAt = previous.ExpiresAt
+	}
+	metadata := map[string]string{}
+	if idToken != "" {
+		metadata["id_token"] = idToken
+	}
+	if idInfo.PlanType != "" {
+		metadata["plan_type"] = idInfo.PlanType
+	}
+	if idInfo.IsFedRAMP || accessInfo.IsFedRAMP {
+		metadata["chatgpt_account_is_fedramp"] = "true"
+	}
 	cred := &Credential{
-		Ref:          stableCredentialRef(config.OAuthProviderCodex, email, accountID),
+		Ref:          stableCredentialRef(config.OAuthProviderCodex, email, firstNonEmpty(accountID, idInfo.Sub, accessInfo.Sub)),
 		Provider:     config.OAuthProviderCodex,
 		Email:        email,
 		AccountID:    accountID,
-		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken,
-		ExpiresAt:    now.Add(time.Duration(token.ExpiresIn) * time.Second),
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
 		LastRefresh:  now,
-		Metadata: map[string]string{
-			"id_token": token.IDToken,
-		},
+		Metadata:     metadata,
 	}
 	if previous != nil {
 		cred.Ref = previous.Ref
@@ -237,41 +319,54 @@ func (c *CodexClient) credentialFromToken(token *codexTokenResponse, previous *C
 			}
 		}
 	} else if cred.Ref == "" {
-		cred.Ref = stableCredentialRef(config.OAuthProviderCodex, "", accountID)
+		cred.Ref = stableCredentialRef(config.OAuthProviderCodex, "", firstNonEmpty(accountID, idInfo.Sub, accessInfo.Sub))
 	}
 	return cred
 }
 
 func parseCodexIdentityToken(idToken string) (string, string) {
+	info := parseCodexIdentityTokenInfo(idToken)
+	return info.Email, info.AccountID
+}
+
+type codexIdentityTokenInfo struct {
+	Email     string
+	AccountID string
+	Sub       string
+	PlanType  string
+	IsFedRAMP bool
+}
+
+func parseCodexIdentityTokenInfo(idToken string) codexIdentityTokenInfo {
 	claims, ok := parseCodexIdentityClaims(idToken)
 	if !ok {
-		return "", ""
+		return codexIdentityTokenInfo{}
 	}
 	accountID := strings.TrimSpace(claims.Auth.ChatGPTAccountID)
-	if accountID == "" {
-		accountID = strings.TrimSpace(claims.Sub)
-	}
 	email := strings.TrimSpace(claims.Email)
 	if email == "" {
 		email = strings.TrimSpace(claims.Profile.Email)
 	}
-	return email, accountID
+	return codexIdentityTokenInfo{
+		Email:     email,
+		AccountID: accountID,
+		Sub:       strings.TrimSpace(claims.Sub),
+		PlanType:  strings.TrimSpace(claims.Auth.ChatGPTPlanType),
+		IsFedRAMP: claims.Auth.ChatGPTAccountIsFedRAMP,
+	}
 }
 
 func parseCodexPlanType(idToken string) string {
-	claims, ok := parseCodexIdentityClaims(idToken)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(claims.Auth.ChatGPTPlanType)
+	return parseCodexIdentityTokenInfo(idToken).PlanType
 }
 
 func parseCodexIdentityClaims(idToken string) (*struct {
 	Email string `json:"email"`
 	Sub   string `json:"sub"`
 	Auth  struct {
-		ChatGPTAccountID string `json:"chatgpt_account_id"`
-		ChatGPTPlanType  string `json:"chatgpt_plan_type"`
+		ChatGPTAccountID        string `json:"chatgpt_account_id"`
+		ChatGPTPlanType         string `json:"chatgpt_plan_type"`
+		ChatGPTAccountIsFedRAMP bool   `json:"chatgpt_account_is_fedramp"`
 	} `json:"https://api.openai.com/auth"`
 	Profile struct {
 		Email string `json:"email"`
@@ -289,8 +384,9 @@ func parseCodexIdentityClaims(idToken string) (*struct {
 		Email string `json:"email"`
 		Sub   string `json:"sub"`
 		Auth  struct {
-			ChatGPTAccountID string `json:"chatgpt_account_id"`
-			ChatGPTPlanType  string `json:"chatgpt_plan_type"`
+			ChatGPTAccountID        string `json:"chatgpt_account_id"`
+			ChatGPTPlanType         string `json:"chatgpt_plan_type"`
+			ChatGPTAccountIsFedRAMP bool   `json:"chatgpt_account_is_fedramp"`
 		} `json:"https://api.openai.com/auth"`
 		Profile struct {
 			Email string `json:"email"`

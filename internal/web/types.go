@@ -133,6 +133,7 @@ type OpenAIProviderOverrideSupport struct {
 
 type ClaudeProviderOverrideSupport struct {
 	ThinkingBudgetTokens bool `json:"thinking_budget_tokens"`
+	Effort               bool `json:"effort"`
 }
 
 type ProviderOverridesRequest struct {
@@ -146,7 +147,8 @@ type OpenAIProviderOverridesRequest struct {
 }
 
 type ClaudeProviderOverridesRequest struct {
-	ThinkingBudgetTokens *int `json:"thinking_budget_tokens,omitempty"`
+	ThinkingBudgetTokens *int    `json:"thinking_budget_tokens,omitempty"`
+	Effort               *string `json:"effort,omitempty"`
 }
 
 type ProviderOverridesResponse struct {
@@ -160,7 +162,8 @@ type OpenAIProviderOverridesResponse struct {
 }
 
 type ClaudeProviderOverridesResponse struct {
-	ThinkingBudgetTokens int `json:"thinking_budget_tokens,omitempty"`
+	ThinkingBudgetTokens int    `json:"thinking_budget_tokens,omitempty"`
+	Effort               string `json:"effort,omitempty"`
 }
 
 // ProviderRequest represents a request to create or update a provider
@@ -530,8 +533,9 @@ func mapProviderOverridesResponse(p config.Provider) *ProviderOverridesResponse 
 	model := p.ModelOverride()
 	reasoning := p.OpenAIReasoningEffort()
 	thinking := p.ClaudeThinkingBudgetTokens()
+	claudeEffort := p.ClaudeEffort()
 
-	if model == "" && reasoning == "" && thinking == 0 {
+	if model == "" && reasoning == "" && thinking == 0 && claudeEffort == "" {
 		return nil
 	}
 
@@ -543,9 +547,10 @@ func mapProviderOverridesResponse(p config.Provider) *ProviderOverridesResponse 
 			ReasoningEffort: reasoning,
 		}
 	}
-	if thinking > 0 {
+	if thinking > 0 || claudeEffort != "" {
 		resp.Claude = &ClaudeProviderOverridesResponse{
 			ThinkingBudgetTokens: thinking,
+			Effort:               claudeEffort,
 		}
 	}
 	return resp
@@ -688,6 +693,7 @@ func toProviderOverrideSupport(s providerOverrideSupport) ProviderOverrideSuppor
 		},
 		Claude: ClaudeProviderOverrideSupport{
 			ThinkingBudgetTokens: s.Claude.ThinkingBudgetTokens,
+			Effort:               s.Claude.Effort,
 		},
 	}
 }

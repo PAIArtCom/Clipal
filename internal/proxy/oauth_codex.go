@@ -14,8 +14,8 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.133.0"
-	codexOAuthUserAgent      = "codex_cli_rs/0.133.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
+	codexOAuthVersion        = "0.135.0"
+	codexOAuthUserAgent      = "codex_cli_rs/0.135.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
 	codexOAuthOriginator     = "codex_cli_rs"
 )
 
@@ -44,6 +44,7 @@ var codexOAuthAllowedHeaders = map[string]bool{
 	"x-codex-window-id":                     true,
 	"x-client-request-id":                   true,
 	"x-oai-attestation":                     true,
+	"x-openai-fedramp":                      true,
 	"x-openai-internal-codex-residency":     true,
 	"x-openai-memgen-request":               true,
 	"x-openai-subagent":                     true,
@@ -237,6 +238,11 @@ func normalizeCodexOAuthResponsesRoot(root map[string]any, forceCompact bool) (b
 		delete(root, "stream")
 		delete(root, "store")
 	}
+	if forceCompact {
+		delete(root, "include")
+		delete(root, "tool_choice")
+		delete(root, "client_metadata")
+	}
 
 	delete(root, "prompt_cache_retention")
 	delete(root, "safety_identifier")
@@ -297,11 +303,19 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
 		proxyReq.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
 	}
+	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
+		proxyReq.Header.Set("X-Codex-Window-Id", codexCtx.threadID+":0")
+	}
 
 	if cred != nil && strings.TrimSpace(cred.AccountID) != "" {
 		proxyReq.Header.Set("ChatGPT-Account-ID", strings.TrimSpace(cred.AccountID))
 	} else {
 		proxyReq.Header.Del("Chatgpt-Account-Id")
+	}
+	if cred != nil && strings.EqualFold(strings.TrimSpace(cred.Metadata["chatgpt_account_is_fedramp"]), "true") {
+		proxyReq.Header.Set("X-OpenAI-Fedramp", "true")
+	} else {
+		proxyReq.Header.Del("X-OpenAI-Fedramp")
 	}
 }
 

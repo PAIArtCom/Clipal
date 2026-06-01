@@ -1206,6 +1206,7 @@ type providerOverrideSupport struct {
 	}
 	Claude struct {
 		ThinkingBudgetTokens bool
+		Effort               bool
 	}
 }
 
@@ -1218,6 +1219,7 @@ func providerOverrideSupportForClient(clientType string) providerOverrideSupport
 	case ok && canonical == "claude":
 		support.Model = true
 		support.Claude.ThinkingBudgetTokens = true
+		support.Claude.Effort = true
 	}
 	return support
 }
@@ -1235,9 +1237,16 @@ func normalizeProviderOverrideRequest(overrides *ProviderOverridesRequest) *Prov
 			ReasoningEffort: trimStringPtr(overrides.OpenAI.ReasoningEffort),
 		}
 	}
-	if overrides.Claude != nil && overrides.Claude.ThinkingBudgetTokens != nil {
-		normalized.Claude = &ClaudeProviderOverridesRequest{
-			ThinkingBudgetTokens: ptr(*overrides.Claude.ThinkingBudgetTokens),
+	if overrides.Claude != nil {
+		var claude ClaudeProviderOverridesRequest
+		if overrides.Claude.ThinkingBudgetTokens != nil {
+			claude.ThinkingBudgetTokens = ptr(*overrides.Claude.ThinkingBudgetTokens)
+		}
+		if overrides.Claude.Effort != nil {
+			claude.Effort = trimStringPtr(overrides.Claude.Effort)
+		}
+		if claude.ThinkingBudgetTokens != nil || claude.Effort != nil {
+			normalized.Claude = &claude
 		}
 	}
 	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil {
@@ -1268,6 +1277,14 @@ func validateProviderOverrideRequest(clientType string, overrides *ProviderOverr
 			return fmt.Errorf("thinking_budget_tokens must be >= 0")
 		}
 	}
+	if overrides.Claude != nil && overrides.Claude.Effort != nil {
+		if !support.Claude.Effort {
+			return fmt.Errorf("overrides.claude.effort is not supported for %s providers", clientType)
+		}
+		if !isValidClaudeEffort(*overrides.Claude.Effort) {
+			return fmt.Errorf("claude effort must be one of low, medium, high, max, xhigh")
+		}
+	}
 	return nil
 }
 
@@ -1293,7 +1310,22 @@ func applyProviderOverrides(provider *config.Provider, req ProviderRequest) {
 		}
 		provider.Overrides.Claude.ThinkingBudgetTokens = ptr(*req.Overrides.Claude.ThinkingBudgetTokens)
 	}
+	if req.Overrides.Claude != nil && req.Overrides.Claude.Effort != nil {
+		if provider.Overrides.Claude == nil {
+			provider.Overrides.Claude = &config.ClaudeOverrides{}
+		}
+		provider.Overrides.Claude.Effort = ptr(strings.TrimSpace(*req.Overrides.Claude.Effort))
+	}
 	provider.Overrides = config.NormalizeProviderOverrides(provider.Overrides)
+}
+
+func isValidClaudeEffort(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "low", "medium", "high", "max", "xhigh":
+		return true
+	default:
+		return false
+	}
 }
 
 func providerFromCreateRequest(clientType string, req ProviderRequest, priority int, keys []string) (config.Provider, error) {

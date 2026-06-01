@@ -147,7 +147,8 @@ type OpenAIOverrides struct {
 }
 
 type ClaudeOverrides struct {
-	ThinkingBudgetTokens *int `yaml:"thinking_budget_tokens,omitempty"`
+	ThinkingBudgetTokens *int    `yaml:"thinking_budget_tokens,omitempty"`
+	Effort               *string `yaml:"effort,omitempty"`
 }
 
 type GlobalUpstreamProxyMode string
@@ -317,6 +318,13 @@ func (p Provider) ClaudeThinkingBudgetTokens() int {
 	return *p.Overrides.Claude.ThinkingBudgetTokens
 }
 
+func (p Provider) ClaudeEffort() string {
+	if p.Overrides == nil || p.Overrides.Claude == nil || p.Overrides.Claude.Effort == nil {
+		return ""
+	}
+	return normalizeClaudeEffort(*p.Overrides.Claude.Effort)
+}
+
 func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides {
 	if overrides == nil {
 		return nil
@@ -337,17 +345,39 @@ func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides
 			}
 		}
 	}
-	if overrides.Claude != nil && overrides.Claude.ThinkingBudgetTokens != nil {
-		if *overrides.Claude.ThinkingBudgetTokens != 0 {
-			normalized.Claude = &ClaudeOverrides{
-				ThinkingBudgetTokens: ptr(*overrides.Claude.ThinkingBudgetTokens),
+	if overrides.Claude != nil {
+		var claude ClaudeOverrides
+		if overrides.Claude.ThinkingBudgetTokens != nil && *overrides.Claude.ThinkingBudgetTokens != 0 {
+			claude.ThinkingBudgetTokens = ptr(*overrides.Claude.ThinkingBudgetTokens)
+		}
+		if overrides.Claude.Effort != nil {
+			if trimmed := strings.TrimSpace(*overrides.Claude.Effort); trimmed != "" {
+				if effort := normalizeClaudeEffort(trimmed); effort != "" {
+					claude.Effort = ptr(effort)
+				} else {
+					claude.Effort = ptr(trimmed)
+				}
 			}
+		}
+		if claude.ThinkingBudgetTokens != nil || claude.Effort != nil {
+			normalized.Claude = &claude
 		}
 	}
 	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil {
 		return nil
 	}
 	return &normalized
+}
+
+func normalizeClaudeEffort(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "xhigh":
+		return "max"
+	case "low", "medium", "high", "max":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }
 
 func NormalizeProviderAuthSettings(provider *Provider) {
@@ -1214,6 +1244,9 @@ func validateProviders(clientName string, providers []Provider) error {
 		}
 		if p.ClaudeThinkingBudgetTokens() < 0 {
 			return fmt.Errorf("%s provider %s: thinking_budget_tokens must be >= 0", clientName, p.Name)
+		}
+		if p.Overrides != nil && p.Overrides.Claude != nil && p.Overrides.Claude.Effort != nil && p.ClaudeEffort() == "" {
+			return fmt.Errorf("%s provider %s: claude effort must be one of low, medium, high, max, xhigh", clientName, p.Name)
 		}
 	}
 	return nil

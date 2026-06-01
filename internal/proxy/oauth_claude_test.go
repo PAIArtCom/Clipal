@@ -104,7 +104,7 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 		t.Fatalf("X-Stainless-Package-Version = %q, want %q", got, claudeOAuthStainlessPackageVersion)
 	}
 	betas := proxyReq.Header.Get("Anthropic-Beta")
-	for _, token := range []string{"oauth-2025-04-20", "claude-code-20250219", "interleaved-thinking-2025-05-14", "prompt-caching-scope-2026-01-05", "effort-2025-11-24"} {
+	for _, token := range []string{"oauth-2025-04-20", "claude-code-20250219", "redact-thinking-2026-02-12", "interleaved-thinking-2025-05-14", "thinking-token-count-2026-05-13", "prompt-caching-scope-2026-01-05"} {
 		if !strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
 			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
 		}
@@ -138,12 +138,12 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	if !strings.Contains(systemText, "x-anthropic-billing-header:") {
 		t.Fatalf("system[0].text = %q, want billing header", systemText)
 	}
-	if !strings.Contains(systemText, "cc_version="+claudeOAuthAppVersion) {
+	if !strings.Contains(systemText, "cc_version="+claudeOAuthBillingVersion(root["messages"])) {
 		t.Fatalf("system[0].text = %q, want current app version", systemText)
 	}
 	cch := claudeOAuthTestCCH(systemText)
 	if cch == "" || cch == "00000" {
-		t.Fatalf("system billing cch = %q, want non-zero signed value", cch)
+		t.Fatalf("system billing cch = %q, want signed non-zero cch", cch)
 	}
 	thinking, ok := root["thinking"].(map[string]any)
 	if !ok {
@@ -258,15 +258,33 @@ func TestCreateProxyRequest_ClaudeOAuthPrependsAttributionToStringSystem(t *test
 	}
 	system, ok := root["system"].([]any)
 	if !ok || len(system) != 2 {
-		t.Fatalf("system = %#v, want attribution plus original string", root["system"])
+		t.Fatalf("system = %#v, want billing plus client system", root["system"])
 	}
 	attribution, ok := system[0].(map[string]any)
 	if !ok || !isClaudeOAuthBillingHeaderText(stringValue(attribution["text"])) {
 		t.Fatalf("system[0] = %#v, want billing attribution", system[0])
 	}
-	originalSystem, ok := system[1].(map[string]any)
-	if !ok || originalSystem["text"] != "Keep it short." {
-		t.Fatalf("system[1] = %#v, want original system text", system[1])
+	clientSystem, ok := system[1].(map[string]any)
+	if !ok || clientSystem["text"] != "Keep it short." {
+		t.Fatalf("system[1] = %#v, want client system preserved", system[1])
+	}
+	messages, ok := root["messages"].([]any)
+	if !ok || len(messages) == 0 {
+		t.Fatalf("messages = %#v", root["messages"])
+	}
+	firstMessage, ok := messages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("messages[0] = %#v", messages[0])
+	}
+	content, ok := firstMessage["content"].([]any)
+	if !ok || len(content) < 2 {
+		t.Fatalf("messages[0].content = %#v", firstMessage["content"])
+	}
+	for _, item := range content {
+		block, _ := item.(map[string]any)
+		if strings.Contains(stringValue(block["text"]), "Keep it short.") {
+			t.Fatalf("messages[0].content = %#v, client system should not be moved into messages", content)
+		}
 	}
 }
 
@@ -325,10 +343,10 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 		t.Fatalf("ReadAll: %v", err)
 	}
 	if strings.Contains(string(rewrittenBody), "cch=00000;") {
-		t.Fatalf("body = %s, want billing header to be re-signed", string(rewrittenBody))
+		t.Fatalf("body = %s, want signed non-zero cch", string(rewrittenBody))
 	}
 	if got := signClaudeOAuthMessageBody(rewrittenBody); string(got) != string(rewrittenBody) {
-		t.Fatalf("body was not emitted in signed form")
+		t.Fatalf("body was not emitted in normalized billing form")
 	}
 
 	var root map[string]any
@@ -350,8 +368,8 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 	if !ok {
 		t.Fatalf("system[0].text = %#v", systemBlock["text"])
 	}
-	if strings.Contains(systemText, "cch=00000;") {
-		t.Fatalf("system billing header was not re-signed: %q", systemText)
+	if cch := claudeOAuthTestCCH(systemText); cch == "" || cch == "00000" {
+		t.Fatalf("system billing header was not signed: %q", systemText)
 	}
 
 	messages, ok := root["messages"].([]any)
@@ -366,12 +384,16 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 	if !ok || len(content) == 0 {
 		t.Fatalf("messages[0].content = %#v", message["content"])
 	}
-	messageBlock, ok := content[0].(map[string]any)
-	if !ok {
-		t.Fatalf("messages[0].content[0] = %#v", content[0])
+	foundOriginalMessageText := false
+	for _, item := range content {
+		messageBlock, _ := item.(map[string]any)
+		if messageBlock != nil && messageBlock["text"] == "x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=user; cch=abcde;" {
+			foundOriginalMessageText = true
+			break
+		}
 	}
-	if got := messageBlock["text"]; got != "x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=user; cch=abcde;" {
-		t.Fatalf("messages[0].content[0].text = %#v", got)
+	if !foundOriginalMessageText {
+		t.Fatalf("messages[0].content = %#v, want original billing-like message text preserved", content)
 	}
 
 	metadata, ok := root["metadata"].(map[string]any)
@@ -383,6 +405,244 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 	}
 }
 
+func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"temperature":0.2}`)
+	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
+	requestCtx := RequestContext{
+		ClientType:   ClientClaude,
+		Family:       ProtocolFamilyClaude,
+		Capability:   CapabilityClaudeMessages,
+		UpstreamPath: "/v1/messages",
+	}
+
+	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, original, requestCtx)
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if _, ok := root["temperature"]; ok {
+		t.Fatalf("temperature should be removed: %#v", root["temperature"])
+	}
+	if got := root["max_tokens"]; got != float64(claudeOAuthDefaultMaxTokens) {
+		t.Fatalf("max_tokens = %v", got)
+	}
+	metadata, ok := root["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata = %#v", root["metadata"])
+	}
+	var userID map[string]any
+	if err := json.Unmarshal([]byte(stringValue(metadata["user_id"])), &userID); err != nil {
+		t.Fatalf("metadata.user_id is not JSON: %v", err)
+	}
+	if stringValue(userID["device_id"]) == "" || stringValue(userID["session_id"]) == "" {
+		t.Fatalf("metadata.user_id = %#v, want device_id and session_id", userID)
+	}
+	if got := proxyReq.Header.Get("X-Claude-Code-Session-Id"); got != stringValue(userID["session_id"]) {
+		t.Fatalf("X-Claude-Code-Session-Id = %q, want metadata session %q", got, userID["session_id"])
+	}
+	if _, ok := metadata["session_id"]; ok {
+		t.Fatalf("metadata.session_id should be removed: %#v", metadata)
+	}
+	thinking, ok := root["thinking"].(map[string]any)
+	if !ok || thinking["type"] != "adaptive" {
+		t.Fatalf("thinking = %#v, want adaptive", root["thinking"])
+	}
+	outputConfig, ok := root["output_config"].(map[string]any)
+	if !ok || outputConfig["effort"] != "high" {
+		t.Fatalf("output_config = %#v, want effort high", root["output_config"])
+	}
+	contextManagement, ok := root["context_management"].(map[string]any)
+	if !ok {
+		t.Fatalf("context_management = %#v", root["context_management"])
+	}
+	edits, ok := contextManagement["edits"].([]any)
+	if !ok || len(edits) == 0 {
+		t.Fatalf("context_management.edits = %#v", contextManagement["edits"])
+	}
+	edit, ok := edits[0].(map[string]any)
+	if !ok || edit["type"] != "clear_thinking_20251015" || edit["keep"] != "all" {
+		t.Fatalf("context_management.edits[0] = %#v", edits[0])
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) < len(claudeOAuthToolNames()) {
+		t.Fatalf("tools = %#v", root["tools"])
+	}
+	for idx, name := range claudeOAuthToolNames() {
+		tool, _ := tools[idx].(map[string]any)
+		if tool == nil || tool["name"] != name {
+			t.Fatalf("tools[%d] = %#v, want %q", idx, tools[idx], name)
+		}
+	}
+	agent, _ := tools[0].(map[string]any)
+	agentSchema, _ := agent["input_schema"].(map[string]any)
+	agentRequired, _ := agentSchema["required"].([]any)
+	if fmt.Sprint(agentRequired) != "[description prompt]" {
+		t.Fatalf("Agent.required = %#v, want description and prompt only", agentSchema["required"])
+	}
+	agentProps, _ := agentSchema["properties"].(map[string]any)
+	if _, ok := agentProps["model"]; !ok {
+		t.Fatalf("Agent.properties missing model: %#v", agentProps)
+	}
+	if _, ok := agentProps["isolation"]; !ok {
+		t.Fatalf("Agent.properties missing isolation: %#v", agentProps)
+	}
+	bash, _ := tools[1].(map[string]any)
+	bashSchema, _ := bash["input_schema"].(map[string]any)
+	bashRequired, _ := bashSchema["required"].([]any)
+	if fmt.Sprint(bashRequired) != "[command]" {
+		t.Fatalf("Bash.required = %#v, want command only", bashSchema["required"])
+	}
+	bashProps, _ := bashSchema["properties"].(map[string]any)
+	if _, ok := bashProps["dangerouslyDisableSandbox"]; !ok {
+		t.Fatalf("Bash.properties missing dangerouslyDisableSandbox: %#v", bashProps)
+	}
+	system, ok := root["system"].([]any)
+	if !ok || len(system) < 4 {
+		t.Fatalf("system = %#v", root["system"])
+	}
+	systemBlock, _ := system[0].(map[string]any)
+	if !isClaudeOAuthBillingHeaderText(stringValue(systemBlock["text"])) {
+		t.Fatalf("system[0] = %#v, want billing header", system[0])
+	}
+	if cch := claudeOAuthTestCCH(stringValue(systemBlock["text"])); cch == "" || cch == "00000" {
+		t.Fatalf("system billing cch = %q, want signed non-zero cch", cch)
+	}
+	if !strings.Contains(stringValue(systemBlock["text"]), "cc_version=2.1.159.dda;") {
+		t.Fatalf("system[0].text = %q, want fingerprint based on original user prompt", systemBlock["text"])
+	}
+	messages, ok := root["messages"].([]any)
+	if !ok || len(messages) == 0 {
+		t.Fatalf("messages = %#v", root["messages"])
+	}
+	firstMessage, _ := messages[0].(map[string]any)
+	content, ok := firstMessage["content"].([]any)
+	if !ok || len(content) < 3 {
+		t.Fatalf("messages[0].content = %#v", firstMessage["content"])
+	}
+	if !claudeOAuthBlockTextHasPrefix(content[0], "<system-reminder>\nThe following deferred tools are now available via ToolSearch.") {
+		t.Fatalf("messages[0].content[0] = %#v", content[0])
+	}
+	finalBlock, ok := claudeOAuthLastTextBlock(content)
+	if !ok || finalBlock["text"] != "hello" || !claudeOAuthCacheControlMatches(finalBlock["cache_control"], "ephemeral", "1h", "") {
+		t.Fatalf("final user block = %#v", finalBlock)
+	}
+	betas := proxyReq.Header.Get("Anthropic-Beta")
+	for _, token := range []string{"context-management-2025-06-27", "effort-2025-11-24", "interleaved-thinking-2025-05-14", "advanced-tool-use-2025-11-20"} {
+		if !strings.Contains(betas, token) {
+			t.Fatalf("Anthropic-Beta = %q, want %q", betas, token)
+		}
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *testing.T) {
+	tools := make([]map[string]any, 0, len(claudeOAuthToolNames()))
+	for _, name := range claudeOAuthToolNames() {
+		tools = append(tools, map[string]any{
+			"name":         name,
+			"description":  "client " + name,
+			"input_schema": map[string]any{"type": "object"},
+		})
+	}
+	bodyRoot := map[string]any{
+		"model": "claude-sonnet-4-5",
+		"metadata": map[string]any{
+			"user_id": `{"device_id":"client-device","account_uuid":"acct","session_id":"client-session"}`,
+		},
+		"messages": []any{map[string]any{
+			"role": "user",
+			"content": []any{
+				map[string]any{"type": "text", "text": claudeOAuthDeferredToolsPrompt},
+				map[string]any{"type": "text", "text": claudeOAuthSkillsPrompt},
+				map[string]any{"type": "text", "text": "hello", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}},
+			},
+		}},
+		"system": []any{
+			map[string]any{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.159.dda; cc_entrypoint=cli; cch=00000;"},
+			map[string]any{"type": "text", "text": claudeOAuthSystemPrompt},
+			map[string]any{"type": "text", "text": "client core", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h", "scope": "global"}},
+			map[string]any{"type": "text", "text": "client runtime", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}},
+		},
+		"tools": tools,
+	}
+	body, err := json.Marshal(bodyRoot)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
+	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	system, ok := root["system"].([]any)
+	if !ok || len(system) != 4 {
+		t.Fatalf("system = %#v", root["system"])
+	}
+	core, _ := system[2].(map[string]any)
+	if core["text"] != "client core" {
+		t.Fatalf("system[2] = %#v, want client core preserved", system[2])
+	}
+	rewrittenTools, ok := root["tools"].([]any)
+	if !ok || len(rewrittenTools) != len(claudeOAuthToolNames()) {
+		t.Fatalf("tools = %#v", root["tools"])
+	}
+	bash, _ := rewrittenTools[1].(map[string]any)
+	if bash["description"] != "client Bash" {
+		t.Fatalf("tools[1] = %#v, want client Bash preserved", rewrittenTools[1])
+	}
+	systemBlock, _ := system[0].(map[string]any)
+	if cch := claudeOAuthTestCCH(stringValue(systemBlock["text"])); cch == "" || cch == "00000" {
+		t.Fatalf("system billing header was not signed: %q", systemBlock["text"])
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestPreservesExplicitCustomTools(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"tools":[{"name":"CustomTool","description":"custom","input_schema":{"type":"object"}}]}`)
+	rewritten := normalizeClaudeOAuthRequest(body, httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil), nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v", root["tools"])
+	}
+	custom, _ := tools[0].(map[string]any)
+	if custom["name"] != "CustomTool" {
+		t.Fatalf("tools[0] = %#v, want CustomTool", tools[0])
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestPreservesExplicitEmptyTools(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"tools":[]}`)
+	rewritten := normalizeClaudeOAuthRequest(body, httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil), nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 0 {
+		t.Fatalf("tools = %#v, want explicit empty tools preserved", root["tools"])
+	}
+}
+
+func TestClaudeOAuthBillingVersionUsesOfficialMessageFingerprint(t *testing.T) {
+	messages := []any{
+		map[string]any{
+			"role":    "user",
+			"content": []any{map[string]any{"type": "text", "text": "hello"}},
+		},
+	}
+	if got := claudeOAuthBillingVersion(messages); got != "2.1.159.dda" {
+		t.Fatalf("billing version = %q, want 2.1.159.dda", got)
+	}
+}
+
 func TestForwardWithFailover_ClaudeOAuthRefreshesAndRetriesOn401(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
@@ -390,16 +650,10 @@ func TestForwardWithFailover_ClaudeOAuthRefreshesAndRetriesOn401(t *testing.T) {
 	var upstreamCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("ReadAll: %v", err)
-		}
 		if got := r.Header.Get("Content-Type"); got != "application/json" {
 			t.Fatalf("Content-Type = %q", got)
 		}
-		if got := string(body); got == "" {
-			t.Fatalf("expected refresh body")
-		}
+		assertClaudeRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"access_token":"access-2","refresh_token":"refresh-2","token_type":"Bearer","expires_in":3600,"account":{"uuid":"acct_123","email_address":"sean@example.com"},"organization":{"uuid":"org_123","name":"Example"}}`)
@@ -410,6 +664,7 @@ func TestForwardWithFailover_ClaudeOAuthRefreshesAndRetriesOn401(t *testing.T) {
 		oauthpkg.WithNowFunc(func() time.Time { return now }),
 		oauthpkg.WithProviderClient(&oauthpkg.ClaudeClient{
 			TokenURL:     tokenServer.URL,
+			ClientID:     "test-client",
 			HTTPClient:   tokenServer.Client(),
 			CallbackHost: "127.0.0.1",
 			CallbackPort: 0,
@@ -493,16 +748,10 @@ func TestForwardCountTokensSingleShot_ClaudeOAuthRefreshesAndRetriesOn401(t *tes
 	var upstreamCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("ReadAll: %v", err)
-		}
 		if got := r.Header.Get("Content-Type"); got != "application/json" {
 			t.Fatalf("Content-Type = %q", got)
 		}
-		if got := string(body); got == "" {
-			t.Fatalf("expected refresh body")
-		}
+		assertClaudeRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"access_token":"access-2","refresh_token":"refresh-2","token_type":"Bearer","expires_in":3600,"account":{"uuid":"acct_123","email_address":"sean@example.com"},"organization":{"uuid":"org_123","name":"Example"}}`)
@@ -513,6 +762,7 @@ func TestForwardCountTokensSingleShot_ClaudeOAuthRefreshesAndRetriesOn401(t *tes
 		oauthpkg.WithNowFunc(func() time.Time { return now }),
 		oauthpkg.WithProviderClient(&oauthpkg.ClaudeClient{
 			TokenURL:     tokenServer.URL,
+			ClientID:     "test-client",
 			HTTPClient:   tokenServer.Client(),
 			CallbackHost: "127.0.0.1",
 			CallbackPort: 0,
@@ -713,4 +963,24 @@ func claudeOAuthTestCCH(text string) string {
 		end++
 	}
 	return text[start:end]
+}
+
+func assertClaudeRefreshJSONRequest(t *testing.T, r *http.Request, wantClientID string, wantRefreshToken string) {
+	t.Helper()
+	var req map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		t.Fatalf("Decode refresh request: %v", err)
+	}
+	if got := req["grant_type"]; got != "refresh_token" {
+		t.Fatalf("grant_type = %q, want refresh_token", got)
+	}
+	if got := req["client_id"]; got != wantClientID {
+		t.Fatalf("client_id = %q, want %q", got, wantClientID)
+	}
+	if got := req["refresh_token"]; got != wantRefreshToken {
+		t.Fatalf("refresh_token = %q, want %q", got, wantRefreshToken)
+	}
+	if _, ok := req["scope"]; ok {
+		t.Fatalf("scope should be omitted from claude refresh request: %#v", req)
+	}
 }

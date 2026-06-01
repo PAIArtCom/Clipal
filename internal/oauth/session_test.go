@@ -3,6 +3,7 @@ package oauth
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -326,7 +327,7 @@ func TestCompleteLoginWithCode_ClaudeRequiresStateInManualInput(t *testing.T) {
 	svc.sessions["session-claude"] = &LoginSession{
 		ID:          "session-claude",
 		Provider:    config.OAuthProviderClaude,
-		AuthURL:     "https://claude.ai/oauth/authorize?state=session-claude",
+		AuthURL:     "https://platform.claude.com/oauth/authorize?state=session-claude",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
 		pkce:        PKCECodes{CodeVerifier: "verifier", CodeChallenge: "challenge"},
@@ -585,11 +586,15 @@ func TestRefreshIfNeededCoalescesConcurrentCallers(t *testing.T) {
 	var refreshCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
+		var req codexRefreshRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("Decode: %v", err)
 		}
-		if got := r.Form.Get("grant_type"); got != "refresh_token" {
+		if got := req.GrantType; got != "refresh_token" {
 			t.Fatalf("grant_type = %q, want refresh_token", got)
+		}
+		if got := req.RefreshToken; got != "refresh-1" {
+			t.Fatalf("refresh_token = %q, want refresh-1", got)
 		}
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
@@ -946,7 +951,7 @@ func TestStartLogin_UsesRegisteredProviderClient(t *testing.T) {
 		startSession: &LoginSession{
 			ID:        "session-123",
 			Provider:  config.OAuthProviderClaude,
-			AuthURL:   "https://claude.ai/oauth/authorize?state=session-123",
+			AuthURL:   "https://platform.claude.com/oauth/authorize?state=session-123",
 			Status:    LoginStatusPending,
 			ExpiresAt: now.Add(5 * time.Minute),
 		},

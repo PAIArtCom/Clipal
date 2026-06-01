@@ -209,6 +209,110 @@ func TestCreateProxyRequest_AppliesClaudeThinkingOverrides(t *testing.T) {
 	}
 }
 
+func TestCreateProxyRequest_SkipsClaudeThinkingBudgetForEffortModels(t *testing.T) {
+	t.Parallel()
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:     "claude",
+			BaseURL:  "https://api.anthropic.example",
+			APIKey:   "provider-key",
+			Priority: 1,
+			Overrides: &config.ProviderOverrides{
+				Model: strPtr("claude-opus-4-8"),
+				Claude: &config.ClaudeOverrides{
+					ThinkingBudgetTokens: intPtr(4096),
+				},
+			},
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+
+	body := []byte(`{"model":"claude-opus-4-6","thinking":{"type":"disabled"},"messages":[]}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "provider-key", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+
+	root := decodeRequestBodyMap(t, proxyReq)
+	if got := root["model"]; got != "claude-opus-4-8" {
+		t.Fatalf("model = %v", got)
+	}
+	thinking, ok := root["thinking"].(map[string]any)
+	if !ok {
+		t.Fatalf("thinking = %T %#v", root["thinking"], root["thinking"])
+	}
+	if _, ok := thinking["budget_tokens"]; ok {
+		t.Fatalf("thinking.budget_tokens should not be injected for effort models: %#v", thinking)
+	}
+	if got := thinking["type"]; got != "disabled" {
+		t.Fatalf("thinking.type = %v", got)
+	}
+}
+
+func TestCreateProxyRequest_AppliesClaudeEffortOverride(t *testing.T) {
+	t.Parallel()
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:     "claude",
+			BaseURL:  "https://api.anthropic.example",
+			APIKey:   "provider-key",
+			Priority: 1,
+			Overrides: &config.ProviderOverrides{
+				Model: strPtr("claude-opus-4-8"),
+				Claude: &config.ClaudeOverrides{
+					Effort: strPtr("xhigh"),
+				},
+			},
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+
+	body := []byte(`{"model":"claude-opus-4-6","thinking":{"type":"disabled"},"output_config":{"format":{"type":"text"}},"messages":[]}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "provider-key", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+
+	root := decodeRequestBodyMap(t, proxyReq)
+	outputConfig, ok := root["output_config"].(map[string]any)
+	if !ok {
+		t.Fatalf("output_config = %T %#v", root["output_config"], root["output_config"])
+	}
+	if got := outputConfig["effort"]; got != "max" {
+		t.Fatalf("output_config.effort = %v, want max", got)
+	}
+	if _, ok := outputConfig["format"]; !ok {
+		t.Fatalf("output_config.format was not preserved: %#v", outputConfig)
+	}
+	thinking, ok := root["thinking"].(map[string]any)
+	if !ok {
+		t.Fatalf("thinking = %T %#v", root["thinking"], root["thinking"])
+	}
+	if got := thinking["type"]; got != "adaptive" {
+		t.Fatalf("thinking.type = %v, want adaptive", got)
+	}
+}
+
 func TestCreateProxyRequest_SkipsOverridesForNonJSONRequests(t *testing.T) {
 	t.Parallel()
 

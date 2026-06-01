@@ -408,7 +408,7 @@ func oauthProviderEnvironmentProxyProbeURLs(provider config.OAuthProvider) []str
 			"https://chatgpt.com/backend-api/wham/usage",
 		}
 	case config.OAuthProviderClaude:
-		return []string{"https://api.anthropic.com/v1/oauth/token"}
+		return []string{"https://platform.claude.com/v1/oauth/token"}
 	case config.OAuthProviderGemini:
 		return []string{
 			"https://oauth2.googleapis.com/token",

@@ -575,8 +575,8 @@ func TestHandleSubmitOAuthSessionCode_AcceptsCallbackURLInput(t *testing.T) {
 func TestHandleSubmitOAuthSessionCode_ClaudeRejectsRawCodeWithoutState(t *testing.T) {
 	now := time.Date(2026, 4, 22, 10, 20, 0, 0, time.UTC)
 	api := newTestOAuthAPI(t, oauthpkg.WithClaudeClient(&oauthpkg.ClaudeClient{
-		AuthURL:      "https://claude.ai/oauth/authorize",
-		TokenURL:     "https://api.anthropic.com/v1/oauth/token",
+		AuthURL:      "https://platform.claude.com/oauth/authorize",
+		TokenURL:     "https://platform.claude.com/v1/oauth/token",
 		ClientID:     "test-client",
 		CallbackHost: "127.0.0.1",
 		CallbackPort: 0,
@@ -1930,7 +1930,7 @@ func TestHandleGetOAuthSession_ClaudeFlowRequiresExplicitLink(t *testing.T) {
 	defer tokenServer.Close()
 
 	api := newTestOAuthAPI(t, oauthpkg.WithClaudeClient(&oauthpkg.ClaudeClient{
-		AuthURL:      "https://claude.ai/oauth/authorize",
+		AuthURL:      "https://platform.claude.com/oauth/authorize",
 		TokenURL:     tokenServer.URL,
 		ClientID:     "test-client",
 		CallbackHost: "127.0.0.1",

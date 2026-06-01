@@ -1497,7 +1497,7 @@ test('oauth authorization manual-entry copy is provider-aware for Claude', () =>
         client_type: 'claude',
         started_at: 1710000000000,
         expires_at: '2099-04-21T13:00:00Z',
-        auth_url: 'https://claude.ai/oauth/authorize?state=sess-claude'
+        auth_url: 'https://platform.claude.com/oauth/authorize?state=sess-claude'
     }, {
         phase: 'waiting'
     });

@@ -541,7 +541,7 @@ payload = {
     "system": [
         {
             "type": "text",
-            "text": "x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli; cch=00000;",
+            "text": "x-anthropic-billing-header: cc_version=2.1.159.3e1; cc_entrypoint=cli; cch=00000;",
         },
         {
             "type": "text",
@@ -574,7 +574,7 @@ payload = {
     "system": [
         {
             "type": "text",
-            "text": "x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli; cch=00000;",
+            "text": "x-anthropic-billing-header: cc_version=2.1.159.3e1; cc_entrypoint=cli; cch=00000;",
         },
         {
             "type": "text",

@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	defaultClaudeAuthURL      = "https://claude.ai/oauth/authorize"
-	defaultClaudeTokenURL     = "https://api.anthropic.com/v1/oauth/token"
+	defaultClaudeAuthURL      = "https://platform.claude.com/oauth/authorize"
+	defaultClaudeTokenURL     = "https://platform.claude.com/v1/oauth/token"
 	defaultClaudeUsageURL     = "https://api.anthropic.com/api/oauth/usage"
 	defaultClaudeClientID     = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-	defaultClaudeScope        = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+	defaultClaudeScope        = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+	defaultClaudeRefreshBeta  = "oauth-2025-04-20"
+	defaultClaudeRefreshUA    = "anthropic-sdk-typescript/0.94.0 userOAuthProvider"
 	defaultClaudeCallbackHost = "localhost"
 	defaultClaudeCallbackPort = 54545
 	defaultClaudeCallbackPath = "/callback"
@@ -46,6 +48,7 @@ type claudeTokenRequest struct {
 	RedirectURI  string `json:"redirect_uri,omitempty"`
 	CodeVerifier string `json:"code_verifier,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
 }
 
 type claudeTokenResponse struct {
@@ -200,6 +203,10 @@ func (c *ClaudeClient) exchange(ctx context.Context, requestBody claudeTokenRequ
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if requestBody.GrantType == "refresh_token" {
+		req.Header.Set("Anthropic-Beta", defaultClaudeRefreshBeta)
+		req.Header.Set("User-Agent", defaultClaudeRefreshUA)
+	}
 
 	resp, err := c.httpClient().Do(req)
 	if err != nil {

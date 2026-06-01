@@ -36,7 +36,7 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 		`oauth_provider: "claude"`,
 		`"http://127.0.0.1:$clipal_port/clipal/v1/messages"`,
 		`"http://127.0.0.1:$clipal_port/clipal/v1/messages/count_tokens"`,
-		`x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli; cch=00000;`,
+		`x-anthropic-billing-header: cc_version=2.1.159.3e1; cc_entrypoint=cli; cch=00000;`,
 		`clipal-live-invalid-token`,
 		`credential access_token was not replaced after refresh retry`,
 		`ok refreshed temp credential updated`,

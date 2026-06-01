@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -72,6 +74,15 @@ func TestCodexStartLoginAndPollCompletesCredential(t *testing.T) {
 	if query.Get("code_challenge") == "" {
 		t.Fatalf("expected code_challenge to be set")
 	}
+	if got := query.Get("scope"); got != defaultCodexScope {
+		t.Fatalf("scope = %q, want %q", got, defaultCodexScope)
+	}
+	if got := query.Get("originator"); got != defaultCodexOriginator {
+		t.Fatalf("originator = %q, want %q", got, defaultCodexOriginator)
+	}
+	if got := query.Get("prompt"); got != "" {
+		t.Fatalf("prompt = %q, want empty", got)
+	}
 
 	redirectURI := query.Get("redirect_uri")
 	resp, err := http.Get(redirectURI + "?code=auth-code&state=" + url.QueryEscape(session.ID))
@@ -106,6 +117,88 @@ func TestCodexStartLoginAndPollCompletesCredential(t *testing.T) {
 	}
 	if cred.Email != "sean@example.com" {
 		t.Fatalf("email = %q, want sean@example.com", cred.Email)
+	}
+}
+
+func TestCodexRefreshUsesOfficialJSONRequestAndPreservesOmittedFields(t *testing.T) {
+	now := time.Date(2026, 4, 18, 21, 30, 0, 0, time.UTC)
+	previousExpiresAt := now.Add(10 * time.Minute)
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %q, want POST", r.Method)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("content-type = %q, want application/json", got)
+		}
+		if got := r.Header.Get("Accept"); got != "application/json" {
+			t.Fatalf("accept = %q, want application/json", got)
+		}
+		if got := r.Header.Get("Originator"); got != defaultCodexOriginator {
+			t.Fatalf("originator = %q, want %q", got, defaultCodexOriginator)
+		}
+		if got := r.Header.Get("User-Agent"); got != defaultCodexUserAgent {
+			t.Fatalf("user-agent = %q, want %q", got, defaultCodexUserAgent)
+		}
+
+		var req codexRefreshRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("Decode: %v", err)
+		}
+		if got := req.GrantType; got != "refresh_token" {
+			t.Fatalf("grant_type = %q, want refresh_token", got)
+		}
+		if got := req.ClientID; got != "test-client" {
+			t.Fatalf("client_id = %q, want test-client", got)
+		}
+		if got := req.RefreshToken; got != "refresh-1" {
+			t.Fatalf("refresh_token = %q, want refresh-1", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"access-2"}`)
+	}))
+	defer tokenServer.Close()
+
+	client := &CodexClient{
+		TokenURL:   tokenServer.URL,
+		ClientID:   "test-client",
+		HTTPClient: tokenServer.Client(),
+		Now:        func() time.Time { return now },
+	}
+	cred, err := client.Refresh(context.Background(), &Credential{
+		Ref:          "codex-sean-example-com",
+		Provider:     config.OAuthProviderCodex,
+		Email:        "sean@example.com",
+		AccountID:    "acct_123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    previousExpiresAt,
+		Metadata: map[string]string{
+			"id_token":                   testJWT("sean@example.com", "acct_123"),
+			"chatgpt_account_is_fedramp": "true",
+			"custom":                     "keep",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if got := cred.AccessToken; got != "access-2" {
+		t.Fatalf("access_token = %q, want access-2", got)
+	}
+	if got := cred.RefreshToken; got != "refresh-1" {
+		t.Fatalf("refresh_token = %q, want refresh-1", got)
+	}
+	if got := cred.ExpiresAt; !got.Equal(previousExpiresAt) {
+		t.Fatalf("expires_at = %s, want %s", got, previousExpiresAt)
+	}
+	if got := cred.Metadata["id_token"]; got == "" {
+		t.Fatalf("expected id_token metadata to be preserved")
+	}
+	if got := cred.Metadata["chatgpt_account_is_fedramp"]; got != "true" {
+		t.Fatalf("chatgpt_account_is_fedramp = %q, want true", got)
+	}
+	if got := cred.Metadata["custom"]; got != "keep" {
+		t.Fatalf("custom metadata = %q, want keep", got)
 	}
 }
 

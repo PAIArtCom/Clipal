@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,6 +26,9 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 		Email:       "sean@example.com",
 		AccountID:   "acct_123",
 		AccessToken: "access-1",
+		Metadata: map[string]string{
+			"chatgpt_account_is_fedramp": "true",
+		},
 	}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -79,6 +83,9 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 	if got := proxyReq.Header.Get("Chatgpt-Account-Id"); got != "acct_123" {
 		t.Fatalf("Chatgpt-Account-Id = %q", got)
 	}
+	if got := proxyReq.Header.Get("X-OpenAI-Fedramp"); got != "true" {
+		t.Fatalf("X-OpenAI-Fedramp = %q, want true", got)
+	}
 	if got := proxyReq.Header.Get("Cookie"); got != "" {
 		t.Fatalf("Cookie = %q, want empty", got)
 	}
@@ -96,6 +103,9 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 	}
 	if got := proxyReq.Header.Get("X-Client-Request-Id"); got != proxyReq.Header.Get("Thread-Id") {
 		t.Fatalf("X-Client-Request-Id = %q, want Thread-Id %q", got, proxyReq.Header.Get("Thread-Id"))
+	}
+	if got, want := proxyReq.Header.Get("X-Codex-Window-Id"), proxyReq.Header.Get("Thread-Id")+":0"; got != want {
+		t.Fatalf("X-Codex-Window-Id = %q, want %q", got, want)
 	}
 	if got := proxyReq.Header.Get("Session_id"); got != "" {
 		t.Fatalf("Session_id = %q, want empty", got)
@@ -161,6 +171,7 @@ func TestCreateCodexOAuthRequest_RefreshUsesProviderCustomProxy(t *testing.T) {
 		if got := r.URL.Host; got != "auth.example" {
 			t.Fatalf("proxied host = %q, want auth.example", got)
 		}
+		assertCodexRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"access_token":"access-2","refresh_token":"refresh-2","expires_in":3600}`)
 	}))
@@ -1050,7 +1061,10 @@ func TestBuildCodexOAuthRequest_CompactEndpointKeepsCanonicalFields(t *testing.T
 		"text":{"verbosity":"low"},
 		"stream":true,
 		"store":true,
-		"stream_options":{"include_usage":true}
+		"stream_options":{"include_usage":true},
+		"include":["reasoning.encrypted_content"],
+		"tool_choice":"auto",
+		"client_metadata":{"x-codex-installation-id":"install-123"}
 	}`)
 
 	targetPath, stream, rewritten, err := buildCodexOAuthRequest("/v1/responses/compact", body)
@@ -1094,6 +1108,12 @@ func TestBuildCodexOAuthRequest_CompactEndpointKeepsCanonicalFields(t *testing.T
 	}
 	if _, ok := root["include"]; ok {
 		t.Fatalf("did not expect include in compact body: %#v", root["include"])
+	}
+	if _, ok := root["tool_choice"]; ok {
+		t.Fatalf("did not expect tool_choice in compact body: %#v", root["tool_choice"])
+	}
+	if _, ok := root["client_metadata"]; ok {
+		t.Fatalf("did not expect client_metadata in compact body: %#v", root["client_metadata"])
 	}
 }
 
@@ -1148,12 +1168,7 @@ func TestCreateProxyRequest_CodexOAuthRefreshesExpiredCredential(t *testing.T) {
 	var refreshCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
-		}
-		if got := r.Form.Get("grant_type"); got != "refresh_token" {
-			t.Fatalf("grant_type = %q", got)
-		}
+		assertCodexRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, fmt.Sprintf(`{"access_token":"access-2","refresh_token":"refresh-2","id_token":"%s","expires_in":3600}`, testCodexJWT("sean@example.com", "acct_123")))
@@ -1399,12 +1414,7 @@ func TestForwardWithFailover_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 	var upstreamCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
-		}
-		if got := r.Form.Get("grant_type"); got != "refresh_token" {
-			t.Fatalf("grant_type = %q", got)
-		}
+		assertCodexRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, fmt.Sprintf(`{"access_token":"access-2","refresh_token":"refresh-2","id_token":"%s","expires_in":3600}`, testCodexJWT("sean@example.com", "acct_123")))
@@ -1630,12 +1640,7 @@ func TestForwardManual_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 	var upstreamCalls int32
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
-		}
-		if got := r.Form.Get("grant_type"); got != "refresh_token" {
-			t.Fatalf("grant_type = %q", got)
-		}
+		assertCodexRefreshJSONRequest(t, r, "test-client", "refresh-1")
 		atomic.AddInt32(&refreshCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, fmt.Sprintf(`{"access_token":"access-2","refresh_token":"refresh-2","id_token":"%s","expires_in":3600}`, testCodexJWT("sean@example.com", "acct_123")))
@@ -1743,6 +1748,38 @@ func testCodexJWT(email string, accountID string) string {
 	payload := fmt.Sprintf(`{"email":"%s","sub":"sub_123","https://api.openai.com/auth":{"chatgpt_account_id":"%s"}}`, email, accountID)
 	return base64.RawURLEncoding.EncodeToString([]byte(header)) + "." +
 		base64.RawURLEncoding.EncodeToString([]byte(payload)) + "."
+}
+
+func assertCodexRefreshJSONRequest(t *testing.T, r *http.Request, wantClientID string, wantRefreshToken string) {
+	t.Helper()
+	if r.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", r.Method)
+	}
+	if got := r.Header.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("content-type = %q, want application/json", got)
+	}
+	if got := r.Header.Get("Originator"); got != "codex_cli_rs" {
+		t.Fatalf("originator = %q, want codex_cli_rs", got)
+	}
+	if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "codex_cli_rs/0.135.0") {
+		t.Fatalf("user-agent = %q, want codex_cli_rs/0.135.0 prefix", got)
+	}
+	var req map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		t.Fatalf("Decode refresh request: %v", err)
+	}
+	if got := req["grant_type"]; got != "refresh_token" {
+		t.Fatalf("grant_type = %q, want refresh_token", got)
+	}
+	if got := req["client_id"]; got != wantClientID {
+		t.Fatalf("client_id = %q, want %q", got, wantClientID)
+	}
+	if got := req["refresh_token"]; got != wantRefreshToken {
+		t.Fatalf("refresh_token = %q, want %q", got, wantRefreshToken)
+	}
+	if _, ok := req["scope"]; ok {
+		t.Fatalf("scope should be omitted from codex refresh request: %#v", req)
+	}
 }
 
 func containsStringValue(values []any, want string) bool {

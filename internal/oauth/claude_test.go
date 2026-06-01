@@ -13,7 +13,7 @@ import (
 
 func TestClaudeGenerateAuthURL(t *testing.T) {
 	client := &ClaudeClient{
-		AuthURL:  "https://claude.ai/oauth/authorize",
+		AuthURL:  "https://platform.claude.com/oauth/authorize",
 		ClientID: "test-client",
 		Scope:    "scope-a scope-b",
 	}
@@ -31,7 +31,7 @@ func TestClaudeGenerateAuthURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("url.Parse: %v", err)
 	}
-	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != "https://claude.ai/oauth/authorize" {
+	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != "https://platform.claude.com/oauth/authorize" {
 		t.Fatalf("auth url = %q", got)
 	}
 
@@ -182,6 +182,15 @@ func TestClaudeRefreshPreservesIdentityMetadata(t *testing.T) {
 		}
 		if req.RefreshToken != "refresh-1" {
 			t.Fatalf("refresh_token = %q, want refresh-1", req.RefreshToken)
+		}
+		if req.Scope != "" {
+			t.Fatalf("scope = %q, want omitted", req.Scope)
+		}
+		if got := r.Header.Get("Anthropic-Beta"); got != defaultClaudeRefreshBeta {
+			t.Fatalf("Anthropic-Beta = %q, want %q", got, defaultClaudeRefreshBeta)
+		}
+		if got := r.Header.Get("User-Agent"); got != defaultClaudeRefreshUA {
+			t.Fatalf("User-Agent = %q, want %q", got, defaultClaudeRefreshUA)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

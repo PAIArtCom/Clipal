@@ -184,6 +184,7 @@ func providerOverrideCacheKey(requestCtx RequestContext, provider config.Provide
 		provider.Name,
 		provider.ModelOverride(),
 		provider.OpenAIReasoningEffort(),
+		provider.ClaudeEffort(),
 		fmt.Sprintf("%d", provider.ClaudeThinkingBudgetTokens()),
 	}, "\x00")
 }
@@ -198,6 +199,9 @@ func cloneJSONRootForRequestOverrides(root map[string]any) map[string]any {
 	}
 	if reasoning, ok := out["reasoning"].(map[string]any); ok {
 		out["reasoning"] = cloneStringAnyMap(reasoning)
+	}
+	if outputConfig, ok := out["output_config"].(map[string]any); ok {
+		out["output_config"] = cloneStringAnyMap(outputConfig)
 	}
 	return out
 }

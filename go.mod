@@ -3,7 +3,6 @@ module github.com/lansespirit/Clipal
 go 1.25.9
 
 require (
-	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/gen2brain/beeep v0.11.2
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/refraction-networking/utls v1.8.2

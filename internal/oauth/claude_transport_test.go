@@ -59,7 +59,7 @@ func TestAnthropicFallbackRoundTripper_RoutesAnthropicHostsToUTLS(t *testing.T) 
 		}),
 	}
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/oauth/token", nil)
+	req, err := http.NewRequest(http.MethodPost, "https://platform.claude.com/v1/oauth/token", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest: %v", err)
 	}
