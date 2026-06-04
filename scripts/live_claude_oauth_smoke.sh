@@ -51,6 +51,11 @@ Environment fallbacks:
   CLIPAL_LIVE_SKIP_REFRESH_RETRY
   CLIPAL_LIVE_KEEP_TEMP
   CLIPAL_LIVE_VERBOSE
+
+Notes:
+  The script strips refresh_token from the temporary credential by default.
+  This prevents refresh token rotation in the temp store from invalidating the
+  real credential under the source config dir.
 EOF
 }
 
@@ -206,6 +211,7 @@ for line in headers:
     value = value.strip()
     try:
         seconds = max(int(float(value)), 1)
+        seconds = min(seconds, 30)
     except Exception:
         seconds = 2
     print(seconds)
@@ -441,12 +447,6 @@ import sys
 print(json.loads(sys.argv[1]).get("email", ""))
 PY
 )"
-oauth_has_refresh="$("$PY" - "$selection_json" <<'PY'
-import json
-import sys
-print("1" if json.loads(sys.argv[1]).get("has_refresh_token") else "0")
-PY
-)"
 
 if [[ ! -f "$oauth_source_path" ]]; then
   echo "selected oauth credential file does not exist: $oauth_source_path" >&2
@@ -470,10 +470,13 @@ cleanup() {
     wait "$clipal_pid" >/dev/null 2>&1 || true
   fi
   if [[ "$exit_status" -ne 0 ]]; then
-    KEEP_TEMP=1
     echo "" >&2
     echo "live claude oauth smoke failed" >&2
-    echo "temp dir preserved for debugging: $tmpdir" >&2
+    if [[ "$KEEP_TEMP" == "1" ]]; then
+      echo "temp dir preserved for debugging: $tmpdir" >&2
+    else
+      echo "temp dir will be removed; rerun with --keep-temp to preserve logs" >&2
+    fi
     echo "logs: $tmpdir/clipal.log" >&2
     print_failure_artifacts
     print_failure_details
@@ -488,6 +491,34 @@ trap cleanup EXIT
 credential_path="$cfgdir/oauth/claude/$(basename "$oauth_source_path")"
 cp "$oauth_source_path" "$credential_path"
 chmod 600 "$credential_path"
+oauth_has_refresh="$("$PY" - "$credential_path" <<'PY'
+import json
+import pathlib
+import sys
+from datetime import datetime, timezone
+
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text())
+had_refresh = bool(str(data.get("refresh_token", "")).strip())
+data.pop("refresh_token", None)
+path.write_text(json.dumps(data, indent=2) + "\n")
+
+expires_raw = str(data.get("expires_at", "")).strip()
+if expires_raw:
+    try:
+        expires = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if expires <= datetime.now(timezone.utc):
+            raise SystemExit("selected credential access_token is expired; refusing to run live smoke without refresh_token")
+    except ValueError as exc:
+        raise SystemExit(f"parse selected credential expires_at: {exc}")
+
+print("0")
+if had_refresh:
+    print("note: stripped refresh_token from temp credential to avoid token rotation", file=sys.stderr)
+PY
+)"
 
 cat >"$cfgdir/config.yaml" <<YAML
 listen_addr: 127.0.0.1
@@ -530,18 +561,34 @@ claude_payload() {
   local stream="${2:-0}"
   "$PY" - "$MODEL" "$prompt" "$stream" <<'PY'
 import json
+import hashlib
 import sys
 
 model = sys.argv[1]
 prompt = sys.argv[2]
 stream = sys.argv[3] == "1"
+
+def billing_version(text):
+    encoded = text.encode("utf-16-le", "surrogatepass")
+    picks = []
+    for idx in (4, 7, 20):
+        offset = idx * 2
+        if offset + 1 < len(encoded):
+            unit = int.from_bytes(encoded[offset:offset + 2], "little")
+            picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
+        else:
+            picks.append("0")
+    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + "2.1.161").encode()).digest()
+    suffix = (digest[0] << 4) | (digest[1] >> 4)
+    return f"2.1.161.{suffix:03x}"
+
 payload = {
     "model": model,
     "max_tokens": 64,
     "system": [
         {
             "type": "text",
-            "text": "x-anthropic-billing-header: cc_version=2.1.159.3e1; cc_entrypoint=cli; cch=00000;",
+            "text": f"x-anthropic-billing-header: cc_version={billing_version(prompt)}; cc_entrypoint=sdk-cli; cch=00000;",
         },
         {
             "type": "text",
@@ -565,16 +612,32 @@ claude_count_tokens_payload() {
   local prompt="$1"
   "$PY" - "$MODEL" "$prompt" <<'PY'
 import json
+import hashlib
 import sys
 
 model = sys.argv[1]
 prompt = sys.argv[2]
+
+def billing_version(text):
+    encoded = text.encode("utf-16-le", "surrogatepass")
+    picks = []
+    for idx in (4, 7, 20):
+        offset = idx * 2
+        if offset + 1 < len(encoded):
+            unit = int.from_bytes(encoded[offset:offset + 2], "little")
+            picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
+        else:
+            picks.append("0")
+    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + "2.1.161").encode()).digest()
+    suffix = (digest[0] << 4) | (digest[1] >> 4)
+    return f"2.1.161.{suffix:03x}"
+
 payload = {
     "model": model,
     "system": [
         {
             "type": "text",
-            "text": "x-anthropic-billing-header: cc_version=2.1.159.3e1; cc_entrypoint=cli; cch=00000;",
+            "text": f"x-anthropic-billing-header: cc_version={billing_version(prompt)}; cc_entrypoint=sdk-cli; cch=00000;",
         },
         {
             "type": "text",

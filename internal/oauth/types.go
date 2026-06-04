@@ -38,7 +38,16 @@ func (c *Credential) NeedsRefresh(now time.Time, skew time.Duration) bool {
 	if c == nil || c.ExpiresAt.IsZero() {
 		return false
 	}
-	return !c.ExpiresAt.After(now.Add(skew))
+	skewRefreshAt := c.ExpiresAt.Add(-skew)
+	if !c.LastRefresh.IsZero() && c.ExpiresAt.After(c.LastRefresh) {
+		lifecycleRefreshAt := c.LastRefresh.Add(c.ExpiresAt.Sub(c.LastRefresh) * 4 / 5)
+		refreshAt := lifecycleRefreshAt
+		if skewRefreshAt.Before(refreshAt) {
+			refreshAt = skewRefreshAt
+		}
+		return !now.Before(refreshAt)
+	}
+	return !now.Before(skewRefreshAt)
 }
 
 type LoginStatus string

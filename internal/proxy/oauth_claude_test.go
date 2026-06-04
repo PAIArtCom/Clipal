@@ -50,6 +50,10 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	original.Header.Set("Content-Type", "application/json")
 	original.Header.Set("x-api-key", "client-key")
 	original.Header.Set("anthropic-version", "2023-06-01")
+	original.Header.Set("anthropic-beta", "redact-thinking-2026-02-12")
+	original.Header.Set("X-App-Name", "stale-client")
+	original.Header.Set("X-App-Ver", "0.1.0")
+	original.Header.Set("X-Client-App", "stale-client")
 	original.Header.Set("Cookie", "secret=1")
 	original.Header.Set("Proxy-Authorization", "Basic dGVzdA==")
 	original = withRequestContext(original, RequestContext{
@@ -82,14 +86,14 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	if got := proxyReq.Header.Get("X-App"); got != "cli" {
 		t.Fatalf("X-App = %q, want cli", got)
 	}
-	if got := proxyReq.Header.Get("X-App-Name"); got != claudeOAuthAppName {
-		t.Fatalf("X-App-Name = %q, want %q", got, claudeOAuthAppName)
+	if got := proxyReq.Header.Get("X-App-Name"); got != "" {
+		t.Fatalf("X-App-Name = %q, want empty for synthetic non-CLI request", got)
 	}
-	if got := proxyReq.Header.Get("X-App-Ver"); got != claudeOAuthAppVersion {
-		t.Fatalf("X-App-Ver = %q, want %q", got, claudeOAuthAppVersion)
+	if got := proxyReq.Header.Get("X-App-Ver"); got != "" {
+		t.Fatalf("X-App-Ver = %q, want empty for synthetic non-CLI request", got)
 	}
-	if got := proxyReq.Header.Get("X-Client-App"); got != claudeOAuthClientApp {
-		t.Fatalf("X-Client-App = %q, want %q", got, claudeOAuthClientApp)
+	if got := proxyReq.Header.Get("X-Client-App"); got != "" {
+		t.Fatalf("X-Client-App = %q, want empty for synthetic non-CLI request", got)
 	}
 	if got := proxyReq.Header.Get("X-Claude-Code-Session-Id"); strings.TrimSpace(got) == "" {
 		t.Fatalf("X-Claude-Code-Session-Id = %q, want non-empty", got)
@@ -104,9 +108,19 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 		t.Fatalf("X-Stainless-Package-Version = %q, want %q", got, claudeOAuthStainlessPackageVersion)
 	}
 	betas := proxyReq.Header.Get("Anthropic-Beta")
-	for _, token := range []string{"oauth-2025-04-20", "claude-code-20250219", "redact-thinking-2026-02-12", "interleaved-thinking-2025-05-14", "thinking-token-count-2026-05-13", "prompt-caching-scope-2026-01-05"} {
+	for _, token := range []string{"oauth-2025-04-20", "claude-code-20250219", "interleaved-thinking-2025-05-14", "prompt-caching-scope-2026-01-05"} {
 		if !strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
 			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
+		}
+	}
+	for _, token := range []string{"thinking-token-count-2026-05-13"} {
+		if !strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
+			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
+		}
+	}
+	for _, token := range []string{"redact-thinking-2026-02-12"} {
+		if strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
+			t.Fatalf("Anthropic-Beta = %q, want token %q absent", betas, token)
 		}
 	}
 	if got := proxyReq.Header.Get("Cookie"); got != "" {
@@ -202,13 +216,15 @@ func TestCreateProxyRequest_ClaudeOAuthPreservesOfficialClaudeCodeHeaders(t *tes
 	for key, want := range map[string]string{
 		"User-Agent":               "claude-code/2.2.0 (external, cli)",
 		"X-App":                    "cli",
-		"X-App-Name":               "claude-code",
-		"X-App-Ver":                "2.2.0",
-		"X-Client-App":             "claude-code",
 		"X-Claude-Code-Session-Id": "session-from-claude-code",
 	} {
 		if got := proxyReq.Header.Get(key); got != want {
 			t.Fatalf("%s = %q, want %q", key, got, want)
+		}
+	}
+	for _, key := range []string{"X-App-Name", "X-App-Ver", "X-Client-App"} {
+		if got := proxyReq.Header.Get(key); got != "" {
+			t.Fatalf("%s = %q, want empty for Claude 2.1.161", key, got)
 		}
 	}
 }
@@ -320,7 +336,7 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 		"metadata":{"note":"x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=metadata; cch=fedcb;"},
 		"system":[
 			{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli; cch=00000;"},
-			{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude."}
+			{"type":"text","text":"You are a Claude agent, built on Anthropic's Claude Agent SDK."}
 		]
 	}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
@@ -509,7 +525,7 @@ func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *tes
 	if cch := claudeOAuthTestCCH(stringValue(systemBlock["text"])); cch == "" || cch == "00000" {
 		t.Fatalf("system billing cch = %q, want signed non-zero cch", cch)
 	}
-	if !strings.Contains(stringValue(systemBlock["text"]), "cc_version=2.1.159.dda;") {
+	if !strings.Contains(stringValue(systemBlock["text"]), "cc_version=2.1.161.2ba;") {
 		t.Fatalf("system[0].text = %q, want fingerprint based on original user prompt", systemBlock["text"])
 	}
 	messages, ok := root["messages"].([]any)
@@ -559,7 +575,7 @@ func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *tes
 			},
 		}},
 		"system": []any{
-			map[string]any{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.159.dda; cc_entrypoint=cli; cch=00000;"},
+			map[string]any{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.161.2ba; cc_entrypoint=sdk-cli; cch=00000;"},
 			map[string]any{"type": "text", "text": claudeOAuthSystemPrompt},
 			map[string]any{"type": "text", "text": "client core", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h", "scope": "global"}},
 			map[string]any{"type": "text", "text": "client runtime", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}},
@@ -638,8 +654,8 @@ func TestClaudeOAuthBillingVersionUsesOfficialMessageFingerprint(t *testing.T) {
 			"content": []any{map[string]any{"type": "text", "text": "hello"}},
 		},
 	}
-	if got := claudeOAuthBillingVersion(messages); got != "2.1.159.dda" {
-		t.Fatalf("billing version = %q, want 2.1.159.dda", got)
+	if got := claudeOAuthBillingVersion(messages); got != "2.1.161.2ba" {
+		t.Fatalf("billing version = %q, want 2.1.161.2ba", got)
 	}
 }
 

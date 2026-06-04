@@ -53,6 +53,8 @@ const (
 	ClientGemini ClientType = "gemini"
 )
 
+const defaultOAuthRefreshMaintainerTimeout = 90 * time.Second
+
 type ProviderSwitchEvent struct {
 	At     time.Time
 	From   string
@@ -125,6 +127,12 @@ type Router struct {
 	watchDone  chan struct{}
 	lastMod    map[string]time.Time
 	watchEvery time.Duration
+
+	oauthRefreshMu     sync.Mutex
+	oauthRefreshStop   chan struct{}
+	oauthRefreshDone   chan struct{}
+	oauthRefreshCancel context.CancelFunc
+	oauthRefreshEvery  time.Duration
 }
 
 // ConfigSnapshot returns the current in-memory config pointer.
@@ -221,6 +229,8 @@ func NewRouter(cfg *config.Config) *Router {
 		proxies:    make(map[ClientType]*ClientProxy),
 		lastMod:    make(map[string]time.Time),
 		watchEvery: 5 * time.Second,
+
+		oauthRefreshEvery: 5 * time.Minute,
 	}
 
 	// Initialize client proxies
@@ -574,13 +584,25 @@ func (r *Router) Start(version string, webHandler interface{}) error {
 		logger.Info("loaded %d providers for %s", len(proxy.providers), clientType)
 	}
 
-	r.startProviderConfigWatcher()
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
 
-	return srv.ListenAndServe()
+	r.startProviderConfigWatcher()
+	r.startOAuthRefreshMaintainer()
+
+	err = srv.Serve(listener)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		r.stopOAuthRefreshMaintainer()
+		r.stopProviderConfigWatcher()
+	}
+	return err
 }
 
 // Stop gracefully stops the proxy server
 func (r *Router) Stop() error {
+	r.stopOAuthRefreshMaintainer()
 	r.stopProviderConfigWatcher()
 	r.mu.RLock()
 	srv := r.server
@@ -662,6 +684,125 @@ func (r *Router) stopProviderConfigWatcher() {
 		r.watchDone = nil
 	}
 	r.watchMu.Unlock()
+}
+
+func (r *Router) startOAuthRefreshMaintainer() {
+	if r == nil || r.oauth == nil || r.oauthRefreshEvery <= 0 {
+		return
+	}
+
+	r.oauthRefreshMu.Lock()
+	defer r.oauthRefreshMu.Unlock()
+	if r.oauthRefreshStop != nil {
+		return
+	}
+
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	r.oauthRefreshStop = stopCh
+	r.oauthRefreshDone = doneCh
+	r.oauthRefreshCancel = cancel
+
+	go func(ctx context.Context, stopCh <-chan struct{}, doneCh chan struct{}) {
+		defer close(doneCh)
+		r.refreshDueOAuthProvidersWithContext(ctx)
+		ticker := time.NewTicker(r.oauthRefreshEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				r.refreshDueOAuthProvidersWithContext(ctx)
+			case <-stopCh:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx, stopCh, doneCh)
+}
+
+func (r *Router) stopOAuthRefreshMaintainer() {
+	if r == nil {
+		return
+	}
+	r.oauthRefreshMu.Lock()
+	stopCh := r.oauthRefreshStop
+	doneCh := r.oauthRefreshDone
+	cancel := r.oauthRefreshCancel
+	r.oauthRefreshMu.Unlock()
+
+	if stopCh == nil {
+		return
+	}
+
+	if cancel != nil {
+		cancel()
+	}
+	select {
+	case <-stopCh:
+	default:
+		close(stopCh)
+	}
+	if doneCh != nil {
+		<-doneCh
+	}
+
+	r.oauthRefreshMu.Lock()
+	if r.oauthRefreshStop == stopCh {
+		r.oauthRefreshStop = nil
+		r.oauthRefreshDone = nil
+		r.oauthRefreshCancel = nil
+	}
+	r.oauthRefreshMu.Unlock()
+}
+
+func (r *Router) refreshDueOAuthProviders() {
+	r.refreshDueOAuthProvidersWithContext(context.Background())
+}
+
+func (r *Router) refreshDueOAuthProvidersWithContext(ctx context.Context) {
+	if r == nil || r.oauth == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	r.mu.RLock()
+	snapshot := make(map[ClientType]*ClientProxy, len(r.proxies))
+	for clientType, proxy := range r.proxies {
+		snapshot[clientType] = proxy
+	}
+	r.mu.RUnlock()
+
+	for clientType, proxy := range snapshot {
+		if ctx.Err() != nil {
+			return
+		}
+		if proxy == nil {
+			continue
+		}
+		for index, provider := range proxy.providers {
+			if ctx.Err() != nil {
+				return
+			}
+			if !provider.UsesOAuth() {
+				continue
+			}
+			oauthProvider := provider.NormalizedOAuthProvider()
+			ref := provider.NormalizedOAuthRef()
+			if oauthProvider == "" || ref == "" {
+				continue
+			}
+			refreshCtx, cancel := context.WithTimeout(ctx, defaultOAuthRefreshMaintainerTimeout)
+			_, err := r.oauth.RefreshIfNeededWithHTTPClient(refreshCtx, oauthProvider, ref, proxy.oauthHTTPClientForProvider(provider, index))
+			cancel()
+			if err != nil {
+				logger.Warn("[%s] oauth background refresh failed for %s: %v", clientType, provider.Name, err)
+			}
+		}
+	}
 }
 
 func (r *Router) providerConfigFiles() []string {

@@ -675,6 +675,68 @@ func TestRefreshIfNeededCoalescesConcurrentCallers(t *testing.T) {
 	}
 }
 
+func TestRefreshIfNeededCoalescesConcurrentCallersAcrossHTTPClients(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 4, 18, 18, 0, 0, 0, time.UTC)
+	var refreshCalls int32
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&refreshCalls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, fmt.Sprintf(`{"access_token":"access-2","refresh_token":"refresh-2","id_token":"%s","expires_in":3600}`, testJWT("sean@example.com", "acct_123")))
+	}))
+	defer tokenServer.Close()
+
+	if err := NewStore(dir).Save(&Credential{
+		Ref:          "codex-sean-example-com",
+		Provider:     config.OAuthProviderCodex,
+		Email:        "sean@example.com",
+		AccountID:    "acct_123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    now.Add(10 * time.Second),
+		LastRefresh:  now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	svc := NewService(dir,
+		WithNowFunc(func() time.Time { return now }),
+		WithRefreshSkew(30*time.Second),
+		WithCodexClient(&CodexClient{
+			TokenURL:   tokenServer.URL,
+			ClientID:   "test-client",
+			HTTPClient: tokenServer.Client(),
+			Now:        func() time.Time { return now },
+		}),
+	)
+
+	clients := []*http.Client{
+		{Transport: tokenServer.Client().Transport},
+		{Transport: tokenServer.Client().Transport},
+	}
+	var wg sync.WaitGroup
+	for _, client := range clients {
+		wg.Add(1)
+		go func(client *http.Client) {
+			defer wg.Done()
+			cred, err := svc.RefreshIfNeededWithHTTPClient(context.Background(), config.OAuthProviderCodex, "codex-sean-example-com", client)
+			if err != nil {
+				t.Errorf("RefreshIfNeededWithHTTPClient: %v", err)
+				return
+			}
+			if cred.AccessToken != "access-2" {
+				t.Errorf("access token = %q, want access-2", cred.AccessToken)
+			}
+		}(client)
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&refreshCalls); got != 1 {
+		t.Fatalf("refresh calls = %d, want 1", got)
+	}
+}
+
 func TestRefreshIfNeeded_SkipsUnreadableNeighborCredentialFiles(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 4, 18, 18, 0, 0, 0, time.UTC)

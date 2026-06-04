@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/lansespirit/Clipal/internal/config"
 	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
@@ -14,8 +15,8 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.135.0"
-	codexOAuthUserAgent      = "codex_cli_rs/0.135.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
+	codexOAuthVersion        = "0.136.0"
+	codexOAuthUserAgent      = "codex_cli_rs/0.136.0 (Mac OS 15.7.7; arm64) iTerm.app/3.6.9"
 	codexOAuthOriginator     = "codex_cli_rs"
 )
 
@@ -144,6 +145,7 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 		return nil, err
 	}
 	codexCtx := codexOAuthRequestContextForRequest(original)
+	ensureCodexOAuthTurnMetadata(original, codexCtx, targetPath)
 	requestBody, err = applyCodexOAuthBodyContext(requestBody, stream, codexCtx)
 	if err != nil {
 		return nil, err
@@ -163,7 +165,7 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	addForwardedHeaders(proxyReq, original)
 	clearAuthCarriers(proxyReq)
 	proxyReq.Header.Set("Authorization", "Bearer "+accessToken)
-	applyCodexOAuthHeaders(proxyReq, cred, stream, codexCtx)
+	applyCodexOAuthHeaders(proxyReq, cred, stream, codexCtx, targetPath)
 	proxyReq.ContentLength = int64(len(requestBody))
 	proxyReq.Header.Del("Content-Length")
 	return proxyReq, nil
@@ -266,7 +268,7 @@ func normalizeCodexOAuthResponsesRoot(root map[string]any, forceCompact bool) (b
 	return stream, rewritten, nil
 }
 
-func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, stream bool, codexCtx codexOAuthRequestContext) {
+func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, stream bool, codexCtx codexOAuthRequestContext, targetPath string) {
 	if proxyReq == nil {
 		return
 	}
@@ -278,15 +280,9 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 		proxyReq.Header.Set("Accept", "application/json")
 	}
 	proxyReq.Header.Set("Connection", "Keep-Alive")
-	if strings.TrimSpace(proxyReq.Header.Get("User-Agent")) == "" {
-		proxyReq.Header.Set("User-Agent", codexOAuthUserAgent)
-	}
-	if strings.TrimSpace(proxyReq.Header.Get("Originator")) == "" {
-		proxyReq.Header.Set("Originator", codexOAuthOriginator)
-	}
-	if strings.TrimSpace(proxyReq.Header.Get("Version")) == "" {
-		proxyReq.Header.Set("Version", codexOAuthVersion)
-	}
+	proxyReq.Header.Set("User-Agent", codexOAuthUserAgent)
+	proxyReq.Header.Set("Originator", codexOAuthOriginator)
+	proxyReq.Header.Set("Version", codexOAuthVersion)
 	if strings.TrimSpace(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
 		proxyReq.Header.Set("Session-Id", codexCtx.sessionID)
 	}
@@ -305,6 +301,9 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	}
 	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("X-Codex-Window-Id", codexCtx.threadID+":0")
+	}
+	if (targetPath == "/responses/compact" || strings.TrimSpace(proxyReq.Header.Get("X-Codex-Turn-Metadata")) == "") && codexCtx.sessionID != "" && codexCtx.threadID != "" {
+		proxyReq.Header.Set("X-Codex-Turn-Metadata", codexOAuthTurnMetadata(codexCtx, targetPath))
 	}
 
 	if cred != nil && strings.TrimSpace(cred.AccountID) != "" {
@@ -359,6 +358,21 @@ func codexOAuthRequestContextForRequest(req *http.Request) codexOAuthRequestCont
 	return codexCtx
 }
 
+func ensureCodexOAuthTurnMetadata(req *http.Request, codexCtx codexOAuthRequestContext, targetPath string) {
+	if req == nil || codexCtx.sessionID == "" || codexCtx.threadID == "" {
+		return
+	}
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
+	if targetPath != "/responses/compact" && strings.TrimSpace(req.Header.Get("X-Codex-Turn-Metadata")) != "" {
+		return
+	}
+	if metadata := codexOAuthTurnMetadata(codexCtx, targetPath); metadata != "" {
+		req.Header.Set("X-Codex-Turn-Metadata", metadata)
+	}
+}
+
 func firstNonEmptyHeader(headers http.Header, keys ...string) string {
 	for _, key := range keys {
 		if value := strings.TrimSpace(headers.Get(key)); value != "" {
@@ -376,6 +390,35 @@ func newCodexUUID() string {
 	raw[6] = (raw[6] & 0x0f) | 0x40
 	raw[8] = (raw[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
+}
+
+func codexOAuthTurnMetadata(codexCtx codexOAuthRequestContext, targetPath string) string {
+	windowID := codexCtx.threadID + ":0"
+	metadata := map[string]any{
+		"session_id":              codexCtx.sessionID,
+		"thread_id":               codexCtx.threadID,
+		"thread_source":           "user",
+		"turn_id":                 newCodexUUID(),
+		"sandbox":                 "none",
+		"turn_started_at_unix_ms": time.Now().UnixMilli(),
+		"request_kind":            "turn",
+		"window_id":               windowID,
+	}
+	if targetPath == "/responses/compact" {
+		metadata["request_kind"] = "compaction"
+		metadata["compaction"] = map[string]any{
+			"trigger":        "manual",
+			"reason":         "user_requested",
+			"implementation": "responses_compaction_v2",
+			"phase":          "standalone_turn",
+			"strategy":       "memento",
+		}
+	}
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 func applyCodexOAuthBodyContext(body []byte, stream bool, codexCtx codexOAuthRequestContext) ([]byte, error) {

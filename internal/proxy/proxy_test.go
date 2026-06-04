@@ -107,6 +107,137 @@ func TestPathPrefixMatchAndStrip(t *testing.T) {
 	}
 }
 
+func TestRouterRefreshDueOAuthProvidersRefreshesEnabledProviders(t *testing.T) {
+	now := time.Now().UTC()
+	var refreshCalls int
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		refreshCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"access-2","refresh_token":"refresh-2","token_type":"Bearer","expires_in":3600,"account":{"uuid":"acct_123","email_address":"sean@example.com"},"organization":{"uuid":"org_123","name":"Example"}}`)
+	}))
+	defer tokenServer.Close()
+
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir, oauthpkg.WithClaudeClient(&oauthpkg.ClaudeClient{
+		TokenURL:   tokenServer.URL,
+		ClientID:   "test-client",
+		HTTPClient: tokenServer.Client(),
+		Now:        func() time.Time { return now },
+	}))
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:          "claude-sean-example-com",
+		Provider:     config.OAuthProviderClaude,
+		Email:        "sean@example.com",
+		AccountID:    "acct_123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    now.Add(20 * time.Minute),
+		LastRefresh:  now.Add(-80 * time.Minute),
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	provider := config.Provider{
+		Name:          "claude-oauth",
+		AuthType:      config.ProviderAuthTypeOAuth,
+		OAuthProvider: config.OAuthProviderClaude,
+		OAuthRef:      "claude-sean-example-com",
+		Priority:      1,
+	}
+	router := &Router{
+		oauth: svc,
+		proxies: map[ClientType]*ClientProxy{
+			ClientClaude: newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{provider}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{}),
+		},
+	}
+
+	router.refreshDueOAuthProviders()
+
+	if refreshCalls != 1 {
+		t.Fatalf("refresh calls = %d, want 1", refreshCalls)
+	}
+	refreshed, err := svc.Store().Load(config.OAuthProviderClaude, "claude-sean-example-com")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := refreshed.AccessToken; got != "access-2" {
+		t.Fatalf("access token = %q, want refreshed token", got)
+	}
+}
+
+func TestRouterOAuthRefreshMaintainerStopCancelsInFlightRefresh(t *testing.T) {
+	now := time.Now().UTC()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-started:
+		default:
+			close(started)
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer tokenServer.Close()
+
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir, oauthpkg.WithClaudeClient(&oauthpkg.ClaudeClient{
+		TokenURL:   tokenServer.URL,
+		ClientID:   "test-client",
+		HTTPClient: tokenServer.Client(),
+		Now:        func() time.Time { return now },
+	}))
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:          "claude-sean-example-com",
+		Provider:     config.OAuthProviderClaude,
+		Email:        "sean@example.com",
+		AccountID:    "acct_123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    now.Add(20 * time.Minute),
+		LastRefresh:  now.Add(-80 * time.Minute),
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	provider := config.Provider{
+		Name:          "claude-oauth",
+		AuthType:      config.ProviderAuthTypeOAuth,
+		OAuthProvider: config.OAuthProviderClaude,
+		OAuthRef:      "claude-sean-example-com",
+		Priority:      1,
+	}
+	router := &Router{
+		oauth:             svc,
+		oauthRefreshEvery: time.Hour,
+		proxies: map[ClientType]*ClientProxy{
+			ClientClaude: newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{provider}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{}),
+		},
+	}
+
+	router.startOAuthRefreshMaintainer()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("refresh did not start")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		router.stopOAuthRefreshMaintainer()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		close(release)
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("stopOAuthRefreshMaintainer did not cancel in-flight refresh")
+	}
+}
+
 func TestResponseBodyWriterFlushesOnlyStreamingResponses(t *testing.T) {
 	t.Parallel()
 

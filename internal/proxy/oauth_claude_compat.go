@@ -17,8 +17,9 @@ import (
 
 const (
 	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.159"
-	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, cli)"
+	claudeOAuthAppVersion              = "2.1.161"
+	claudeOAuthDefaultEntrypoint       = "sdk-cli"
+	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
 	claudeOAuthClientApp               = "claude-code"
 	claudeOAuthAppName                 = "claude-code"
 	claudeOAuthXApp                    = "cli"
@@ -34,7 +35,7 @@ const (
 	claudeOAuthBillingVersionSalt      = "59cf53e54c78"
 	claudeOAuthBillingCCHSeed          = uint64(0x6E52736AC806831E)
 	claudeOAuthDefaultMaxTokens        = 32000
-	claudeOAuthSystemPrompt            = "You are Claude Code, Anthropic's official CLI for Claude."
+	claudeOAuthSystemPrompt            = "You are a Claude agent, built on Anthropic's Claude Agent SDK."
 	claudeOAuthSystemCorePrompt        = `You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
 IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes.
@@ -160,21 +161,28 @@ func applyClaudeOAuthHeaderDefaults(proxyReq *http.Request, original *http.Reque
 
 	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "Anthropic-Version", claudeOAuthAnthropicVersion)
 	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-App", claudeOAuthXApp)
-	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-App-Name", claudeOAuthAppName)
-	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-App-Ver", claudeOAuthAppVersion)
-	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Client-App", claudeOAuthClientApp)
+	proxyReq.Header.Del("X-App-Name")
+	proxyReq.Header.Del("X-App-Ver")
+	proxyReq.Header.Del("X-Client-App")
 
+	officialCLIRequest := false
 	if isOfficialClaudeCLIUserAgent(proxyReq.Header.Get("User-Agent")) {
+		officialCLIRequest = true
 		// Preserve official Claude Code fingerprints when they already exist.
 	} else if isOfficialClaudeCLIUserAgent(headerValue(inbound, "User-Agent")) {
 		proxyReq.Header.Set("User-Agent", headerValue(inbound, "User-Agent"))
+		officialCLIRequest = true
 	} else {
 		proxyReq.Header.Set("User-Agent", claudeOAuthUserAgent)
 	}
 
 	requiredBetas := requiredClaudeOAuthBetas(body, requestCtx)
 	if len(requiredBetas) > 0 {
-		merged := mergeClaudeOAuthBetas(proxyReq.Header.Get("Anthropic-Beta"), requiredBetas)
+		existingBetas := ""
+		if officialCLIRequest {
+			existingBetas = proxyReq.Header.Get("Anthropic-Beta")
+		}
+		merged := mergeClaudeOAuthBetas(existingBetas, requiredBetas)
 		if strings.TrimSpace(merged) != "" {
 			proxyReq.Header.Set("Anthropic-Beta", merged)
 		}
@@ -201,13 +209,13 @@ func requiredClaudeOAuthBetas(body []byte, requestCtx RequestContext) []string {
 	betas := []string{
 		"oauth-2025-04-20",
 		"claude-code-20250219",
-		"redact-thinking-2026-02-12",
 		"prompt-caching-scope-2026-01-05",
 	}
 	var root map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(body), &root); err == nil && root != nil {
 		if _, ok := root["thinking"]; ok {
-			betas = append(betas, "interleaved-thinking-2025-05-14", "thinking-token-count-2026-05-13")
+			betas = append(betas, "interleaved-thinking-2025-05-14")
+			betas = append(betas, "thinking-token-count-2026-05-13")
 		}
 		if _, ok := root["context_management"]; ok {
 			betas = append(betas, "context-management-2025-06-27")
@@ -1007,7 +1015,7 @@ func claudeOAuthBillingEntrypoint() string {
 	if entrypoint := strings.TrimSpace(os.Getenv("CLAUDE_CODE_ENTRYPOINT")); entrypoint != "" {
 		return entrypoint
 	}
-	return "cli"
+	return claudeOAuthDefaultEntrypoint
 }
 
 func claudeOAuthContentHash(payload []byte) string {

@@ -77,8 +77,14 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 	if got := proxyReq.Header.Get("Accept"); got != "text/event-stream" {
 		t.Fatalf("Accept = %q", got)
 	}
+	if got := proxyReq.Header.Get("User-Agent"); got != "codex_cli_rs/0.136.0 (Mac OS 15.7.7; arm64) iTerm.app/3.6.9" {
+		t.Fatalf("User-Agent = %q", got)
+	}
 	if got := proxyReq.Header.Get("Originator"); got != codexOAuthOriginator {
 		t.Fatalf("Originator = %q", got)
+	}
+	if got := proxyReq.Header.Get("Version"); got != "0.136.0" {
+		t.Fatalf("Version = %q", got)
 	}
 	if got := proxyReq.Header.Get("Chatgpt-Account-Id"); got != "acct_123" {
 		t.Fatalf("Chatgpt-Account-Id = %q", got)
@@ -107,11 +113,40 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 	if got, want := proxyReq.Header.Get("X-Codex-Window-Id"), proxyReq.Header.Get("Thread-Id")+":0"; got != want {
 		t.Fatalf("X-Codex-Window-Id = %q, want %q", got, want)
 	}
+	turnMetadata := proxyReq.Header.Get("X-Codex-Turn-Metadata")
+	if strings.TrimSpace(turnMetadata) == "" {
+		t.Fatalf("expected X-Codex-Turn-Metadata to be generated")
+	}
+	var turn map[string]any
+	if err := json.Unmarshal([]byte(turnMetadata), &turn); err != nil {
+		t.Fatalf("X-Codex-Turn-Metadata json = %q: %v", turnMetadata, err)
+	}
+	if got := turn["session_id"]; got != proxyReq.Header.Get("Session-Id") {
+		t.Fatalf("turn session_id = %v, want %q", got, proxyReq.Header.Get("Session-Id"))
+	}
+	if got := turn["thread_id"]; got != proxyReq.Header.Get("Thread-Id") {
+		t.Fatalf("turn thread_id = %v, want %q", got, proxyReq.Header.Get("Thread-Id"))
+	}
+	if got, want := turn["window_id"], proxyReq.Header.Get("Thread-Id")+":0"; got != want {
+		t.Fatalf("turn window_id = %v, want %q", got, want)
+	}
+	if got := turn["request_kind"]; got != "turn" {
+		t.Fatalf("turn request_kind = %v, want turn", got)
+	}
+	if got := turn["thread_source"]; got != "user" {
+		t.Fatalf("turn thread_source = %v, want user", got)
+	}
+	if got := turn["sandbox"]; got != "none" {
+		t.Fatalf("turn sandbox = %v, want none", got)
+	}
+	if got, ok := turn["turn_started_at_unix_ms"].(float64); !ok || got <= 0 {
+		t.Fatalf("turn_started_at_unix_ms = %v, want positive number", turn["turn_started_at_unix_ms"])
+	}
+	if got := strings.TrimSpace(fmt.Sprint(turn["turn_id"])); got == "" {
+		t.Fatalf("turn_id = %v, want non-empty", turn["turn_id"])
+	}
 	if got := proxyReq.Header.Get("Session_id"); got != "" {
 		t.Fatalf("Session_id = %q, want empty", got)
-	}
-	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
-		t.Fatalf("Version = %q", got)
 	}
 	if got := proxyReq.Header.Get("OpenAI-Beta"); got != "" {
 		t.Fatalf("OpenAI-Beta = %q, want empty", got)
@@ -331,11 +366,14 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if got := proxyReq.Header.Get("Accept"); got != "text/event-stream" {
 		t.Fatalf("Accept = %q", got)
 	}
-	if got := proxyReq.Header.Get("Originator"); got != "clipal-test" {
+	if got := proxyReq.Header.Get("Originator"); got != codexOAuthOriginator {
 		t.Fatalf("Originator = %q", got)
 	}
-	if got := proxyReq.Header.Get("User-Agent"); got != "clipal-test/1.0" {
+	if got := proxyReq.Header.Get("User-Agent"); got != codexOAuthUserAgent {
 		t.Fatalf("User-Agent = %q", got)
+	}
+	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
+		t.Fatalf("Version = %q", got)
 	}
 	if got := proxyReq.Header.Get("X-Codex-Turn-Metadata"); got != `{"turn_id":"turn-1"}` {
 		t.Fatalf("X-Codex-Turn-Metadata = %q", got)
@@ -882,7 +920,7 @@ func TestCreateProxyRequest_CodexOAuthLatestHeadersAndLegacySessionID(t *testing
 	if got := proxyReq.Header.Get("X-Client-Request-Id"); got != "thread-123" {
 		t.Fatalf("X-Client-Request-Id = %q", got)
 	}
-	if got := proxyReq.Header.Get("Version"); got != "0.134.0" {
+	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
 		t.Fatalf("Version = %q", got)
 	}
 	if got := proxyReq.Header.Get("OpenAI-Beta"); got != "responses_websockets=2026-02-06" {
@@ -1114,6 +1152,84 @@ func TestBuildCodexOAuthRequest_CompactEndpointKeepsCanonicalFields(t *testing.T
 	}
 	if _, ok := root["client_metadata"]; ok {
 		t.Fatalf("did not expect client_metadata in compact body: %#v", root["client_metadata"])
+	}
+}
+
+func TestCreateProxyRequest_CodexOAuthCompactUsesCompactionTurnMetadata(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{"model":"gpt-5.2","input":"compact this","stream":true,"store":true}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses/compact", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("X-Codex-Turn-Metadata", `{"request_kind":"turn","turn_id":"stale-turn"}`)
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIResponses,
+		UpstreamPath:   "/v1/responses/compact",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/responses/compact", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	if got := proxyReq.URL.String(); got != "https://chatgpt.com/backend-api/codex/responses/compact" {
+		t.Fatalf("url = %q", got)
+	}
+	if got := proxyReq.Header.Get("Accept"); got != "application/json" {
+		t.Fatalf("Accept = %q", got)
+	}
+
+	var turn map[string]any
+	if err := json.Unmarshal([]byte(proxyReq.Header.Get("X-Codex-Turn-Metadata")), &turn); err != nil {
+		t.Fatalf("X-Codex-Turn-Metadata json: %v", err)
+	}
+	if got := turn["request_kind"]; got != "compaction" {
+		t.Fatalf("request_kind = %v, want compaction", got)
+	}
+	for _, key := range []string{"session_id", "thread_id", "window_id", "turn_id", "turn_started_at_unix_ms"} {
+		if _, ok := turn[key]; !ok {
+			t.Fatalf("X-Codex-Turn-Metadata missing %s: %#v", key, turn)
+		}
+	}
+	if got := turn["turn_id"]; got == "stale-turn" {
+		t.Fatalf("turn_id = %v, want regenerated compact metadata", got)
+	}
+	compaction, ok := turn["compaction"].(map[string]any)
+	if !ok {
+		t.Fatalf("compaction = %T %#v", turn["compaction"], turn["compaction"])
+	}
+	for key, want := range map[string]string{
+		"trigger":        "manual",
+		"reason":         "user_requested",
+		"implementation": "responses_compaction_v2",
+		"phase":          "standalone_turn",
+		"strategy":       "memento",
+	} {
+		if got := compaction[key]; got != want {
+			t.Fatalf("compaction.%s = %v, want %q", key, got, want)
+		}
 	}
 }
 
@@ -1457,7 +1573,7 @@ func TestForwardWithFailover_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 		},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 	cp.oauth = svc
-	var firstSessionID, firstThreadID, firstInstallationID string
+	var firstSessionID, firstThreadID, firstInstallationID, firstTurnMetadata string
 	cp.httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		call := atomic.AddInt32(&upstreamCalls, 1)
 		switch call {
@@ -1468,6 +1584,10 @@ func TestForwardWithFailover_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 			firstSessionID = r.Header.Get("Session-Id")
 			firstThreadID = r.Header.Get("Thread-Id")
 			firstInstallationID = r.Header.Get("X-Codex-Installation-Id")
+			firstTurnMetadata = r.Header.Get("X-Codex-Turn-Metadata")
+			if strings.TrimSpace(firstTurnMetadata) == "" {
+				t.Fatalf("X-Codex-Turn-Metadata(first) = empty")
+			}
 			return newResponse(http.StatusUnauthorized, http.Header{"Content-Type": []string{"application/json"}}, `{"error":{"type":"authentication_error","code":"token_invalid","message":"expired"}}`), nil
 		case 2:
 			if got := r.Header.Get("Authorization"); got != "Bearer access-2" {
@@ -1481,6 +1601,9 @@ func TestForwardWithFailover_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 			}
 			if got := r.Header.Get("X-Codex-Installation-Id"); got == "" || got != firstInstallationID {
 				t.Fatalf("X-Codex-Installation-Id(second) = %q, want first %q", got, firstInstallationID)
+			}
+			if got := r.Header.Get("X-Codex-Turn-Metadata"); got != firstTurnMetadata {
+				t.Fatalf("X-Codex-Turn-Metadata(second) = %q, want first %q", got, firstTurnMetadata)
 			}
 			return newResponse(http.StatusOK, http.Header{"Content-Type": []string{"application/json"}}, `{"ok":true}`), nil
 		default:
@@ -1683,7 +1806,7 @@ func TestForwardManual_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 		},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 	cp.oauth = svc
-	var firstSessionID, firstThreadID, firstInstallationID string
+	var firstSessionID, firstThreadID, firstInstallationID, firstTurnMetadata string
 	cp.httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		call := atomic.AddInt32(&upstreamCalls, 1)
 		switch call {
@@ -1694,6 +1817,10 @@ func TestForwardManual_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 			firstSessionID = r.Header.Get("Session-Id")
 			firstThreadID = r.Header.Get("Thread-Id")
 			firstInstallationID = r.Header.Get("X-Codex-Installation-Id")
+			firstTurnMetadata = r.Header.Get("X-Codex-Turn-Metadata")
+			if strings.TrimSpace(firstTurnMetadata) == "" {
+				t.Fatalf("X-Codex-Turn-Metadata(first) = empty")
+			}
 			return newResponse(http.StatusUnauthorized, http.Header{"Content-Type": []string{"application/json"}}, `{"error":{"type":"authentication_error","code":"token_invalid","message":"expired"}}`), nil
 		case 2:
 			if got := r.Header.Get("Authorization"); got != "Bearer access-2" {
@@ -1707,6 +1834,9 @@ func TestForwardManual_CodexOAuthRefreshesAndRetriesOn401(t *testing.T) {
 			}
 			if got := r.Header.Get("X-Codex-Installation-Id"); got == "" || got != firstInstallationID {
 				t.Fatalf("X-Codex-Installation-Id(second) = %q, want first %q", got, firstInstallationID)
+			}
+			if got := r.Header.Get("X-Codex-Turn-Metadata"); got != firstTurnMetadata {
+				t.Fatalf("X-Codex-Turn-Metadata(second) = %q, want first %q", got, firstTurnMetadata)
 			}
 			return newResponse(http.StatusOK, http.Header{"Content-Type": []string{"application/json"}}, `{"ok":true}`), nil
 		default:
@@ -1761,8 +1891,8 @@ func assertCodexRefreshJSONRequest(t *testing.T, r *http.Request, wantClientID s
 	if got := r.Header.Get("Originator"); got != "codex_cli_rs" {
 		t.Fatalf("originator = %q, want codex_cli_rs", got)
 	}
-	if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "codex_cli_rs/0.135.0") {
-		t.Fatalf("user-agent = %q, want codex_cli_rs/0.135.0 prefix", got)
+	if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "codex_cli_rs/0.136.0") {
+		t.Fatalf("user-agent = %q, want codex_cli_rs/0.136.0 prefix", got)
 	}
 	var req map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

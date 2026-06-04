@@ -387,9 +387,6 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	}
 
 	key := string(cred.Provider) + ":" + cred.Ref
-	if httpClient != nil {
-		key += fmt.Sprintf(":%p", httpClient)
-	}
 	s.mu.Lock()
 	if call, ok := s.refreshes[key]; ok {
 		s.mu.Unlock()
