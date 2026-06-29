@@ -10,14 +10,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"unicode/utf16"
 )
 
 const (
 	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.161"
+	claudeOAuthAppVersion              = "2.1.195"
 	claudeOAuthDefaultEntrypoint       = "sdk-cli"
 	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
 	claudeOAuthClientApp               = "claude-code"
@@ -25,6 +24,7 @@ const (
 	claudeOAuthXApp                    = "cli"
 	claudeOAuthDangerousBrowserAccess  = "true"
 	claudeOAuthStainlessRetryCount     = "0"
+	claudeOAuthStainlessHelperMethod   = "stream"
 	claudeOAuthStainlessRuntime        = "node"
 	claudeOAuthStainlessLang           = "js"
 	claudeOAuthStainlessTimeout        = "600"
@@ -32,6 +32,8 @@ const (
 	claudeOAuthStainlessRuntimeVersion = "v24.3.0"
 	claudeOAuthStainlessOS             = "MacOS"
 	claudeOAuthStainlessArch           = "arm64"
+	claudeOAuthAccept                  = "application/json"
+	claudeOAuthAcceptEncoding          = "gzip, deflate, br, zstd"
 	claudeOAuthBillingVersionSalt      = "59cf53e54c78"
 	claudeOAuthBillingCCHSeed          = uint64(0x6E52736AC806831E)
 	claudeOAuthDefaultMaxTokens        = 32000
@@ -106,13 +108,15 @@ The following skills are available for use with the Skill tool:
 </system-reminder>`
 )
 
-var (
-	claudeOAuthCLIUserAgentPattern = regexp.MustCompile(`(?i)^(claude-(?:cli|code))/([0-9]+(?:\.[0-9]+){1,3})\s+\(external,\s*(cli|sdk-cli)\)$`)
+type claudeOAuthEnvelopeMode string
+
+const (
+	claudeOAuthEnvelopeModeSDK claudeOAuthEnvelopeMode = "sdk"
 )
 
 func normalizeClaudeOAuthRequest(body []byte, proxyReq *http.Request, original *http.Request, requestCtx RequestContext) []byte {
 	sessionID := resolveClaudeOAuthSessionID(body, proxyReq, original, requestCtx)
-	body = ensureClaudeOAuthProviderCompatibleEnvelope(body, requestCtx, sessionID)
+	body = ensureClaudeOAuthProviderCompatibleEnvelope(body, requestCtx, sessionID, claudeOAuthEnvelopeModeSDK)
 	body = signClaudeOAuthMessageBody(body)
 	applyClaudeOAuthHeaderDefaults(proxyReq, original, body, requestCtx, sessionID)
 	return body
@@ -154,54 +158,65 @@ func applyClaudeOAuthHeaderDefaults(proxyReq *http.Request, original *http.Reque
 		return
 	}
 
-	inbound := http.Header(nil)
-	if original != nil {
-		inbound = original.Header
-	}
-
-	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "Anthropic-Version", claudeOAuthAnthropicVersion)
-	ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-App", claudeOAuthXApp)
+	proxyReq.Header.Set("Anthropic-Version", claudeOAuthAnthropicVersion)
+	proxyReq.Header.Set("X-App", claudeOAuthXApp)
+	proxyReq.Header.Set("Accept", claudeOAuthAccept)
+	proxyReq.Header.Set("Accept-Encoding", claudeOAuthAcceptEncoding)
 	proxyReq.Header.Del("X-App-Name")
 	proxyReq.Header.Del("X-App-Ver")
 	proxyReq.Header.Del("X-Client-App")
 
-	officialCLIRequest := false
-	if isOfficialClaudeCLIUserAgent(proxyReq.Header.Get("User-Agent")) {
-		officialCLIRequest = true
-		// Preserve official Claude Code fingerprints when they already exist.
-	} else if isOfficialClaudeCLIUserAgent(headerValue(inbound, "User-Agent")) {
-		proxyReq.Header.Set("User-Agent", headerValue(inbound, "User-Agent"))
-		officialCLIRequest = true
-	} else {
-		proxyReq.Header.Set("User-Agent", claudeOAuthUserAgent)
-	}
+	proxyReq.Header.Set("User-Agent", claudeOAuthUserAgent)
 
 	requiredBetas := requiredClaudeOAuthBetas(body, requestCtx)
 	if len(requiredBetas) > 0 {
-		existingBetas := ""
-		if officialCLIRequest {
-			existingBetas = proxyReq.Header.Get("Anthropic-Beta")
-		}
-		merged := mergeClaudeOAuthBetas(existingBetas, requiredBetas)
+		merged := mergeClaudeOAuthBetas("", requiredBetas)
 		if strings.TrimSpace(merged) != "" {
 			proxyReq.Header.Set("Anthropic-Beta", merged)
 		}
 	}
 
 	if requestCtx.Capability == CapabilityClaudeMessages {
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "Anthropic-Dangerous-Direct-Browser-Access", claudeOAuthDangerousBrowserAccess)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "Connection", "keep-alive")
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Claude-Code-Session-Id", sessionID)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Retry-Count", claudeOAuthStainlessRetryCount)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Runtime", claudeOAuthStainlessRuntime)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Lang", claudeOAuthStainlessLang)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Timeout", claudeOAuthStainlessTimeout)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Package-Version", claudeOAuthStainlessPackageVersion)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Runtime-Version", claudeOAuthStainlessRuntimeVersion)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Os", claudeOAuthStainlessOS)
-		ensureClaudeOAuthHeader(proxyReq.Header, inbound, "X-Stainless-Arch", claudeOAuthStainlessArch)
+		proxyReq.Header.Set("Anthropic-Dangerous-Direct-Browser-Access", claudeOAuthDangerousBrowserAccess)
+		proxyReq.Header.Set("Connection", "keep-alive")
+		if strings.TrimSpace(sessionID) != "" {
+			proxyReq.Header.Set("X-Claude-Code-Session-Id", sessionID)
+		}
+		proxyReq.Header.Set("X-Stainless-Retry-Count", claudeOAuthStainlessRetryCount)
+		proxyReq.Header.Set("X-Stainless-Runtime", claudeOAuthStainlessRuntime)
+		proxyReq.Header.Set("X-Stainless-Lang", claudeOAuthStainlessLang)
+		proxyReq.Header.Set("X-Stainless-Timeout", claudeOAuthStainlessTimeout)
+		proxyReq.Header.Set("X-Stainless-Package-Version", claudeOAuthStainlessPackageVersion)
+		proxyReq.Header.Set("X-Stainless-Runtime-Version", claudeOAuthStainlessRuntimeVersion)
+		proxyReq.Header.Set("X-Stainless-Os", claudeOAuthStainlessOS)
+		proxyReq.Header.Set("X-Stainless-Arch", claudeOAuthStainlessArch)
+		if claudeOAuthRequestBodyStreams(body) {
+			proxyReq.Header.Set("X-Stainless-Helper-Method", claudeOAuthStainlessHelperMethod)
+		} else {
+			proxyReq.Header.Del("X-Stainless-Helper-Method")
+		}
 	} else {
 		proxyReq.Header.Del("Anthropic-Dangerous-Direct-Browser-Access")
+		clearClaudeOAuthStainlessHeaders(proxyReq.Header)
+	}
+}
+
+func clearClaudeOAuthStainlessHeaders(headers http.Header) {
+	if headers == nil {
+		return
+	}
+	for _, key := range []string{
+		"X-Stainless-Retry-Count",
+		"X-Stainless-Runtime",
+		"X-Stainless-Lang",
+		"X-Stainless-Timeout",
+		"X-Stainless-Package-Version",
+		"X-Stainless-Runtime-Version",
+		"X-Stainless-Os",
+		"X-Stainless-Arch",
+		"X-Stainless-Helper-Method",
+	} {
+		headers.Del(key)
 	}
 }
 
@@ -209,47 +224,25 @@ func requiredClaudeOAuthBetas(body []byte, requestCtx RequestContext) []string {
 	betas := []string{
 		"oauth-2025-04-20",
 		"claude-code-20250219",
+		"interleaved-thinking-2025-05-14",
+		"redact-thinking-2026-02-12",
+		"context-management-2025-06-27",
 		"prompt-caching-scope-2026-01-05",
+		"extended-cache-ttl-2025-04-11",
+		"advanced-tool-use-2025-11-20",
+		"advisor-tool-2026-03-01",
+		"effort-2025-11-24",
 	}
 	var root map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(body), &root); err == nil && root != nil {
 		if _, ok := root["thinking"]; ok {
-			betas = append(betas, "interleaved-thinking-2025-05-14")
 			betas = append(betas, "thinking-token-count-2026-05-13")
-		}
-		if _, ok := root["context_management"]; ok {
-			betas = append(betas, "context-management-2025-06-27")
-		}
-		if claudeOAuthHasOutputEffort(root["output_config"]) {
-			betas = append(betas, "effort-2025-11-24")
-		}
-		if claudeOAuthHasToolName(root["tools"], "ToolSearch") {
-			betas = append(betas, "advanced-tool-use-2025-11-20")
-		}
-		if claudeOAuthHasToolName(root["tools"], "Advisor") {
-			betas = append(betas, "advisor-tool-2026-03-01")
 		}
 	}
 	if requestCtx.Capability == CapabilityClaudeCountTokens {
 		betas = append(betas, "token-counting-2024-11-01")
 	}
 	return betas
-}
-
-func claudeOAuthHasOutputEffort(value any) bool {
-	outputConfig, _ := value.(map[string]any)
-	return outputConfig != nil && strings.TrimSpace(stringValue(outputConfig["effort"])) != ""
-}
-
-func claudeOAuthHasToolName(value any, name string) bool {
-	tools, _ := value.([]any)
-	for _, item := range tools {
-		tool, _ := item.(map[string]any)
-		if strings.EqualFold(strings.TrimSpace(stringValue(tool["name"])), name) {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeClaudeOAuthBetas(existing string, required []string) string {
@@ -277,22 +270,6 @@ func mergeClaudeOAuthBetas(existing string, required []string) string {
 	return strings.Join(ordered, ",")
 }
 
-func ensureClaudeOAuthHeader(dst http.Header, inbound http.Header, key string, fallback string) {
-	if dst == nil {
-		return
-	}
-	if strings.TrimSpace(dst.Get(key)) != "" {
-		return
-	}
-	if value := headerValue(inbound, key); value != "" {
-		dst.Set(key, value)
-		return
-	}
-	if strings.TrimSpace(fallback) != "" {
-		dst.Set(key, fallback)
-	}
-}
-
 func headerValue(header http.Header, key string) string {
 	if header == nil {
 		return ""
@@ -310,8 +287,13 @@ func claudeOAuthSessionID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
 }
 
-func isOfficialClaudeCLIUserAgent(value string) bool {
-	return claudeOAuthCLIUserAgentPattern.MatchString(strings.TrimSpace(value))
+func claudeOAuthRequestBodyStreams(body []byte) bool {
+	var root map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(body), &root); err != nil || root == nil {
+		return false
+	}
+	stream, _ := root["stream"].(bool)
+	return stream
 }
 
 func resolveClaudeOAuthSessionID(body []byte, proxyReq *http.Request, original *http.Request, requestCtx RequestContext) string {
@@ -340,7 +322,6 @@ func resolveClaudeOAuthSessionID(body []byte, proxyReq *http.Request, original *
 			return sessionID
 		}
 	}
-
 	return claudeOAuthSessionID()
 }
 
@@ -351,7 +332,7 @@ func originalHeader(req *http.Request) http.Header {
 	return req.Header
 }
 
-func ensureClaudeOAuthProviderCompatibleEnvelope(body []byte, requestCtx RequestContext, sessionID string) []byte {
+func ensureClaudeOAuthProviderCompatibleEnvelope(body []byte, requestCtx RequestContext, sessionID string, mode claudeOAuthEnvelopeMode) []byte {
 	if requestCtx.Capability != CapabilityClaudeMessages {
 		return body
 	}
@@ -375,10 +356,22 @@ func ensureClaudeOAuthProviderCompatibleEnvelope(body []byte, requestCtx Request
 	officialMessages := claudeOAuthHasOfficialMessageBaseline(cloned["messages"])
 
 	ensureClaudeOAuthMetadata(cloned, sessionID)
+	if mode == claudeOAuthEnvelopeModeSDK {
+		messages := ensureClaudeOAuthMessages(cloned, "", true)
+		ensureClaudeOAuthSDKDefaults(cloned)
+		ensureClaudeOAuthSDKSystem(cloned, messages, preservedSystem)
+		rewritten, err := marshalClaudeOAuthJSON(cloned)
+		if err != nil {
+			return body
+		}
+		return rewritten
+	}
+
 	messages := ensureClaudeOAuthMessages(cloned, "", officialMessages)
 	ensureClaudeOAuthDefaults(cloned)
 	switch {
 	case officialSystem:
+		ensureClaudeOAuthOfficialSystem(cloned, messages, preservedSystem)
 	case len(preservedSystem) > 0:
 		ensureClaudeOAuthClientSystem(cloned, messages, preservedSystem)
 	default:
@@ -563,6 +556,20 @@ func ensureClaudeOAuthFinalUserCache(blocks []any) {
 }
 
 func ensureClaudeOAuthDefaults(root map[string]any) {
+	ensureClaudeOAuthDefaultsWithoutTools(root)
+	if _, ok := root["tools"]; !ok {
+		root["tools"] = claudeOAuthDefaultTools()
+	}
+}
+
+func ensureClaudeOAuthSDKDefaults(root map[string]any) {
+	ensureClaudeOAuthDefaultsWithoutTools(root)
+	if _, ok := root["tools"]; !ok {
+		root["tools"] = []any{}
+	}
+}
+
+func ensureClaudeOAuthDefaultsWithoutTools(root map[string]any) {
 	if _, ok := root["max_tokens"]; !ok {
 		root["max_tokens"] = claudeOAuthDefaultMaxTokens
 	}
@@ -590,15 +597,33 @@ func ensureClaudeOAuthDefaults(root map[string]any) {
 		delete(root, "output_config")
 	}
 
-	if _, ok := root["tools"]; !ok {
-		root["tools"] = claudeOAuthDefaultTools()
-	}
 }
 
 func ensureClaudeOAuthClientSystem(root map[string]any, messages []any, preserved []any) {
 	system := make([]any, 0, len(preserved)+1)
 	system = append(system, claudeOAuthTextBlock(claudeOAuthBillingHeaderText(messages, "00000"), false))
 	system = append(system, preserved...)
+	root["system"] = system
+}
+
+func ensureClaudeOAuthOfficialSystem(root map[string]any, messages []any, preserved []any) {
+	system := make([]any, 0, len(preserved)+2)
+	system = append(system,
+		claudeOAuthTextBlock(claudeOAuthBillingHeaderText(messages, "00000"), false),
+		claudeOAuthTextBlock(claudeOAuthSystemPrompt, false),
+	)
+	system = append(system, preserved...)
+	root["system"] = system
+}
+
+func ensureClaudeOAuthSDKSystem(root map[string]any, messages []any, preserved []any) {
+	system := make([]any, 0, len(preserved)+2)
+	system = append(system, claudeOAuthTextBlock(claudeOAuthBillingHeaderText(messages, "00000"), false))
+	if len(preserved) == 0 {
+		system = append(system, claudeOAuthTextBlock(claudeOAuthSystemPrompt, false))
+	} else {
+		system = append(system, preserved...)
+	}
 	root["system"] = system
 }
 

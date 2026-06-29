@@ -564,6 +564,7 @@ import json
 import hashlib
 import sys
 
+CLAUDE_OAUTH_APP_VERSION = "2.1.195"
 model = sys.argv[1]
 prompt = sys.argv[2]
 stream = sys.argv[3] == "1"
@@ -578,9 +579,9 @@ def billing_version(text):
             picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
         else:
             picks.append("0")
-    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + "2.1.161").encode()).digest()
+    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + CLAUDE_OAUTH_APP_VERSION).encode()).digest()
     suffix = (digest[0] << 4) | (digest[1] >> 4)
-    return f"2.1.161.{suffix:03x}"
+    return f"{CLAUDE_OAUTH_APP_VERSION}.{suffix:03x}"
 
 payload = {
     "model": model,
@@ -615,6 +616,7 @@ import json
 import hashlib
 import sys
 
+CLAUDE_OAUTH_APP_VERSION = "2.1.195"
 model = sys.argv[1]
 prompt = sys.argv[2]
 
@@ -628,9 +630,9 @@ def billing_version(text):
             picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
         else:
             picks.append("0")
-    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + "2.1.161").encode()).digest()
+    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + CLAUDE_OAUTH_APP_VERSION).encode()).digest()
     suffix = (digest[0] << 4) | (digest[1] >> 4)
-    return f"2.1.161.{suffix:03x}"
+    return f"{CLAUDE_OAUTH_APP_VERSION}.{suffix:03x}"
 
 payload = {
     "model": model,

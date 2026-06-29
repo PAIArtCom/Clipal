@@ -77,13 +77,13 @@ func TestCreateProxyRequest_CodexOAuthNonStreamingUsesResponsesStreamEndpoint(t 
 	if got := proxyReq.Header.Get("Accept"); got != "text/event-stream" {
 		t.Fatalf("Accept = %q", got)
 	}
-	if got := proxyReq.Header.Get("User-Agent"); got != "codex_cli_rs/0.136.0 (Mac OS 15.7.7; arm64) iTerm.app/3.6.9" {
+	if got := proxyReq.Header.Get("User-Agent"); got != codexOAuthUserAgent {
 		t.Fatalf("User-Agent = %q", got)
 	}
 	if got := proxyReq.Header.Get("Originator"); got != codexOAuthOriginator {
 		t.Fatalf("Originator = %q", got)
 	}
-	if got := proxyReq.Header.Get("Version"); got != "0.136.0" {
+	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
 		t.Fatalf("Version = %q", got)
 	}
 	if got := proxyReq.Header.Get("Chatgpt-Account-Id"); got != "acct_123" {
@@ -343,6 +343,12 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	original.Header.Set("X-Codex-Installation-Id", "install-123")
 	original.Header.Set("X-Codex-Beta-Features", "feature-a")
 	original.Header.Set("X-OpenAI-Subagent", "review")
+	original.Header.Set("Accept-Encoding", "gzip")
+	original.Header.Set("Idempotency-Key", "idem-secret")
+	original.Header.Set("OpenAI-Organization", "org-secret")
+	original.Header.Set("OpenAI-Project", "proj-secret")
+	original.Header.Set("Traceparent", "00-secret")
+	original.Header.Set("X-Request-Id", "req-secret")
 	original.Header.Set("Session-Id", "session-123")
 	original.Header.Set("Thread-Id", "thread-123")
 	original.Header.Set("X-Client-Request-Id", "req-123")
@@ -375,8 +381,18 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
 		t.Fatalf("Version = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Turn-Metadata"); got != `{"turn_id":"turn-1"}` {
-		t.Fatalf("X-Codex-Turn-Metadata = %q", got)
+	var turnMetadata map[string]any
+	if err := json.Unmarshal([]byte(proxyReq.Header.Get("X-Codex-Turn-Metadata")), &turnMetadata); err != nil {
+		t.Fatalf("X-Codex-Turn-Metadata json: %v", err)
+	}
+	if got := turnMetadata["turn_id"]; got == "turn-1" {
+		t.Fatalf("X-Codex-Turn-Metadata preserved client turn_id: %#v", turnMetadata)
+	}
+	if got := turnMetadata["session_id"]; got != "session-123" {
+		t.Fatalf("turn session_id = %v", got)
+	}
+	if got := turnMetadata["thread_id"]; got != "thread-123" {
+		t.Fatalf("turn thread_id = %v", got)
 	}
 	if got := proxyReq.Header.Get("X-Client-Request-Id"); got != "req-123" {
 		t.Fatalf("X-Client-Request-Id = %q", got)
@@ -393,14 +409,19 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if got := proxyReq.Header.Get("X-Codex-Window-Id"); got != "thread-123:0" {
 		t.Fatalf("X-Codex-Window-Id = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Parent-Thread-Id"); got != "parent-thread-1" {
-		t.Fatalf("X-Codex-Parent-Thread-Id = %q", got)
+	if got := proxyReq.Header.Get("X-Codex-Parent-Thread-Id"); got != "" {
+		t.Fatalf("X-Codex-Parent-Thread-Id = %q, want empty", got)
 	}
 	if got := proxyReq.Header.Get("X-Codex-Beta-Features"); got != "feature-a" {
 		t.Fatalf("X-Codex-Beta-Features = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-OpenAI-Subagent"); got != "review" {
-		t.Fatalf("X-OpenAI-Subagent = %q", got)
+	if got := proxyReq.Header.Get("X-OpenAI-Subagent"); got != "" {
+		t.Fatalf("X-OpenAI-Subagent = %q, want empty", got)
+	}
+	for _, key := range []string{"Accept-Encoding", "Idempotency-Key", "OpenAI-Organization", "OpenAI-Project", "Traceparent", "X-Request-Id"} {
+		if got := proxyReq.Header.Get(key); got != "" {
+			t.Fatalf("%s = %q, want empty", key, got)
+		}
 	}
 	if got := proxyReq.Header.Get("Cookie"); got != "" {
 		t.Fatalf("Cookie = %q, want empty", got)
@@ -932,8 +953,89 @@ func TestCreateProxyRequest_CodexOAuthLatestHeadersAndLegacySessionID(t *testing
 	if got := proxyReq.Header.Get("X-ResponsesAPI-Include-Timing-Metrics"); got != "true" {
 		t.Fatalf("X-ResponsesAPI-Include-Timing-Metrics = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Turn-State"); got != "turn-state-123" {
-		t.Fatalf("X-Codex-Turn-State = %q", got)
+	if got := proxyReq.Header.Get("X-Codex-Turn-State"); got != "" {
+		t.Fatalf("X-Codex-Turn-State = %q, want empty", got)
+	}
+}
+
+func TestCreateProxyRequest_CodexOAuthRegeneratesUnsafeContextIdentifiers(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{"model":"gpt-5.2","stream":true,"input":"hello"}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("Session-Id", "user@example.com")
+	original.Header.Set("Thread-Id", "sk-secret-thread")
+	original.Header.Set("X-Codex-Installation-Id", "provider.customer.raw_ref")
+	original.Header.Set("X-Codex-Parent-Thread-Id", "customer@example.com")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIResponses,
+		UpstreamPath:   "/v1/responses",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/responses", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	for key, unsafe := range map[string]string{
+		"Session-Id":               "user@example.com",
+		"Thread-Id":                "sk-secret-thread",
+		"X-Codex-Installation-Id":  "provider.customer.raw_ref",
+		"X-Codex-Parent-Thread-Id": "customer@example.com",
+		"X-Client-Request-Id":      "sk-secret-thread",
+		"X-Codex-Window-Id":        "sk-secret-thread:0",
+		"X-Codex-Turn-Metadata":    "user@example.com",
+		"X-Codex-Turn-Metadata#sk": "sk-secret-thread",
+	} {
+		got := proxyReq.Header.Get(strings.Split(key, "#")[0])
+		if strings.Contains(got, unsafe) {
+			t.Fatalf("%s = %q, leaked unsafe identifier %q", key, got, unsafe)
+		}
+	}
+
+	var turn map[string]any
+	if err := json.Unmarshal([]byte(proxyReq.Header.Get("X-Codex-Turn-Metadata")), &turn); err != nil {
+		t.Fatalf("X-Codex-Turn-Metadata json: %v", err)
+	}
+	for _, key := range []string{"session_id", "thread_id", "window_id"} {
+		value := fmt.Sprint(turn[key])
+		for _, unsafe := range []string{"user@example.com", "sk-secret-thread", "provider.customer.raw_ref"} {
+			if strings.Contains(value, unsafe) {
+				t.Fatalf("turn[%s] = %q, leaked unsafe identifier %q", key, value, unsafe)
+			}
+		}
+	}
+
+	root := decodeRequestBodyMap(t, proxyReq)
+	metadata, ok := root["client_metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("client_metadata = %T %#v", root["client_metadata"], root["client_metadata"])
+	}
+	if got := fmt.Sprint(metadata["x-codex-installation-id"]); strings.Contains(got, "provider.customer.raw_ref") {
+		t.Fatalf("client_metadata.x-codex-installation-id = %q, leaked unsafe identifier", got)
 	}
 }
 
@@ -1012,6 +1114,177 @@ func TestCreateProxyRequest_CodexOAuthPreservesAndCompletesBodyContext(t *testin
 	}
 }
 
+func TestCreateProxyRequest_CodexOAuthOfficialLookingReadyBodyStillNormalizes(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccountID:   "acct_123",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{
+		"model":"gpt-5.2",
+		"instructions":"client instructions",
+		"stream":false,
+		"store":false,
+		"tools":[{"type":"function","function":{"name":"client_tool"}}],
+		"tool_choice":{"type":"function","function":{"name":"client_tool"}},
+		"parallel_tool_calls":true,
+		"reasoning":{"effort":"low"},
+		"include":["file_search_call.results"],
+		"client_metadata":{"custom":"keep"},
+		"input":[
+			{"type":"message","role":"system","content":"stay in input"},
+			{"type":"message","role":"user","content":"hello"}
+		]
+	}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("User-Agent", "codex_cli_rs/0.142.4 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
+	original.Header.Set("Originator", "codex_cli_rs")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIResponses,
+		UpstreamPath:   "/v1/responses",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/responses", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	root := decodeRequestBodyMap(t, proxyReq)
+	if got := root["instructions"]; got != "stay in input\n\nclient instructions" {
+		t.Fatalf("instructions = %#v, want normalized system extraction", got)
+	}
+	if got := root["stream"]; got != true {
+		t.Fatalf("stream = %#v, want forced streaming transport", got)
+	}
+	if got := root["store"]; got != false {
+		t.Fatalf("store = %#v, want false", got)
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v, want client tools", root["tools"])
+	}
+	toolChoice, ok := root["tool_choice"].(map[string]any)
+	if !ok {
+		t.Fatalf("tool_choice = %#v, want client tool choice", root["tool_choice"])
+	}
+	choiceFunction, _ := toolChoice["function"].(map[string]any)
+	if choiceFunction["name"] != "client_tool" {
+		t.Fatalf("tool_choice = %#v, want client tool", toolChoice)
+	}
+	if got := root["parallel_tool_calls"]; got != true {
+		t.Fatalf("parallel_tool_calls = %#v, want client true", got)
+	}
+	reasoning, ok := root["reasoning"].(map[string]any)
+	if !ok || reasoning["effort"] != "low" {
+		t.Fatalf("reasoning = %#v, want client reasoning", root["reasoning"])
+	}
+	include, ok := root["include"].([]any)
+	if !ok || !containsStringValue(include, "file_search_call.results") {
+		t.Fatalf("include = %#v, want client include", root["include"])
+	}
+	metadata, ok := root["client_metadata"].(map[string]any)
+	if !ok || metadata["custom"] != "keep" {
+		t.Fatalf("client_metadata = %#v, want client metadata", root["client_metadata"])
+	}
+	input, ok := root["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("input = %#v", root["input"])
+	}
+	userMessage, _ := input[0].(map[string]any)
+	if _, ok := userMessage["type"]; ok {
+		t.Fatalf("input[0] preserved message type for official-looking client: %#v", userMessage)
+	}
+	if userMessage["role"] != "user" || userMessage["content"] != "hello" {
+		t.Fatalf("input[0] = %#v, want normalized user message", input[0])
+	}
+}
+
+func TestCreateProxyRequest_CodexOAuthSpoofedOfficialUserAgentStillNormalizes(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{
+		"model":"gpt-5.2",
+		"instructions":"client instructions",
+		"store":false,
+		"input":[
+			{"type":"message","role":"system","content":"system instructions"},
+			{"type":"message","role":"user","content":"hello"}
+		]
+	}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("User-Agent", "my-codex_cli_rs-proxy/1.0")
+	original.Header.Set("Originator", "codex_cli_rs")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIResponses,
+		UpstreamPath:   "/v1/responses",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/responses", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	root := decodeRequestBodyMap(t, proxyReq)
+	if got := root["instructions"]; got != "system instructions\n\nclient instructions" {
+		t.Fatalf("instructions = %#v, want normalized system extraction", got)
+	}
+	input, ok := root["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("input = %#v, want system message removed", root["input"])
+	}
+	userMessage, _ := input[0].(map[string]any)
+	if _, ok := userMessage["type"]; ok {
+		t.Fatalf("input[0] preserved message type for spoofed client: %#v", userMessage)
+	}
+	if _, ok := root["tools"].([]any); !ok {
+		t.Fatalf("tools = %#v, want normalized tools", root["tools"])
+	}
+}
+
 func TestBuildCodexOAuthRequest_NormalizesResponsesBodyForCompatibility(t *testing.T) {
 	body := []byte(`{
 		"model":"gpt-5.2",
@@ -1083,6 +1356,126 @@ func TestBuildCodexOAuthRequest_NormalizesResponsesBodyForCompatibility(t *testi
 	msg, ok := input[0].(map[string]any)
 	if !ok || msg["role"] != "user" {
 		t.Fatalf("input[0] = %#v", input[0])
+	}
+}
+
+func TestBuildCodexOAuthRequest_AddsOrbitResponseDefaults(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.2","input":"hello","reasoning":{"effort":"high"}}`)
+
+	targetPath, stream, rewritten, err := buildCodexOAuthRequest("/v1/responses", body)
+	if err != nil {
+		t.Fatalf("buildCodexOAuthRequest: %v", err)
+	}
+	if targetPath != "/responses" {
+		t.Fatalf("targetPath = %q", targetPath)
+	}
+	if !stream {
+		t.Fatalf("stream = false, want true")
+	}
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v body=%s", err, string(rewritten))
+	}
+	input, ok := root["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("input = %#v", root["input"])
+	}
+	msg, _ := input[0].(map[string]any)
+	content, ok := msg["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("input[0].content = %#v", msg["content"])
+	}
+	block, _ := content[0].(map[string]any)
+	if block["type"] != "input_text" || block["text"] != "hello" {
+		t.Fatalf("input text block = %#v", block)
+	}
+	if tools, ok := root["tools"].([]any); !ok || len(tools) != 0 {
+		t.Fatalf("tools = %#v, want empty array", root["tools"])
+	}
+	if got := root["tool_choice"]; got != "auto" {
+		t.Fatalf("tool_choice = %#v, want auto", got)
+	}
+	if got := root["parallel_tool_calls"]; got != false {
+		t.Fatalf("parallel_tool_calls = %#v, want false", got)
+	}
+	include, ok := root["include"].([]any)
+	if !ok || !containsStringValue(include, "reasoning.encrypted_content") {
+		t.Fatalf("include = %#v, want reasoning.encrypted_content", root["include"])
+	}
+}
+
+func TestBuildCodexOAuthRequest_PreservesExplicitAgentSDKControlFields(t *testing.T) {
+	body := []byte(`{
+		"model":"gpt-5.2",
+		"input":"hello",
+		"tools":[{"type":"function","function":{"name":"client_tool"}}],
+		"tool_choice":{"type":"function","function":{"name":"client_tool"}},
+		"parallel_tool_calls":true,
+		"reasoning":{"effort":"low","summary":"auto"},
+		"include":["file_search_call.results"]
+	}`)
+
+	targetPath, stream, rewritten, err := buildCodexOAuthRequest("/v1/responses", body)
+	if err != nil {
+		t.Fatalf("buildCodexOAuthRequest: %v", err)
+	}
+	if targetPath != "/responses" {
+		t.Fatalf("targetPath = %q", targetPath)
+	}
+	if !stream {
+		t.Fatalf("stream = false, want true")
+	}
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v body=%s", err, string(rewritten))
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v, want client tools", root["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	function, _ := tool["function"].(map[string]any)
+	if function["name"] != "client_tool" {
+		t.Fatalf("tools[0] = %#v, want client tool", tools[0])
+	}
+	toolChoice, ok := root["tool_choice"].(map[string]any)
+	if !ok {
+		t.Fatalf("tool_choice = %#v, want client object", root["tool_choice"])
+	}
+	choiceFunction, _ := toolChoice["function"].(map[string]any)
+	if choiceFunction["name"] != "client_tool" {
+		t.Fatalf("tool_choice = %#v, want client value", toolChoice)
+	}
+	if got := root["parallel_tool_calls"]; got != true {
+		t.Fatalf("parallel_tool_calls = %#v, want client true", got)
+	}
+	reasoning, ok := root["reasoning"].(map[string]any)
+	if !ok || reasoning["effort"] != "low" || reasoning["summary"] != "auto" {
+		t.Fatalf("reasoning = %#v, want client value", root["reasoning"])
+	}
+	include, ok := root["include"].([]any)
+	if !ok || len(include) != 1 || !containsStringValue(include, "file_search_call.results") {
+		t.Fatalf("include = %#v, want client include", root["include"])
+	}
+}
+
+func TestBuildCodexOAuthRequest_CompactEndpointDoesNotAddResponseDefaults(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.2","input":"compact this"}`)
+
+	_, _, rewritten, err := buildCodexOAuthRequest("/v1/responses/compact", body)
+	if err != nil {
+		t.Fatalf("buildCodexOAuthRequest: %v", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v body=%s", err, string(rewritten))
+	}
+	for _, key := range []string{"tools", "tool_choice", "parallel_tool_calls", "include", "client_metadata"} {
+		if _, ok := root[key]; ok {
+			t.Fatalf("did not expect compact body to gain %q: %#v", key, root[key])
+		}
 	}
 }
 
@@ -1891,8 +2284,8 @@ func assertCodexRefreshJSONRequest(t *testing.T, r *http.Request, wantClientID s
 	if got := r.Header.Get("Originator"); got != "codex_cli_rs" {
 		t.Fatalf("originator = %q, want codex_cli_rs", got)
 	}
-	if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "codex_cli_rs/0.136.0") {
-		t.Fatalf("user-agent = %q, want codex_cli_rs/0.136.0 prefix", got)
+	if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "codex_cli_rs/"+codexOAuthVersion) {
+		t.Fatalf("user-agent = %q, want codex_cli_rs/%s prefix", got, codexOAuthVersion)
 	}
 	var req map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

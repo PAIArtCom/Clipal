@@ -78,7 +78,7 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	payload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello")
 	billing := claudeSmokeBillingText(t, payload)
-	if !strings.Contains(billing, "cc_version=2.1.161.2ba; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(billing, "cc_version=2.1.195.325; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("billing system block = %q", billing)
 	}
 	if got := payload["stream"]; got == true {
@@ -87,13 +87,13 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	countTokensPayload := runClaudeSmokePayloadPython(t, py, script, "claude_count_tokens_payload()", "hello")
 	countTokensBilling := claudeSmokeBillingText(t, countTokensPayload)
-	if !strings.Contains(countTokensBilling, "cc_version=2.1.161.2ba; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(countTokensBilling, "cc_version=2.1.195.325; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("count_tokens billing system block = %q", countTokensBilling)
 	}
 
 	emojiPayload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello 🌍")
 	emojiBilling := claudeSmokeBillingText(t, emojiPayload)
-	if !strings.Contains(emojiBilling, "cc_version=2.1.161.") {
+	if !strings.Contains(emojiBilling, "cc_version=2.1.195.") {
 		t.Fatalf("emoji billing system block = %q", emojiBilling)
 	}
 }

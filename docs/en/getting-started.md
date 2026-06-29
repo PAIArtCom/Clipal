@@ -65,6 +65,8 @@ OAuth upstream notes:
 - `OAuth -> Codex` supports OpenAI `Responses` requests
 - `OAuth -> Claude` supports Claude `messages` and `count_tokens`
 - `OAuth -> Gemini` supports Gemini `generateContent`, `streamGenerateContent`, and `countTokens`
+- For Claude and Codex OAuth, ordinary clients use an Agent SDK-compatible upstream envelope by default, with required transport fields handled by Clipal.
+- Client-supplied control fields win over defaults when supported by the target model: explicit `tools`, Claude `thinking` / `context_management` / `output_config`, and Codex `reasoning` / `tool_choice` / `parallel_tool_calls` are preserved.
 - OAuth credentials are stored locally outside YAML under `~/.clipal/oauth/`
 - Clipal refreshes access tokens automatically before expiry when a `refresh_token` is available, and retries once after an upstream `401` by forcing a refresh
 - OAuth providers are usually added through the authorization flow; if you already have Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON, or a sub2api export JSON bundle, you can import it from the same Add Provider dialog

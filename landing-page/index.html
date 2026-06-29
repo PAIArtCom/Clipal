@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clipal — LLM API Gateway for Claude Code, Codex & Gemini CLI</title>
   <meta name="description"
-    content="Clipal is a free, local LLM API gateway. Install with npm to manage multi-key pools, bypass 429 rate limits, and proxy Claude Code, Codex & Gemini CLI. No Docker, no Python.">
+    content="Clipal is a free, local LLM API gateway. Install with npm to manage multi-key pools, OAuth upstreams, Agent SDK-compatible Claude/Codex wrapping, and Claude Code, Codex & Gemini CLI traffic. No Docker, no Python.">
   <meta name="keywords"
     content="claude code proxy, llm api gateway, openrouter proxy, 429 rate limit bypass, gemini cli proxy, codex cli proxy, anthropic bedrock proxy, vertex ai claude code, clipal">
   <link rel="canonical" href="https://clipal.paiart.com">
@@ -31,7 +31,7 @@
   <!-- OpenGraph -->
   <meta property="og:title" content="Clipal — LLM API Gateway for Claude Code, Codex & Gemini">
   <meta property="og:description"
-    content="Free local binary. Manage multi-key pools, bypass 429 rate limits, and proxy Claude Code, Codex & Gemini. No Docker required.">
+    content="Free local binary. Manage multi-key pools, OAuth upstreams, and Agent SDK-compatible Claude/Codex proxying. No Docker required.">
   <meta property="og:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
   <meta property="og:url" content="https://clipal.paiart.com">
   <meta property="og:type" content="website">
@@ -39,7 +39,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Clipal — LLM API Gateway for Claude Code, Codex & Gemini">
   <meta name="twitter:description"
-    content="Free local binary. Bypass 429 rate limits. Proxy Claude Code, Codex & Gemini CLI. No Docker.">
+    content="Free local binary. OAuth upstreams, Agent SDK-compatible Claude/Codex proxying, and CLI takeover. No Docker.">
   <meta name="twitter:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
 
   <!-- Structured Data -->
@@ -48,10 +48,10 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Clipal",
-    "description": "Free local LLM API gateway with bulletproof failover, multi-key rotation, and one-click CLI takeover for Claude Code, Codex, and Gemini.",
+    "description": "Free local LLM API gateway with bulletproof failover, OAuth upstreams, Agent SDK-compatible Claude/Codex proxying, multi-key rotation, and one-click CLI takeover for Claude Code, Codex, and Gemini.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
-    "softwareVersion": "0.18.1",
+    "softwareVersion": "0.19.0",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
     "url": "https://clipal.paiart.com",
@@ -211,8 +211,9 @@
           </h1>
 
           <p class="hero-sub reveal">
-            Native support for OpenRouter, new-api, and any provider. Automatically patches ~/.claude/settings.json and
-            standard configs—eliminating 429 rate limits through intelligent multi-key rotation and failover.
+            Native support for OpenRouter, new-api, OAuth accounts, and any provider. Automatically patches
+            ~/.claude/settings.json and standard configs while using Agent SDK-compatible Claude/Codex OAuth wrapping for
+            ordinary clients.
           </p>
 
           <div class="cta-group">
@@ -263,8 +264,8 @@
             Directly patches ~/.claude/settings.json & ~/.codex/config.toml.<br>
             Clipal also serves as a unified proxy for Coding Agents such as Claude code, Codex, Gemini CLI, Aider,
             Continue ...,<br>
-            and AI Apps such as Jan, Cherry Studio, Chatbox, and any app supporting custom API endpoints (OpenRouter,
-            new-api, sub2api).
+            and AI Apps such as Jan, Cherry Studio, Chatbox, and any app supporting custom API endpoints or OAuth
+            upstreams (OpenRouter, new-api, sub2api, Claude OAuth, Codex OAuth).
           </p>
         </div>
         <div class="ecosystem-track-container reveal">
@@ -681,11 +682,12 @@
           <div class="bp-col">
             <div class="bp-item">
               <div class="bp-title">Anthropic / Bedrock</div>
-              <div class="bp-desc">100% Protocol match. Zero authentication loops.</div>
+              <div class="bp-desc">Claude OAuth uses an Agent SDK-compatible envelope with Clipal-generated transport headers.
+              </div>
             </div>
             <div class="bp-item">
               <div class="bp-title">OpenAI / Custom Models</div>
-              <div class="bp-desc">High-performance Codex compatibility with load balancing.
+              <div class="bp-desc">Codex OAuth normalizes Responses requests into Agent SDK-compatible upstream shape.
               </div>
             </div>
             <div class="bp-item">
@@ -782,7 +784,8 @@
               <h4>Claude Code Proxy: Native & Powerful</h4>
               <p>Directly hijacking <code>ANTHROPIC_BASE_URL</code> without environment
                 pollution. Perfect for relaying requests to Bedrock, Vertex AI, or any 3rd-party Claude Mirror without
-                protocol header errors.</p>
+                protocol header errors. OAuth requests use a lightweight Agent SDK envelope with transport fields
+                handled by Clipal.</p>
             </article>
 
             <article class="why-card">
@@ -1036,7 +1039,7 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               </a>
               <div class="version-note">
                 <span>Latest stable:</span>
-                <code>v0.18.1</code>
+                <code>v0.19.0</code>
                 <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                   class="version-link">All releases →</a>
               </div>

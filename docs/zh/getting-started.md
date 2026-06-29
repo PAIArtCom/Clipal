@@ -65,6 +65,8 @@ OAuth 上游说明：
 - `OAuth -> Codex` 支持 OpenAI `Responses` 请求
 - `OAuth -> Claude` 支持 Claude `messages` 和 `count_tokens`
 - `OAuth -> Gemini` 支持 Gemini `generateContent`、`streamGenerateContent`、`countTokens`
+- Claude 和 Codex OAuth 对普通客户端默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
+- 客户端显式传入的控制字段在目标模型支持时优先于默认值：例如 `tools`、Claude `thinking` / `context_management` / `output_config`，以及 Codex `reasoning` / `tool_choice` / `parallel_tool_calls` 都会被保留。
 - OAuth 凭据保存在 YAML 之外的 `~/.clipal/oauth/`
 - 只要有 `refresh_token`，Clipal 会在 access token 过期前自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
 - OAuth provider 通常通过授权流程接入；如果你已经有 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，或 sub2api 导出的 JSON，也可以在同一个 Add Provider 对话框里直接导入

@@ -25,6 +25,7 @@ http://127.0.0.1:3333/
 - 配置 provider 级 OpenAI `reasoning_effort` 或 Claude `thinking_budget_tokens`
 - 对支持的客户端 / 服务组合发起 OAuth 授权
 - 在 Add Provider 对话框里导入 OAuth 授权文件。当前支持 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，以及 sub2api 导出的 JSON；Clipal 只会导入与当前所选服务匹配的账号。
+- 对 Claude 和 Codex OAuth 请求默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
 - 在 provider 卡片上查看 OAuth 鉴权状态和最近刷新摘要
 - 为支持的 OAuth provider 加载套餐和限额详情（当前仅 Codex）
 

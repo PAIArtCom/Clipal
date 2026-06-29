@@ -118,9 +118,9 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
 		}
 	}
-	for _, token := range []string{"redact-thinking-2026-02-12"} {
-		if strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
-			t.Fatalf("Anthropic-Beta = %q, want token %q absent", betas, token)
+	for _, token := range []string{"redact-thinking-2026-02-12", "extended-cache-ttl-2025-04-11", "advisor-tool-2026-03-01", "advanced-tool-use-2025-11-20", "effort-2025-11-24"} {
+		if !strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
+			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
 		}
 	}
 	if got := proxyReq.Header.Get("Cookie"); got != "" {
@@ -168,7 +168,7 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	}
 }
 
-func TestCreateProxyRequest_ClaudeOAuthPreservesOfficialClaudeCodeHeaders(t *testing.T) {
+func TestCreateProxyRequest_ClaudeOAuthRegeneratesOfficialLookingClaudeCodeHeaders(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -200,6 +200,10 @@ func TestCreateProxyRequest_ClaudeOAuthPreservesOfficialClaudeCodeHeaders(t *tes
 	original.Header.Set("X-App-Ver", "2.2.0")
 	original.Header.Set("X-Client-App", "claude-code")
 	original.Header.Set("X-Claude-Code-Session-Id", "session-from-claude-code")
+	original.Header.Set("Anthropic-Beta", "attacker-beta")
+	original.Header.Set("X-Stainless-Runtime", "attacker-runtime")
+	original.Header.Set("X-Stainless-Package-Version", "attacker-package")
+	original.Header.Set("X-Stainless-Helper-Method", "attacker-helper")
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -214,22 +218,313 @@ func TestCreateProxyRequest_ClaudeOAuthPreservesOfficialClaudeCodeHeaders(t *tes
 	}
 
 	for key, want := range map[string]string{
-		"User-Agent":               "claude-code/2.2.0 (external, cli)",
-		"X-App":                    "cli",
-		"X-Claude-Code-Session-Id": "session-from-claude-code",
+		"User-Agent": claudeOAuthUserAgent,
+		"X-App":      "cli",
 	} {
 		if got := proxyReq.Header.Get(key); got != want {
 			t.Fatalf("%s = %q, want %q", key, got, want)
 		}
 	}
+	if got := proxyReq.Header.Get("X-Claude-Code-Session-Id"); got != "session-from-claude-code" {
+		t.Fatalf("X-Claude-Code-Session-Id = %q, want inherited client session", got)
+	}
 	for _, key := range []string{"X-App-Name", "X-App-Ver", "X-Client-App"} {
 		if got := proxyReq.Header.Get(key); got != "" {
-			t.Fatalf("%s = %q, want empty for Claude 2.1.161", key, got)
+			t.Fatalf("%s = %q, want empty for Claude %s", key, got, claudeOAuthAppVersion)
 		}
+	}
+	if got := proxyReq.Header.Get("Anthropic-Beta"); strings.Contains(got, "attacker-beta") {
+		t.Fatalf("Anthropic-Beta preserved attacker beta: %q", got)
+	}
+	if got := proxyReq.Header.Get("X-Stainless-Runtime"); got != claudeOAuthStainlessRuntime {
+		t.Fatalf("X-Stainless-Runtime = %q, want %q", got, claudeOAuthStainlessRuntime)
+	}
+	if got := proxyReq.Header.Get("X-Stainless-Package-Version"); got != claudeOAuthStainlessPackageVersion {
+		t.Fatalf("X-Stainless-Package-Version = %q, want %q", got, claudeOAuthStainlessPackageVersion)
+	}
+	if got := proxyReq.Header.Get("X-Stainless-Helper-Method"); got != "" {
+		t.Fatalf("X-Stainless-Helper-Method = %q, want empty for non-streaming request", got)
+	}
+	assertClaudeOAuthSDKEnvelopeBody(t, proxyReq)
+}
+
+func TestCreateProxyRequest_ClaudeOAuthInheritsClientSessionContext(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "claude-sean-example-com",
+		Provider:    config.OAuthProviderClaude,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "claude-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderClaude,
+			OAuthRef:      "claude-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{
+		"model":"claude-sonnet-4-5",
+		"conversation_id":"conversation-secret@example.com",
+		"metadata":{
+			"session_id":"metadata-session-secret",
+			"user_id":"{\"device_id\":\"device-123\",\"account_uuid\":\"acct-123\",\"session_id\":\"user-id-session-secret\"}"
+		},
+		"messages":[{"role":"user","content":"hello"}]
+	}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("X-Claude-Code-Session-Id", "header-session-secret")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	sessionID := proxyReq.Header.Get("X-Claude-Code-Session-Id")
+	if sessionID != "header-session-secret" {
+		t.Fatalf("X-Claude-Code-Session-Id = %q, want inherited header session", sessionID)
+	}
+
+	root := decodeRequestBodyMap(t, proxyReq)
+	metadata, _ := root["metadata"].(map[string]any)
+	userID := stringValue(metadata["user_id"])
+	if !strings.Contains(userID, sessionID) {
+		t.Fatalf("metadata.user_id = %q, want inherited session %q", userID, sessionID)
+	}
+	if _, ok := metadata["session_id"]; ok {
+		t.Fatalf("metadata.session_id should be removed: %#v", metadata)
 	}
 }
 
-func TestCreateProxyRequest_ClaudeOAuthPrependsAttributionToStringSystem(t *testing.T) {
+func TestCreateProxyRequest_ClaudeOAuthPreservesExplicitSDKControls(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "claude-sean-example-com",
+		Provider:    config.OAuthProviderClaude,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "claude-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderClaude,
+			OAuthRef:      "claude-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{
+		"model":"claude-sonnet-4-5",
+		"messages":[{"role":"user","content":"hello"}],
+		"tools":[{"name":"CustomTool","description":"custom","input_schema":{"type":"object"}}],
+		"thinking":{"type":"enabled","budget_tokens":1024},
+		"context_management":{"edits":[{"type":"clear_thinking_20251015","keep":"none"}]},
+		"output_config":{"effort":"low"}
+	}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	if got := proxyReq.Header.Get("User-Agent"); got != claudeOAuthUserAgent {
+		t.Fatalf("User-Agent = %q, want %q", got, claudeOAuthUserAgent)
+	}
+	root := decodeRequestBodyMap(t, proxyReq)
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v, want client tool", root["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	if tool["name"] != "CustomTool" {
+		t.Fatalf("tools[0] = %#v, want CustomTool", tools[0])
+	}
+	thinking, _ := root["thinking"].(map[string]any)
+	if thinking["type"] != "enabled" || thinking["budget_tokens"] != float64(1024) {
+		t.Fatalf("thinking = %#v, want explicit thinking", root["thinking"])
+	}
+	contextManagement, _ := root["context_management"].(map[string]any)
+	edits, _ := contextManagement["edits"].([]any)
+	edit, _ := edits[0].(map[string]any)
+	if edit["keep"] != "none" {
+		t.Fatalf("context_management = %#v, want explicit keep none", root["context_management"])
+	}
+	outputConfig, _ := root["output_config"].(map[string]any)
+	if outputConfig["effort"] != "low" {
+		t.Fatalf("output_config = %#v, want explicit effort low", root["output_config"])
+	}
+}
+
+func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "claude-sean-example-com",
+		Provider:    config.OAuthProviderClaude,
+		Email:       "sean@example.com",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "claude-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderClaude,
+			OAuthRef:      "claude-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	body := []byte(`{"model":"claude-sonnet-4-5","stream":true,"messages":[{"role":"user","content":"hello"}]}`)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	original.Header.Set("Content-Type", "application/json")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	if got := proxyReq.Header.Get("Accept"); got != claudeOAuthAccept {
+		t.Fatalf("Accept = %q, want %q", got, claudeOAuthAccept)
+	}
+	if got := proxyReq.Header.Get("Accept-Encoding"); got != claudeOAuthAcceptEncoding {
+		t.Fatalf("Accept-Encoding = %q, want %q", got, claudeOAuthAcceptEncoding)
+	}
+	if got := proxyReq.Header.Get("X-Stainless-Helper-Method"); got != claudeOAuthStainlessHelperMethod {
+		t.Fatalf("X-Stainless-Helper-Method = %q, want %q", got, claudeOAuthStainlessHelperMethod)
+	}
+
+	official := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	official.Header.Set("Content-Type", "application/json")
+	official.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-ts, agent-sdk/0.3.185)")
+	official = withRequestContext(official, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+	officialReq, err := cp.createProxyRequest(official, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest official: %v", err)
+	}
+	if got := officialReq.Header.Get("User-Agent"); got != claudeOAuthUserAgent {
+		t.Fatalf("official User-Agent = %q", got)
+	}
+	assertClaudeOAuthSDKEnvelopeBody(t, officialReq)
+
+	spoof := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	spoof.Header.Set("Content-Type", "application/json")
+	spoof.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-secret)")
+	spoof = withRequestContext(spoof, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+	spoofReq, err := cp.createProxyRequest(spoof, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest spoof: %v", err)
+	}
+	if got := spoofReq.Header.Get("User-Agent"); got != claudeOAuthUserAgent {
+		t.Fatalf("spoof User-Agent = %q, want synthesized %q", got, claudeOAuthUserAgent)
+	}
+
+	sdkCLI := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	sdkCLI.Header.Set("Content-Type", "application/json")
+	sdkCLI.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-cli)")
+	sdkCLI = withRequestContext(sdkCLI, RequestContext{
+		ClientType:     ClientClaude,
+		Family:         ProtocolFamilyClaude,
+		Capability:     CapabilityClaudeMessages,
+		UpstreamPath:   "/v1/messages",
+		UnifiedIngress: true,
+	})
+	sdkCLIReq, err := cp.createProxyRequest(sdkCLI, cp.providers[0], "", "/v1/messages", body)
+	if err != nil {
+		t.Fatalf("createProxyRequest sdk-cli: %v", err)
+	}
+	assertClaudeOAuthSDKEnvelopeBody(t, sdkCLIReq)
+}
+
+func assertClaudeOAuthSDKEnvelopeBody(t *testing.T, req *http.Request) {
+	t.Helper()
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	req.Body = io.NopCloser(bytes.NewReader(body))
+
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v body=%s", err, string(body))
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 0 {
+		t.Fatalf("tools = %#v, want SDK empty tools", root["tools"])
+	}
+	system, ok := root["system"].([]any)
+	if !ok || len(system) != 2 {
+		t.Fatalf("system = %#v, want SDK billing plus prompt", root["system"])
+	}
+	for _, item := range system {
+		block, _ := item.(map[string]any)
+		text := stringValue(block["text"])
+		if strings.Contains(text, claudeOAuthSystemCorePrompt) || strings.Contains(text, claudeOAuthSessionGuidancePrompt) {
+			t.Fatalf("SDK system included Claude Code prompt block: %#v", system)
+		}
+	}
+	messages, ok := root["messages"].([]any)
+	if !ok || len(messages) != 1 {
+		t.Fatalf("messages = %#v", root["messages"])
+	}
+	firstMessage, _ := messages[0].(map[string]any)
+	content, ok := firstMessage["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("messages[0].content = %#v, want SDK content without Claude Code prefix", firstMessage["content"])
+	}
+}
+
+func TestCreateProxyRequest_ClaudeOAuthPreservesStringSystemInSDKEnvelope(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -255,6 +550,7 @@ func TestCreateProxyRequest_ClaudeOAuthPrependsAttributionToStringSystem(t *test
 	body := []byte(`{"model":"claude-sonnet-4-5","system":"Keep it short.","messages":[]}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
+	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -293,7 +589,7 @@ func TestCreateProxyRequest_ClaudeOAuthPrependsAttributionToStringSystem(t *test
 		t.Fatalf("messages[0] = %#v", messages[0])
 	}
 	content, ok := firstMessage["content"].([]any)
-	if !ok || len(content) < 2 {
+	if !ok || len(content) != 1 {
 		t.Fatalf("messages[0].content = %#v", firstMessage["content"])
 	}
 	for _, item := range content {
@@ -421,10 +717,11 @@ func TestCreateProxyRequest_ClaudeOAuthResignsBillingHeaderAfterOverrides(t *tes
 	}
 }
 
-func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *testing.T) {
+func TestNormalizeClaudeOAuthRequestSynthesizesAgentSDKEnvelopeForOfficialLookingUA(t *testing.T) {
 	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"temperature":0.2}`)
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
+	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
 	requestCtx := RequestContext{
 		ClientType:   ClientClaude,
 		Family:       ProtocolFamilyClaude,
@@ -482,41 +779,12 @@ func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *tes
 		t.Fatalf("context_management.edits[0] = %#v", edits[0])
 	}
 	tools, ok := root["tools"].([]any)
-	if !ok || len(tools) < len(claudeOAuthToolNames()) {
-		t.Fatalf("tools = %#v", root["tools"])
-	}
-	for idx, name := range claudeOAuthToolNames() {
-		tool, _ := tools[idx].(map[string]any)
-		if tool == nil || tool["name"] != name {
-			t.Fatalf("tools[%d] = %#v, want %q", idx, tools[idx], name)
-		}
-	}
-	agent, _ := tools[0].(map[string]any)
-	agentSchema, _ := agent["input_schema"].(map[string]any)
-	agentRequired, _ := agentSchema["required"].([]any)
-	if fmt.Sprint(agentRequired) != "[description prompt]" {
-		t.Fatalf("Agent.required = %#v, want description and prompt only", agentSchema["required"])
-	}
-	agentProps, _ := agentSchema["properties"].(map[string]any)
-	if _, ok := agentProps["model"]; !ok {
-		t.Fatalf("Agent.properties missing model: %#v", agentProps)
-	}
-	if _, ok := agentProps["isolation"]; !ok {
-		t.Fatalf("Agent.properties missing isolation: %#v", agentProps)
-	}
-	bash, _ := tools[1].(map[string]any)
-	bashSchema, _ := bash["input_schema"].(map[string]any)
-	bashRequired, _ := bashSchema["required"].([]any)
-	if fmt.Sprint(bashRequired) != "[command]" {
-		t.Fatalf("Bash.required = %#v, want command only", bashSchema["required"])
-	}
-	bashProps, _ := bashSchema["properties"].(map[string]any)
-	if _, ok := bashProps["dangerouslyDisableSandbox"]; !ok {
-		t.Fatalf("Bash.properties missing dangerouslyDisableSandbox: %#v", bashProps)
+	if !ok || len(tools) != 0 {
+		t.Fatalf("tools = %#v, want SDK empty tools", root["tools"])
 	}
 	system, ok := root["system"].([]any)
-	if !ok || len(system) < 4 {
-		t.Fatalf("system = %#v", root["system"])
+	if !ok || len(system) != 2 {
+		t.Fatalf("system = %#v, want billing plus SDK prompt", root["system"])
 	}
 	systemBlock, _ := system[0].(map[string]any)
 	if !isClaudeOAuthBillingHeaderText(stringValue(systemBlock["text"])) {
@@ -525,8 +793,12 @@ func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *tes
 	if cch := claudeOAuthTestCCH(stringValue(systemBlock["text"])); cch == "" || cch == "00000" {
 		t.Fatalf("system billing cch = %q, want signed non-zero cch", cch)
 	}
-	if !strings.Contains(stringValue(systemBlock["text"]), "cc_version=2.1.161.2ba;") {
+	if !strings.Contains(stringValue(systemBlock["text"]), "cc_version="+claudeOAuthBillingVersion(root["messages"])+";") {
 		t.Fatalf("system[0].text = %q, want fingerprint based on original user prompt", systemBlock["text"])
+	}
+	sdkPrompt, _ := system[1].(map[string]any)
+	if got := stringValue(sdkPrompt["text"]); got != claudeOAuthSystemPrompt {
+		t.Fatalf("system[1].text = %q, want SDK prompt", got)
 	}
 	messages, ok := root["messages"].([]any)
 	if !ok || len(messages) == 0 {
@@ -534,14 +806,11 @@ func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *tes
 	}
 	firstMessage, _ := messages[0].(map[string]any)
 	content, ok := firstMessage["content"].([]any)
-	if !ok || len(content) < 3 {
+	if !ok || len(content) != 1 {
 		t.Fatalf("messages[0].content = %#v", firstMessage["content"])
 	}
-	if !claudeOAuthBlockTextHasPrefix(content[0], "<system-reminder>\nThe following deferred tools are now available via ToolSearch.") {
-		t.Fatalf("messages[0].content[0] = %#v", content[0])
-	}
 	finalBlock, ok := claudeOAuthLastTextBlock(content)
-	if !ok || finalBlock["text"] != "hello" || !claudeOAuthCacheControlMatches(finalBlock["cache_control"], "ephemeral", "1h", "") {
+	if !ok || finalBlock["text"] != "hello" {
 		t.Fatalf("final user block = %#v", finalBlock)
 	}
 	betas := proxyReq.Header.Get("Anthropic-Beta")
@@ -552,7 +821,125 @@ func TestNormalizeClaudeOAuthRequestSynthesizesProviderCompatibleEnvelope(t *tes
 	}
 }
 
-func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *testing.T) {
+func TestNormalizeClaudeOAuthRequestDefaultsToSDKEnvelope(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"temperature":0.2}`)
+	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
+
+	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, original, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 0 {
+		t.Fatalf("tools = %#v, want SDK empty tools", root["tools"])
+	}
+	system, ok := root["system"].([]any)
+	if !ok || len(system) != 2 {
+		t.Fatalf("system = %#v, want billing plus SDK prompt", root["system"])
+	}
+	sdkPrompt, _ := system[1].(map[string]any)
+	if got := stringValue(sdkPrompt["text"]); got != claudeOAuthSystemPrompt {
+		t.Fatalf("system[1].text = %q, want SDK prompt", got)
+	}
+	for _, item := range system {
+		block, _ := item.(map[string]any)
+		text := stringValue(block["text"])
+		if strings.Contains(text, claudeOAuthSystemCorePrompt) || strings.Contains(text, claudeOAuthSessionGuidancePrompt) {
+			t.Fatalf("SDK system included Claude Code prompt block: %#v", system)
+		}
+	}
+	messages, ok := root["messages"].([]any)
+	if !ok || len(messages) != 1 {
+		t.Fatalf("messages = %#v", root["messages"])
+	}
+	firstMessage, _ := messages[0].(map[string]any)
+	content, ok := firstMessage["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("messages[0].content = %#v, want only client content", firstMessage["content"])
+	}
+	block, _ := content[0].(map[string]any)
+	if got := stringValue(block["text"]); got != "hello" {
+		t.Fatalf("messages[0].content[0].text = %q", got)
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestSDKCustomSystemReplacesDefaultPrompt(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","system":"Keep it short.","messages":[{"role":"user","content":"hello"}]}`)
+	rewritten := normalizeClaudeOAuthRequest(body, httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil), nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	system, ok := root["system"].([]any)
+	if !ok || len(system) != 2 {
+		t.Fatalf("system = %#v, want billing plus custom system", root["system"])
+	}
+	custom, _ := system[1].(map[string]any)
+	if got := stringValue(custom["text"]); got != "Keep it short." {
+		t.Fatalf("system[1].text = %q, want custom system", got)
+	}
+	for _, item := range system {
+		block, _ := item.(map[string]any)
+		if stringValue(block["text"]) == claudeOAuthSystemPrompt {
+			t.Fatalf("system = %#v, SDK prompt should be replaced by custom system", system)
+		}
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestSDKPreservesExplicitControlFields(t *testing.T) {
+	body := []byte(`{
+		"model":"claude-sonnet-4-5",
+		"messages":[{"role":"user","content":"hello"}],
+		"max_tokens":1234,
+		"thinking":{"type":"enabled","budget_tokens":999},
+		"context_management":{"edits":[{"type":"client_edit","keep":"none"}]},
+		"output_config":{"effort":"low"},
+		"tools":[{"name":"CustomTool","description":"custom","input_schema":{"type":"object"}}]
+	}`)
+	rewritten := normalizeClaudeOAuthRequest(body, httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil), nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+
+	var root map[string]any
+	if err := json.Unmarshal(rewritten, &root); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if got := root["max_tokens"]; got != float64(1234) {
+		t.Fatalf("max_tokens = %v, want client value", got)
+	}
+	thinking, ok := root["thinking"].(map[string]any)
+	if !ok || thinking["type"] != "enabled" || thinking["budget_tokens"] != float64(999) {
+		t.Fatalf("thinking = %#v, want client value", root["thinking"])
+	}
+	contextManagement, ok := root["context_management"].(map[string]any)
+	if !ok {
+		t.Fatalf("context_management = %#v", root["context_management"])
+	}
+	edits, ok := contextManagement["edits"].([]any)
+	if !ok || len(edits) != 1 {
+		t.Fatalf("context_management.edits = %#v", contextManagement["edits"])
+	}
+	edit, _ := edits[0].(map[string]any)
+	if edit["type"] != "client_edit" || edit["keep"] != "none" {
+		t.Fatalf("context_management.edits[0] = %#v, want client value", edits[0])
+	}
+	outputConfig, ok := root["output_config"].(map[string]any)
+	if !ok || outputConfig["effort"] != "low" {
+		t.Fatalf("output_config = %#v, want client value", root["output_config"])
+	}
+	tools, ok := root["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v, want client tools", root["tools"])
+	}
+	custom, _ := tools[0].(map[string]any)
+	if custom["name"] != "CustomTool" {
+		t.Fatalf("tools[0] = %#v, want client tool", tools[0])
+	}
+}
+
+func TestNormalizeClaudeOAuthRequestRegeneratesOfficialLookingSystemAndPreservesClientTools(t *testing.T) {
 	tools := make([]map[string]any, 0, len(claudeOAuthToolNames()))
 	for _, name := range claudeOAuthToolNames() {
 		tools = append(tools, map[string]any{
@@ -575,7 +962,7 @@ func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *tes
 			},
 		}},
 		"system": []any{
-			map[string]any{"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.161.2ba; cc_entrypoint=sdk-cli; cch=00000;"},
+			map[string]any{"type": "text", "text": "x-anthropic-billing-header: cc_version=9.9.9.abc; cc_entrypoint=evil; cch=00000;"},
 			map[string]any{"type": "text", "text": claudeOAuthSystemPrompt},
 			map[string]any{"type": "text", "text": "client core", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h", "scope": "global"}},
 			map[string]any{"type": "text", "text": "client runtime", "cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}},
@@ -587,19 +974,21 @@ func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *tes
 		t.Fatalf("json.Marshal: %v", err)
 	}
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
-	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, nil, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
+	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
+	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, original, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
 
 	var root map[string]any
 	if err := json.Unmarshal(rewritten, &root); err != nil {
 		t.Fatalf("json.Unmarshal: %v", err)
 	}
 	system, ok := root["system"].([]any)
-	if !ok || len(system) != 4 {
+	if !ok || len(system) != 3 {
 		t.Fatalf("system = %#v", root["system"])
 	}
-	core, _ := system[2].(map[string]any)
+	core, _ := system[1].(map[string]any)
 	if core["text"] != "client core" {
-		t.Fatalf("system[2] = %#v, want client core preserved", system[2])
+		t.Fatalf("system[1] = %#v, want client core preserved", system[1])
 	}
 	rewrittenTools, ok := root["tools"].([]any)
 	if !ok || len(rewrittenTools) != len(claudeOAuthToolNames()) {
@@ -612,6 +1001,12 @@ func TestNormalizeClaudeOAuthRequestPreservesClientOfficialSystemAndTools(t *tes
 	systemBlock, _ := system[0].(map[string]any)
 	if cch := claudeOAuthTestCCH(stringValue(systemBlock["text"])); cch == "" || cch == "00000" {
 		t.Fatalf("system billing header was not signed: %q", systemBlock["text"])
+	}
+	if got := stringValue(systemBlock["text"]); strings.Contains(got, "9.9.9") || strings.Contains(got, "cc_entrypoint=evil") {
+		t.Fatalf("system billing header preserved spoofed client fingerprint: %q", got)
+	}
+	if got := stringValue(systemBlock["text"]); !strings.Contains(got, "cc_version="+claudeOAuthBillingVersion(root["messages"])+"; cc_entrypoint=sdk-cli;") {
+		t.Fatalf("system billing header = %q, want regenerated current fingerprint", got)
 	}
 }
 
@@ -654,8 +1049,8 @@ func TestClaudeOAuthBillingVersionUsesOfficialMessageFingerprint(t *testing.T) {
 			"content": []any{map[string]any{"type": "text", "text": "hello"}},
 		},
 	}
-	if got := claudeOAuthBillingVersion(messages); got != "2.1.161.2ba" {
-		t.Fatalf("billing version = %q, want 2.1.161.2ba", got)
+	if got := claudeOAuthBillingVersion(messages); got != "2.1.195.325" {
+		t.Fatalf("billing version = %q, want 2.1.195.325", got)
 	}
 }
 
@@ -810,6 +1205,25 @@ func TestForwardCountTokensSingleShot_ClaudeOAuthRefreshesAndRetriesOn401(t *tes
 	cp.oauth = svc
 	cp.httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		call := atomic.AddInt32(&upstreamCalls, 1)
+		for _, key := range []string{
+			"Anthropic-Dangerous-Direct-Browser-Access",
+			"X-Stainless-Retry-Count",
+			"X-Stainless-Runtime",
+			"X-Stainless-Lang",
+			"X-Stainless-Timeout",
+			"X-Stainless-Package-Version",
+			"X-Stainless-Runtime-Version",
+			"X-Stainless-Os",
+			"X-Stainless-Arch",
+			"X-Stainless-Helper-Method",
+			"X-App-Name",
+			"X-App-Ver",
+			"X-Client-App",
+		} {
+			if got := r.Header.Get(key); got != "" {
+				t.Fatalf("%s(%d) = %q, want empty", key, call, got)
+			}
+		}
 		switch call {
 		case 1:
 			if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
@@ -831,6 +1245,19 @@ func TestForwardCountTokensSingleShot_ClaudeOAuthRefreshesAndRetriesOn401(t *tes
 	body := []byte(`{"model":"claude-3-7-sonnet","messages":[]}`)
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/claudecode/v1/messages/count_tokens", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Anthropic-Dangerous-Direct-Browser-Access", "true")
+	req.Header.Set("X-Stainless-Retry-Count", "99")
+	req.Header.Set("X-Stainless-Runtime", "attacker-runtime")
+	req.Header.Set("X-Stainless-Lang", "attacker-lang")
+	req.Header.Set("X-Stainless-Timeout", "1")
+	req.Header.Set("X-Stainless-Package-Version", "attacker-package")
+	req.Header.Set("X-Stainless-Runtime-Version", "attacker-runtime-version")
+	req.Header.Set("X-Stainless-Os", "attacker-os")
+	req.Header.Set("X-Stainless-Arch", "attacker-arch")
+	req.Header.Set("X-Stainless-Helper-Method", "attacker-helper")
+	req.Header.Set("X-App-Name", "attacker-app-name")
+	req.Header.Set("X-App-Ver", "9.9.9")
+	req.Header.Set("X-Client-App", "attacker-client")
 	req = withRequestContext(req, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,

@@ -200,6 +200,9 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 
 - 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: gemini`
 - 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Gemini OAuth 支持 `generateContent`、`streamGenerateContent`、`countTokens`
+- Claude OAuth 请求默认使用轻量 Agent SDK 兼容 envelope，并由 Clipal 生成当前传输 header 和 billing fingerprint。
+- Codex OAuth Responses 请求会归一化为轻量 Agent SDK 兼容形态，并由 Clipal 处理必要传输字段。
+- 默认值不会覆盖目标模型支持的客户端显式字段。如果请求中已经带了 `tools`、Claude `thinking` / `context_management` / `output_config`，或 Codex `reasoning` / `tool_choice` / `parallel_tool_calls`，Clipal 会保留这些值；不支持相关能力的 Claude 模型仍可能移除不兼容的 thinking/output 控制。
 - OAuth provider 不允许设置 `base_url`、`api_key`、`api_keys`
 - 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Gemini` 直接发起授权
 - Add Provider 对话框也可以导入已有 OAuth 授权文件：Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。导入时会按当前选择的 OAuth 服务过滤账号。

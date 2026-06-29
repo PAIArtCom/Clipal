@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -15,49 +16,46 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.136.0"
-	codexOAuthUserAgent      = "codex_cli_rs/0.136.0 (Mac OS 15.7.7; arm64) iTerm.app/3.6.9"
+	codexOAuthVersion        = "0.142.4"
+	codexOAuthUserAgent      = "codex_cli_rs/0.142.4 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
 	codexOAuthOriginator     = "codex_cli_rs"
 )
 
 var codexOAuthAllowedHeaders = map[string]bool{
-	"accept":                                true,
-	"accept-language":                       true,
-	"chatgpt-account-id":                    true,
-	"content-type":                          true,
-	"conversation-id":                       true,
-	"conversation_id":                       true,
-	"openai-beta":                           true,
-	"user-agent":                            true,
-	"originator":                            true,
-	"session-id":                            true,
-	"session_id":                            true,
-	"thread-id":                             true,
-	"thread_id":                             true,
-	"traceparent":                           true,
-	"tracestate":                            true,
-	"version":                               true,
-	"x-codex-beta-features":                 true,
-	"x-codex-installation-id":               true,
-	"x-codex-parent-thread-id":              true,
-	"x-codex-turn-state":                    true,
-	"x-codex-turn-metadata":                 true,
-	"x-codex-window-id":                     true,
-	"x-client-request-id":                   true,
-	"x-oai-attestation":                     true,
-	"x-openai-fedramp":                      true,
-	"x-openai-internal-codex-residency":     true,
-	"x-openai-memgen-request":               true,
-	"x-openai-subagent":                     true,
-	"x-responsesapi-include-timing-metrics": true,
-	"x-request-id":                          true,
+	"accept":                                 true,
+	"accept-language":                        true,
+	"chatgpt-account-id":                     true,
+	"content-type":                           true,
+	"conversation-id":                        true,
+	"conversation_id":                        true,
+	"openai-beta":                            true,
+	"user-agent":                             true,
+	"originator":                             true,
+	"session-id":                             true,
+	"session_id":                             true,
+	"thread-id":                              true,
+	"thread_id":                              true,
+	"version":                                true,
+	"x-codex-beta-features":                  true,
+	"x-codex-installation-id":                true,
+	"x-codex-window-id":                      true,
+	"x-client-request-id":                    true,
+	"x-oai-attestation":                      true,
+	"x-openai-fedramp":                       true,
+	"x-openai-internal-codex-residency":      true,
+	"x-openai-internal-codex-responses-lite": true,
+	"x-openai-memgen-request":                true,
+	"x-responsesapi-include-timing-metrics":  true,
 }
 
 type codexOAuthRequestContext struct {
 	sessionID      string
 	threadID       string
 	installationID string
+	turnMetadata   string
 }
+
+type codexOAuthTurnMetadataContextKey struct{}
 
 func providerSupportsCapability(provider config.Provider, capability RequestCapability) bool {
 	if !provider.UsesOAuth() {
@@ -144,7 +142,7 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	if err != nil {
 		return nil, err
 	}
-	codexCtx := codexOAuthRequestContextForRequest(original)
+	codexCtx := codexOAuthRequestContextForRequest(original, targetPath)
 	ensureCodexOAuthTurnMetadata(original, codexCtx, targetPath)
 	requestBody, err = applyCodexOAuthBodyContext(requestBody, stream, codexCtx)
 	if err != nil {
@@ -260,6 +258,9 @@ func normalizeCodexOAuthResponsesRoot(root map[string]any, forceCompact bool) (b
 	if instructions, ok := root["instructions"]; !ok || instructions == nil {
 		root["instructions"] = ""
 	}
+	if !forceCompact {
+		ensureCodexOAuthResponseDefaults(root)
+	}
 
 	rewritten, err := json.Marshal(root)
 	if err != nil {
@@ -283,27 +284,34 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	proxyReq.Header.Set("User-Agent", codexOAuthUserAgent)
 	proxyReq.Header.Set("Originator", codexOAuthOriginator)
 	proxyReq.Header.Set("Version", codexOAuthVersion)
-	if strings.TrimSpace(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
 		proxyReq.Header.Set("Session-Id", codexCtx.sessionID)
 	}
 	proxyReq.Header.Del("Session_id")
 	proxyReq.Header.Del("Session_Id")
-	if strings.TrimSpace(proxyReq.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("Thread-Id", codexCtx.threadID)
 	}
 	proxyReq.Header.Del("Thread_id")
 	proxyReq.Header.Del("Thread_Id")
-	if strings.TrimSpace(proxyReq.Header.Get("X-Client-Request-Id")) == "" && codexCtx.threadID != "" {
+	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Client-Request-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("X-Client-Request-Id", codexCtx.threadID)
 	}
-	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
 		proxyReq.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
 	}
-	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
+	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("X-Codex-Window-Id", codexCtx.threadID+":0")
 	}
+	proxyReq.Header.Del("X-Codex-Parent-Thread-Id")
 	if (targetPath == "/responses/compact" || strings.TrimSpace(proxyReq.Header.Get("X-Codex-Turn-Metadata")) == "") && codexCtx.sessionID != "" && codexCtx.threadID != "" {
-		proxyReq.Header.Set("X-Codex-Turn-Metadata", codexOAuthTurnMetadata(codexCtx, targetPath))
+		metadata := strings.TrimSpace(codexCtx.turnMetadata)
+		if metadata == "" {
+			metadata = codexOAuthTurnMetadata(codexCtx, targetPath)
+		}
+		if metadata != "" {
+			proxyReq.Header.Set("X-Codex-Turn-Metadata", metadata)
+		}
 	}
 
 	if cred != nil && strings.TrimSpace(cred.AccountID) != "" {
@@ -319,15 +327,15 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 }
 
 func newCodexOAuthRequestContext(headers http.Header) codexOAuthRequestContext {
-	sessionID := firstNonEmptyHeader(headers, "Session-Id", "Session_id")
+	sessionID := firstSafeCodexOAuthHeader(headers, "Session-Id", "Session_id")
 	if sessionID == "" {
 		sessionID = newCodexUUID()
 	}
-	threadID := firstNonEmptyHeader(headers, "Thread-Id", "Thread_id")
+	threadID := firstSafeCodexOAuthHeader(headers, "Thread-Id", "Thread_id")
 	if threadID == "" {
 		threadID = newCodexUUID()
 	}
-	installationID := firstNonEmptyHeader(headers, "X-Codex-Installation-Id")
+	installationID := firstSafeCodexOAuthHeader(headers, "X-Codex-Installation-Id")
 	if installationID == "" {
 		installationID = newCodexUUID()
 	}
@@ -338,22 +346,35 @@ func newCodexOAuthRequestContext(headers http.Header) codexOAuthRequestContext {
 	}
 }
 
-func codexOAuthRequestContextForRequest(req *http.Request) codexOAuthRequestContext {
+func codexOAuthRequestContextForRequest(req *http.Request, targetPath string) codexOAuthRequestContext {
 	if req == nil {
-		return newCodexOAuthRequestContext(nil)
+		codexCtx := newCodexOAuthRequestContext(nil)
+		codexCtx.turnMetadata = codexOAuthTurnMetadata(codexCtx, targetPath)
+		return codexCtx
 	}
 	codexCtx := newCodexOAuthRequestContext(req.Header)
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
-	if strings.TrimSpace(req.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+	if sanitizeCodexOAuthIdentifier(req.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
 		req.Header.Set("Session-Id", codexCtx.sessionID)
 	}
-	if strings.TrimSpace(req.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+	if sanitizeCodexOAuthIdentifier(req.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
 		req.Header.Set("Thread-Id", codexCtx.threadID)
 	}
-	if strings.TrimSpace(req.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+	if sanitizeCodexOAuthIdentifier(req.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
 		req.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
+	}
+	if existing, _ := req.Context().Value(codexOAuthTurnMetadataContextKey{}).(string); strings.TrimSpace(existing) != "" {
+		codexCtx.turnMetadata = existing
+	} else {
+		codexCtx.turnMetadata = codexOAuthTurnMetadata(codexCtx, targetPath)
+		if codexCtx.turnMetadata != "" {
+			*req = *req.WithContext(context.WithValue(req.Context(), codexOAuthTurnMetadataContextKey{}, codexCtx.turnMetadata))
+		}
+	}
+	if codexCtx.turnMetadata != "" {
+		req.Header.Set("X-Codex-Turn-Metadata", codexCtx.turnMetadata)
 	}
 	return codexCtx
 }
@@ -365,21 +386,47 @@ func ensureCodexOAuthTurnMetadata(req *http.Request, codexCtx codexOAuthRequestC
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
-	if targetPath != "/responses/compact" && strings.TrimSpace(req.Header.Get("X-Codex-Turn-Metadata")) != "" {
-		return
+	metadata := strings.TrimSpace(codexCtx.turnMetadata)
+	if metadata == "" {
+		metadata = codexOAuthTurnMetadata(codexCtx, targetPath)
 	}
-	if metadata := codexOAuthTurnMetadata(codexCtx, targetPath); metadata != "" {
+	if metadata != "" {
 		req.Header.Set("X-Codex-Turn-Metadata", metadata)
 	}
 }
 
-func firstNonEmptyHeader(headers http.Header, keys ...string) string {
+func firstSafeCodexOAuthHeader(headers http.Header, keys ...string) string {
 	for _, key := range keys {
-		if value := strings.TrimSpace(headers.Get(key)); value != "" {
+		value := sanitizeCodexOAuthIdentifier(headers.Get(key))
+		if value != "" {
 			return value
 		}
 	}
 	return ""
+}
+
+func sanitizeCodexOAuthIdentifier(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 128 {
+		return ""
+	}
+	lower := strings.ToLower(value)
+	for _, marker := range []string{"@", "sk-", "secret", "token", "provider", "customer", "raw_ref", "raw-ref", ".env"} {
+		if strings.Contains(lower, marker) {
+			return ""
+		}
+	}
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == ':' || r == '.':
+		default:
+			return ""
+		}
+	}
+	return value
 }
 
 func newCodexUUID() string {
@@ -556,14 +603,63 @@ func normalizeCodexOAuthInput(root map[string]any) {
 		} else {
 			root["input"] = []any{
 				map[string]any{
-					"type":    "message",
-					"role":    "user",
-					"content": input,
+					"role": "user",
+					"content": []any{
+						map[string]any{
+							"type": "input_text",
+							"text": input,
+						},
+					},
 				},
 			}
 		}
 	case []any:
+		for _, item := range input {
+			msg, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(asString(msg["type"])), "message") {
+				delete(msg, "type")
+			}
+		}
 		extractCodexOAuthSystemInstructions(root, input)
+	}
+}
+
+func ensureCodexOAuthResponseDefaults(root map[string]any) {
+	if root == nil {
+		return
+	}
+	if _, ok := root["tools"]; !ok {
+		root["tools"] = []any{}
+	}
+	if _, ok := root["tool_choice"]; !ok {
+		root["tool_choice"] = "auto"
+	}
+	if _, ok := root["parallel_tool_calls"]; !ok {
+		root["parallel_tool_calls"] = false
+	}
+	if codexOAuthIncludeMissingOrEmpty(root["include"]) {
+		if _, hasReasoning := root["reasoning"]; hasReasoning {
+			root["include"] = []any{"reasoning.encrypted_content"}
+		} else {
+			root["include"] = []any{}
+		}
+	}
+}
+
+func codexOAuthIncludeMissingOrEmpty(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch include := value.(type) {
+	case []any:
+		return len(include) == 0
+	case []string:
+		return len(include) == 0
+	default:
+		return false
 	}
 }
 

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clipal — Claude Code & Codex LLM API 网关 | 一键绕过 429 限流</title>
   <meta name="description"
-    content="Clipal 是免费的本地 LLM API 网关。推荐通过 npm 安装，用来管理多密钥 Token 池、智能绕过 429 限流，并代理 Claude Code、Codex 和 Gemini CLI。无需 Docker，无需 Python。">
+    content="Clipal 是免费的本地 LLM API 网关。推荐通过 npm 安装，用来管理多密钥 Token 池、OAuth 上游、Claude/Codex Agent SDK 兼容包装，并代理 Claude Code、Codex 和 Gemini CLI。无需 Docker，无需 Python。">
   <meta name="keywords"
     content="claude code 代理, llm api 网关, openrouter 代理, 429 限流解决方案, gemini cli 代理, codex cli 代理, anthropic bedrock 代理, vertex ai claude code, clipal">
   <link rel="canonical" href="https://clipal.paiart.com/zh/">
@@ -30,14 +30,14 @@
 
   <!-- OpenGraph -->
   <meta property="og:title" content="Clipal — Claude Code & Codex LLM API 网关">
-  <meta property="og:description" content="免费本地二进制网关。管理多密钥池，智能绕过 429 限流，代理 Claude Code、Codex 和 Gemini。无需 Docker。">
+  <meta property="og:description" content="免费本地二进制网关。管理多密钥池、OAuth 上游和 Claude/Codex Agent SDK 兼容代理。无需 Docker。">
   <meta property="og:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
   <meta property="og:url" content="https://clipal.paiart.com/zh/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Clipal">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Clipal — Claude Code & Codex LLM API 网关">
-  <meta name="twitter:description" content="免费本地二进制。智能绕过 429 限流。代理 Claude Code、Codex 和 Gemini CLI。无需 Docker。">
+  <meta name="twitter:description" content="免费本地二进制。OAuth 上游、Claude/Codex Agent SDK 兼容代理与 CLI 接管。无需 Docker。">
   <meta name="twitter:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
 
   <!-- Structured Data -->
@@ -46,10 +46,10 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Clipal",
-    "description": "免费本地 LLM API 网关，具备极致的故障转移、多密钥轮询与一键式 CLI 接管功能，支持 Claude Code、Codex 和 Gemini。",
+    "description": "免费本地 LLM API 网关，具备极致的故障转移、OAuth 上游、Claude/Codex Agent SDK 兼容代理、多密钥轮询与一键式 CLI 接管功能，支持 Claude Code、Codex 和 Gemini。",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
-    "softwareVersion": "0.18.1",
+    "softwareVersion": "0.19.0",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
     "url": "https://clipal.paiart.com",
@@ -210,8 +210,8 @@
           </h1>
 
           <p class="hero-sub reveal">
-            原生支持 OpenRouter、new-api 及任意三方提供商。自动注入 ~/.claude/settings.json 与各类标准配置，通过智能密钥轮询与多级兜底，彻底解决第三方 API 在命令行环境下的 429
-            限流报错。
+            原生支持 OpenRouter、new-api、OAuth 账号及任意三方提供商。自动注入 ~/.claude/settings.json 与各类标准配置，普通 Claude/Codex OAuth
+            客户端默认使用 Agent SDK 兼容包装。
           </p>
 
           <div class="cta-group">
@@ -261,7 +261,7 @@
           <p class="section-sub">
             直接补丁 ~/.claude/settings.json & ~/.codex/config.toml。<br>
             Clipal 也是 Claude code, Codex, Gemini CLI, Aider, Continue ... 等 Coding Agents，<br>
-            以及 Jan, Cherry Studio, Chatbox 等 AI 应用的统一代理，支持任意自定义 API 端点 (OpenRouter, new-api, sub2api)。
+            以及 Jan, Cherry Studio, Chatbox 等 AI 应用的统一代理，支持任意自定义 API 端点和 OAuth 上游 (OpenRouter, new-api, sub2api, Claude OAuth, Codex OAuth)。
           </p>
         </div>
         <div class="ecosystem-track-container reveal">
@@ -673,11 +673,11 @@
           <div class="bp-col">
             <div class="bp-item">
               <div class="bp-title">Anthropic / Bedrock</div>
-              <div class="bp-desc">1:1 反向模拟协议，彻底粉碎 401 拒权死循环。</div>
+              <div class="bp-desc">Claude OAuth 使用 Agent SDK 兼容 envelope，并由 Clipal 生成传输 header。</div>
             </div>
             <div class="bp-item">
               <div class="bp-title">OpenAI / 多中转节点</div>
-              <div class="bp-desc">兼容所有遵循 OpenAI 标准的第三方 API 与中转节点。</div>
+              <div class="bp-desc">Codex OAuth 将 Responses 请求归一化为 Agent SDK 兼容上游形态。</div>
             </div>
             <div class="bp-item">
               <div class="bp-title">Google Vertex / AI Studio</div>
@@ -770,7 +770,7 @@
               <div class="why-card-tag">深度集成</div>
               <h4>Claude Code: 协议抹平专家</h4>
               <p>告别手动 export 环境变量。Clipal 自动注入 ANTHROPIC_BASE_URL 并处理 Bedrock/Vertex
-                严格的协议头校验。</p>
+                严格的协议头校验。OAuth 请求使用轻量 Agent SDK envelope，并由 Clipal 处理必要传输字段。</p>
             </article>
 
             <article class="why-card">
@@ -1010,7 +1010,7 @@
               </a>
               <div class="version-note">
                 <span>最新稳定版：</span>
-                <code>v0.18.1</code>
+                <code>v0.19.0</code>
                 <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                   class="version-link">查看所有版本 →</a>
               </div>
