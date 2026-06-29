@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clipal — LLM API Gateway for Claude Code, Codex & Gemini CLI</title>
   <meta name="description"
-    content="Clipal is a free, local LLM API gateway. One binary to manage multi-key pools, bypass 429 rate limits, and proxy Claude Code, Codex & Gemini CLI. No Docker, no Python. Download in seconds.">
+    content="Clipal is a free, local LLM API gateway. Install with npm to manage multi-key pools, bypass 429 rate limits, and proxy Claude Code, Codex & Gemini CLI. No Docker, no Python.">
   <meta name="keywords"
     content="claude code proxy, llm api gateway, openrouter proxy, 429 rate limit bypass, gemini cli proxy, codex cli proxy, anthropic bedrock proxy, vertex ai claude code, clipal">
   <link rel="canonical" href="https://clipal.paiart.com">
@@ -51,13 +51,13 @@
     "description": "Free local LLM API gateway with bulletproof failover, multi-key rotation, and one-click CLI takeover for Claude Code, Codex, and Gemini.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
-    "softwareVersion": "0.11.6",
+    "softwareVersion": "0.18.1",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
     "url": "https://clipal.paiart.com",
-    "downloadUrl": "https://github.com/lansespirit/Clipal/releases",
+    "downloadUrl": "https://www.npmjs.com/package/clipal",
     "screenshot": "https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg",
-    "releaseNotes": "https://github.com/lansespirit/Clipal/releases",
+    "releaseNotes": "https://github.com/PAIArtCom/Clipal/releases",
     "author": {
       "@type": "Organization",
       "name": "PAIART",
@@ -171,7 +171,7 @@
         <a href="#features" class="nav-link">Features</a>
         <a href="#install" class="nav-link">Quick Start</a>
         <a href="#how-it-works" class="nav-link">How It Works</a>
-        <a href="https://github.com/lansespirit/Clipal/tree/main/docs/en" target="_blank" rel="noopener noreferrer"
+        <a href="https://github.com/PAIArtCom/Clipal/tree/main/docs/en" target="_blank" rel="noopener noreferrer"
           class="nav-link">Docs</a>
       </div>
 
@@ -181,7 +181,7 @@
           <span class="lang-sep">/</span>
           <span class="lang-label lang-zh">中文</span>
         </a>
-        <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer" class="btn-ghost"
+        <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer" class="btn-ghost"
           id="nav-github">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path
@@ -216,18 +216,17 @@
           </p>
 
           <div class="cta-group">
-            <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
-              id="cta-primary" class="btn-primary">
+            <a href="#install" id="cta-primary" class="btn-primary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span id="cta-primary-text">Download Clipal</span>
-              <span id="cta-platform-badge" class="platform-badge"></span>
+              <span id="cta-primary-text">Install with npm</span>
+              <span id="cta-platform-badge" class="platform-badge visible">npm</span>
             </a>
-            <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer"
+            <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
               class="btn-secondary" id="cta-github">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path
@@ -498,10 +497,11 @@
                       d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                   </svg>
                 </div>
-                <h3 class="fstrip-title">Lightweight Single-Binary LLM Gateway</h3>
+                <h3 class="fstrip-title">Lightweight npm-first LLM Gateway</h3>
                 <p class="fstrip-desc">Unlike heavy Python proxies (like LiteLLM) or
-                  complex Docker deployments, Clipal is a high-performance, zero-dependency API Gateway compiled in Go
-                  for macOS, Linux, and Windows. Download. Executable. Proxy active.</p>
+                  complex Docker deployments, Clipal installs with <code>npm install -g clipal</code> and runs as a
+                  high-performance Go gateway for macOS, Linux, and Windows. Standalone binaries remain available from
+                  GitHub Releases.</p>
               </div>
               <div class="fstrip-visual">
                 <div class="cmp-viz" aria-hidden="true">
@@ -850,12 +850,14 @@
                   <span>Copy</span>
                 </button>
               </div>
-              <pre class="prompt-text" id="ai-prompt-content">Please help me install and start Clipal. Project: https://github.com/lansespirit/Clipal
+              <pre class="prompt-text" id="ai-prompt-content">Please help me install and start Clipal. Project: https://github.com/PAIArtCom/Clipal
 
-Please detect my current OS and architecture, check the project's Releases and docs, and complete the download, installation, and startup for me. Then confirm that I can open the Web UI successfully. Use these official links when needed:
-- Releases: https://github.com/lansespirit/Clipal/releases
-- Getting Started: https://github.com/lansespirit/Clipal/blob/main/docs/en/getting-started.md
-- Web UI Guide: https://github.com/lansespirit/Clipal/blob/main/docs/en/web-ui.md
+Please use the recommended npm installation first: npm install -g clipal. If npm is unavailable, fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
+- npm package: https://www.npmjs.com/package/clipal
+- GitHub repository: https://github.com/PAIArtCom/Clipal
+- Releases fallback: https://github.com/PAIArtCom/Clipal/releases
+- Getting Started: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md
+- Web UI Guide: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/web-ui.md
 
 After that, guide me through using the Web UI to enable CLI takeover and add my first provider.</pre>
             </div>
@@ -868,23 +870,19 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               <div class="mstep">
                 <div class="mstep-num">1</div>
                 <div class="mstep-body">
-                  <h4 class="mstep-title">Download the Binary</h4>
-                  <div class="platform-tabs" id="install-ptabs" role="tablist">
-                    <button class="ptab active" role="tab" data-platform="mac-arm">macOS (Apple Silicon)</button>
-                    <button class="ptab" role="tab" data-platform="mac-intel">macOS (Intel)</button>
-                    <button class="ptab" role="tab" data-platform="linux-x64">Linux x86_64</button>
-                    <button class="ptab" role="tab" data-platform="linux-arm">Linux ARM64</button>
-                    <button class="ptab" role="tab" data-platform="windows">Windows</button>
+                  <h4 class="mstep-title">Install from npm</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">npm install -g clipal</span>
                   </div>
-                  <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
-                    class="btn-primary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
+                  <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
+                    class="btn-secondary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                       aria-hidden="true">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    <span id="manual-dl-text">Download Binary</span>
+                    <span id="manual-dl-text">Standalone binaries</span>
                   </a>
                 </div>
               </div>
@@ -892,11 +890,8 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               <div class="mstep">
                 <div class="mstep-num">2</div>
                 <div class="mstep-body">
-                  <h4 class="mstep-title">Move to PATH & Start</h4>
+                  <h4 class="mstep-title">Start Clipal</h4>
                   <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmt"># macOS / Linux</span><br>
-                    <span class="t-cmd">chmod +x</span> clipal-darwin-arm64<br>
-                    <span class="t-cmd">mv</span> clipal-darwin-arm64 /usr/local/bin/clipal<br>
                     <span class="t-cmd">clipal service install</span><br>
                     <span class="t-cmd">clipal service start</span><br>
                     <span class="t-ok">✓ Running on http://127.0.0.1:3333</span>
@@ -1022,20 +1017,15 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
 
           <!-- Download Panel -->
           <div class="download-panel" id="download-panel">
-            <h3 class="download-panel-title">Download for Your Platform</h3>
-
-            <div class="platform-tabs" id="platform-tabs" role="tablist" aria-label="Select platform">
-              <button class="ptab active" role="tab" aria-selected="true" data-platform="mac-arm">macOS (Apple
-                Silicon)</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="mac-intel">macOS (Intel)</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="linux-x64">Linux x86_64</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="linux-arm">Linux ARM64</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="windows">Windows</button>
-            </div>
+            <h3 class="download-panel-title">Install from npm</h3>
 
             <div class="install-cmd-wrap">
-              <div class="install-label">Or download directly:</div>
-              <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+              <div class="install-label">Recommended install:</div>
+              <div class="code-block" style="margin-top:12px">
+                <span class="t-cmd">npm install -g clipal</span>
+              </div>
+              <div class="install-label" style="margin-top:16px">Prefer a standalone binary?</div>
+              <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                   aria-hidden="true">
@@ -1043,12 +1033,12 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                <span id="download-btn-text">Download Binary</span>
+                <span id="download-btn-text">Download from GitHub Releases</span>
               </a>
               <div class="version-note">
                 <span>Latest stable:</span>
-                <code>v0.11.6</code>
-                <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+                <code>v0.18.1</code>
+                <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                   class="version-link">All releases →</a>
               </div>
             </div>
@@ -1068,7 +1058,7 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
             <p class="community-sub">Get setup help, share configs, and discuss new providers
               with other developers.</p>
             <div class="qr-wrap">
-              <img src="https://github.com/lansespirit/Clipal/raw/main/assets/wechat-group.png"
+              <img src="https://github.com/PAIArtCom/Clipal/raw/main/assets/wechat-group.png"
                 alt="Clipal WeChat Developer Community QR Code - Join for Claude Code and Gemini setup support"
                 loading="lazy" width="180" height="180" class="qr-img">
               <p class="qr-label">Scan to join WeChat group</p>
@@ -1102,19 +1092,19 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
         </div>
         <div class="footer-link-col">
           <div class="footer-link-heading">Resources</div>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/docs/en/getting-started.md" target="_blank"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md" target="_blank"
             rel="noopener noreferrer" class="footer-link">Getting Started</a>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/docs/en/config-reference.md" target="_blank"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/config-reference.md" target="_blank"
             rel="noopener noreferrer" class="footer-link">Config
             Reference</a>
-          <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
             class="footer-link">Release Notes</a>
         </div>
         <div class="footer-link-col">
           <div class="footer-link-heading">Community</div>
-          <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
             class="footer-link">GitHub</a>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
             class="footer-link">MIT License</a>
         </div>
       </nav>

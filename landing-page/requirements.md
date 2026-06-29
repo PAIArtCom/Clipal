@@ -126,7 +126,7 @@ $ clipal service start
  ╚██████╗███████╗██║██║     ██║  ██║███████╗
   ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝
 
-✓ Clipal v0.11.6 running on http://127.0.0.1:3333
+✓ Clipal v0.18.1 running on http://127.0.0.1:3333
 ✓ Providers loaded: Anthropic, OpenAI, Gemini (3)
 ✓ Key pool: 5 keys active across 2 providers
 
@@ -214,12 +214,11 @@ Each pillar = Card with: Icon + Title + Description + Visual Demo
 
 **Step 1 — Install** *(terminal mockup)*
 ```bash
-# Download binary and put it on your PATH
-chmod +x clipal-darwin-arm64
-./clipal-darwin-arm64 --version
-# → clipal version 0.11.6
+npm install -g clipal
+clipal --version
+# → clipal version 0.18.1
 ```
-Caption: *One binary. No dependencies. Works on macOS, Linux, and Windows.*
+Caption: *Recommended npm install. Standalone binaries remain available for macOS, Linux, and Windows.*
 
 **Step 2 — Start the Service** *(terminal mockup)*
 ```bash
@@ -246,13 +245,12 @@ Caption: *One click. All your AI tools now route through Clipal.*
 
 #### Left: Download Panel
 
-- **Platform tabs**: `macOS (Apple Silicon)` / `macOS (Intel)` / `Linux x86_64` / `Linux ARM64` / `Windows`
-- **One-liner install script** (with Clipboard copy button):
+- **Recommended npm install** (with Clipboard copy button):
   ```bash
-  curl -fsSL https://clipal.paiart.com/install.sh | sh
+  npm install -g clipal
   ```
-- **Manual download link** → GitHub Releases
-- **Version badge**: `Latest: v0.11.6` (auto-fetch from GitHub API or hardcoded with update workflow)
+- **Standalone binary fallback** → GitHub Releases
+- **Version badge**: `Latest: v0.18.1` (auto-fetch from GitHub API or hardcoded with update workflow)
 
 #### Right: Community Panel
 
@@ -377,7 +375,7 @@ Caption: *One click. All your AI tools now route through Clipal.*
 **`_redirects` file**:
 ```
 /zh    /index.html    200
-/docs  https://github.com/lansespirit/Clipal/tree/main/docs    301
+/docs  https://github.com/PAIArtCom/Clipal/tree/main/docs    301
 ```
 
 ---
@@ -448,4 +446,3 @@ landing-page/
 14. Test on: Chrome, Firefox, Safari, Mobile Safari, Chrome Android.
 15. Connect repository to Cloudflare Pages (branch: `main`, build: none / direct upload).
 16. Set custom domain if available.
-

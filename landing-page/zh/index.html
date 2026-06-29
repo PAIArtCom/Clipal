@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clipal — Claude Code & Codex LLM API 网关 | 一键绕过 429 限流</title>
   <meta name="description"
-    content="Clipal 是免费的本地 LLM API 网关。一个二进制文件，管理多密钥 Token 池，智能绕过 429 限流，代理 Claude Code、Codex 和 Gemini CLI。无需 Docker，无需 Python，10 秒启动。">
+    content="Clipal 是免费的本地 LLM API 网关。推荐通过 npm 安装，用来管理多密钥 Token 池、智能绕过 429 限流，并代理 Claude Code、Codex 和 Gemini CLI。无需 Docker，无需 Python。">
   <meta name="keywords"
     content="claude code 代理, llm api 网关, openrouter 代理, 429 限流解决方案, gemini cli 代理, codex cli 代理, anthropic bedrock 代理, vertex ai claude code, clipal">
   <link rel="canonical" href="https://clipal.paiart.com/zh/">
@@ -49,13 +49,13 @@
     "description": "免费本地 LLM API 网关，具备极致的故障转移、多密钥轮询与一键式 CLI 接管功能，支持 Claude Code、Codex 和 Gemini。",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
-    "softwareVersion": "0.11.6",
+    "softwareVersion": "0.18.1",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
     "url": "https://clipal.paiart.com",
-    "downloadUrl": "https://github.com/lansespirit/Clipal/releases",
+    "downloadUrl": "https://www.npmjs.com/package/clipal",
     "screenshot": "https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg",
-    "releaseNotes": "https://github.com/lansespirit/Clipal/releases",
+    "releaseNotes": "https://github.com/PAIArtCom/Clipal/releases",
     "author": {
       "@type": "Organization",
       "name": "PAIART",
@@ -170,7 +170,7 @@
         <a href="#features" class="nav-link">功能特性</a>
         <a href="#install" class="nav-link">快速开始</a>
         <a href="#how-it-works" class="nav-link">工作原理</a>
-        <a href="https://github.com/lansespirit/Clipal/tree/main/docs/zh" target="_blank" rel="noopener noreferrer"
+        <a href="https://github.com/PAIArtCom/Clipal/tree/main/docs/zh" target="_blank" rel="noopener noreferrer"
           class="nav-link">文档</a>
       </div>
 
@@ -180,7 +180,7 @@
           <span class="lang-sep">/</span>
           <span class="lang-label lang-zh active">中文</span>
         </a>
-        <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer" class="btn-ghost"
+        <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer" class="btn-ghost"
           id="nav-github">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path
@@ -215,18 +215,17 @@
           </p>
 
           <div class="cta-group">
-            <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
-              id="cta-primary" class="btn-primary">
+            <a href="#install" id="cta-primary" class="btn-primary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span id="cta-primary-text">下载 Clipal</span>
-              <span id="cta-platform-badge" class="platform-badge"></span>
+              <span id="cta-primary-text">使用 npm 安装</span>
+              <span id="cta-platform-badge" class="platform-badge visible">npm</span>
             </a>
-            <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer"
+            <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
               class="btn-secondary" id="cta-github">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path
@@ -497,9 +496,10 @@
                       d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                   </svg>
                 </div>
-                <h3 class="fstrip-title">零依赖的极速单体本地网关</h3>
+                <h3 class="fstrip-title">npm 优先的极速本地网关</h3>
                 <p class="fstrip-desc">不同于臃肿的 Python 依赖 (如 LiteLLM) 或是复杂的 Docker
-                  Compose 编排，Clipal 是完全基于 Go 开发的高并发独立二进制网关。下载即用，告别环境红字报错。</p>
+                  Compose 编排，Clipal 推荐通过 <code>npm install -g clipal</code> 安装，并以 Go 编译的高性能网关在
+                  macOS、Linux 和 Windows 上运行。需要独立二进制时，也可以从 GitHub Releases 下载。</p>
               </div>
               <div class="fstrip-visual">
                 <div class="cmp-viz" aria-hidden="true">
@@ -836,12 +836,14 @@
                   <span>复制</span>
                 </button>
               </div>
-              <pre class="prompt-text" id="ai-prompt-content">请帮我安装并启动 Clipal。项目地址：https://github.com/lansespirit/Clipal
+              <pre class="prompt-text" id="ai-prompt-content">请帮我安装并启动 Clipal。项目地址：https://github.com/PAIArtCom/Clipal
 
-请检测我当前的操作系统和架构，查看项目的 Releases 和文档，并为我完成下载、安装和启动。然后确认我能成功打开 Web UI。需要时请使用以下官方链接：
-- Releases：https://github.com/lansespirit/Clipal/releases
-- 快速入门：https://github.com/lansespirit/Clipal/blob/main/docs/zh-CN/getting-started.md
-- Web UI 指南：https://github.com/lansespirit/Clipal/blob/main/docs/zh-CN/web-ui.md
+请优先使用推荐的 npm 安装方式：npm install -g clipal。如果当前环境不能使用 npm，再回退到 GitHub Releases 的独立二进制。随后启动 Clipal，并确认我能成功打开 Web UI。需要时请使用以下官方链接：
+- npm 包：https://www.npmjs.com/package/clipal
+- GitHub 仓库：https://github.com/PAIArtCom/Clipal
+- Releases 备用下载：https://github.com/PAIArtCom/Clipal/releases
+- 快速入门：https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/getting-started.md
+- Web UI 指南：https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/web-ui.md
 
 完成后，请引导我通过 Web UI 启用 CLI 接管并添加我的第一个提供商。</pre>
             </div>
@@ -854,23 +856,19 @@
               <div class="mstep">
                 <div class="mstep-num">1</div>
                 <div class="mstep-body">
-                  <h4 class="mstep-title">下载二进制文件</h4>
-                  <div class="platform-tabs" id="install-ptabs" role="tablist">
-                    <button class="ptab active" role="tab" data-platform="mac-arm">macOS (Apple Silicon)</button>
-                    <button class="ptab" role="tab" data-platform="mac-intel">macOS (Intel)</button>
-                    <button class="ptab" role="tab" data-platform="linux-x64">Linux x86_64</button>
-                    <button class="ptab" role="tab" data-platform="linux-arm">Linux ARM64</button>
-                    <button class="ptab" role="tab" data-platform="windows">Windows</button>
+                  <h4 class="mstep-title">通过 npm 安装</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">npm install -g clipal</span>
                   </div>
-                  <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
-                    class="btn-primary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
+                  <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
+                    class="btn-secondary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                       aria-hidden="true">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    <span id="manual-dl-text">下载二进制</span>
+                    <span id="manual-dl-text">独立二进制下载</span>
                   </a>
                 </div>
               </div>
@@ -878,11 +876,8 @@
               <div class="mstep">
                 <div class="mstep-num">2</div>
                 <div class="mstep-body">
-                  <h4 class="mstep-title">加入 PATH 并启动</h4>
+                  <h4 class="mstep-title">启动 Clipal</h4>
                   <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmt"># macOS / Linux</span><br>
-                    <span class="t-cmd">chmod +x</span> clipal-darwin-arm64<br>
-                    <span class="t-cmd">mv</span> clipal-darwin-arm64 /usr/local/bin/clipal<br>
                     <span class="t-cmd">clipal service install</span><br>
                     <span class="t-cmd">clipal service start</span><br>
                     <span class="t-ok">✓ 成功启动 http://127.0.0.1:3333</span>
@@ -996,20 +991,15 @@
 
           <!-- Download Panel -->
           <div class="download-panel" id="download-panel">
-            <h3 class="download-panel-title">选择你的平台下载</h3>
-
-            <div class="platform-tabs" id="platform-tabs" role="tablist" aria-label="选择平台">
-              <button class="ptab active" role="tab" aria-selected="true" data-platform="mac-arm">macOS (Apple
-                Silicon)</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="mac-intel">macOS (Intel)</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="linux-x64">Linux x86_64</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="linux-arm">Linux ARM64</button>
-              <button class="ptab" role="tab" aria-selected="false" data-platform="windows">Windows</button>
-            </div>
+            <h3 class="download-panel-title">通过 npm 安装</h3>
 
             <div class="install-cmd-wrap">
-              <div class="install-label">或直接下载：</div>
-              <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+              <div class="install-label">推荐安装方式：</div>
+              <div class="code-block" style="margin-top:12px">
+                <span class="t-cmd">npm install -g clipal</span>
+              </div>
+              <div class="install-label" style="margin-top:16px">更偏好独立二进制？</div>
+              <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                   aria-hidden="true">
@@ -1017,12 +1007,12 @@
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                <span id="download-btn-text">下载二进制文件</span>
+                <span id="download-btn-text">从 GitHub Releases 下载</span>
               </a>
               <div class="version-note">
                 <span>最新稳定版：</span>
-                <code>v0.11.6</code>
-                <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+                <code>v0.18.1</code>
+                <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                   class="version-link">查看所有版本 →</a>
               </div>
             </div>
@@ -1041,7 +1031,7 @@
             <h3 class="community-panel-title">加入社区</h3>
             <p class="community-sub">与其他开发者交流配置心得、获取帮助、探讨新提供商接入。</p>
             <div class="qr-wrap">
-              <img src="https://github.com/lansespirit/Clipal/raw/main/assets/wechat-group.png"
+              <img src="https://github.com/PAIArtCom/Clipal/raw/main/assets/wechat-group.png"
                 alt="Clipal 微信开发者社区二维码 - 获取 Claude Code 和 Gemini 设置支持" loading="lazy" width="180" height="180"
                 class="qr-img">
               <p class="qr-label">扫码加入微信交流群</p>
@@ -1075,18 +1065,18 @@
         </div>
         <div class="footer-link-col">
           <div class="footer-link-heading">资源</div>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/docs/zh/getting-started.md" target="_blank"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/getting-started.md" target="_blank"
             rel="noopener noreferrer" class="footer-link">快速入门</a>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/docs/zh/config-reference.md" target="_blank"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/config-reference.md" target="_blank"
             rel="noopener noreferrer" class="footer-link">配置参考</a>
-          <a href="https://github.com/lansespirit/Clipal/releases" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
             class="footer-link">发布日志</a>
         </div>
         <div class="footer-link-col">
           <div class="footer-link-heading">社区</div>
-          <a href="https://github.com/lansespirit/Clipal" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
             class="footer-link">GitHub</a>
-          <a href="https://github.com/lansespirit/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
             class="footer-link">MIT 协议</a>
         </div>
       </nav>

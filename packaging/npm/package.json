@@ -3,7 +3,7 @@
   "version": "0.0.0-dev",
   "description": "Clipal CLI installer for the local LLM API gateway",
   "license": "MIT",
-  "homepage": "https://github.com/PAIArtCom/Clipal",
+  "homepage": "https://clipal.paiart.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/PAIArtCom/Clipal.git"

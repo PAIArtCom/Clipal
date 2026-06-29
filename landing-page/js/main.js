@@ -45,7 +45,7 @@ const TERMINAL_SCRIPT = [
   ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝`, delay: 200, instant: true
   },
   { type: 'blank', text: '', delay: 100 },
-  { type: 'ok', text: '✓ Clipal v0.11.6 running on http://127.0.0.1:3333', delay: 180, speed: 18 },
+  { type: 'ok', text: '✓ Clipal v0.18.1 running on http://127.0.0.1:3333', delay: 180, speed: 18 },
   { type: 'ok', text: '✓ Providers loaded: Anthropic, OpenAI (3), Gemini (2)', delay: 160, speed: 18 },
   { type: 'ok', text: '✓ Key pool: 5 keys active across 2 providers', delay: 500, speed: 18 },
   { type: 'blank', text: '', delay: 200 },
@@ -182,7 +182,7 @@ function initScrollReveal() {
 /* ============================================================
    3. OS DETECTION & DOWNLOAD LINKS
    ============================================================ */
-const RELEASE_BASE = 'https://github.com/lansespirit/Clipal/releases/latest/download';
+const RELEASE_BASE = 'https://github.com/PAIArtCom/Clipal/releases/latest/download';
 const PLATFORM_CONFIG = {
   'mac-arm': { file: 'clipal-darwin-arm64', badge: 'Apple Silicon' },
   'mac-intel': { file: 'clipal-darwin-amd64', badge: 'Intel Mac' },
@@ -225,15 +225,10 @@ function applyPlatform(key) {
 
   const url = `${RELEASE_BASE}/${config.file}`;
 
-  const heroCta = document.getElementById('cta-primary');
-  const badge = document.getElementById('cta-platform-badge');
-  if (heroCta) {
-    heroCta.href = url;
-  }
-  if (badge) {
-    badge.textContent = TEXT.platform[key] || config.badge;
-    badge.classList.add('visible');
-  }
+  const platformLabel = TEXT.platform[key] || config.badge;
+  const binaryLabel = PAGE_LANG === 'zh'
+    ? `${platformLabel} 二进制下载`
+    : `Download ${platformLabel} binary`;
 
   const downloadButton = document.getElementById('download-direct-btn');
   const downloadText = document.getElementById('download-btn-text');
@@ -241,7 +236,7 @@ function applyPlatform(key) {
     downloadButton.href = url;
   }
   if (downloadText) {
-    downloadText.textContent = config.file;
+    downloadText.textContent = binaryLabel;
   }
 
   const manualButton = document.getElementById('manual-dl-btn');
@@ -250,7 +245,7 @@ function applyPlatform(key) {
     manualButton.href = url;
   }
   if (manualText) {
-    manualText.textContent = config.file;
+    manualText.textContent = binaryLabel;
   }
 
   document.querySelectorAll('.ptab').forEach(tab => {
