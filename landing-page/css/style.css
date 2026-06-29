@@ -222,6 +222,13 @@ section {
   transform: translateY(0);
 }
 
+.btn-primary code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 0.95em;
+}
+
 .btn-secondary {
   display: inline-flex;
   align-items: center;
