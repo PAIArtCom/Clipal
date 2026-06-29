@@ -300,36 +300,76 @@ function initInstallTabs() {
 /* ============================================================
    6. CLIPBOARD COPY BUTTON
    ============================================================ */
-function initClipboard() {
-  const button = document.getElementById('copy-ai-prompt');
-  if (!button) {
+async function writeClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
     return;
   }
 
-  button.addEventListener('click', async () => {
-    const textEl = document.getElementById('ai-prompt-content');
-    if (!textEl) {
-      return;
-    }
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-9999px';
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand('copy');
+  textArea.remove();
+}
 
-    try {
-      await navigator.clipboard.writeText(textEl.textContent);
-      const label = button.querySelector('span');
-      if (!label) {
+function showCopiedState(button, label, restoreHtml = false) {
+  const original = restoreHtml ? label.innerHTML : label.textContent;
+  button.classList.add('copied');
+  label.textContent = TEXT.copied;
+
+  setTimeout(() => {
+    button.classList.remove('copied');
+    if (restoreHtml) {
+      label.innerHTML = original;
+    } else {
+      label.textContent = original;
+    }
+  }, 2000);
+}
+
+function initClipboard() {
+  const promptButton = document.getElementById('copy-ai-prompt');
+  if (promptButton) {
+    promptButton.addEventListener('click', async () => {
+      const textEl = document.getElementById('ai-prompt-content');
+      if (!textEl) {
         return;
       }
 
-      const original = label.textContent;
-      button.classList.add('copied');
-      label.textContent = TEXT.copied;
-      setTimeout(() => {
-        button.classList.remove('copied');
-        label.textContent = original;
-      }, 2000);
-    } catch (error) {
-      console.warn('Clipboard API unavailable', error);
-    }
-  });
+      try {
+        await writeClipboard(textEl.textContent);
+        const label = promptButton.querySelector('span');
+        if (label) {
+          showCopiedState(promptButton, label);
+        }
+      } catch (error) {
+        console.warn('Clipboard API unavailable', error);
+      }
+    });
+  }
+
+  const commandButton = document.getElementById('cta-primary');
+  if (commandButton) {
+    commandButton.addEventListener('click', async () => {
+      const command = commandButton.dataset.copyCommand;
+      const label = document.getElementById('cta-primary-text');
+      if (!command || !label) {
+        return;
+      }
+
+      try {
+        await writeClipboard(command);
+        showCopiedState(commandButton, label, true);
+      } catch (error) {
+        console.warn('Clipboard API unavailable', error);
+      }
+    });
+  }
 }
 
 /* ============================================================
