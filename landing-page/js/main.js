@@ -45,7 +45,7 @@ const TERMINAL_SCRIPT = [
   ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝`, delay: 200, instant: true
   },
   { type: 'blank', text: '', delay: 100 },
-  { type: 'ok', text: '✓ Clipal v0.19.1 running on http://127.0.0.1:3333', delay: 180, speed: 18 },
+  { type: 'ok', text: '✓ Clipal running on http://127.0.0.1:3333', delay: 180, speed: 18 },
   { type: 'ok', text: '✓ Providers loaded: Anthropic, OpenAI (3), Gemini (2)', delay: 160, speed: 18 },
   { type: 'ok', text: '✓ Key pool: 5 keys active across 2 providers', delay: 500, speed: 18 },
   { type: 'blank', text: '', delay: 200 },

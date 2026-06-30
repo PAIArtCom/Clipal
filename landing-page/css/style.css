@@ -1278,24 +1278,6 @@ section {
   padding: 14px 24px;
 }
 
-.version-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
-
-.version-link {
-  color: var(--gold-dim);
-  transition: color var(--dur-fast);
-}
-
-.version-link:hover {
-  color: var(--gold);
-}
-
 .security-note {
   display: flex;
   align-items: center;
