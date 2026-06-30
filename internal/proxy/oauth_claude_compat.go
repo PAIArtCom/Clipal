@@ -16,7 +16,7 @@ import (
 
 const (
 	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.195"
+	claudeOAuthAppVersion              = "2.1.196"
 	claudeOAuthDefaultEntrypoint       = "sdk-cli"
 	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
 	claudeOAuthClientApp               = "claude-code"
@@ -170,7 +170,7 @@ func applyClaudeOAuthHeaderDefaults(proxyReq *http.Request, original *http.Reque
 
 	requiredBetas := requiredClaudeOAuthBetas(body, requestCtx)
 	if len(requiredBetas) > 0 {
-		merged := mergeClaudeOAuthBetas("", requiredBetas)
+		merged := mergeClaudeOAuthBetas(proxyReq.Header.Get("Anthropic-Beta"), requiredBetas)
 		if strings.TrimSpace(merged) != "" {
 			proxyReq.Header.Set("Anthropic-Beta", merged)
 		}
@@ -248,9 +248,12 @@ func requiredClaudeOAuthBetas(body []byte, requestCtx RequestContext) []string {
 func mergeClaudeOAuthBetas(existing string, required []string) string {
 	ordered := make([]string, 0, len(required)+4)
 	seen := make(map[string]struct{}, len(required)+4)
-	appendToken := func(token string) {
+	appendToken := func(token string, requireUserBetaShape bool) {
 		token = strings.TrimSpace(token)
 		if token == "" {
+			return
+		}
+		if requireUserBetaShape && !isClaudeOAuthUserBetaToken(token) {
 			return
 		}
 		lower := strings.ToLower(token)
@@ -262,12 +265,34 @@ func mergeClaudeOAuthBetas(existing string, required []string) string {
 	}
 
 	for _, token := range strings.Split(existing, ",") {
-		appendToken(token)
+		appendToken(token, true)
 	}
 	for _, token := range required {
-		appendToken(token)
+		appendToken(token, false)
 	}
 	return strings.Join(ordered, ",")
+}
+
+func isClaudeOAuthUserBetaToken(token string) bool {
+	token = strings.TrimSpace(token)
+	if len(token) < len("x-YYYY-MM-DD") {
+		return false
+	}
+	date := token[len(token)-10:]
+	return date[4] == '-' &&
+		date[7] == '-' &&
+		isASCIIDigit(date[0]) &&
+		isASCIIDigit(date[1]) &&
+		isASCIIDigit(date[2]) &&
+		isASCIIDigit(date[3]) &&
+		isASCIIDigit(date[5]) &&
+		isASCIIDigit(date[6]) &&
+		isASCIIDigit(date[8]) &&
+		isASCIIDigit(date[9])
+}
+
+func isASCIIDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
 }
 
 func headerValue(header http.Header, key string) string {

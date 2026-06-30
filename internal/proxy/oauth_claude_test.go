@@ -50,7 +50,7 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	original.Header.Set("Content-Type", "application/json")
 	original.Header.Set("x-api-key", "client-key")
 	original.Header.Set("anthropic-version", "2023-06-01")
-	original.Header.Set("anthropic-beta", "redact-thinking-2026-02-12")
+	original.Header.Set("anthropic-beta", "custom-beta-2026-06-30")
 	original.Header.Set("X-App-Name", "stale-client")
 	original.Header.Set("X-App-Ver", "0.1.0")
 	original.Header.Set("X-Client-App", "stale-client")
@@ -118,7 +118,7 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
 		}
 	}
-	for _, token := range []string{"redact-thinking-2026-02-12", "extended-cache-ttl-2025-04-11", "advisor-tool-2026-03-01", "advanced-tool-use-2025-11-20", "effort-2025-11-24"} {
+	for _, token := range []string{"custom-beta-2026-06-30", "redact-thinking-2026-02-12", "extended-cache-ttl-2025-04-11", "advisor-tool-2026-03-01", "advanced-tool-use-2025-11-20", "effort-2025-11-24"} {
 		if !strings.Contains(strings.ToLower(betas), strings.ToLower(token)) {
 			t.Fatalf("Anthropic-Beta = %q, want token %q", betas, token)
 		}
@@ -434,7 +434,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	official := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	official.Header.Set("Content-Type", "application/json")
-	official.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-ts, agent-sdk/0.3.185)")
+	official.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-ts, agent-sdk/0.3.185)")
 	official = withRequestContext(official, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -453,7 +453,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	spoof := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	spoof.Header.Set("Content-Type", "application/json")
-	spoof.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-secret)")
+	spoof.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-secret)")
 	spoof = withRequestContext(spoof, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -471,7 +471,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	sdkCLI := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	sdkCLI.Header.Set("Content-Type", "application/json")
-	sdkCLI.Header.Set("User-Agent", "claude-cli/2.1.195 (external, sdk-cli)")
+	sdkCLI.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-cli)")
 	sdkCLI = withRequestContext(sdkCLI, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -550,7 +550,7 @@ func TestCreateProxyRequest_ClaudeOAuthPreservesStringSystemInSDKEnvelope(t *tes
 	body := []byte(`{"model":"claude-sonnet-4-5","system":"Keep it short.","messages":[]}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
-	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
+	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -721,7 +721,7 @@ func TestNormalizeClaudeOAuthRequestSynthesizesAgentSDKEnvelopeForOfficialLookin
 	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"temperature":0.2}`)
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
-	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
+	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
 	requestCtx := RequestContext{
 		ClientType:   ClientClaude,
 		Family:       ProtocolFamilyClaude,
@@ -975,7 +975,7 @@ func TestNormalizeClaudeOAuthRequestRegeneratesOfficialLookingSystemAndPreserves
 	}
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
-	original.Header.Set("User-Agent", "claude-code/2.1.195 (external, cli)")
+	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
 	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, original, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
 
 	var root map[string]any
@@ -1049,8 +1049,8 @@ func TestClaudeOAuthBillingVersionUsesOfficialMessageFingerprint(t *testing.T) {
 			"content": []any{map[string]any{"type": "text", "text": "hello"}},
 		},
 	}
-	if got := claudeOAuthBillingVersion(messages); got != "2.1.195.325" {
-		t.Fatalf("billing version = %q, want 2.1.195.325", got)
+	if got := claudeOAuthBillingVersion(messages); got != "2.1.196.68b" {
+		t.Fatalf("billing version = %q, want 2.1.196.68b", got)
 	}
 }
 

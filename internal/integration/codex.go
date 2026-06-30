@@ -30,7 +30,7 @@ func (m Manager) codexStatus(cfg *config.Config) (Status, error) {
 		State:           StateNotConfigured,
 		TargetPath:      targetPath,
 		BackupAvailable: m.hasLatestBackup(ProductCodexCLI),
-		Warning:         "Per-project .codex/config.toml files can override user config in trusted projects.",
+		Warning:         "Codex ignores model provider settings in project-local .codex/config.toml; keep Clipal provider settings in user-level ~/.codex/config.toml.",
 	}
 
 	doc, err := readTOMLMap(targetPath)

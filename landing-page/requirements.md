@@ -126,7 +126,7 @@ $ clipal service start
  ╚██████╗███████╗██║██║     ██║  ██║███████╗
   ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝
 
-✓ Clipal v0.19.0 running on http://127.0.0.1:3333
+✓ Clipal v0.19.1 running on http://127.0.0.1:3333
 ✓ Providers loaded: Anthropic, OpenAI, Gemini (3)
 ✓ Key pool: 5 keys active across 2 providers
 
@@ -216,7 +216,7 @@ Each pillar = Card with: Icon + Title + Description + Visual Demo
 ```bash
 npm install -g clipal
 clipal --version
-# → clipal version 0.19.0
+# → clipal version 0.19.1
 ```
 Caption: *Recommended npm install. Standalone binaries remain available for macOS, Linux, and Windows.*
 
@@ -250,7 +250,7 @@ Caption: *One click. All your AI tools now route through Clipal.*
   npm install -g clipal
   ```
 - **Standalone binary fallback** → GitHub Releases
-- **Version badge**: `Latest: v0.19.0` (auto-fetch from GitHub API or hardcoded with update workflow)
+- **Version badge**: `Latest: v0.19.1` (auto-fetch from GitHub API or hardcoded with update workflow)
 
 #### Right: Community Panel
 

@@ -564,7 +564,7 @@ import json
 import hashlib
 import sys
 
-CLAUDE_OAUTH_APP_VERSION = "2.1.195"
+CLAUDE_OAUTH_APP_VERSION = "2.1.196"
 model = sys.argv[1]
 prompt = sys.argv[2]
 stream = sys.argv[3] == "1"
@@ -616,7 +616,7 @@ import json
 import hashlib
 import sys
 
-CLAUDE_OAUTH_APP_VERSION = "2.1.195"
+CLAUDE_OAUTH_APP_VERSION = "2.1.196"
 model = sys.argv[1]
 prompt = sys.argv[2]
 

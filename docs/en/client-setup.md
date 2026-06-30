@@ -47,7 +47,7 @@ wire_api = "responses"
 Notes:
 
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
-- If your environment also uses workspace-local Codex settings, those may still take precedence
+- Codex ignores model provider settings in project-local `.codex/config.toml`; keep the Clipal provider in user-level `~/.codex/config.toml`
 
 ## OpenCode
 
