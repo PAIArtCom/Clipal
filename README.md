@@ -14,9 +14,22 @@
 
 ## Join the WeChat Group
 
-Scan the QR code below to join the Clipal WeChat group and discuss usage, setup, and feedback with other users.
+Scan the QR codes below to join the Clipal WeChat group or contact the author.
 
-<img src="assets/wechat-group.png" alt="Clipal WeChat Group QR Code" width="320">
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="assets/wechat-group.jpeg" alt="Clipal WeChat Group QR Code" width="220"><br>
+        <sub>WeChat Group</sub>
+      </td>
+      <td align="center">
+        <img src="assets/wechat-supporter.jpeg" alt="Author WeChat QR Code" width="220"><br>
+        <sub>Author WeChat</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ## ✨ Why Clipal?
 
