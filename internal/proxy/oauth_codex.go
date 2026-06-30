@@ -35,9 +35,14 @@ var codexOAuthAllowedHeaders = map[string]bool{
 	"session_id":                             true,
 	"thread-id":                              true,
 	"thread_id":                              true,
+	"traceparent":                            true,
+	"tracestate":                             true,
 	"version":                                true,
 	"x-codex-beta-features":                  true,
 	"x-codex-installation-id":                true,
+	"x-codex-parent-thread-id":               true,
+	"x-codex-turn-state":                     true,
+	"x-codex-turn-metadata":                  true,
 	"x-codex-window-id":                      true,
 	"x-client-request-id":                    true,
 	"x-oai-attestation":                      true,
@@ -45,7 +50,9 @@ var codexOAuthAllowedHeaders = map[string]bool{
 	"x-openai-internal-codex-residency":      true,
 	"x-openai-internal-codex-responses-lite": true,
 	"x-openai-memgen-request":                true,
+	"x-openai-subagent":                      true,
 	"x-responsesapi-include-timing-metrics":  true,
+	"x-request-id":                           true,
 }
 
 type codexOAuthRequestContext struct {
@@ -284,26 +291,25 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 	proxyReq.Header.Set("User-Agent", codexOAuthUserAgent)
 	proxyReq.Header.Set("Originator", codexOAuthOriginator)
 	proxyReq.Header.Set("Version", codexOAuthVersion)
-	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+	if strings.TrimSpace(proxyReq.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
 		proxyReq.Header.Set("Session-Id", codexCtx.sessionID)
 	}
 	proxyReq.Header.Del("Session_id")
 	proxyReq.Header.Del("Session_Id")
-	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+	if strings.TrimSpace(proxyReq.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("Thread-Id", codexCtx.threadID)
 	}
 	proxyReq.Header.Del("Thread_id")
 	proxyReq.Header.Del("Thread_Id")
-	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Client-Request-Id")) == "" && codexCtx.threadID != "" {
+	if strings.TrimSpace(proxyReq.Header.Get("X-Client-Request-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("X-Client-Request-Id", codexCtx.threadID)
 	}
-	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
 		proxyReq.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
 	}
-	if sanitizeCodexOAuthIdentifier(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
+	if strings.TrimSpace(proxyReq.Header.Get("X-Codex-Window-Id")) == "" && codexCtx.threadID != "" {
 		proxyReq.Header.Set("X-Codex-Window-Id", codexCtx.threadID+":0")
 	}
-	proxyReq.Header.Del("X-Codex-Parent-Thread-Id")
 	if (targetPath == "/responses/compact" || strings.TrimSpace(proxyReq.Header.Get("X-Codex-Turn-Metadata")) == "") && codexCtx.sessionID != "" && codexCtx.threadID != "" {
 		metadata := strings.TrimSpace(codexCtx.turnMetadata)
 		if metadata == "" {
@@ -327,15 +333,15 @@ func applyCodexOAuthHeaders(proxyReq *http.Request, cred *oauthpkg.Credential, s
 }
 
 func newCodexOAuthRequestContext(headers http.Header) codexOAuthRequestContext {
-	sessionID := firstSafeCodexOAuthHeader(headers, "Session-Id", "Session_id")
+	sessionID := firstNonEmptyHeader(headers, "Session-Id", "Session_id")
 	if sessionID == "" {
 		sessionID = newCodexUUID()
 	}
-	threadID := firstSafeCodexOAuthHeader(headers, "Thread-Id", "Thread_id")
+	threadID := firstNonEmptyHeader(headers, "Thread-Id", "Thread_id")
 	if threadID == "" {
 		threadID = newCodexUUID()
 	}
-	installationID := firstSafeCodexOAuthHeader(headers, "X-Codex-Installation-Id")
+	installationID := firstNonEmptyHeader(headers, "X-Codex-Installation-Id")
 	if installationID == "" {
 		installationID = newCodexUUID()
 	}
@@ -356,16 +362,18 @@ func codexOAuthRequestContextForRequest(req *http.Request, targetPath string) co
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
-	if sanitizeCodexOAuthIdentifier(req.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
+	if strings.TrimSpace(req.Header.Get("Session-Id")) == "" && codexCtx.sessionID != "" {
 		req.Header.Set("Session-Id", codexCtx.sessionID)
 	}
-	if sanitizeCodexOAuthIdentifier(req.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
+	if strings.TrimSpace(req.Header.Get("Thread-Id")) == "" && codexCtx.threadID != "" {
 		req.Header.Set("Thread-Id", codexCtx.threadID)
 	}
-	if sanitizeCodexOAuthIdentifier(req.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
+	if strings.TrimSpace(req.Header.Get("X-Codex-Installation-Id")) == "" && codexCtx.installationID != "" {
 		req.Header.Set("X-Codex-Installation-Id", codexCtx.installationID)
 	}
-	if existing, _ := req.Context().Value(codexOAuthTurnMetadataContextKey{}).(string); strings.TrimSpace(existing) != "" {
+	if existing := strings.TrimSpace(req.Header.Get("X-Codex-Turn-Metadata")); targetPath != "/responses/compact" && existing != "" {
+		codexCtx.turnMetadata = existing
+	} else if existing, _ := req.Context().Value(codexOAuthTurnMetadataContextKey{}).(string); strings.TrimSpace(existing) != "" {
 		codexCtx.turnMetadata = existing
 	} else {
 		codexCtx.turnMetadata = codexOAuthTurnMetadata(codexCtx, targetPath)
@@ -386,6 +394,9 @@ func ensureCodexOAuthTurnMetadata(req *http.Request, codexCtx codexOAuthRequestC
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
+	if targetPath != "/responses/compact" && strings.TrimSpace(req.Header.Get("X-Codex-Turn-Metadata")) != "" {
+		return
+	}
 	metadata := strings.TrimSpace(codexCtx.turnMetadata)
 	if metadata == "" {
 		metadata = codexOAuthTurnMetadata(codexCtx, targetPath)
@@ -395,38 +406,14 @@ func ensureCodexOAuthTurnMetadata(req *http.Request, codexCtx codexOAuthRequestC
 	}
 }
 
-func firstSafeCodexOAuthHeader(headers http.Header, keys ...string) string {
+func firstNonEmptyHeader(headers http.Header, keys ...string) string {
 	for _, key := range keys {
-		value := sanitizeCodexOAuthIdentifier(headers.Get(key))
+		value := strings.TrimSpace(headers.Get(key))
 		if value != "" {
 			return value
 		}
 	}
 	return ""
-}
-
-func sanitizeCodexOAuthIdentifier(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || len(value) > 128 {
-		return ""
-	}
-	lower := strings.ToLower(value)
-	for _, marker := range []string{"@", "sk-", "secret", "token", "provider", "customer", "raw_ref", "raw-ref", ".env"} {
-		if strings.Contains(lower, marker) {
-			return ""
-		}
-	}
-	for _, r := range value {
-		switch {
-		case r >= 'a' && r <= 'z':
-		case r >= 'A' && r <= 'Z':
-		case r >= '0' && r <= '9':
-		case r == '-' || r == '_' || r == ':' || r == '.':
-		default:
-			return ""
-		}
-	}
-	return value
 }
 
 func newCodexUUID() string {

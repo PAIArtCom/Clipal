@@ -385,14 +385,8 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if err := json.Unmarshal([]byte(proxyReq.Header.Get("X-Codex-Turn-Metadata")), &turnMetadata); err != nil {
 		t.Fatalf("X-Codex-Turn-Metadata json: %v", err)
 	}
-	if got := turnMetadata["turn_id"]; got == "turn-1" {
-		t.Fatalf("X-Codex-Turn-Metadata preserved client turn_id: %#v", turnMetadata)
-	}
-	if got := turnMetadata["session_id"]; got != "session-123" {
-		t.Fatalf("turn session_id = %v", got)
-	}
-	if got := turnMetadata["thread_id"]; got != "thread-123" {
-		t.Fatalf("turn thread_id = %v", got)
+	if got := proxyReq.Header.Get("X-Codex-Turn-Metadata"); got != `{"turn_id":"turn-1"}` {
+		t.Fatalf("X-Codex-Turn-Metadata = %q", got)
 	}
 	if got := proxyReq.Header.Get("X-Client-Request-Id"); got != "req-123" {
 		t.Fatalf("X-Client-Request-Id = %q", got)
@@ -409,16 +403,22 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if got := proxyReq.Header.Get("X-Codex-Window-Id"); got != "thread-123:0" {
 		t.Fatalf("X-Codex-Window-Id = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Parent-Thread-Id"); got != "" {
-		t.Fatalf("X-Codex-Parent-Thread-Id = %q, want empty", got)
+	if got := proxyReq.Header.Get("X-Codex-Parent-Thread-Id"); got != "parent-thread-1" {
+		t.Fatalf("X-Codex-Parent-Thread-Id = %q", got)
 	}
 	if got := proxyReq.Header.Get("X-Codex-Beta-Features"); got != "feature-a" {
 		t.Fatalf("X-Codex-Beta-Features = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-OpenAI-Subagent"); got != "" {
-		t.Fatalf("X-OpenAI-Subagent = %q, want empty", got)
+	if got := proxyReq.Header.Get("X-OpenAI-Subagent"); got != "review" {
+		t.Fatalf("X-OpenAI-Subagent = %q", got)
 	}
-	for _, key := range []string{"Accept-Encoding", "Idempotency-Key", "OpenAI-Organization", "OpenAI-Project", "Traceparent", "X-Request-Id"} {
+	if got := proxyReq.Header.Get("Traceparent"); got != "00-secret" {
+		t.Fatalf("Traceparent = %q", got)
+	}
+	if got := proxyReq.Header.Get("X-Request-Id"); got != "req-secret" {
+		t.Fatalf("X-Request-Id = %q", got)
+	}
+	for _, key := range []string{"Accept-Encoding", "Idempotency-Key", "OpenAI-Organization", "OpenAI-Project"} {
 		if got := proxyReq.Header.Get(key); got != "" {
 			t.Fatalf("%s = %q, want empty", key, got)
 		}
@@ -953,12 +953,12 @@ func TestCreateProxyRequest_CodexOAuthLatestHeadersAndLegacySessionID(t *testing
 	if got := proxyReq.Header.Get("X-ResponsesAPI-Include-Timing-Metrics"); got != "true" {
 		t.Fatalf("X-ResponsesAPI-Include-Timing-Metrics = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Turn-State"); got != "" {
-		t.Fatalf("X-Codex-Turn-State = %q, want empty", got)
+	if got := proxyReq.Header.Get("X-Codex-Turn-State"); got != "turn-state-123" {
+		t.Fatalf("X-Codex-Turn-State = %q", got)
 	}
 }
 
-func TestCreateProxyRequest_CodexOAuthRegeneratesUnsafeContextIdentifiers(t *testing.T) {
+func TestCreateProxyRequest_CodexOAuthPreservesClientContextIdentifiers(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -1000,19 +1000,16 @@ func TestCreateProxyRequest_CodexOAuthRegeneratesUnsafeContextIdentifiers(t *tes
 	if err != nil {
 		t.Fatalf("createProxyRequest: %v", err)
 	}
-	for key, unsafe := range map[string]string{
+	for key, want := range map[string]string{
 		"Session-Id":               "user@example.com",
 		"Thread-Id":                "sk-secret-thread",
 		"X-Codex-Installation-Id":  "provider.customer.raw_ref",
 		"X-Codex-Parent-Thread-Id": "customer@example.com",
 		"X-Client-Request-Id":      "sk-secret-thread",
 		"X-Codex-Window-Id":        "sk-secret-thread:0",
-		"X-Codex-Turn-Metadata":    "user@example.com",
-		"X-Codex-Turn-Metadata#sk": "sk-secret-thread",
 	} {
-		got := proxyReq.Header.Get(strings.Split(key, "#")[0])
-		if strings.Contains(got, unsafe) {
-			t.Fatalf("%s = %q, leaked unsafe identifier %q", key, got, unsafe)
+		if got := proxyReq.Header.Get(key); got != want {
+			t.Fatalf("%s = %q, want %q", key, got, want)
 		}
 	}
 
@@ -1020,13 +1017,14 @@ func TestCreateProxyRequest_CodexOAuthRegeneratesUnsafeContextIdentifiers(t *tes
 	if err := json.Unmarshal([]byte(proxyReq.Header.Get("X-Codex-Turn-Metadata")), &turn); err != nil {
 		t.Fatalf("X-Codex-Turn-Metadata json: %v", err)
 	}
-	for _, key := range []string{"session_id", "thread_id", "window_id"} {
-		value := fmt.Sprint(turn[key])
-		for _, unsafe := range []string{"user@example.com", "sk-secret-thread", "provider.customer.raw_ref"} {
-			if strings.Contains(value, unsafe) {
-				t.Fatalf("turn[%s] = %q, leaked unsafe identifier %q", key, value, unsafe)
-			}
-		}
+	if got := turn["session_id"]; got != "user@example.com" {
+		t.Fatalf("turn session_id = %v", got)
+	}
+	if got := turn["thread_id"]; got != "sk-secret-thread" {
+		t.Fatalf("turn thread_id = %v", got)
+	}
+	if got := turn["window_id"]; got != "sk-secret-thread:0" {
+		t.Fatalf("turn window_id = %v", got)
 	}
 
 	root := decodeRequestBodyMap(t, proxyReq)
@@ -1034,8 +1032,8 @@ func TestCreateProxyRequest_CodexOAuthRegeneratesUnsafeContextIdentifiers(t *tes
 	if !ok {
 		t.Fatalf("client_metadata = %T %#v", root["client_metadata"], root["client_metadata"])
 	}
-	if got := fmt.Sprint(metadata["x-codex-installation-id"]); strings.Contains(got, "provider.customer.raw_ref") {
-		t.Fatalf("client_metadata.x-codex-installation-id = %q, leaked unsafe identifier", got)
+	if got := metadata["x-codex-installation-id"]; got != "provider.customer.raw_ref" {
+		t.Fatalf("client_metadata.x-codex-installation-id = %v", got)
 	}
 }
 

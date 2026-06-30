@@ -92,6 +92,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if npm view "clipal@${VERSION}" version >/dev/null 2>&1; then
+            echo "clipal@${VERSION} already exists on npm; skipping publish"
+            exit 0
+          fi
           npm publish --provenance
 
       - name: Publish npm package @paiart/clipal
@@ -101,4 +106,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if npm view "@paiart/clipal@${VERSION}" version >/dev/null 2>&1; then
+            echo "@paiart/clipal@${VERSION} already exists on npm; skipping publish"
+            exit 0
+          fi
           npm publish --provenance --access public
