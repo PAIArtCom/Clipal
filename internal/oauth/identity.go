@@ -88,11 +88,34 @@ func mergeCredentialForUpdate(existing *Credential, incoming *Credential) *Crede
 		merged.Metadata = make(map[string]string, len(existing.Metadata))
 	}
 	for k, v := range existing.Metadata {
+		if volatileCredentialMetadataKey(merged.Provider, k) {
+			continue
+		}
 		if strings.TrimSpace(merged.Metadata[k]) == "" {
 			merged.Metadata[k] = v
 		}
 	}
 	return merged
+}
+
+func volatileCredentialMetadataKey(provider config.OAuthProvider, key string) bool {
+	if normalizeProvider(provider) != config.OAuthProviderAntigravity {
+		return false
+	}
+	switch strings.TrimSpace(key) {
+	case "tier_id",
+		"current_tier_id",
+		"current_tier_name",
+		"paid_tier_id",
+		"paid_tier_name",
+		"paid_credit_type",
+		"paid_minimum_credit_amount_for_usage",
+		"allowed_default_tier_id",
+		"allowed_default_tier_name":
+		return true
+	default:
+		return false
+	}
 }
 
 func credentialUpdateMatchScore(existing *Credential, incoming *Credential) int {

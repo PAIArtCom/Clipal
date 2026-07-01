@@ -1,11 +1,15 @@
 package proxy
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/lansespirit/Clipal/internal/config"
 	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
 )
 
@@ -291,5 +295,83 @@ func TestGeminiOAuthCooldownUntil_DoesNotFallbackAcrossTiersWhenMatchedTierExist
 	}, "gemini-2.5-pro-preview-05-06", now)
 	if ok {
 		t.Fatalf("until = %s, want no cooldown", until.Format(time.RFC3339))
+	}
+}
+
+func TestGeminiOAuthCooldown_UsesAntigravityUsageProvider(t *testing.T) {
+	now := time.Date(2026, 5, 7, 10, 0, 0, 0, time.UTC)
+	reset := now.Add(2 * time.Hour)
+	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Method; got != http.MethodPost {
+			t.Fatalf("method = %s, want POST", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
+			t.Fatalf("authorization = %q", got)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		if got := string(body); got != `{"project":"project-123"}` {
+			t.Fatalf("body = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1internal:retrieveUserQuota":
+			_, _ = io.WriteString(w, fmt.Sprintf(`{
+				"buckets": [
+					{
+						"modelId": "gemini-3.1-pro",
+						"tokenType": "GOOGLE_ONE_AI",
+						"remainingFraction": 0.0,
+						"resetTime": %q
+					}
+				]
+			}`, reset.Format(time.RFC3339)))
+		case "/v1internal:retrieveUserQuotaSummary":
+			_, _ = io.WriteString(w, `{"groups":[]}`)
+		default:
+			t.Fatalf("path = %s, want quota or quota summary", r.URL.Path)
+		}
+	}))
+	defer usageServer.Close()
+
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir,
+		oauthpkg.WithNowFunc(func() time.Time { return now }),
+		oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+			DailyCloudCodeURL: usageServer.URL,
+			CloudCodeVersion:  "v1internal",
+			HTTPClient:        usageServer.Client(),
+			Now:               func() time.Time { return now },
+		}),
+	)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "antigravity-sean-example-com",
+		Provider:    config.OAuthProviderAntigravity,
+		AccessToken: "access-1",
+		AccountID:   "project-123",
+		ExpiresAt:   now.Add(time.Hour),
+		Metadata: map[string]string{
+			"project_id": "project-123",
+		},
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := &ClientProxy{oauth: svc}
+	provider := config.Provider{
+		Name:          "antigravity-oauth",
+		AuthType:      config.ProviderAuthTypeOAuth,
+		OAuthProvider: config.OAuthProviderAntigravity,
+		OAuthRef:      "antigravity-sean-example-com",
+	}
+
+	cooldown, ok := cp.geminiOAuthCooldown(t.Context(), provider, 0, "/v1beta/models/gemini-3.1-pro:generateContent", now)
+	if !ok {
+		t.Fatalf("expected cooldown")
+	}
+	if cooldown != 2*time.Hour {
+		t.Fatalf("cooldown = %s, want 2h", cooldown)
 	}
 }

@@ -347,7 +347,7 @@ func (a *API) HandleGetProviderOAuthMetadata(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	oauthProvider := provider.NormalizedOAuthProvider()
-	if oauthProvider != config.OAuthProviderCodex && oauthProvider != config.OAuthProviderClaude {
+	if oauthProvider != config.OAuthProviderCodex && oauthProvider != config.OAuthProviderClaude && oauthProvider != config.OAuthProviderAntigravity {
 		writeError(w, "oauth metadata is unavailable for this provider", http.StatusBadRequest)
 		return
 	}
@@ -373,6 +373,15 @@ func (a *API) HandleGetProviderOAuthMetadata(w http.ResponseWriter, r *http.Requ
 			resp = ProviderOAuthMetadataResponse{
 				OAuthPlanType:   firstNonEmptyString(details.PlanType, claudeOAuthPlanType(a.oauth, provider.NormalizedOAuthRef())),
 				OAuthRateLimits: mapProviderClaudeOAuthLimitsResponse(details),
+			}
+		}
+	case config.OAuthProviderAntigravity:
+		var details *oauthpkg.GeminiUsageDetails
+		details, metadataErr = a.oauth.GetGeminiUsageForProviderWithHTTPClient(usageCtx, config.OAuthProviderAntigravity, provider.NormalizedOAuthRef(), httpClient)
+		if details != nil {
+			resp = ProviderOAuthMetadataResponse{
+				OAuthPlanType:   googleOAuthPlanTypeWithRefresh(usageCtx, a.oauth, config.OAuthProviderAntigravity, provider.NormalizedOAuthRef(), httpClient),
+				OAuthRateLimits: mapProviderGeminiOAuthLimitsResponse(details),
 			}
 		}
 	}
@@ -498,6 +507,131 @@ func mapProviderClaudeExtraUsageLimitWindow(extra *oauthpkg.ClaudeExtraUsage) *P
 	return &ProviderOAuthLimitWindow{UsedPercent: usedPercent}
 }
 
+func mapProviderGeminiOAuthLimitsResponse(details *oauthpkg.GeminiUsageDetails) *ProviderOAuthLimits {
+	if details == nil || (len(details.Groups) == 0 && len(details.Buckets) == 0) {
+		return nil
+	}
+	resp := &ProviderOAuthLimits{}
+	for _, group := range details.Groups {
+		for _, bucket := range group.Buckets {
+			window := mapProviderGeminiSummaryOAuthLimitWindow(bucket)
+			if window == nil {
+				continue
+			}
+			resp.Additional = append(resp.Additional, ProviderOAuthAdditionalLimit{
+				LimitID:   geminiSummaryOAuthLimitID(group, bucket),
+				LimitName: geminiSummaryOAuthLimitName(group, bucket),
+				Primary:   window,
+			})
+		}
+	}
+	if len(resp.Additional) > 0 {
+		return resp
+	}
+	for _, bucket := range details.Buckets {
+		window := mapProviderGeminiOAuthLimitWindow(bucket)
+		if window == nil {
+			continue
+		}
+		limitID := strings.TrimSpace(bucket.ModelID)
+		if tokenType := strings.TrimSpace(bucket.TokenType); tokenType != "" {
+			if limitID == "" {
+				limitID = tokenType
+			} else {
+				limitID += ":" + tokenType
+			}
+		}
+		resp.Additional = append(resp.Additional, ProviderOAuthAdditionalLimit{
+			LimitID:   limitID,
+			LimitName: geminiOAuthLimitName(bucket),
+			Primary:   window,
+		})
+	}
+	if len(resp.Additional) == 0 {
+		return nil
+	}
+	return resp
+}
+
+func mapProviderGeminiSummaryOAuthLimitWindow(bucket oauthpkg.GeminiUsageSummaryBucket) *ProviderOAuthLimitWindow {
+	window := &ProviderOAuthLimitWindow{
+		ResetsAt: formatTimeRFC3339(bucket.ResetTime),
+	}
+	if bucket.RemainingFraction != nil {
+		remaining := *bucket.RemainingFraction
+		if remaining < 0 {
+			remaining = 0
+		}
+		if remaining > 1 {
+			remaining = 1
+		}
+		window.UsedPercent = (1 - remaining) * 100
+	}
+	if window.UsedPercent == 0 && window.ResetsAt == "" {
+		return nil
+	}
+	return window
+}
+
+func mapProviderGeminiOAuthLimitWindow(bucket oauthpkg.GeminiUsageBucket) *ProviderOAuthLimitWindow {
+	window := &ProviderOAuthLimitWindow{
+		ResetsAt: formatTimeRFC3339(bucket.ResetTime),
+	}
+	if bucket.RemainingFraction != nil {
+		remaining := *bucket.RemainingFraction
+		if remaining < 0 {
+			remaining = 0
+		}
+		if remaining > 1 {
+			remaining = 1
+		}
+		window.UsedPercent = (1 - remaining) * 100
+	}
+	if window.UsedPercent == 0 && window.ResetsAt == "" {
+		return nil
+	}
+	return window
+}
+
+func geminiOAuthLimitName(bucket oauthpkg.GeminiUsageBucket) string {
+	parts := make([]string, 0, 2)
+	if modelID := strings.TrimSpace(bucket.ModelID); modelID != "" {
+		parts = append(parts, modelID)
+	}
+	if tokenType := strings.TrimSpace(bucket.TokenType); tokenType != "" {
+		parts = append(parts, tokenType)
+	}
+	return strings.Join(parts, " ")
+}
+
+func geminiSummaryOAuthLimitID(group oauthpkg.GeminiUsageGroup, bucket oauthpkg.GeminiUsageSummaryBucket) string {
+	if bucketID := strings.TrimSpace(bucket.BucketID); bucketID != "" {
+		return bucketID
+	}
+	parts := make([]string, 0, 2)
+	if groupName := strings.TrimSpace(group.DisplayName); groupName != "" {
+		parts = append(parts, groupName)
+	}
+	if bucketName := strings.TrimSpace(bucket.DisplayName); bucketName != "" {
+		parts = append(parts, bucketName)
+	}
+	return strings.Join(parts, ":")
+}
+
+func geminiSummaryOAuthLimitName(group oauthpkg.GeminiUsageGroup, bucket oauthpkg.GeminiUsageSummaryBucket) string {
+	parts := make([]string, 0, 2)
+	if groupName := strings.TrimSpace(group.DisplayName); groupName != "" {
+		parts = append(parts, groupName)
+	}
+	if bucketName := strings.TrimSpace(bucket.DisplayName); bucketName != "" {
+		parts = append(parts, bucketName)
+	}
+	if len(parts) == 0 {
+		return strings.TrimSpace(bucket.BucketID)
+	}
+	return strings.Join(parts, " ")
+}
+
 func claudeOAuthPlanType(svc *oauthpkg.Service, ref string) string {
 	if svc == nil {
 		return ""
@@ -507,6 +641,53 @@ func claudeOAuthPlanType(svc *oauthpkg.Service, ref string) string {
 		return ""
 	}
 	return strings.TrimSpace(cred.Metadata["plan_type"])
+}
+
+func googleOAuthPlanTypeWithRefresh(ctx context.Context, svc *oauthpkg.Service, provider config.OAuthProvider, ref string, httpClient *http.Client) string {
+	if svc == nil {
+		return ""
+	}
+	cred, err := svc.Load(provider, ref)
+	if err != nil || cred == nil || cred.Metadata == nil {
+		return ""
+	}
+	planType := googleOAuthPlanTypeFromMetadata(cred.Metadata)
+	if provider != config.OAuthProviderAntigravity || antigravityPlanMetadataIsCurrent(cred.Metadata) {
+		return planType
+	}
+	refreshed, err := svc.RefreshWithHTTPClient(ctx, provider, ref, httpClient)
+	if err != nil || refreshed == nil || refreshed.Metadata == nil {
+		return planType
+	}
+	return googleOAuthPlanTypeFromMetadata(refreshed.Metadata)
+}
+
+func googleOAuthPlanTypeFromMetadata(metadata map[string]string) string {
+	if metadata == nil {
+		return ""
+	}
+	for _, key := range []string{"paid_tier_name", "paid_tier_id", "current_tier_name", "current_tier_id", "tier_id", "plan_type"} {
+		if value := strings.TrimSpace(metadata[key]); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func antigravityPlanMetadataIsCurrent(metadata map[string]string) bool {
+	for _, key := range []string{
+		"paid_tier_name",
+		"paid_tier_id",
+		"current_tier_name",
+		"current_tier_id",
+		"allowed_default_tier_name",
+		"allowed_default_tier_id",
+	} {
+		if strings.TrimSpace(metadata[key]) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func firstNonEmptyString(values ...string) string {

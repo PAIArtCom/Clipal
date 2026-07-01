@@ -85,6 +85,18 @@ type AntigravityClient struct {
 
 var _ ProviderClient = (*AntigravityClient)(nil)
 
+type antigravityTierMetadata struct {
+	TierID                          string
+	CurrentTierID                   string
+	CurrentTierName                 string
+	PaidTierID                      string
+	PaidTierName                    string
+	PaidCreditType                  string
+	PaidMinimumCreditAmountForUsage string
+	AllowedDefaultTierID            string
+	AllowedDefaultTierName          string
+}
+
 func NewAntigravityClient() *AntigravityClient {
 	client := &AntigravityClient{
 		AuthURL:           defaultGeminiAuthURL,
@@ -218,14 +230,14 @@ func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *gemi
 	if err != nil && strings.TrimSpace(previousValue(previous, func(v *Credential) string { return v.Email })) == "" {
 		return nil, err
 	}
-	projectID, tierID, autoProject, err := c.resolveProjectID(ctx, token.AccessToken, previous)
+	projectID, tiers, autoProject, err := c.resolveProjectID(ctx, token.AccessToken, previous)
 	if err != nil {
 		return nil, err
 	}
 	email = strings.TrimSpace(firstNonEmpty(email, previousValue(previous, func(v *Credential) string { return v.Email })))
 	projectID = strings.TrimSpace(firstNonEmpty(projectID, c.requestedProjectID(previous), previousValue(previous, func(v *Credential) string { return v.AccountID })))
 
-	metadata := c.metadataFromToken(token, projectID, tierID, autoProject)
+	metadata := c.metadataFromToken(token, projectID, tiers, autoProject)
 	cred := &Credential{
 		Ref:          antigravityCredentialRef(email, projectID),
 		Provider:     config.OAuthProviderAntigravity,
@@ -253,6 +265,9 @@ func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *gemi
 			cred.RefreshToken = previous.RefreshToken
 		}
 		for k, v := range previous.Metadata {
+			if volatileCredentialMetadataKey(config.OAuthProviderAntigravity, k) {
+				continue
+			}
 			if _, exists := cred.Metadata[k]; !exists {
 				cred.Metadata[k] = v
 			}
@@ -272,36 +287,39 @@ func (c *AntigravityClient) fetchUserEmail(ctx context.Context, accessToken stri
 	return gemini.fetchUserEmail(ctx, accessToken)
 }
 
-func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken string, previous *Credential) (string, string, bool, error) {
+func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken string, previous *Credential) (string, antigravityTierMetadata, bool, error) {
 	requestedProject := c.requestedProjectID(previous)
 	if err := validateGeminiProjectID(requestedProject); err != nil {
-		return "", "", false, err
+		return "", antigravityTierMetadata{}, false, err
 	}
 	loadResp, err := c.callCloudCode(ctx, accessToken, c.cloudCodeURL(), "loadCodeAssist", map[string]any{
 		"metadata": antigravityClientMetadata(),
 	})
 	if err != nil {
 		if fallbackProject := previousGeminiMetadata(previous, "project_id"); fallbackProject != "" {
-			return fallbackProject, previousGeminiMetadata(previous, "tier_id"), previousGeminiMetadata(previous, "auto_project") == "true", nil
+			return fallbackProject, antigravityTierMetadataFromCredential(previous), previousGeminiMetadata(previous, "auto_project") == "true", nil
 		}
-		return "", "", false, fmt.Errorf("load code assist: %w", err)
+		return "", antigravityTierMetadata{}, false, fmt.Errorf("load code assist: %w", err)
 	}
-	tierID := extractAntigravityTierID(loadResp)
+	tiers := extractAntigravityTierMetadata(loadResp)
 	projectID := strings.TrimSpace(firstNonEmpty(extractGeminiProjectID(loadResp), requestedProject, previousGeminiMetadata(previous, "project_id")))
 	if projectID != "" {
-		return projectID, tierID, requestedProject == "", nil
+		return projectID, tiers, requestedProject == "", nil
 	}
 	if requestedProject != "" {
-		return requestedProject, tierID, false, nil
+		return requestedProject, tiers, false, nil
 	}
-	projectID, err = c.onboardUser(ctx, accessToken, tierID)
+	projectID, err = c.onboardUser(ctx, accessToken, tiers.onboardTierID())
 	if err != nil {
 		if fallbackProject := previousGeminiMetadata(previous, "project_id"); fallbackProject != "" {
-			return fallbackProject, firstNonEmpty(tierID, previousGeminiMetadata(previous, "tier_id")), previousGeminiMetadata(previous, "auto_project") == "true", nil
+			if tiers.isZero() {
+				tiers = antigravityTierMetadataFromCredential(previous)
+			}
+			return fallbackProject, tiers, previousGeminiMetadata(previous, "auto_project") == "true", nil
 		}
-		return "", tierID, false, fmt.Errorf("onboard user: %w", err)
+		return "", tiers, false, fmt.Errorf("onboard user: %w", err)
 	}
-	return strings.TrimSpace(projectID), tierID, requestedProject == "", nil
+	return strings.TrimSpace(projectID), tiers, requestedProject == "", nil
 }
 
 func (c *AntigravityClient) onboardUser(ctx context.Context, accessToken string, tierID string) (string, error) {
@@ -327,9 +345,17 @@ func (c *AntigravityClient) onboardUser(ctx context.Context, accessToken string,
 }
 
 func extractAntigravityTierID(payload map[string]any) string {
+	return extractAntigravityTierMetadata(payload).TierID
+}
+
+func extractAntigravityTierMetadata(payload map[string]any) antigravityTierMetadata {
 	if payload == nil {
-		return defaultAntigravityFreeTierID
+		return antigravityTierMetadata{TierID: defaultAntigravityFreeTierID}
 	}
+	var metadata antigravityTierMetadata
+	metadata.PaidTierID, metadata.PaidTierName = extractAntigravityTierIdentity(payload["paidTier"])
+	metadata.PaidCreditType, metadata.PaidMinimumCreditAmountForUsage = extractAntigravityPaidCredit(payload["paidTier"])
+	metadata.CurrentTierID, metadata.CurrentTierName = extractAntigravityTierIdentity(payload["currentTier"])
 	if tiers, ok := payload["allowedTiers"].([]any); ok {
 		for _, rawTier := range tiers {
 			tier, ok := rawTier.(map[string]any)
@@ -340,17 +366,85 @@ func extractAntigravityTierID(payload map[string]any) string {
 			if !isDefault {
 				continue
 			}
-			if id := extractGeminiTierIDValue(tier); id != "" {
-				return id
-			}
+			metadata.AllowedDefaultTierID, metadata.AllowedDefaultTierName = extractAntigravityTierIdentity(tier)
+			break
 		}
 	}
-	for _, key := range []string{"paidTier", "currentTier"} {
-		if id := extractGeminiTierIDValue(payload[key]); id != "" {
-			return id
+	metadata.TierID = firstNonEmpty(
+		metadata.PaidTierID,
+		metadata.CurrentTierID,
+		metadata.AllowedDefaultTierID,
+		defaultAntigravityFreeTierID,
+	)
+	return metadata
+}
+
+func extractAntigravityTierIdentity(raw any) (string, string) {
+	tier, ok := raw.(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	id, _ := tier["id"].(string)
+	name, _ := tier["name"].(string)
+	return strings.TrimSpace(id), strings.TrimSpace(name)
+}
+
+func extractAntigravityPaidCredit(raw any) (string, string) {
+	tier, ok := raw.(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	credits, ok := tier["availableCredits"].([]any)
+	if !ok {
+		return "", ""
+	}
+	for _, rawCredit := range credits {
+		credit, ok := rawCredit.(map[string]any)
+		if !ok {
+			continue
+		}
+		creditType, _ := credit["creditType"].(string)
+		minimum, _ := credit["minimumCreditAmountForUsage"].(string)
+		creditType = strings.TrimSpace(creditType)
+		minimum = strings.TrimSpace(minimum)
+		if creditType != "" || minimum != "" {
+			return creditType, minimum
 		}
 	}
-	return defaultAntigravityFreeTierID
+	return "", ""
+}
+
+func antigravityTierMetadataFromCredential(cred *Credential) antigravityTierMetadata {
+	if cred == nil || cred.Metadata == nil {
+		return antigravityTierMetadata{}
+	}
+	return antigravityTierMetadata{
+		TierID:                          strings.TrimSpace(cred.Metadata["tier_id"]),
+		CurrentTierID:                   strings.TrimSpace(cred.Metadata["current_tier_id"]),
+		CurrentTierName:                 strings.TrimSpace(cred.Metadata["current_tier_name"]),
+		PaidTierID:                      strings.TrimSpace(cred.Metadata["paid_tier_id"]),
+		PaidTierName:                    strings.TrimSpace(cred.Metadata["paid_tier_name"]),
+		PaidCreditType:                  strings.TrimSpace(cred.Metadata["paid_credit_type"]),
+		PaidMinimumCreditAmountForUsage: strings.TrimSpace(cred.Metadata["paid_minimum_credit_amount_for_usage"]),
+		AllowedDefaultTierID:            strings.TrimSpace(cred.Metadata["allowed_default_tier_id"]),
+		AllowedDefaultTierName:          strings.TrimSpace(cred.Metadata["allowed_default_tier_name"]),
+	}
+}
+
+func (m antigravityTierMetadata) onboardTierID() string {
+	return firstNonEmpty(m.CurrentTierID, m.AllowedDefaultTierID, defaultAntigravityFreeTierID)
+}
+
+func (m antigravityTierMetadata) isZero() bool {
+	return m.TierID == "" &&
+		m.CurrentTierID == "" &&
+		m.CurrentTierName == "" &&
+		m.PaidTierID == "" &&
+		m.PaidTierName == "" &&
+		m.PaidCreditType == "" &&
+		m.PaidMinimumCreditAmountForUsage == "" &&
+		m.AllowedDefaultTierID == "" &&
+		m.AllowedDefaultTierName == ""
 }
 
 func (c *AntigravityClient) callCloudCode(ctx context.Context, accessToken string, baseURL string, action string, body map[string]any) (map[string]any, error) {
@@ -417,7 +511,7 @@ func ioReadAllAndClose(resp *http.Response) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projectID string, tierID string, autoProject bool) map[string]string {
+func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projectID string, tiers antigravityTierMetadata, autoProject bool) map[string]string {
 	tokenJSON := map[string]any{
 		"access_token":  strings.TrimSpace(token.AccessToken),
 		"client_id":     c.clientID(),
@@ -437,9 +531,23 @@ func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projec
 		"auto_project": strconv.FormatBool(autoProject),
 		"project_id":   strings.TrimSpace(projectID),
 		"scopes":       strings.Join(c.scopes(), " "),
-		"tier_id":      strings.TrimSpace(tierID),
+		"tier_id":      strings.TrimSpace(firstNonEmpty(tiers.TierID, defaultAntigravityFreeTierID)),
 		"token_json":   string(encodedToken),
 		"token_type":   strings.TrimSpace(token.TokenType),
+	}
+	for key, value := range map[string]string{
+		"current_tier_id":                      tiers.CurrentTierID,
+		"current_tier_name":                    tiers.CurrentTierName,
+		"paid_tier_id":                         tiers.PaidTierID,
+		"paid_tier_name":                       tiers.PaidTierName,
+		"paid_credit_type":                     tiers.PaidCreditType,
+		"paid_minimum_credit_amount_for_usage": tiers.PaidMinimumCreditAmountForUsage,
+		"allowed_default_tier_id":              tiers.AllowedDefaultTierID,
+		"allowed_default_tier_name":            tiers.AllowedDefaultTierName,
+	} {
+		if value = strings.TrimSpace(value); value != "" {
+			metadata[key] = value
+		}
 	}
 	if scope := strings.TrimSpace(token.Scope); scope != "" {
 		metadata["granted_scope"] = scope

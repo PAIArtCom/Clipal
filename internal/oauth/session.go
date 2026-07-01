@@ -440,7 +440,7 @@ func (s *Service) refreshCredential(ctx context.Context, cred *Credential, httpC
 	if err := s.store.Save(refreshed); err != nil {
 		return nil, err
 	}
-	if refreshed.Provider == config.OAuthProviderGemini {
+	if refreshed.Provider == config.OAuthProviderGemini || refreshed.Provider == config.OAuthProviderAntigravity {
 		s.invalidateGeminiUsageCache(refreshed.Ref)
 	}
 	return refreshed, nil

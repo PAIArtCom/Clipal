@@ -153,6 +153,77 @@ func TestStoreSave_ReusesExistingRefForSameOAuthAccount(t *testing.T) {
 	}
 }
 
+func TestStoreSave_DropsStaleAntigravityTierMetadataOnUpdate(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(dir)
+
+	existing := &Credential{
+		Ref:          "antigravity-sean-example-com-project-123",
+		Provider:     config.OAuthProviderAntigravity,
+		Email:        "sean@example.com",
+		AccountID:    "project-123",
+		AccessToken:  "access-old",
+		RefreshToken: "refresh-old",
+		Metadata: map[string]string{
+			"project_id":                           "project-123",
+			"requested_project_id":                 "requested-project",
+			"tier_id":                              "g1-pro-tier",
+			"current_tier_id":                      "free-tier",
+			"current_tier_name":                    "Antigravity",
+			"paid_tier_id":                         "g1-pro-tier",
+			"paid_tier_name":                       "Google AI Pro",
+			"paid_credit_type":                     "GOOGLE_ONE_AI",
+			"paid_minimum_credit_amount_for_usage": "50",
+			"allowed_default_tier_id":              "free-tier",
+			"allowed_default_tier_name":            "Antigravity",
+		},
+	}
+	if err := store.Save(existing); err != nil {
+		t.Fatalf("Save existing: %v", err)
+	}
+
+	incoming := &Credential{
+		Ref:          "antigravity-sean-example-com-project-123",
+		Provider:     config.OAuthProviderAntigravity,
+		Email:        "sean@example.com",
+		AccountID:    "project-123",
+		AccessToken:  "access-new",
+		RefreshToken: "refresh-new",
+		Metadata: map[string]string{
+			"project_id":        "project-123",
+			"tier_id":           "free-tier",
+			"current_tier_id":   "free-tier",
+			"current_tier_name": "Antigravity",
+		},
+	}
+	if err := store.Save(incoming); err != nil {
+		t.Fatalf("Save incoming: %v", err)
+	}
+
+	loaded, err := store.Load(config.OAuthProviderAntigravity, incoming.Ref)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := loaded.Metadata["requested_project_id"]; got != "requested-project" {
+		t.Fatalf("requested_project_id = %q, want requested-project", got)
+	}
+	for _, key := range []string{
+		"paid_tier_id",
+		"paid_tier_name",
+		"paid_credit_type",
+		"paid_minimum_credit_amount_for_usage",
+		"allowed_default_tier_id",
+		"allowed_default_tier_name",
+	} {
+		if got := loaded.Metadata[key]; got != "" {
+			t.Fatalf("metadata[%q] = %q, want empty", key, got)
+		}
+	}
+	if got := loaded.Metadata["tier_id"]; got != "free-tier" {
+		t.Fatalf("tier_id = %q, want free-tier", got)
+	}
+}
+
 func TestStoreSave_DoesNotMergeDifferentAccountsOnRefCollision(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)

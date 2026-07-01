@@ -140,7 +140,7 @@ func (cp *ClientProxy) geminiOAuthCooldown(ctx context.Context, provider config.
 	defer cancel()
 
 	modelName, _ := geminiModelFromPath(path)
-	details, err := cp.oauth.GetGeminiUsageWithHTTPClient(lookupCtx, provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
+	details, err := cp.oauth.GetGeminiUsageForProviderWithHTTPClient(lookupCtx, provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
 	if err != nil {
 		return 0, false
 	}

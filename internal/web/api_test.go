@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -979,6 +980,257 @@ providers:
 	}
 	if reviewPrimary["resets_at"] != reviewReset.Format(time.RFC3339) {
 		t.Fatalf("review.primary.resets_at = %v, want %s", reviewPrimary["resets_at"], reviewReset.Format(time.RFC3339))
+	}
+}
+
+func TestHandleGetProviderOAuthMetadata_IncludesAntigravityUsageBuckets(t *testing.T) {
+	now := time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)
+	resetTime := now.Add(5 * time.Hour)
+	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s, want POST", r.Method)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
+			t.Fatalf("authorization = %q", got)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		if got := string(body); got != `{"project":"project-123"}` {
+			t.Fatalf("body = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1internal:retrieveUserQuota":
+			_, _ = io.WriteString(w, fmt.Sprintf(`{
+  "buckets": [
+    {
+      "modelId": "gemini-3.1-pro",
+      "tokenType": "GOOGLE_ONE_AI",
+      "remainingAmount": "12",
+      "remainingFraction": 0.25,
+      "resetTime": %q
+    }
+  ]
+}`, resetTime.Format(time.RFC3339)))
+		case "/v1internal:retrieveUserQuotaSummary":
+			_, _ = io.WriteString(w, fmt.Sprintf(`{
+  "groups": [
+    {
+      "displayName": "Gemini Models",
+      "description": "Models within this group: Gemini Pro",
+      "buckets": [
+        {
+          "bucketId": "gemini-models:pro",
+          "displayName": "Gemini Pro",
+          "remainingFraction": 0.25,
+          "resetTime": %q
+        }
+      ]
+    }
+  ]
+}`, resetTime.Format(time.RFC3339)))
+		default:
+			t.Fatalf("path = %s, want quota or quota summary", r.URL.Path)
+		}
+	}))
+	defer usageServer.Close()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte(`
+providers:
+  - name: antigravity-sean-example-com
+    auth_type: oauth
+    oauth_provider: antigravity
+    oauth_ref: antigravity-sean-example-com
+    priority: 1
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	api := NewAPI(dir, "test", nil)
+	api.oauth = oauthpkg.NewService(
+		dir,
+		oauthpkg.WithNowFunc(func() time.Time { return now }),
+		oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+			DailyCloudCodeURL: usageServer.URL,
+			CloudCodeVersion:  "v1internal",
+			HTTPClient:        usageServer.Client(),
+			Now:               func() time.Time { return now },
+		}),
+	)
+
+	if err := api.oauth.Store().Save(&oauthpkg.Credential{
+		Ref:          "antigravity-sean-example-com",
+		Provider:     config.OAuthProviderAntigravity,
+		Email:        "sean@example.com",
+		AccountID:    "project-123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    now.Add(24 * time.Hour),
+		LastRefresh:  now.Add(-30 * time.Minute),
+		Metadata: map[string]string{
+			"project_id":        "project-123",
+			"tier_id":           "free-tier",
+			"current_tier_id":   "free-tier",
+			"current_tier_name": "Antigravity",
+			"paid_tier_id":      "g1-pro-tier",
+			"paid_tier_name":    "Google AI Pro",
+		},
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/providers/gemini/antigravity-sean-example-com/oauth-metadata", nil)
+	w := httptest.NewRecorder()
+	api.HandleGetProviderOAuthMetadata(w, req)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Result().StatusCode, w.Body.String())
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode json: %v\nbody=%s", err, w.Body.String())
+	}
+	if got["oauth_plan_type"] != "Google AI Pro" {
+		t.Fatalf("oauth_plan_type = %v, want Google AI Pro", got["oauth_plan_type"])
+	}
+	limits, ok := got["oauth_rate_limits"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected oauth_rate_limits object, got %#v", got["oauth_rate_limits"])
+	}
+	additional, ok := limits["additional"].([]any)
+	if !ok || len(additional) != 1 {
+		t.Fatalf("expected one additional rate limit, got %#v", limits["additional"])
+	}
+	quota, ok := additional[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected additional limit object, got %#v", additional[0])
+	}
+	if quota["limit_id"] != "gemini-models:pro" {
+		t.Fatalf("limit_id = %v, want gemini-models:pro", quota["limit_id"])
+	}
+	if quota["limit_name"] != "Gemini Models Gemini Pro" {
+		t.Fatalf("limit_name = %v, want Gemini Models Gemini Pro", quota["limit_name"])
+	}
+	primary, ok := quota["primary"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected primary quota window, got %#v", quota["primary"])
+	}
+	if primary["used_percent"] != float64(75) {
+		t.Fatalf("primary.used_percent = %v, want 75", primary["used_percent"])
+	}
+	if primary["resets_at"] != resetTime.Format(time.RFC3339) {
+		t.Fatalf("primary.resets_at = %v, want %s", primary["resets_at"], resetTime.Format(time.RFC3339))
+	}
+}
+
+func TestGoogleOAuthPlanTypeWithRefreshUpdatesLegacyAntigravityPlanMetadata(t *testing.T) {
+	now := time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)
+	var refreshCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/token":
+			refreshCalls++
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("ParseForm: %v", err)
+			}
+			if got := r.Form.Get("grant_type"); got != "refresh_token" {
+				t.Fatalf("grant_type = %q, want refresh_token", got)
+			}
+			if got := r.Form.Get("refresh_token"); got != "refresh-1" {
+				t.Fatalf("refresh_token = %q, want refresh-1", got)
+			}
+			_, _ = io.WriteString(w, `{"access_token":"access-2","refresh_token":"refresh-2","expires_in":3600,"scope":"scope-a","token_type":"Bearer"}`)
+		case "/userinfo":
+			if got := r.Header.Get("Authorization"); got != "Bearer access-2" {
+				t.Fatalf("authorization = %q, want Bearer access-2", got)
+			}
+			_, _ = io.WriteString(w, `{"email":"sean@example.com"}`)
+		case "/v1internal:loadCodeAssist":
+			if got := r.Header.Get("Authorization"); got != "Bearer access-2" {
+				t.Fatalf("authorization = %q, want Bearer access-2", got)
+			}
+			_, _ = io.WriteString(w, `{
+  "cloudaicompanionProject": "project-123",
+  "currentTier": {"id": "free-tier", "name": "Antigravity"},
+  "paidTier": {
+    "id": "g1-pro-tier",
+    "name": "Google AI Pro",
+    "availableCredits": [
+      {"creditType": "GOOGLE_ONE_AI", "minimumCreditAmountForUsage": "50"}
+    ]
+  },
+  "allowedTiers": [
+    {"id": "free-tier", "name": "Antigravity", "isDefault": true}
+  ]
+}`)
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(
+		dir,
+		oauthpkg.WithNowFunc(func() time.Time { return now }),
+		oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+			TokenURL:         server.URL + "/token",
+			UserInfoURL:      server.URL + "/userinfo",
+			CloudCodeURL:     server.URL,
+			CloudCodeVersion: "v1internal",
+			ClientID:         "client-1",
+			ClientSecret:     "secret-1",
+			Scopes:           []string{"scope-a"},
+			HTTPClient:       server.Client(),
+			Now:              func() time.Time { return now },
+		}),
+	)
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:          "antigravity-sean-example-com-project-123",
+		Provider:     config.OAuthProviderAntigravity,
+		Email:        "sean@example.com",
+		AccountID:    "project-123",
+		AccessToken:  "access-1",
+		RefreshToken: "refresh-1",
+		ExpiresAt:    now.Add(24 * time.Hour),
+		LastRefresh:  now.Add(-30 * time.Minute),
+		Metadata: map[string]string{
+			"project_id": "project-123",
+			"tier_id":    "free-tier",
+		},
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	got := googleOAuthPlanTypeWithRefresh(context.Background(), svc, config.OAuthProviderAntigravity, "antigravity-sean-example-com-project-123", server.Client())
+	if got != "Google AI Pro" {
+		t.Fatalf("plan type = %q, want Google AI Pro", got)
+	}
+	if refreshCalls != 1 {
+		t.Fatalf("refresh calls = %d, want 1", refreshCalls)
+	}
+	cred, err := svc.Load(config.OAuthProviderAntigravity, "antigravity-sean-example-com-project-123")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for key, want := range map[string]string{
+		"tier_id":                              "g1-pro-tier",
+		"current_tier_id":                      "free-tier",
+		"current_tier_name":                    "Antigravity",
+		"paid_tier_id":                         "g1-pro-tier",
+		"paid_tier_name":                       "Google AI Pro",
+		"paid_credit_type":                     "GOOGLE_ONE_AI",
+		"paid_minimum_credit_amount_for_usage": "50",
+		"allowed_default_tier_id":              "free-tier",
+		"allowed_default_tier_name":            "Antigravity",
+	} {
+		if got := cred.Metadata[key]; got != want {
+			t.Fatalf("metadata[%q] = %q, want %q", key, got, want)
+		}
 	}
 }
 
