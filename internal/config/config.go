@@ -137,9 +137,10 @@ const (
 type OAuthProvider string
 
 const (
-	OAuthProviderCodex  OAuthProvider = "codex"
-	OAuthProviderGemini OAuthProvider = "gemini"
-	OAuthProviderClaude OAuthProvider = "claude"
+	OAuthProviderCodex       OAuthProvider = "codex"
+	OAuthProviderGemini      OAuthProvider = "gemini"
+	OAuthProviderAntigravity OAuthProvider = "antigravity"
+	OAuthProviderClaude      OAuthProvider = "claude"
 )
 
 type OpenAIOverrides struct {
@@ -1211,9 +1212,9 @@ func validateProviders(clientName string, providers []Provider) error {
 				if clientName != "openai" {
 					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for openai client", clientName, p.Name, OAuthProviderCodex)
 				}
-			case OAuthProviderGemini:
+			case OAuthProviderGemini, OAuthProviderAntigravity:
 				if clientName != "gemini" {
-					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for gemini client", clientName, p.Name, OAuthProviderGemini)
+					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for gemini client", clientName, p.Name, p.NormalizedOAuthProvider())
 				}
 			case OAuthProviderClaude:
 				if clientName != "claude" {

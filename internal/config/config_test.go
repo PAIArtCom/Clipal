@@ -473,6 +473,36 @@ func TestValidate_ProviderOAuthGeminiSupportedForGeminiWithoutBaseURL(t *testing
 	}
 }
 
+func TestValidate_ProviderOAuthAntigravitySupportedForGeminiWithoutBaseURL(t *testing.T) {
+	t.Parallel()
+
+	cfg := &Config{
+		Global: DefaultGlobalConfig(),
+		Gemini: ClientConfig{
+			Mode: ClientModeAuto,
+			Providers: []Provider{
+				{
+					Name:          "antigravity-oauth",
+					AuthType:      ProviderAuthTypeOAuth,
+					OAuthProvider: OAuthProviderAntigravity,
+					OAuthRef:      "antigravity_sean_example_com_project_123",
+					Priority:      1,
+				},
+			},
+		},
+		OpenAI: ClientConfig{Mode: ClientModeAuto},
+		Claude: ClientConfig{Mode: ClientModeAuto},
+	}
+
+	applyClientDefaults(&cfg.Gemini)
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected validation success, got: %v", err)
+	}
+	if got := cfg.Gemini.Providers[0].NormalizedOAuthProvider(); got != OAuthProviderAntigravity {
+		t.Fatalf("oauth_provider = %q, want %q", got, OAuthProviderAntigravity)
+	}
+}
+
 func TestValidate_ProviderOAuthRejectsMixedCredentialSources(t *testing.T) {
 	t.Parallel()
 

@@ -6,12 +6,29 @@ mode: auto # auto | manual
 pinned_provider: "" # required when mode=manual
 
 providers:
-  # Primary provider - Google Gemini API
-  - name: "gemini-direct"
+  # Primary provider - Google AI Studio / Gemini API
+  - name: "google-ai-studio"
     base_url: "https://generativelanguage.googleapis.com"
     api_key: "AIza-xxx"
     priority: 1
     enabled: true
+
+  # Google Vertex AI Gemini REST API.
+  # Put an OAuth access token or service-account token in api_key/api_keys.
+  # Clipal sends it as Authorization: Bearer ... for aiplatform.googleapis.com hosts.
+  - name: "vertex-gemini"
+    base_url: "https://us-central1-aiplatform.googleapis.com"
+    api_key: "ya29.xxx"
+    priority: 2
+    enabled: false
+
+  # Google personal OAuth for Gemini-compatible requests now uses Antigravity.
+  - name: "antigravity-oauth"
+    auth_type: oauth
+    oauth_provider: antigravity
+    oauth_ref: "antigravity-account-ref"
+    priority: 3
+    enabled: false
 
   # Fallback provider - OpenRouter (Gemini models available)
   - name: "openrouter"
@@ -19,5 +36,5 @@ providers:
     api_keys:
       - "sk-or-xxx"
       - "sk-or-yyy"
-    priority: 2
+    priority: 4
     enabled: true

@@ -66,6 +66,21 @@ func TestHandleStartOAuthProvider_RejectsInvalidProxySettings(t *testing.T) {
 	}
 }
 
+func TestHandleStartOAuthProvider_RejectsDownlinedGeminiOAuth(t *testing.T) {
+	api := newTestOAuthAPI(t)
+
+	body := []byte(`{"client_type":"gemini","provider":"gemini"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/oauth/providers/start", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	api.HandleStartOAuthProvider(w, req)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", w.Result().StatusCode, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "no longer available") {
+		t.Fatalf("body=%s, want availability error", w.Body.String())
+	}
+}
+
 func TestHandleCancelOAuthSession_ReleasesCallbackAndDeletesTarget(t *testing.T) {
 	api := newTestOAuthAPI(t)
 	start := startOAuthSessionFor(t, api, "openai", "codex")
@@ -215,8 +230,8 @@ func TestHandleListOAuthProviders_ReturnsAvailableProvidersForClient(t *testing.
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("json.Unmarshal gemini: %v", err)
 	}
-	if len(got) != 1 || got[0].Provider != config.OAuthProviderGemini {
-		t.Fatalf("providers = %#v, want [gemini]", got)
+	if len(got) != 1 || got[0].Provider != config.OAuthProviderAntigravity {
+		t.Fatalf("providers = %#v, want [antigravity]", got)
 	}
 }
 
@@ -420,7 +435,7 @@ func TestOAuthHTTPClientForTarget_ClaudeDirectPreservesProviderClient(t *testing
 	}
 }
 
-func TestHandleSubmitOAuthSessionCode_AutoCreatesGeminiProvider(t *testing.T) {
+func TestHandleSubmitOAuthSessionCode_AutoCreatesAntigravityProvider(t *testing.T) {
 	now := time.Date(2026, 4, 22, 10, 15, 0, 0, time.UTC)
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -457,22 +472,23 @@ func TestHandleSubmitOAuthSessionCode_AutoCreatesGeminiProvider(t *testing.T) {
 	}))
 	defer cloudCodeServer.Close()
 
-	api := newTestOAuthAPI(t, oauthpkg.WithGeminiClient(&oauthpkg.GeminiClient{
-		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:     tokenServer.URL,
-		UserInfoURL:  userInfoServer.URL,
-		CloudCodeURL: cloudCodeServer.URL,
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		CallbackHost: "127.0.0.1",
-		CallbackPort: 0,
-		CallbackPath: "/oauth2callback",
-		HTTPClient:   tokenServer.Client(),
-		Now:          func() time.Time { return now },
-		Sleep:        func(time.Duration) {},
+	api := newTestOAuthAPI(t, oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+		AuthURL:           "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:          tokenServer.URL,
+		UserInfoURL:       userInfoServer.URL,
+		CloudCodeURL:      cloudCodeServer.URL,
+		DailyCloudCodeURL: cloudCodeServer.URL,
+		ClientID:          "test-client",
+		ClientSecret:      "test-secret",
+		CallbackHost:      "127.0.0.1",
+		CallbackPort:      0,
+		CallbackPath:      "/oauth2callback",
+		HTTPClient:        tokenServer.Client(),
+		Now:               func() time.Time { return now },
+		Sleep:             func(time.Duration) {},
 	}))
 
-	start := startOAuthSessionFor(t, api, "gemini", "gemini")
+	start := startOAuthSessionFor(t, api, "gemini", "antigravity")
 	body := []byte(`{"code":"manual-code"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/oauth/sessions/"+start.SessionID+"/code", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -485,8 +501,8 @@ func TestHandleSubmitOAuthSessionCode_AutoCreatesGeminiProvider(t *testing.T) {
 	if got["status"] != "completed" {
 		t.Fatalf("status = %v, want completed", got["status"])
 	}
-	if got["provider_name"] != "gemini-sean-example-com-gen-lang-client-123" {
-		t.Fatalf("provider_name = %v, want gemini-sean-example-com-gen-lang-client-123", got["provider_name"])
+	if got["provider_name"] != "antigravity-sean-example-com-gen-lang-client-123" {
+		t.Fatalf("provider_name = %v, want antigravity-sean-example-com-gen-lang-client-123", got["provider_name"])
 	}
 	if got["display_name"] != "sean@example.com" {
 		t.Fatalf("display_name = %v, want sean@example.com", got["display_name"])
@@ -499,8 +515,8 @@ func TestHandleSubmitOAuthSessionCode_AutoCreatesGeminiProvider(t *testing.T) {
 	if len(cfg.Gemini.Providers) != 1 {
 		t.Fatalf("providers len = %d, want 1", len(cfg.Gemini.Providers))
 	}
-	if got := cfg.Gemini.Providers[0].Name; got != "gemini-sean-example-com-gen-lang-client-123" {
-		t.Fatalf("provider name = %q, want gemini-sean-example-com-gen-lang-client-123", got)
+	if got := cfg.Gemini.Providers[0].Name; got != "antigravity-sean-example-com-gen-lang-client-123" {
+		t.Fatalf("provider name = %q, want antigravity-sean-example-com-gen-lang-client-123", got)
 	}
 }
 
@@ -541,22 +557,23 @@ func TestHandleSubmitOAuthSessionCode_AcceptsCallbackURLInput(t *testing.T) {
 	}))
 	defer cloudCodeServer.Close()
 
-	api := newTestOAuthAPI(t, oauthpkg.WithGeminiClient(&oauthpkg.GeminiClient{
-		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:     tokenServer.URL,
-		UserInfoURL:  userInfoServer.URL,
-		CloudCodeURL: cloudCodeServer.URL,
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		CallbackHost: "127.0.0.1",
-		CallbackPort: 0,
-		CallbackPath: "/oauth2callback",
-		HTTPClient:   tokenServer.Client(),
-		Now:          func() time.Time { return now },
-		Sleep:        func(time.Duration) {},
+	api := newTestOAuthAPI(t, oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+		AuthURL:           "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:          tokenServer.URL,
+		UserInfoURL:       userInfoServer.URL,
+		CloudCodeURL:      cloudCodeServer.URL,
+		DailyCloudCodeURL: cloudCodeServer.URL,
+		ClientID:          "test-client",
+		ClientSecret:      "test-secret",
+		CallbackHost:      "127.0.0.1",
+		CallbackPort:      0,
+		CallbackPath:      "/oauth2callback",
+		HTTPClient:        tokenServer.Client(),
+		Now:               func() time.Time { return now },
+		Sleep:             func(time.Duration) {},
 	}))
 
-	start := startOAuthSessionFor(t, api, "gemini", "gemini")
+	start := startOAuthSessionFor(t, api, "gemini", "antigravity")
 	callbackURL := fmt.Sprintf("http://127.0.0.1:39393/oauth2callback?code=manual-code&state=%s", start.SessionID)
 	body := []byte(fmt.Sprintf(`{"code":%q}`, callbackURL))
 	req := httptest.NewRequest(http.MethodPost, "/api/oauth/sessions/"+start.SessionID+"/code", bytes.NewReader(body))
@@ -1996,7 +2013,7 @@ func TestHandleGetOAuthSession_ClaudeFlowRequiresExplicitLink(t *testing.T) {
 	}
 }
 
-func TestHandleGetOAuthSession_GeminiFlowRequiresExplicitLink(t *testing.T) {
+func TestHandleGetOAuthSession_AntigravityFlowRequiresExplicitLink(t *testing.T) {
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -2027,22 +2044,23 @@ func TestHandleGetOAuthSession_GeminiFlowRequiresExplicitLink(t *testing.T) {
 	}))
 	defer cloudCodeServer.Close()
 
-	api := newTestOAuthAPI(t, oauthpkg.WithGeminiClient(&oauthpkg.GeminiClient{
-		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:     tokenServer.URL,
-		UserInfoURL:  userInfoServer.URL,
-		CloudCodeURL: cloudCodeServer.URL,
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		CallbackHost: "127.0.0.1",
-		CallbackPort: 0,
-		CallbackPath: "/oauth2callback",
-		HTTPClient:   tokenServer.Client(),
-		Now:          func() time.Time { return now },
-		Sleep:        func(time.Duration) {},
+	api := newTestOAuthAPI(t, oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+		AuthURL:           "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:          tokenServer.URL,
+		UserInfoURL:       userInfoServer.URL,
+		CloudCodeURL:      cloudCodeServer.URL,
+		DailyCloudCodeURL: cloudCodeServer.URL,
+		ClientID:          "test-client",
+		ClientSecret:      "test-secret",
+		CallbackHost:      "127.0.0.1",
+		CallbackPort:      0,
+		CallbackPath:      "/oauth2callback",
+		HTTPClient:        tokenServer.Client(),
+		Now:               func() time.Time { return now },
+		Sleep:             func(time.Duration) {},
 	}))
 
-	start := startOAuthSessionFor(t, api, "gemini", "gemini")
+	start := startOAuthSessionFor(t, api, "gemini", "antigravity")
 	completeOAuthCallback(t, start)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/oauth/sessions/"+start.SessionID, nil)
@@ -2072,8 +2090,8 @@ func TestHandleGetOAuthSession_GeminiFlowRequiresExplicitLink(t *testing.T) {
 	}
 
 	got = linkOAuthSessionFor(t, api, start.SessionID, "gemini")
-	if got["provider_name"] != "gemini-sean-example-com-gen-lang-client-123" {
-		t.Fatalf("provider_name = %v, want gemini-sean-example-com-gen-lang-client-123", got["provider_name"])
+	if got["provider_name"] != "antigravity-sean-example-com-gen-lang-client-123" {
+		t.Fatalf("provider_name = %v, want antigravity-sean-example-com-gen-lang-client-123", got["provider_name"])
 	}
 	if got["provider_action"] != "created" {
 		t.Fatalf("provider_action = %v, want created", got["provider_action"])
@@ -2087,13 +2105,13 @@ func TestHandleGetOAuthSession_GeminiFlowRequiresExplicitLink(t *testing.T) {
 		t.Fatalf("providers len = %d, want 1 after link", len(cfg.Gemini.Providers))
 	}
 	provider := cfg.Gemini.Providers[0]
-	if provider.Name != "gemini-sean-example-com-gen-lang-client-123" {
+	if provider.Name != "antigravity-sean-example-com-gen-lang-client-123" {
 		t.Fatalf("provider name = %q", provider.Name)
 	}
 	if got := provider.NormalizedAuthType(); got != config.ProviderAuthTypeOAuth {
 		t.Fatalf("auth_type = %q, want oauth", got)
 	}
-	if got := provider.NormalizedOAuthRef(); got != "gemini-sean-example-com-gen-lang-client-123" {
+	if got := provider.NormalizedOAuthRef(); got != "antigravity-sean-example-com-gen-lang-client-123" {
 		t.Fatalf("oauth_ref = %q", got)
 	}
 }

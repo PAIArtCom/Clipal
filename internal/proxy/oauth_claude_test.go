@@ -451,22 +451,22 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 	}
 	assertClaudeOAuthSDKEnvelopeBody(t, officialReq)
 
-	spoof := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
-	spoof.Header.Set("Content-Type", "application/json")
-	spoof.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-secret)")
-	spoof = withRequestContext(spoof, RequestContext{
+	customEntrypoint := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
+	customEntrypoint.Header.Set("Content-Type", "application/json")
+	customEntrypoint.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-secret)")
+	customEntrypoint = withRequestContext(customEntrypoint, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
 		Capability:     CapabilityClaudeMessages,
 		UpstreamPath:   "/v1/messages",
 		UnifiedIngress: true,
 	})
-	spoofReq, err := cp.createProxyRequest(spoof, cp.providers[0], "", "/v1/messages", body)
+	customEntrypointReq, err := cp.createProxyRequest(customEntrypoint, cp.providers[0], "", "/v1/messages", body)
 	if err != nil {
-		t.Fatalf("createProxyRequest spoof: %v", err)
+		t.Fatalf("createProxyRequest custom entrypoint: %v", err)
 	}
-	if got := spoofReq.Header.Get("User-Agent"); got != claudeOAuthUserAgent {
-		t.Fatalf("spoof User-Agent = %q, want synthesized %q", got, claudeOAuthUserAgent)
+	if got := customEntrypointReq.Header.Get("User-Agent"); got != claudeOAuthUserAgent {
+		t.Fatalf("custom entrypoint User-Agent = %q, want synthesized %q", got, claudeOAuthUserAgent)
 	}
 
 	sdkCLI := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
@@ -1003,7 +1003,7 @@ func TestNormalizeClaudeOAuthRequestRegeneratesOfficialLookingSystemAndPreserves
 		t.Fatalf("system billing header was not signed: %q", systemBlock["text"])
 	}
 	if got := stringValue(systemBlock["text"]); strings.Contains(got, "9.9.9") || strings.Contains(got, "cc_entrypoint=evil") {
-		t.Fatalf("system billing header preserved spoofed client fingerprint: %q", got)
+		t.Fatalf("system billing header preserved client-supplied runtime fingerprint: %q", got)
 	}
 	if got := stringValue(systemBlock["text"]); !strings.Contains(got, "cc_version="+claudeOAuthBillingVersion(root["messages"])+"; cc_entrypoint=sdk-cli;") {
 		t.Fatalf("system billing header = %q, want regenerated current fingerprint", got)

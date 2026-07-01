@@ -78,6 +78,11 @@ func providerSupportsCapability(provider config.Provider, capability RequestCapa
 		return capability == CapabilityGeminiGenerateContent ||
 			capability == CapabilityGeminiStreamGenerate ||
 			capability == CapabilityGeminiCountTokens
+	case config.OAuthProviderAntigravity:
+		return capability == CapabilityGeminiGenerateContent ||
+			capability == CapabilityGeminiStreamGenerate ||
+			capability == CapabilityGeminiCountTokens ||
+			capability == CapabilityGeminiModels
 	default:
 		return false
 	}
@@ -95,6 +100,8 @@ func supportedCapabilitySummary(provider config.Provider) string {
 		return "Claude messages and count_tokens requests"
 	case config.OAuthProviderGemini:
 		return "Gemini generateContent, streamGenerateContent, and countTokens requests"
+	case config.OAuthProviderAntigravity:
+		return "Antigravity model listing, generateContent, streamGenerateContent, and countTokens requests"
 	default:
 		return "its configured request types"
 	}
@@ -115,6 +122,8 @@ func (cp *ClientProxy) createOAuthProxyRequestWithPayloadForProvider(original *h
 		return cp.createClaudeOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
 	case config.OAuthProviderGemini:
 		return cp.createGeminiOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
+	case config.OAuthProviderAntigravity:
+		return cp.createAntigravityOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
 	default:
 		return nil, fmt.Errorf("unsupported oauth provider %q", provider.NormalizedOAuthProvider())
 	}

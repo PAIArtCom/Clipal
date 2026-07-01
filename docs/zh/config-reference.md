@@ -184,7 +184,7 @@ providers:
 | `base_url` | string | 仅 API Key | 上游 API Base URL；OAuth provider 不允许设置 |
 | `api_key` | string | 仅 API Key | 单个 API Key |
 | `api_keys` | array | 仅 API Key | 多个 API Key，按顺序使用 |
-| `oauth_provider` | string | 仅 OAuth | 支持的组合是：`openai.yaml` 用 `codex`，`claude.yaml` 用 `claude`，`gemini.yaml` 用 `gemini` |
+| `oauth_provider` | string | 仅 OAuth | 支持的组合是：`openai.yaml` 用 `codex`，`claude.yaml` 用 `claude`，`gemini.yaml` 用 `antigravity` |
 | `oauth_ref` | string | 仅 OAuth | 指向本地 OAuth 凭据文件的引用 ID |
 | `proxy_mode` | string | 否 | 该 provider 的上游代理模式；`default` 表示使用全局默认代理 |
 | `proxy_url` | string | 否 | 当 `proxy_mode: custom` 时必填；支持 `http://`、`https://`、`socks5://` 和 `socks5h://` 代理 URL |
@@ -198,13 +198,13 @@ providers:
 
 OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provider 使用相同的顺序、置顶、启停与 failover 逻辑。
 
-- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: gemini`
-- 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Gemini OAuth 支持 `generateContent`、`streamGenerateContent`、`countTokens`
+- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: antigravity`。历史 `oauth_provider: gemini` 配置仍可加载以保持兼容，但新的 Gemini CLI OAuth 授权入口不再提供。
+- 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Antigravity OAuth 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens` 和模型列表。
 - Claude OAuth 请求默认使用轻量 Agent SDK 兼容 envelope，并由 Clipal 生成当前传输 header 和 billing fingerprint。
 - Codex OAuth Responses 请求会归一化为轻量 Agent SDK 兼容形态，并由 Clipal 处理必要传输字段。
 - 默认值不会覆盖目标模型支持的客户端显式字段。如果请求中已经带了 `tools`、Claude `thinking` / `context_management` / `output_config`，或 Codex `reasoning` / `tool_choice` / `parallel_tool_calls`，Clipal 会保留这些值；不支持相关能力的 Claude 模型仍可能移除不兼容的 thinking/output 控制。
 - OAuth provider 不允许设置 `base_url`、`api_key`、`api_keys`
-- 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Gemini` 直接发起授权
+- 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Antigravity` 直接发起授权
 - Add Provider 对话框也可以导入已有 OAuth 授权文件：Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。导入时会按当前选择的 OAuth 服务过滤账号。
 - 授权成功后，后端会根据账号身份生成稳定的内部 `name`，UI 里显示邮箱作为可读标签
 - OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
@@ -219,6 +219,8 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 需要让某个 provider 绕过全局默认代理和环境代理时，用 `proxy_mode: direct`
 - 不同上游对同一模型族使用不同模型 ID 时，可为该 provider 配置 `model`
 - 只有在你希望 Clipal 按 provider 覆盖客户端默认思考参数时，才配置 `reasoning_effort` 或 `thinking_budget_tokens`
+- Google AI Studio / Gemini API key provider 使用 `https://generativelanguage.googleapis.com`。Clipal 会透传 Gemini 的 `generateContent`、流式生成、token 计数、embeddings、Imagen/Veo `predict*`、文件、cached contents、tuned models、`interactions`、batches、operations、file search stores、generated files、corpora、auth tokens、agents 和 webhooks，不改写请求体。Gemini Live API WebSocket 代理暂不支持。
+- Vertex Gemini REST provider 使用区域 base URL，例如 `https://us-central1-aiplatform.googleapis.com`。把短期 OAuth / service account access token 放在 `api_key` 或 `api_keys` 里；Clipal 对 Vertex host 会用 `Authorization: Bearer ...` 转发。
 - 常驻后台运行时，建议：
 
 ```yaml

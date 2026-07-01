@@ -623,6 +623,39 @@ func TestCreateProxyRequest_UsesGeminiXGoogAPIKeyStyle(t *testing.T) {
 	}
 }
 
+func TestCreateProxyRequest_UsesBearerForVertexGeminiProvider(t *testing.T) {
+	t.Parallel()
+
+	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+		{Name: "vertex", BaseURL: "https://us-central1-aiplatform.googleapis.com", APIKey: "provider-token", Priority: 1},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+
+	vertexPath := "/v1/projects/proj/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent"
+	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal"+vertexPath, bytes.NewReader([]byte(`{"contents":[]}`)))
+	original.Header.Set("x-goog-api-key", "client-key")
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientGemini,
+		Family:         ProtocolFamilyGemini,
+		Capability:     CapabilityGeminiGenerateContent,
+		UpstreamPath:   vertexPath,
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "provider-token", vertexPath, []byte(`{"contents":[]}`))
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	if got := proxyReq.Header.Get("Authorization"); got != "Bearer provider-token" {
+		t.Fatalf("Authorization: got %q want %q", got, "Bearer provider-token")
+	}
+	if got := proxyReq.Header.Get("x-goog-api-key"); got != "" {
+		t.Fatalf("x-goog-api-key: got %q want empty", got)
+	}
+	if got := proxyReq.URL.String(); got != "https://us-central1-aiplatform.googleapis.com"+vertexPath {
+		t.Fatalf("url: got %q", got)
+	}
+}
+
 func TestApplyProviderAPIKey_UnknownCarrierFallsBackToProtocolDefault(t *testing.T) {
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", nil)
 	original = withRequestContext(original, RequestContext{

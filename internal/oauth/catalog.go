@@ -21,6 +21,11 @@ var providerCatalog = []ProviderDescriptor{
 	{
 		Provider:    config.OAuthProviderGemini,
 		ClientTypes: []string{"gemini"},
+		Available:   false,
+	},
+	{
+		Provider:    config.OAuthProviderAntigravity,
+		ClientTypes: []string{"gemini"},
 		Available:   true,
 	},
 	{
@@ -43,6 +48,18 @@ func SupportedProvidersForClient(clientType string) []ProviderDescriptor {
 }
 
 func ProviderSupportedForClient(provider config.OAuthProvider, clientType string) bool {
+	provider = normalizeProvider(provider)
+	clientType = canonicalCatalogClientType(clientType)
+	for _, descriptor := range providerCatalog {
+		if normalizeProvider(descriptor.Provider) != provider {
+			continue
+		}
+		return descriptor.SupportsClient(clientType)
+	}
+	return false
+}
+
+func ProviderAvailableForClient(provider config.OAuthProvider, clientType string) bool {
 	provider = normalizeProvider(provider)
 	clientType = canonicalCatalogClientType(clientType)
 	for _, descriptor := range providerCatalog {

@@ -10,7 +10,7 @@ Clipal does not route by app name. It routes by request style, and `/clipal` is 
 
 Pick the client base URL that points at `/clipal`. Clipal detects the request family from the upstream path. The older `/claudecode`, `/codex`, and `/gemini` prefixes are still available as compatibility aliases.
 
-One important routing detail: under `/clipal`, generic `/v1/*` resource paths follow OpenAI-compatible routing by default. Gemini-specific routing is kept on `/v1beta/*`, `/upload/*`, and Gemini model RPC paths such as `/v1beta/models/{model}:generateContent`.
+One important routing detail: under `/clipal`, ambiguous generic resource paths such as `/files`, `/batches`, `/v1/files`, and `/v1/batches` follow OpenAI-compatible routing by default. Gemini-specific routing is kept on `/v1beta/*`, `/upload/*`, Gemini model RPC paths such as `/v1beta/models/{model}:generateContent`, Google AI Studio `interactions`, Gemini REST resources such as `operations`, `fileSearchStores`, `generatedFiles`, `corpora`, `authTokens`, `agents`, and `webhooks`, Google-style resource methods such as `/files:register` and `/batches/{batch}:cancel`, and Vertex Gemini `projects/.../publishers/google/models/...` plus `projects/.../locations/.../operations...` paths. Gemini Live API WebSocket proxying is not supported yet.
 
 ## Claude Code
 
@@ -83,7 +83,7 @@ Notes:
 - The Web UI takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>` when possible
 - Project-local `opencode.json` or environment-based overrides may still take precedence
 
-## Gemini CLI
+## Gemini CLI (Legacy)
 
 Edit `~/.gemini/.env`:
 
@@ -93,6 +93,7 @@ GEMINI_API_BASE=http://127.0.0.1:3333/clipal
 
 Notes:
 
+- Google has moved personal Gemini CLI OAuth toward Antigravity; use Antigravity OAuth for new Google personal OAuth providers in Clipal.
 - The Web UI takeover only updates `GEMINI_API_BASE` in the user-level Gemini CLI `.env`
 - Project-local `.env` files or exported environment variables may still take precedence
 - After applying or rolling back from `CLI Takeover`, restart Gemini CLI or open a new session so it reloads the updated environment

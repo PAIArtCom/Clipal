@@ -43,11 +43,22 @@ const (
 	CapabilityGeminiCountTokens        RequestCapability = "gemini_count_tokens"
 	CapabilityGeminiEmbedContent       RequestCapability = "gemini_embed_content"
 	CapabilityGeminiBatchEmbedContents RequestCapability = "gemini_batch_embed_contents"
+	CapabilityGeminiPredict            RequestCapability = "gemini_predict"
+	CapabilityGeminiPredictLongRunning RequestCapability = "gemini_predict_long_running"
 	CapabilityGeminiModels             RequestCapability = "gemini_models"
 	CapabilityGeminiFiles              RequestCapability = "gemini_files"
 	CapabilityGeminiUploadFiles        RequestCapability = "gemini_upload_files"
 	CapabilityGeminiCachedContents     RequestCapability = "gemini_cached_contents"
 	CapabilityGeminiTunedModels        RequestCapability = "gemini_tuned_models"
+	CapabilityGeminiInteractions       RequestCapability = "gemini_interactions"
+	CapabilityGeminiBatches            RequestCapability = "gemini_batches"
+	CapabilityGeminiOperations         RequestCapability = "gemini_operations"
+	CapabilityGeminiFileSearchStores   RequestCapability = "gemini_file_search_stores"
+	CapabilityGeminiGeneratedFiles     RequestCapability = "gemini_generated_files"
+	CapabilityGeminiCorpora            RequestCapability = "gemini_corpora"
+	CapabilityGeminiAuthTokens         RequestCapability = "gemini_auth_tokens"
+	CapabilityGeminiAgents             RequestCapability = "gemini_agents"
+	CapabilityGeminiWebhooks           RequestCapability = "gemini_webhooks"
 )
 
 type RequestContext struct {
@@ -268,8 +279,20 @@ func canonicalizeBareGeminiPath(path string) (string, bool) {
 		isGeminiBareMethodPath(path, ":countTokens"),
 		isGeminiBareMethodPath(path, ":embedContent"),
 		isGeminiBareMethodPath(path, ":batchEmbedContents"),
-		pathMatchesPrefix(path, "/cachedContents"),
-		pathMatchesPrefix(path, "/tunedModels"):
+		isGeminiBareMethodPath(path, ":predict"),
+		isGeminiBareMethodPath(path, ":predictLongRunning"),
+		isGeminiBareResourceMethodPath(path, "/files"),
+		isGeminiBareResourcePath(path, "/interactions"),
+		isGeminiBareResourcePath(path, "/cachedContents"),
+		isGeminiBareResourcePath(path, "/tunedModels"),
+		isGeminiBareResourceMethodPath(path, "/batches"),
+		isGeminiBareResourcePath(path, "/operations"),
+		isGeminiBareResourcePath(path, "/fileSearchStores"),
+		isGeminiBareResourcePath(path, "/generatedFiles"),
+		isGeminiBareResourcePath(path, "/corpora"),
+		isGeminiBareResourcePath(path, "/authTokens"),
+		isGeminiBareResourcePath(path, "/agents"),
+		isGeminiBareResourcePath(path, "/webhooks"):
 		return "/v1beta" + path, true
 	default:
 		return "", false
@@ -278,6 +301,15 @@ func canonicalizeBareGeminiPath(path string) (string, bool) {
 
 func isGeminiBareMethodPath(path string, method string) bool {
 	return isGeminiMethodPathWithPrefix(path, "/models/", method)
+}
+
+func isGeminiBareResourcePath(path string, resource string) bool {
+	return pathMatchesPrefix(path, resource) || strings.HasPrefix(path, resource+":")
+}
+
+func isGeminiBareResourceMethodPath(path string, resource string) bool {
+	return strings.HasPrefix(path, resource+":") ||
+		strings.HasPrefix(path, resource+"/") && strings.Contains(strings.TrimPrefix(path, resource+"/"), ":")
 }
 
 func canonicalizeBareOpenAIPath(path string) (string, bool) {
@@ -384,6 +416,10 @@ func detectGeminiCapability(path string) RequestCapability {
 		return CapabilityGeminiEmbedContent
 	case isGeminiMethodPath(path, ":batchEmbedContents"):
 		return CapabilityGeminiBatchEmbedContents
+	case isGeminiMethodPath(path, ":predict"):
+		return CapabilityGeminiPredict
+	case isGeminiMethodPath(path, ":predictLongRunning"):
+		return CapabilityGeminiPredictLongRunning
 	case isGeminiModelsPath(path):
 		return CapabilityGeminiModels
 	case isGeminiFilesPath(path):
@@ -394,6 +430,24 @@ func detectGeminiCapability(path string) RequestCapability {
 		return CapabilityGeminiCachedContents
 	case isGeminiTunedModelsPath(path):
 		return CapabilityGeminiTunedModels
+	case isGeminiInteractionsPath(path):
+		return CapabilityGeminiInteractions
+	case isGeminiBatchesPath(path):
+		return CapabilityGeminiBatches
+	case isGeminiOperationsPath(path):
+		return CapabilityGeminiOperations
+	case isGeminiFileSearchStoresPath(path):
+		return CapabilityGeminiFileSearchStores
+	case isGeminiGeneratedFilesPath(path):
+		return CapabilityGeminiGeneratedFiles
+	case isGeminiCorporaPath(path):
+		return CapabilityGeminiCorpora
+	case isGeminiAuthTokensPath(path):
+		return CapabilityGeminiAuthTokens
+	case isGeminiAgentsPath(path):
+		return CapabilityGeminiAgents
+	case isGeminiWebhooksPath(path):
+		return CapabilityGeminiWebhooks
 	default:
 		return ""
 	}
@@ -401,7 +455,8 @@ func detectGeminiCapability(path string) RequestCapability {
 
 func isGeminiMethodPath(path string, method string) bool {
 	return isGeminiMethodPathWithPrefix(path, "/v1beta/models/", method) ||
-		isGeminiMethodPathWithPrefix(path, "/v1/models/", method)
+		isGeminiMethodPathWithPrefix(path, "/v1/models/", method) ||
+		isVertexGeminiMethodPath(path, method)
 }
 
 func isGeminiMethodPathWithPrefix(path string, prefix string, method string) bool {
@@ -410,11 +465,13 @@ func isGeminiMethodPathWithPrefix(path string, prefix string, method string) boo
 }
 
 func isGeminiModelsPath(path string) bool {
-	return pathMatchesPrefix(path, "/v1beta/models") || isGeminiV1ModelMetadataPath(path)
+	return pathMatchesPrefix(path, "/v1beta/models") ||
+		isGeminiV1ModelMetadataPath(path) ||
+		isVertexGeminiModelsPath(path)
 }
 
 func isGeminiFilesPath(path string) bool {
-	return pathMatchesPrefix(path, "/v1beta/files")
+	return isGeminiVersionedResourcePath(path, "/v1beta/files")
 }
 
 func isGeminiUploadFilesPath(path string) bool {
@@ -427,6 +484,57 @@ func isGeminiCachedContentsPath(path string) bool {
 
 func isGeminiTunedModelsPath(path string) bool {
 	return pathMatchesPrefix(path, "/v1beta/tunedModels") || pathMatchesPrefix(path, "/v1/tunedModels")
+}
+
+func isGeminiInteractionsPath(path string) bool {
+	return pathMatchesPrefix(path, "/v1beta/interactions") || pathMatchesPrefix(path, "/v1/interactions")
+}
+
+func isGeminiBatchesPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/batches")
+}
+
+func isGeminiOperationsPath(path string) bool {
+	path = normalizeUpstreamPath(path)
+	return pathMatchesPrefix(path, "/v1beta/operations") ||
+		pathMatchesPrefix(path, "/v1/operations") ||
+		strings.HasPrefix(path, "/v1beta/models/") && strings.Contains(path, "/operations/") ||
+		strings.HasPrefix(path, "/v1/models/") && strings.Contains(path, "/operations/") ||
+		isVertexGeminiOperationsPath(path)
+}
+
+func isGeminiFileSearchStoresPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/fileSearchStores") ||
+		isGeminiVersionedResourcePath(path, "/v1/fileSearchStores")
+}
+
+func isGeminiGeneratedFilesPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/generatedFiles") ||
+		isGeminiVersionedResourcePath(path, "/v1/generatedFiles")
+}
+
+func isGeminiCorporaPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/corpora") ||
+		isGeminiVersionedResourcePath(path, "/v1/corpora")
+}
+
+func isGeminiAuthTokensPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/authTokens") ||
+		isGeminiVersionedResourcePath(path, "/v1/authTokens")
+}
+
+func isGeminiAgentsPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/agents") ||
+		isGeminiVersionedResourcePath(path, "/v1/agents")
+}
+
+func isGeminiWebhooksPath(path string) bool {
+	return isGeminiVersionedResourcePath(path, "/v1beta/webhooks") ||
+		isGeminiVersionedResourcePath(path, "/v1/webhooks")
+}
+
+func isGeminiVersionedResourcePath(path string, resource string) bool {
+	return pathMatchesPrefix(path, resource) || strings.HasPrefix(path, resource+":")
 }
 
 func isGeminiV1ModelMetadataPath(path string) bool {
@@ -444,4 +552,36 @@ func isGeminiV1ModelMetadataPath(path string) bool {
 	}
 	modelID = strings.TrimSpace(modelID)
 	return strings.HasPrefix(modelID, "gemini")
+}
+
+func isVertexGeminiMethodPath(path string, method string) bool {
+	path = normalizeUpstreamPath(path)
+	if !strings.HasPrefix(path, "/v1/projects/") && !strings.HasPrefix(path, "/v1beta/projects/") {
+		return false
+	}
+	if !strings.Contains(path, "/publishers/google/models/") {
+		return false
+	}
+	return strings.HasSuffix(path, method) || strings.HasSuffix(path, method+"/")
+}
+
+func isVertexGeminiModelsPath(path string) bool {
+	path = normalizeUpstreamPath(path)
+	if !strings.HasPrefix(path, "/v1/projects/") && !strings.HasPrefix(path, "/v1beta/projects/") {
+		return false
+	}
+	return strings.Contains(path, "/publishers/google/models")
+}
+
+func isVertexGeminiOperationsPath(path string) bool {
+	path = normalizeUpstreamPath(path)
+	if !strings.HasPrefix(path, "/v1/projects/") && !strings.HasPrefix(path, "/v1beta/projects/") {
+		return false
+	}
+	if !strings.Contains(path, "/locations/") {
+		return false
+	}
+	return strings.Contains(path, "/operations/") ||
+		strings.HasSuffix(path, "/operations") ||
+		strings.Contains(path, "/operations:")
 }

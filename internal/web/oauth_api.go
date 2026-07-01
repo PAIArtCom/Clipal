@@ -79,6 +79,10 @@ func (a *API) HandleStartOAuthProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if !oauthpkg.ProviderAvailableForClient(provider, clientType) {
+		writeError(w, fmt.Sprintf("oauth_provider %q is no longer available for new %s authorizations", provider, clientType), http.StatusBadRequest)
+		return
+	}
 	proxySettings, err := oauthProxySettingsFromStartRequest(req)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -717,7 +721,7 @@ func desiredOAuthProviderName(cred *oauthpkg.Credential) string {
 
 	providerPart := slugOAuthProviderNamePart(string(cred.Provider))
 	identityPart := slugOAuthProviderNamePart(cred.Email)
-	if cred.Provider == config.OAuthProviderGemini {
+	if cred.Provider == config.OAuthProviderGemini || cred.Provider == config.OAuthProviderAntigravity {
 		projectPart := slugOAuthProviderNamePart(cred.AccountID)
 		if projectPart == "" {
 			projectPart = slugOAuthProviderNamePart(cred.Metadata["project_id"])

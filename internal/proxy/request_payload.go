@@ -10,12 +10,13 @@ import (
 )
 
 type requestPayload struct {
-	body          []byte
-	rootParsed    bool
-	root          map[string]any
-	overrideCache map[string][]byte
-	codexCache    map[string]codexOAuthPreparedRequest
-	geminiCache   map[string]geminiOAuthPreparedRequest
+	body             []byte
+	rootParsed       bool
+	root             map[string]any
+	overrideCache    map[string][]byte
+	codexCache       map[string]codexOAuthPreparedRequest
+	geminiCache      map[string]geminiOAuthPreparedRequest
+	antigravityCache map[string]antigravityOAuthPreparedRequest
 }
 
 type codexOAuthPreparedRequest struct {
@@ -28,6 +29,12 @@ type codexOAuthPreparedRequest struct {
 type geminiOAuthPreparedRequest struct {
 	targetPath string
 	modelName  string
+	body       []byte
+	err        error
+}
+
+type antigravityOAuthPreparedRequest struct {
+	targetPath string
 	body       []byte
 	err        error
 }
@@ -175,6 +182,39 @@ func (p *requestPayload) geminiOAuthRequest(original *http.Request, requestCtx R
 		err:        err,
 	}
 	return targetPath, modelName, requestBody, err
+}
+
+func (p *requestPayload) antigravityOAuthRequest(original *http.Request, requestCtx RequestContext, provider config.Provider, path string, projectID string) (string, []byte, error) {
+	if p == nil {
+		return buildAntigravityOAuthRequest(requestCtx.Capability, path, nil, projectID)
+	}
+	key := strings.Join([]string{
+		"antigravity",
+		string(requestCtx.Capability),
+		normalizeUpstreamPath(path),
+		strings.TrimSpace(projectID),
+		providerOverrideCacheKey(requestCtx, provider),
+	}, "\x00")
+	if p.antigravityCache != nil {
+		if cached, ok := p.antigravityCache[key]; ok {
+			return cached.targetPath, cached.body, cached.err
+		}
+	}
+
+	body := p.providerBody(original, requestCtx, provider)
+	targetPath, requestBody, err := buildAntigravityOAuthRequest(requestCtx.Capability, path, body, projectID)
+	if root, ok := p.providerRoot(original, requestCtx, provider); ok {
+		targetPath, requestBody, err = buildAntigravityOAuthRequestFromRoot(requestCtx.Capability, path, root, projectID)
+	}
+	if p.antigravityCache == nil {
+		p.antigravityCache = make(map[string]antigravityOAuthPreparedRequest)
+	}
+	p.antigravityCache[key] = antigravityOAuthPreparedRequest{
+		targetPath: targetPath,
+		body:       requestBody,
+		err:        err,
+	}
+	return targetPath, requestBody, err
 }
 
 func providerOverrideCacheKey(requestCtx RequestContext, provider config.Provider) string {

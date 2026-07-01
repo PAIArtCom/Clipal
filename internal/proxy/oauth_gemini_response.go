@@ -27,13 +27,19 @@ func prepareOAuthProviderResponse(original *http.Request, provider config.Provid
 
 	switch provider.NormalizedOAuthProvider() {
 	case config.OAuthProviderGemini:
-		return prepareGeminiOAuthResponse(original, resp)
+		return prepareGeminiOAuthResponseForProvider(original, resp)
+	case config.OAuthProviderAntigravity:
+		return prepareAntigravityOAuthResponse(original, resp)
 	default:
 		return resp, nil
 	}
 }
 
 func prepareGeminiOAuthResponse(original *http.Request, resp *http.Response) (*http.Response, error) {
+	return prepareGeminiOAuthResponseForProvider(original, resp)
+}
+
+func prepareGeminiOAuthResponseForProvider(original *http.Request, resp *http.Response) (*http.Response, error) {
 	requestCtx, ok := requestContextFromRequest(original)
 	if !ok {
 		return resp, nil

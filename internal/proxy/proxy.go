@@ -425,6 +425,13 @@ func oauthProviderEnvironmentProxyProbeURLs(provider config.OAuthProvider) []str
 			"https://www.googleapis.com/oauth2/v1/userinfo",
 			"https://cloudcode-pa.googleapis.com",
 		}
+	case config.OAuthProviderAntigravity:
+		return []string{
+			"https://oauth2.googleapis.com/token",
+			"https://www.googleapis.com/oauth2/v1/userinfo",
+			"https://cloudcode-pa.googleapis.com",
+			"https://daily-cloudcode-pa.googleapis.com",
+		}
 	default:
 		return nil
 	}
@@ -1305,7 +1312,7 @@ func (cp *ClientProxy) createProxyRequestWithPayloadForProvider(original *http.R
 	addForwardedHeaders(proxyReq, original)
 
 	if apiKey != "" {
-		applyProviderAPIKey(proxyReq, original, apiKey)
+		applyProviderAPIKeyForProvider(proxyReq, original, provider, apiKey)
 	}
 
 	// Set content length
@@ -1313,6 +1320,18 @@ func (cp *ClientProxy) createProxyRequestWithPayloadForProvider(original *http.R
 	proxyReq.Header.Del("Content-Length")
 
 	return proxyReq, nil
+}
+
+func applyProviderAPIKeyForProvider(proxyReq *http.Request, original *http.Request, provider config.Provider, apiKey string) {
+	if proxyReq == nil || original == nil || strings.TrimSpace(apiKey) == "" {
+		return
+	}
+	if providerDefaultsToBearerAuth(provider) {
+		clearAuthCarriers(proxyReq)
+		proxyReq.Header.Set("Authorization", "Bearer "+apiKey)
+		return
+	}
+	applyProviderAPIKey(proxyReq, original, apiKey)
 }
 
 func applyProviderAPIKey(proxyReq *http.Request, original *http.Request, apiKey string) {
@@ -1340,6 +1359,20 @@ func applyProviderAPIKey(proxyReq *http.Request, original *http.Request, apiKey 
 		// fall back to the protocol family's default auth style.
 		applyDefaultProviderAPIKey(proxyReq, original, apiKey)
 	}
+}
+
+func providerDefaultsToBearerAuth(provider config.Provider) bool {
+	baseURL := strings.TrimSpace(provider.BaseURL)
+	if baseURL == "" {
+		return false
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	return host == "aiplatform.googleapis.com" ||
+		strings.HasSuffix(host, "-aiplatform.googleapis.com")
 }
 
 func detectAuthCarrierForRequest(original *http.Request) authCarrier {

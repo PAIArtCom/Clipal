@@ -1218,7 +1218,7 @@ func TestCreateProxyRequest_CodexOAuthOfficialLookingReadyBodyStillNormalizes(t 
 	}
 }
 
-func TestCreateProxyRequest_CodexOAuthSpoofedOfficialUserAgentStillNormalizes(t *testing.T) {
+func TestCreateProxyRequest_CodexOAuthOfficialLookingUserAgentStillNormalizes(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
@@ -1276,7 +1276,7 @@ func TestCreateProxyRequest_CodexOAuthSpoofedOfficialUserAgentStillNormalizes(t 
 	}
 	userMessage, _ := input[0].(map[string]any)
 	if _, ok := userMessage["type"]; ok {
-		t.Fatalf("input[0] preserved message type for spoofed client: %#v", userMessage)
+		t.Fatalf("input[0] preserved message type for official-looking client: %#v", userMessage)
 	}
 	if _, ok := root["tools"].([]any); !ok {
 		t.Fatalf("tools = %#v, want normalized tools", root["tools"])

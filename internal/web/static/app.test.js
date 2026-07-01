@@ -406,15 +406,15 @@ test('loadOAuthProviders switches to the available oauth source for current clie
     state.providerForm.oauth_provider = 'codex';
     state.apiCall = async url => {
         calls.push(url);
-        return [{ provider: 'gemini' }];
+        return [{ provider: 'antigravity' }];
     };
 
     await state.loadOAuthProviders(true);
 
     assert.deepEqual(calls, ['/api/oauth/providers?client_type=gemini']);
-    assert.deepEqual(JSON.parse(JSON.stringify(state.oauthProviders)), [{ provider: 'gemini' }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(state.oauthProviders)), [{ provider: 'antigravity' }]);
     assert.equal(state.providerForm.auth_type, 'oauth');
-    assert.equal(state.providerForm.oauth_provider, 'gemini');
+    assert.equal(state.providerForm.oauth_provider, 'antigravity');
 });
 
 test('oauthImportFileHint names supported credential file types for the selected oauth provider', () => {
@@ -1445,7 +1445,7 @@ test('submitPendingOAuthAuthorizationCode posts pasted input and completes the O
         localStorageData: {
             'clipal.pendingOAuthSession': JSON.stringify({
                 session_id: 'sess-manual',
-                provider: 'gemini',
+                provider: 'antigravity',
                 client_type: 'gemini',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',
@@ -1462,7 +1462,7 @@ test('submitPendingOAuthAuthorizationCode posts pasted input and completes the O
     state.providerForm = {
         ...state.providerForm,
         auth_type: 'oauth',
-        oauth_provider: 'gemini'
+        oauth_provider: 'antigravity'
     };
     state.applyOAuthAuthorizationState(state.loadPendingOAuthSession(), {
         phase: 'waiting'
@@ -1472,8 +1472,8 @@ test('submitPendingOAuthAuthorizationCode posts pasted input and completes the O
         calls.push({ url, payload: JSON.parse(options.body) });
         return {
             status: 'completed',
-            provider: 'gemini',
-            provider_name: 'gemini-sean-example-com',
+            provider: 'antigravity',
+            provider_name: 'antigravity-sean-example-com',
             display_name: 'sean@example.com'
         };
     };
@@ -1509,7 +1509,7 @@ test('submitPendingOAuthAuthorizationCode keeps OAuth session active on invalid 
         localStorageData: {
             'clipal.pendingOAuthSession': JSON.stringify({
                 session_id: 'sess-manual-error',
-                provider: 'gemini',
+                provider: 'antigravity',
                 client_type: 'gemini',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',
@@ -1522,7 +1522,7 @@ test('submitPendingOAuthAuthorizationCode keeps OAuth session active on invalid 
     state.providerForm = {
         ...state.providerForm,
         auth_type: 'oauth',
-        oauth_provider: 'gemini'
+        oauth_provider: 'antigravity'
     };
     state.applyOAuthAuthorizationState(state.loadPendingOAuthSession(), {
         phase: 'waiting'
@@ -1551,7 +1551,7 @@ test('submitPendingOAuthAuthorizationCode keeps OAuth session active on invalid 
         {
             pending: {
                 session_id: 'sess-manual-error',
-                provider: 'gemini',
+                provider: 'antigravity',
                 client_type: 'gemini',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',

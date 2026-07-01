@@ -315,6 +315,86 @@ func TestClipalBareGeminiModelMetadataPathUsesGeminiPool(t *testing.T) {
 	}
 }
 
+func TestClipalGeminiInteractionsPathUsesGeminiPool(t *testing.T) {
+	t.Parallel()
+
+	router := newUnifiedIngressTestRouter()
+
+	var geminiCalls int32
+	installPathAssertingTransport(router.proxies[ClientGemini], "gemini", "/v1beta/interactions", "gemini-ok", &geminiCalls)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/interactions", bytes.NewReader([]byte(`{"input":[]}`)))
+	router.handleRequest(rr, req)
+
+	if rr.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+	}
+	if got := rr.Body.String(); got != "gemini-ok" {
+		t.Fatalf("body: got %q want %q", got, "gemini-ok")
+	}
+	if got := atomic.LoadInt32(&geminiCalls); got != 1 {
+		t.Fatalf("gemini calls: got %d want 1", got)
+	}
+}
+
+func TestClipalVertexGeminiPathUsesGeminiPool(t *testing.T) {
+	t.Parallel()
+
+	router := newUnifiedIngressTestRouter()
+
+	vertexPath := "/v1/projects/proj/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent"
+	var geminiCalls int32
+	installPathAssertingTransport(router.proxies[ClientGemini], "gemini", vertexPath, "gemini-ok", &geminiCalls)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal"+vertexPath, bytes.NewReader([]byte(`{"contents":[]}`)))
+	router.handleRequest(rr, req)
+
+	if rr.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+	}
+	if got := rr.Body.String(); got != "gemini-ok" {
+		t.Fatalf("body: got %q want %q", got, "gemini-ok")
+	}
+	if got := atomic.LoadInt32(&geminiCalls); got != 1 {
+		t.Fatalf("gemini calls: got %d want 1", got)
+	}
+}
+
+func TestClipalBareGeminiPredictLongRunningPathUsesGeminiPool(t *testing.T) {
+	t.Parallel()
+
+	router := newUnifiedIngressTestRouter()
+
+	var geminiCalls int32
+	installPathAssertingTransport(
+		router.proxies[ClientGemini],
+		"gemini",
+		"/v1beta/models/veo-3.1-lite-generate-preview:predictLongRunning",
+		"gemini-ok",
+		&geminiCalls,
+	)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"http://proxy/clipal/models/veo-3.1-lite-generate-preview:predictLongRunning",
+		bytes.NewReader([]byte(`{"instances":[]}`)),
+	)
+	router.handleRequest(rr, req)
+
+	if rr.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+	}
+	if got := rr.Body.String(); got != "gemini-ok" {
+		t.Fatalf("body: got %q want %q", got, "gemini-ok")
+	}
+	if got := atomic.LoadInt32(&geminiCalls); got != 1 {
+		t.Fatalf("gemini calls: got %d want 1", got)
+	}
+}
+
 func TestClipalResponsesRequestRecordsCapabilityInRuntime(t *testing.T) {
 	t.Parallel()
 
@@ -898,6 +978,162 @@ func TestClipalGeminiTunedModelsRequestUsesGeminiPool(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&geminiCalls); got != 1 {
 		t.Fatalf("gemini calls: got %d want 1", got)
+	}
+}
+
+func TestClipalGeminiPlatformRESTPathsUseGeminiPool(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		method   string
+		urlPath  string
+		wantPath string
+	}{
+		{
+			name:     "files register bare collection method",
+			method:   http.MethodPost,
+			urlPath:  "/clipal/files:register",
+			wantPath: "/v1beta/files:register",
+		},
+		{
+			name:     "batches bare resource method",
+			method:   http.MethodPost,
+			urlPath:  "/clipal/batches/batch-1:cancel",
+			wantPath: "/v1beta/batches/batch-1:cancel",
+		},
+		{
+			name:     "batch cancel",
+			method:   http.MethodPost,
+			urlPath:  "/clipal/v1beta/batches/batch-1:cancel",
+			wantPath: "/v1beta/batches/batch-1:cancel",
+		},
+		{
+			name:     "operations bare",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/operations/op-1",
+			wantPath: "/v1beta/operations/op-1",
+		},
+		{
+			name:     "model scoped operation",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/v1beta/models/veo-3.1-lite-generate-preview/operations/op-1",
+			wantPath: "/v1beta/models/veo-3.1-lite-generate-preview/operations/op-1",
+		},
+		{
+			name:     "vertex operation item",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/v1/projects/proj/locations/us-central1/operations/op-1",
+			wantPath: "/v1/projects/proj/locations/us-central1/operations/op-1",
+		},
+		{
+			name:     "vertex operations collection",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/v1/projects/proj/locations/us-central1/operations",
+			wantPath: "/v1/projects/proj/locations/us-central1/operations",
+		},
+		{
+			name:     "file search stores bare",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/fileSearchStores/store-1/documents/doc-1",
+			wantPath: "/v1beta/fileSearchStores/store-1/documents/doc-1",
+		},
+		{
+			name:     "generated files bare",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/generatedFiles/file-1",
+			wantPath: "/v1beta/generatedFiles/file-1",
+		},
+		{
+			name:     "corpora bare",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/corpora/corpus-1/documents/doc-1",
+			wantPath: "/v1beta/corpora/corpus-1/documents/doc-1",
+		},
+		{
+			name:     "auth tokens bare",
+			method:   http.MethodPost,
+			urlPath:  "/clipal/authTokens",
+			wantPath: "/v1beta/authTokens",
+		},
+		{
+			name:     "agents bare",
+			method:   http.MethodGet,
+			urlPath:  "/clipal/agents/agent-1",
+			wantPath: "/v1beta/agents/agent-1",
+		},
+		{
+			name:     "webhooks bare",
+			method:   http.MethodPost,
+			urlPath:  "/clipal/webhooks/hook-1",
+			wantPath: "/v1beta/webhooks/hook-1",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newUnifiedIngressTestRouter()
+			var geminiCalls int32
+			installPathAssertingTransport(router.proxies[ClientGemini], "gemini", tt.wantPath, "gemini-ok", &geminiCalls)
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(tt.method, "http://proxy"+tt.urlPath, bytes.NewReader([]byte(`{"x":1}`)))
+			router.handleRequest(rr, req)
+
+			if rr.Result().StatusCode != http.StatusOK {
+				t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+			}
+			if got := rr.Body.String(); got != "gemini-ok" {
+				t.Fatalf("body: got %q want %q", got, "gemini-ok")
+			}
+			if got := atomic.LoadInt32(&geminiCalls); got != 1 {
+				t.Fatalf("gemini calls: got %d want 1", got)
+			}
+		})
+	}
+}
+
+func TestClipalAmbiguousOpenAIV1PathsStayOpenAICompatible(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "bare files collection", path: "/clipal/files"},
+		{name: "bare files item", path: "/clipal/files/file-1"},
+		{name: "bare batches collection", path: "/clipal/batches"},
+		{name: "bare batches item", path: "/clipal/batches/batch-1"},
+		{name: "versioned files", path: "/clipal/v1/files"},
+		{name: "versioned batches", path: "/clipal/v1/batches"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newUnifiedIngressTestRouter()
+			var codexCalls int32
+			installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "http://proxy"+tt.path, nil)
+			router.handleRequest(rr, req)
+
+			if rr.Result().StatusCode != http.StatusOK {
+				t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+			}
+			if got := rr.Body.String(); got != "codex-ok" {
+				t.Fatalf("body: got %q want %q", got, "codex-ok")
+			}
+			if got := atomic.LoadInt32(&codexCalls); got != 1 {
+				t.Fatalf("codex calls: got %d want 1", got)
+			}
+		})
 	}
 }
 

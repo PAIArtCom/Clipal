@@ -32,6 +32,7 @@ type Service struct {
 	codex                *CodexClient
 	claude               *ClaudeClient
 	gemini               *GeminiClient
+	antigravity          *AntigravityClient
 	clients              map[config.OAuthProvider]ProviderClient
 	now                  func() time.Time
 	sessionTTL           time.Duration
@@ -70,6 +71,7 @@ func NewService(configDir string, opts ...Option) *Service {
 		codex:                NewCodexClient(),
 		claude:               NewClaudeClient(),
 		gemini:               NewGeminiClient(),
+		antigravity:          NewAntigravityClient(),
 		clients:              make(map[config.OAuthProvider]ProviderClient),
 		now:                  time.Now,
 		sessionTTL:           5 * time.Minute,
@@ -85,6 +87,7 @@ func NewService(configDir string, opts ...Option) *Service {
 	svc.registerProviderClient(svc.codex)
 	svc.registerProviderClient(svc.claude)
 	svc.registerProviderClient(svc.gemini)
+	svc.registerProviderClient(svc.antigravity)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(svc)
@@ -123,6 +126,15 @@ func WithGeminiClient(client *GeminiClient) Option {
 	return func(s *Service) {
 		if client != nil {
 			s.gemini = client
+			s.registerProviderClient(client)
+		}
+	}
+}
+
+func WithAntigravityClient(client *AntigravityClient) Option {
+	return func(s *Service) {
+		if client != nil {
+			s.antigravity = client
 			s.registerProviderClient(client)
 		}
 	}
@@ -1129,6 +1141,8 @@ func providerDisplayName(provider config.OAuthProvider) string {
 		return "Claude Code"
 	case config.OAuthProviderGemini:
 		return "Gemini"
+	case config.OAuthProviderAntigravity:
+		return "Antigravity"
 	default:
 		value := strings.TrimSpace(string(provider))
 		if value == "" {
