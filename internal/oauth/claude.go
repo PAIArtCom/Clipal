@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultClaudeAuthURL      = "https://platform.claude.com/oauth/authorize"
+	defaultClaudeAuthURL      = "https://claude.com/cai/oauth/authorize"
 	defaultClaudeTokenURL     = "https://platform.claude.com/v1/oauth/token"
 	defaultClaudeUsageURL     = "https://api.anthropic.com/api/oauth/usage"
 	defaultClaudeClientID     = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"

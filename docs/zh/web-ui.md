@@ -64,7 +64,7 @@ http://127.0.0.1:3333/
 说明：
 
 - 当前阶段只修改用户级配置
-- `Claude Code` 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`，必要时也会把 `~/.claude.json` 的 onboarding 标记补成完成；`ANTHROPIC_AUTH_TOKEN` 不会被覆盖
+- `Claude Code` 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`，只有缺少 Claude 客户端认证环境变量时才补占位 `ANTHROPIC_API_KEY`，必要时也会把 `~/.claude.json` 的 onboarding 标记补成完成；已有 `ANTHROPIC_API_KEY` 和 `ANTHROPIC_AUTH_TOKEN` 不会被覆盖
 - `OpenCode` 的一键接管会新增或更新 `provider.clipal`，并把当前 `model` 改写为 `clipal/<当前模型ID>`
 - `Gemini CLI` 的一键接管只会更新 `~/.gemini/.env` 里的 `GEMINI_API_BASE`
 - `Continue` 的一键接管会新增或更新用户级 `Clipal` 模型项

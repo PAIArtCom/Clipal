@@ -13,7 +13,7 @@ import (
 
 func TestClaudeGenerateAuthURL(t *testing.T) {
 	client := &ClaudeClient{
-		AuthURL:  "https://platform.claude.com/oauth/authorize",
+		AuthURL:  "https://claude.com/cai/oauth/authorize",
 		ClientID: "test-client",
 		Scope:    "scope-a scope-b",
 	}
@@ -31,7 +31,7 @@ func TestClaudeGenerateAuthURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("url.Parse: %v", err)
 	}
-	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != "https://platform.claude.com/oauth/authorize" {
+	if got := parsed.Scheme + "://" + parsed.Host + parsed.Path; got != "https://claude.com/cai/oauth/authorize" {
 		t.Fatalf("auth url = %q", got)
 	}
 

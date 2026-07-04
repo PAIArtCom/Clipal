@@ -19,7 +19,8 @@ Edit `~/.claude/settings.json`:
 ```json
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "http://127.0.0.1:3333/clipal"
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:3333/clipal",
+    "ANTHROPIC_API_KEY": "clipal"
   }
 }
 ```
@@ -27,8 +28,9 @@ Edit `~/.claude/settings.json`:
 Notes:
 
 - The Web UI takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`
+- If neither `ANTHROPIC_API_KEY` nor `ANTHROPIC_AUTH_TOKEN` exists, it inserts the placeholder `ANTHROPIC_API_KEY = clipal` so Claude Code can start without a separate Claude login
 - It may also set `hasCompletedOnboarding = true` in `~/.claude.json` so Claude Code honors the user-level override
-- Your existing `ANTHROPIC_AUTH_TOKEN` is left untouched
+- Your existing `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` values are left untouched
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
 
 ## Codex CLI

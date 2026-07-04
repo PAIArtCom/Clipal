@@ -327,7 +327,7 @@ func TestCompleteLoginWithCode_ClaudeRequiresStateInManualInput(t *testing.T) {
 	svc.sessions["session-claude"] = &LoginSession{
 		ID:          "session-claude",
 		Provider:    config.OAuthProviderClaude,
-		AuthURL:     "https://platform.claude.com/oauth/authorize?state=session-claude",
+		AuthURL:     "https://claude.com/cai/oauth/authorize?state=session-claude",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
 		pkce:        PKCECodes{CodeVerifier: "verifier", CodeChallenge: "challenge"},
@@ -1013,7 +1013,7 @@ func TestStartLogin_UsesRegisteredProviderClient(t *testing.T) {
 		startSession: &LoginSession{
 			ID:        "session-123",
 			Provider:  config.OAuthProviderClaude,
-			AuthURL:   "https://platform.claude.com/oauth/authorize?state=session-123",
+			AuthURL:   "https://claude.com/cai/oauth/authorize?state=session-123",
 			Status:    LoginStatusPending,
 			ExpiresAt: now.Add(5 * time.Minute),
 		},

@@ -64,7 +64,7 @@ If you changed the port, replace `3333` with your actual port.
 Notes:
 
 - This feature currently edits user-level config only
-- `Claude Code` takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, may also mark `~/.claude.json` onboarding as complete, and does not overwrite `ANTHROPIC_AUTH_TOKEN`
+- `Claude Code` takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, inserts a placeholder `ANTHROPIC_API_KEY` only when no Claude client auth env is present, may also mark `~/.claude.json` onboarding as complete, and does not overwrite existing `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`
 - `OpenCode` takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>`
 - `Gemini CLI` takeover only updates `GEMINI_API_BASE` in `~/.gemini/.env`
 - `Continue` takeover adds or updates a user-level `Clipal` model entry

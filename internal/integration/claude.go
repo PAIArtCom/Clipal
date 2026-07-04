@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/lansespirit/Clipal/internal/config"
 )
@@ -12,6 +13,7 @@ import (
 const (
 	claudeHomeConfigBackupMetaName = "claude-home-config-metadata.json"
 	claudeHomeConfigBackupBodyName = "claude-home-config-original.bin"
+	claudeClipalAPIKey             = "clipal"
 )
 
 type claudeHomeConfigBackup struct {
@@ -58,7 +60,7 @@ func (m Manager) claudeStatus(cfg *config.Config) (Status, error) {
 	}
 
 	env, _ := body["env"].(map[string]any)
-	if env["ANTHROPIC_BASE_URL"] == m.advertisedBaseURL(cfg) {
+	if claudeEnvValue(env, "ANTHROPIC_BASE_URL") == m.advertisedBaseURL(cfg) && claudeEnvHasClientAuth(env) {
 		status.State = StateConfigured
 	}
 	return status, nil
@@ -87,6 +89,9 @@ func (m Manager) previewClaude(cfg *config.Config) (Preview, error) {
 		env = map[string]any{}
 	}
 	env["ANTHROPIC_BASE_URL"] = m.advertisedBaseURL(cfg)
+	if !claudeEnvHasClientAuth(env) {
+		env["ANTHROPIC_API_KEY"] = claudeClipalAPIKey
+	}
 	body["env"] = env
 
 	plannedBytes, err := marshalJSONMap(body)
@@ -99,6 +104,19 @@ func (m Manager) previewClaude(cfg *config.Config) (Preview, error) {
 		CurrentContent: current,
 		PlannedContent: string(plannedBytes),
 	}, nil
+}
+
+func claudeEnvHasClientAuth(env map[string]any) bool {
+	return claudeEnvValue(env, "ANTHROPIC_API_KEY") != "" ||
+		claudeEnvValue(env, "ANTHROPIC_AUTH_TOKEN") != ""
+}
+
+func claudeEnvValue(env map[string]any, key string) string {
+	if env == nil {
+		return ""
+	}
+	value, _ := env[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func (m Manager) applyClaude(cfg *config.Config) (Result, error) {

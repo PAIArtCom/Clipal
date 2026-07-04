@@ -28,7 +28,32 @@ func TestClaudeStatus_NotConfiguredWhenFileMissing(t *testing.T) {
 	}
 }
 
-func TestClaudeStatus_ConfiguredWithoutClaudeHomeConfig(t *testing.T) {
+func TestClaudeStatus_ConfiguredWithPlaceholderAPIKey(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	claudeDir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	targetPath := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(targetPath, []byte(`{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:3333/clipal","ANTHROPIC_API_KEY":"clipal"}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+
+	status, err := m.Status(ProductClaudeCode, cfg)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if status.State != StateConfigured {
+		t.Fatalf("state = %q", status.State)
+	}
+}
+
+func TestClaudeStatus_NotConfiguredWhenClientAuthMissing(t *testing.T) {
 	t.Parallel()
 
 	home := t.TempDir()
@@ -48,7 +73,7 @@ func TestClaudeStatus_ConfiguredWithoutClaudeHomeConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if status.State != StateConfigured {
+	if status.State != StateNotConfigured {
 		t.Fatalf("state = %q", status.State)
 	}
 }
@@ -98,6 +123,9 @@ func TestClaudeApply_CreatesAndMergesUserSettings(t *testing.T) {
 	}
 	if env["ANTHROPIC_BASE_URL"] != "http://127.0.0.1:4444/clipal" {
 		t.Fatalf("ANTHROPIC_BASE_URL = %v", env["ANTHROPIC_BASE_URL"])
+	}
+	if env["ANTHROPIC_API_KEY"] != "clipal" {
+		t.Fatalf("ANTHROPIC_API_KEY = %v", env["ANTHROPIC_API_KEY"])
 	}
 	if _, exists := env["ANTHROPIC_AUTH_TOKEN"]; exists {
 		t.Fatalf("ANTHROPIC_AUTH_TOKEN should not be inserted: %v", env["ANTHROPIC_AUTH_TOKEN"])
@@ -154,6 +182,9 @@ func TestClaudeApply_PreservesExistingAuthToken(t *testing.T) {
 	}
 	if env["ANTHROPIC_AUTH_TOKEN"] != "user-token" {
 		t.Fatalf("ANTHROPIC_AUTH_TOKEN = %v", env["ANTHROPIC_AUTH_TOKEN"])
+	}
+	if _, exists := env["ANTHROPIC_API_KEY"]; exists {
+		t.Fatalf("ANTHROPIC_API_KEY should not be inserted when auth token exists: %v", env["ANTHROPIC_API_KEY"])
 	}
 }
 
