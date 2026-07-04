@@ -64,7 +64,7 @@ OAuth 上游说明：
 
 - `OAuth -> Codex` 支持 OpenAI `Responses` 请求
 - `OAuth -> Claude` 支持 Claude `messages` 和 `count_tokens`
-- `OAuth -> Antigravity` 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens` 和模型列表
+- `OAuth -> Antigravity` 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens`、模型列表，以及通过 `generateContent` 调用 Gemini 图片模型。Imagen/Veo `predict*` 端点请使用 Google AI Studio API key 或 Vertex provider。
 - Claude 和 Codex OAuth 对普通客户端默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
 - 客户端显式传入的控制字段在目标模型支持时优先于默认值：例如 `tools`、Claude `thinking` / `context_management` / `output_config`，以及 Codex `reasoning` / `tool_choice` / `parallel_tool_calls` 都会被保留。
 - OAuth 凭据保存在 YAML 之外的 `~/.clipal/oauth/`

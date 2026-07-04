@@ -64,7 +64,7 @@ OAuth upstream notes:
 
 - `OAuth -> Codex` supports OpenAI `Responses` requests
 - `OAuth -> Claude` supports Claude `messages` and `count_tokens`
-- `OAuth -> Antigravity` supports Gemini-compatible `generateContent`, `streamGenerateContent`, `countTokens`, and model listing
+- `OAuth -> Antigravity` supports Gemini-compatible `generateContent`, `streamGenerateContent`, `countTokens`, model listing, and Gemini image models through `generateContent`. Imagen/Veo `predict*` endpoints use Google AI Studio API-key or Vertex providers instead.
 - For Claude and Codex OAuth, ordinary clients use an Agent SDK-compatible upstream envelope by default, with required transport fields handled by Clipal.
 - Client-supplied control fields win over defaults when supported by the target model: explicit `tools`, Claude `thinking` / `context_management` / `output_config`, and Codex `reasoning` / `tool_choice` / `parallel_tool_calls` are preserved.
 - OAuth credentials are stored locally outside YAML under `~/.clipal/oauth/`
