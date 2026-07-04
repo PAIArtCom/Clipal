@@ -434,7 +434,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	official := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	official.Header.Set("Content-Type", "application/json")
-	official.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-ts, agent-sdk/0.3.185)")
+	official.Header.Set("User-Agent", fmt.Sprintf("claude-cli/%s (external, sdk-ts, agent-sdk/0.3.185)", claudeOAuthAppVersion))
 	official = withRequestContext(official, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -453,7 +453,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	customEntrypoint := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	customEntrypoint.Header.Set("Content-Type", "application/json")
-	customEntrypoint.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-secret)")
+	customEntrypoint.Header.Set("User-Agent", fmt.Sprintf("claude-cli/%s (external, sdk-secret)", claudeOAuthAppVersion))
 	customEntrypoint = withRequestContext(customEntrypoint, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -471,7 +471,7 @@ func TestCreateProxyRequest_ClaudeOAuthSDKHeadersAndStreamingHelper(t *testing.T
 
 	sdkCLI := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	sdkCLI.Header.Set("Content-Type", "application/json")
-	sdkCLI.Header.Set("User-Agent", "claude-cli/2.1.196 (external, sdk-cli)")
+	sdkCLI.Header.Set("User-Agent", claudeOAuthUserAgent)
 	sdkCLI = withRequestContext(sdkCLI, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -550,7 +550,7 @@ func TestCreateProxyRequest_ClaudeOAuthPreservesStringSystemInSDKEnvelope(t *tes
 	body := []byte(`{"model":"claude-sonnet-4-5","system":"Keep it short.","messages":[]}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
-	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
+	original.Header.Set("User-Agent", fmt.Sprintf("claude-code/%s (external, cli)", claudeOAuthAppVersion))
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientClaude,
 		Family:         ProtocolFamilyClaude,
@@ -721,7 +721,7 @@ func TestNormalizeClaudeOAuthRequestSynthesizesAgentSDKEnvelopeForOfficialLookin
 	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}],"temperature":0.2}`)
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
-	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
+	original.Header.Set("User-Agent", fmt.Sprintf("claude-code/%s (external, cli)", claudeOAuthAppVersion))
 	requestCtx := RequestContext{
 		ClientType:   ClientClaude,
 		Family:       ProtocolFamilyClaude,
@@ -975,7 +975,7 @@ func TestNormalizeClaudeOAuthRequestRegeneratesOfficialLookingSystemAndPreserves
 	}
 	proxyReq := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", nil)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/v1/messages", bytes.NewReader(body))
-	original.Header.Set("User-Agent", "claude-code/2.1.196 (external, cli)")
+	original.Header.Set("User-Agent", fmt.Sprintf("claude-code/%s (external, cli)", claudeOAuthAppVersion))
 	rewritten := normalizeClaudeOAuthRequest(body, proxyReq, original, RequestContext{Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages})
 
 	var root map[string]any
@@ -1049,8 +1049,8 @@ func TestClaudeOAuthBillingVersionUsesOfficialMessageFingerprint(t *testing.T) {
 			"content": []any{map[string]any{"type": "text", "text": "hello"}},
 		},
 	}
-	if got := claudeOAuthBillingVersion(messages); got != "2.1.196.68b" {
-		t.Fatalf("billing version = %q, want 2.1.196.68b", got)
+	if got := claudeOAuthBillingVersion(messages); got != claudeOAuthBillingVersionForText("hello") {
+		t.Fatalf("billing version = %q, want %q", got, claudeOAuthBillingVersionForText("hello"))
 	}
 }
 

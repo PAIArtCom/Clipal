@@ -64,7 +64,7 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	if strings.TrimSpace(derivedContentType) != "" {
 		upstreamResp.Header.Set("Content-Type", derivedContentType)
 	}
-	tracker := newProtocolTrackerWithContentType(cp.clientType, originalReq, derivedContentType)
+	tracker := newProtocolTracker(cp.clientType, originalReq, upstreamResp)
 	var capture bytes.Buffer
 	shouldCapture := !isEventStreamContentType(derivedContentType)
 	usageExtractor := usageExtractorFromRequestWithContentType(originalReq, derivedContentType)

@@ -11,34 +11,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"unicode/utf16"
 )
 
 const (
-	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.196"
-	claudeOAuthDefaultEntrypoint       = "sdk-cli"
-	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
-	claudeOAuthClientApp               = "claude-code"
-	claudeOAuthAppName                 = "claude-code"
-	claudeOAuthXApp                    = "cli"
-	claudeOAuthDangerousBrowserAccess  = "true"
-	claudeOAuthStainlessRetryCount     = "0"
-	claudeOAuthStainlessHelperMethod   = "stream"
-	claudeOAuthStainlessRuntime        = "node"
-	claudeOAuthStainlessLang           = "js"
-	claudeOAuthStainlessTimeout        = "600"
-	claudeOAuthStainlessPackageVersion = "0.94.0"
-	claudeOAuthStainlessRuntimeVersion = "v24.3.0"
-	claudeOAuthStainlessOS             = "MacOS"
-	claudeOAuthStainlessArch           = "arm64"
-	claudeOAuthAccept                  = "application/json"
-	claudeOAuthAcceptEncoding          = "gzip, deflate, br, zstd"
-	claudeOAuthBillingVersionSalt      = "59cf53e54c78"
-	claudeOAuthBillingCCHSeed          = uint64(0x6E52736AC806831E)
-	claudeOAuthDefaultMaxTokens        = 32000
-	claudeOAuthSystemPrompt            = "You are a Claude agent, built on Anthropic's Claude Agent SDK."
-	claudeOAuthSystemCorePrompt        = `You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+	claudeOAuthDangerousBrowserAccess = "true"
+	claudeOAuthDefaultMaxTokens       = 32000
+	claudeOAuthSystemPrompt           = "You are a Claude agent, built on Anthropic's Claude Agent SDK."
+	claudeOAuthSystemCorePrompt       = `You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
 IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes.
 
@@ -996,8 +975,7 @@ func claudeOAuthBillingHeaderText(messages any, cch string) string {
 }
 
 func claudeOAuthBillingVersion(messages any) string {
-	sum := sha256.Sum256([]byte(claudeOAuthBillingVersionSalt + claudeOAuthBillingFingerprintSegment(firstClaudeOAuthUserMessageText(messages)) + claudeOAuthAppVersion))
-	return fmt.Sprintf("%s.%03x", claudeOAuthAppVersion, uint16(sum[0])<<4|uint16(sum[1])>>4)
+	return claudeOAuthBillingVersionForText(firstClaudeOAuthUserMessageText(messages))
 }
 
 func firstClaudeOAuthUserMessageText(messages any) string {
@@ -1044,21 +1022,6 @@ func isClaudeOAuthInjectedMessageText(text string) bool {
 		}
 	}
 	return false
-}
-
-func claudeOAuthBillingFingerprintSegment(text string) string {
-	codeUnits := utf16.Encode([]rune(text))
-	picks := []int{4, 7, 20}
-	var builder strings.Builder
-	builder.Grow(len(picks))
-	for _, idx := range picks {
-		if idx >= 0 && idx < len(codeUnits) {
-			_, _ = builder.WriteRune(rune(codeUnits[idx]))
-			continue
-		}
-		_ = builder.WriteByte('0')
-	}
-	return builder.String()
 }
 
 func claudeOAuthBillingEntrypoint() string {

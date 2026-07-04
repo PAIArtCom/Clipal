@@ -40,6 +40,9 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 		`temp dir will be removed; rerun with --keep-temp to preserve logs`,
 		`set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail and request headers/body`,
 		`seconds = min(seconds, 30)`,
+		`--compressed`,
+		`claude_code_app_version="2.1.201"`,
+		`claude_billing_version_salt="59cf53e54c78"`,
 		`auth_type: "oauth"`,
 		`oauth_provider: "claude"`,
 		`"http://127.0.0.1:$clipal_port/clipal/v1/messages"`,
@@ -78,7 +81,7 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	payload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello")
 	billing := claudeSmokeBillingText(t, payload)
-	if !strings.Contains(billing, "cc_version=2.1.196.68b; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(billing, "cc_version=2.1.201.4e1; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("billing system block = %q", billing)
 	}
 	if got := payload["stream"]; got == true {
@@ -87,13 +90,13 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	countTokensPayload := runClaudeSmokePayloadPython(t, py, script, "claude_count_tokens_payload()", "hello")
 	countTokensBilling := claudeSmokeBillingText(t, countTokensPayload)
-	if !strings.Contains(countTokensBilling, "cc_version=2.1.196.68b; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(countTokensBilling, "cc_version=2.1.201.4e1; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("count_tokens billing system block = %q", countTokensBilling)
 	}
 
 	emojiPayload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello 🌍")
 	emojiBilling := claudeSmokeBillingText(t, emojiPayload)
-	if !strings.Contains(emojiBilling, "cc_version=2.1.196.") {
+	if !strings.Contains(emojiBilling, "cc_version=2.1.201.") {
 		t.Fatalf("emoji billing system block = %q", emojiBilling)
 	}
 }
@@ -124,6 +127,7 @@ func runClaudeSmokePayloadPython(t *testing.T, py string, script string, anchor 
 	if anchor == "claude_payload()" {
 		args = append(args, "0")
 	}
+	args = append(args, "2.1.201", "59cf53e54c78")
 	cmd := exec.Command(py, args...)
 	cmd.Stdin = strings.NewReader(pythonScript)
 	out, err := cmd.Output()

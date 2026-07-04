@@ -70,6 +70,8 @@ SKIP_REFRESH_RETRY="${CLIPAL_LIVE_SKIP_REFRESH_RETRY:-0}"
 KEEP_TEMP="${CLIPAL_LIVE_KEEP_TEMP:-0}"
 VERBOSE="${CLIPAL_LIVE_VERBOSE:-0}"
 LIST_ONLY=0
+claude_code_app_version="2.1.201"
+claude_billing_version_salt="59cf53e54c78"
 
 clipal_log_level="info"
 if [[ "$VERBOSE" == "1" ]]; then
@@ -231,6 +233,7 @@ post_with_rate_limit_retry() {
   local retry_after=""
   local curl_args=(
     -sS
+    --compressed
     --max-time 120
     -D "$headers_file"
     -o "$body_file"
@@ -559,15 +562,16 @@ fi
 claude_payload() {
   local prompt="$1"
   local stream="${2:-0}"
-  "$PY" - "$MODEL" "$prompt" "$stream" <<'PY'
+  "$PY" - "$MODEL" "$prompt" "$stream" "$claude_code_app_version" "$claude_billing_version_salt" <<'PY'
 import json
 import hashlib
 import sys
 
-CLAUDE_OAUTH_APP_VERSION = "2.1.196"
 model = sys.argv[1]
 prompt = sys.argv[2]
 stream = sys.argv[3] == "1"
+claude_code_app_version = sys.argv[4]
+claude_billing_version_salt = sys.argv[5]
 
 def billing_version(text):
     encoded = text.encode("utf-16-le", "surrogatepass")
@@ -579,9 +583,9 @@ def billing_version(text):
             picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
         else:
             picks.append("0")
-    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + CLAUDE_OAUTH_APP_VERSION).encode()).digest()
+    digest = hashlib.sha256((claude_billing_version_salt + "".join(picks) + claude_code_app_version).encode()).digest()
     suffix = (digest[0] << 4) | (digest[1] >> 4)
-    return f"{CLAUDE_OAUTH_APP_VERSION}.{suffix:03x}"
+    return f"{claude_code_app_version}.{suffix:03x}"
 
 payload = {
     "model": model,
@@ -611,14 +615,15 @@ PY
 
 claude_count_tokens_payload() {
   local prompt="$1"
-  "$PY" - "$MODEL" "$prompt" <<'PY'
+  "$PY" - "$MODEL" "$prompt" "$claude_code_app_version" "$claude_billing_version_salt" <<'PY'
 import json
 import hashlib
 import sys
 
-CLAUDE_OAUTH_APP_VERSION = "2.1.196"
 model = sys.argv[1]
 prompt = sys.argv[2]
+claude_code_app_version = sys.argv[3]
+claude_billing_version_salt = sys.argv[4]
 
 def billing_version(text):
     encoded = text.encode("utf-16-le", "surrogatepass")
@@ -630,9 +635,9 @@ def billing_version(text):
             picks.append("\ufffd" if 0xD800 <= unit <= 0xDFFF else chr(unit))
         else:
             picks.append("0")
-    digest = hashlib.sha256(("59cf53e54c78" + "".join(picks) + CLAUDE_OAUTH_APP_VERSION).encode()).digest()
+    digest = hashlib.sha256((claude_billing_version_salt + "".join(picks) + claude_code_app_version).encode()).digest()
     suffix = (digest[0] << 4) | (digest[1] >> 4)
-    return f"{CLAUDE_OAUTH_APP_VERSION}.{suffix:03x}"
+    return f"{claude_code_app_version}.{suffix:03x}"
 
 payload = {
     "model": model,

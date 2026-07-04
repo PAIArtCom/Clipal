@@ -1294,6 +1294,73 @@ func TestForwardWithFailover_CodexSSEEOFWithoutDoneLogsIncomplete(t *testing.T) 
 	}
 }
 
+func TestForwardWithFailover_CompressedClaudeSSEEOFLogsCompleted(t *testing.T) {
+	var (
+		logMu    sync.Mutex
+		messages []string
+	)
+	logger.SetHook(func(_ string, message string) {
+		if strings.Contains(message, "claudegzipsse") {
+			logMu.Lock()
+			messages = append(messages, message)
+			logMu.Unlock()
+		}
+	})
+	t.Cleanup(func() {
+		logger.SetHook(nil)
+	})
+
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "claudegzipsse" {
+			return nil, errors.New("unexpected host")
+		}
+		var body bytes.Buffer
+		gz := gzip.NewWriter(&body)
+		_, _ = gz.Write([]byte("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
+		_ = gz.Close()
+
+		h := make(http.Header)
+		h.Set("Content-Type", "text/event-stream; charset=utf-8")
+		h.Set("Content-Encoding", "gzip")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     h,
+			Body:       io.NopCloser(bytes.NewReader(body.Bytes())),
+		}, nil
+	})
+
+	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
+		{Name: "claudegzipsse", BaseURL: "http://claudegzipsse", APIKey: "k1", Priority: 1},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.httpClient.Transport = rt
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader([]byte(`{"stream":true}`)))
+	cp.forwardWithFailover(rr, req, "/v1/messages")
+
+	if rr.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d", rr.Result().StatusCode, http.StatusOK)
+	}
+	if got := rr.Result().Header.Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", got)
+	}
+	if rr.Body.Len() == 0 {
+		t.Fatal("expected compressed response body")
+	}
+
+	logMu.Lock()
+	defer logMu.Unlock()
+	for _, msg := range messages {
+		if strings.Contains(msg, "Incomplete response via claudegzipsse") {
+			t.Fatalf("did not expect incomplete log for compressed SSE, got %q", msg)
+		}
+		if strings.Contains(msg, "Completed via claudegzipsse") {
+			return
+		}
+	}
+	t.Fatalf("expected completion log for claudegzipsse, got %v", messages)
+}
+
 func TestClaudeCountTokens_FailureDoesNotRetryOrAffectHealthState(t *testing.T) {
 	t.Parallel()
 

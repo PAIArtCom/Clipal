@@ -42,6 +42,14 @@ func isEventStreamContentType(contentType string) bool {
 	return strings.Contains(strings.ToLower(strings.TrimSpace(contentType)), "text/event-stream")
 }
 
+func hasNonIdentityContentEncoding(resp *http.Response) bool {
+	if resp == nil {
+		return false
+	}
+	encoding := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding")))
+	return encoding != "" && encoding != "identity"
+}
+
 func looksLikeSSEPrelude(chunk []byte) bool {
 	trimmed := bytes.TrimLeft(chunk, " \t\r\n")
 	if len(trimmed) == 0 {
@@ -81,6 +89,9 @@ type protocolTracker struct {
 
 func newProtocolTracker(clientType ClientType, req *http.Request, resp *http.Response) *protocolTracker {
 	if resp == nil {
+		return &protocolTracker{kind: streamProtocolNone}
+	}
+	if hasNonIdentityContentEncoding(resp) {
 		return &protocolTracker{kind: streamProtocolNone}
 	}
 	return newProtocolTrackerWithContentType(clientType, req, resp.Header.Get("Content-Type"))
