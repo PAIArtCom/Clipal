@@ -14,6 +14,7 @@ English: [docs/en/README.md](../en/README.md) | 中文: [docs/zh/README.md](READ
 - [快速开始](getting-started.md)
 - [客户端接入](client-setup.md)
 - [配置参考](config-reference.md)
+- [部署包](deploy.md)
 - [Web UI 使用说明](web-ui.md)
 - [路由与故障切换](routing-and-failover.md)
 - [后台服务、状态与更新](services.md)

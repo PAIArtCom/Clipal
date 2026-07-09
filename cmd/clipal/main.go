@@ -33,6 +33,7 @@ const (
 	rootCommandUpdate      rootCommand = "update"
 	rootCommandStatus      rootCommand = "status"
 	rootCommandService     rootCommand = "service"
+	rootCommandDeploy      rootCommand = "deploy"
 	rootCommandApplyUpdate rootCommand = "__apply-update"
 )
 
@@ -73,6 +74,9 @@ func main() {
 	case rootCommandService:
 		runService(args)
 		return
+	case rootCommandDeploy:
+		runDeploy(args)
+		return
 	case rootCommandApplyUpdate:
 		runApplyUpdate(args)
 		return
@@ -99,6 +103,14 @@ func resolveRootCommand(args []string) (rootCommand, []string, error) {
 		return rootCommandStatus, args[1:], nil
 	case "service":
 		return rootCommandService, args[1:], nil
+	case "deploy":
+		return rootCommandDeploy, args[1:], nil
+	case "export":
+		return rootCommandDeploy, append([]string{"export"}, args[1:]...), nil
+	case "import":
+		return rootCommandDeploy, append([]string{"import"}, args[1:]...), nil
+	case "install":
+		return rootCommandDeploy, append([]string{"install"}, args[1:]...), nil
 	case "__apply-update":
 		return rootCommandApplyUpdate, args[1:], nil
 	case "restart":
@@ -119,6 +131,10 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "Commands:")
 	fmt.Fprintln(w, "  status            Show runtime and service status without starting the server")
 	fmt.Fprintln(w, "  service           Install and manage the background service")
+	fmt.Fprintln(w, "  deploy            Import config and install/takeover selected AI CLIs")
+	fmt.Fprintln(w, "  export            Shortcut for 'clipal deploy export'")
+	fmt.Fprintln(w, "  import            Shortcut for 'clipal deploy import'")
+	fmt.Fprintln(w, "  install           Install selected AI CLI without takeover")
 	fmt.Fprintln(w, "  update            Check for updates or replace the current binary in place")
 	fmt.Fprintln(w, "  restart           Shortcut for 'clipal service restart'")
 	fmt.Fprintln(w, "  help              Show this help")
@@ -142,6 +158,10 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "  clipal status")
 	fmt.Fprintln(w, "  clipal restart")
 	fmt.Fprintln(w, "  clipal service install")
+	fmt.Fprintln(w, "  clipal export")
+	fmt.Fprintln(w, "  clipal import clipal.json")
+	fmt.Fprintln(w, "  clipal deploy codex")
+	fmt.Fprintln(w, "  clipal install codex")
 	fmt.Fprintln(w, "  clipal update")
 }
 

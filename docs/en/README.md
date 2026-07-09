@@ -14,6 +14,7 @@ English: [docs/en/README.md](README.md) | 中文: [docs/zh/README.md](../zh/READ
 - [Getting Started](getting-started.md)
 - [Client Setup](client-setup.md)
 - [Config Reference](config-reference.md)
+- [Deploy Packages](deploy.md)
 - [Web UI Guide](web-ui.md)
 - [Routing and Failover](routing-and-failover.md)
 - [Services, Status, and Updates](services.md)

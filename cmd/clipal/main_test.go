@@ -33,9 +33,17 @@ func resetForMainTest() {
 
 func runMainHelper(t *testing.T, args ...string) (string, int) {
 	t.Helper()
+	return runMainHelperInDir(t, "", args...)
+}
+
+func runMainHelperInDir(t *testing.T, dir string, args ...string) (string, int) {
+	t.Helper()
 
 	//nolint:gosec // Tests intentionally re-exec the current test binary as a helper process.
 	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelperProcess")
+	if dir != "" {
+		cmd.Dir = dir
+	}
 	cmd.Env = append(os.Environ(),
 		"CLIPAL_MAIN_HELPER=1",
 		"CLIPAL_MAIN_ARGS="+strings.Join(args, "\n"),
@@ -163,6 +171,30 @@ func TestResolveRootCommand(t *testing.T) {
 			wantArgs: []string{"restart"},
 		},
 		{
+			name:     "DeployCommandPassesThrough",
+			args:     []string{"deploy", "export", "-o", "prod.json"},
+			wantCmd:  rootCommandDeploy,
+			wantArgs: []string{"export", "-o", "prod.json"},
+		},
+		{
+			name:     "ExportAliasRoutesToDeployExport",
+			args:     []string{"export"},
+			wantCmd:  rootCommandDeploy,
+			wantArgs: []string{"export"},
+		},
+		{
+			name:     "ImportAliasRoutesToDeployImport",
+			args:     []string{"import", "clipal.json"},
+			wantCmd:  rootCommandDeploy,
+			wantArgs: []string{"import", "clipal.json"},
+		},
+		{
+			name:     "InstallAliasRoutesToDeployInstall",
+			args:     []string{"install", "codex"},
+			wantCmd:  rootCommandDeploy,
+			wantArgs: []string{"install", "codex"},
+		},
+		{
 			name:    "HelpTokenShowsRootHelp",
 			args:    []string{"help"},
 			wantCmd: rootCommandHelp,
@@ -212,9 +244,306 @@ func TestMainHelpFlagShowsCommands(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, out=%s", code, out)
 	}
-	if !strings.Contains(out, "Commands:") || !strings.Contains(out, "clipal restart") {
+	if !strings.Contains(out, "Commands:") || !strings.Contains(out, "clipal restart") || !strings.Contains(out, "deploy") {
 		t.Fatalf("unexpected help output: %s", out)
 	}
+}
+
+func TestDeployExportImportCLI(t *testing.T) {
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+	if err := os.WriteFile(filepath.Join(src, "gemini.yaml"), []byte("mode: auto\nproviders: []\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile gemini.yaml: %v", err)
+	}
+
+	packagePath := filepath.Join(t.TempDir(), "prod.json")
+	out, code := runMainHelper(t, "deploy", "export", "-o", packagePath, "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("export exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "Deploy package written:") {
+		t.Fatalf("unexpected export output: %s", out)
+	}
+
+	dst := t.TempDir()
+	out, code = runMainHelper(t, "deploy", "import", packagePath, "--config-dir", dst)
+	if code != 0 {
+		t.Fatalf("import exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "Deploy package imported:") {
+		t.Fatalf("unexpected import output: %s", out)
+	}
+	got, err := os.ReadFile(filepath.Join(dst, "openai.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile openai.yaml: %v", err)
+	}
+	if !strings.Contains(string(got), "api_key: key1") {
+		t.Fatalf("imported openai.yaml did not include secret: %s", got)
+	}
+}
+
+func TestDeployExportDefaultOutputAndFixedSuffix(t *testing.T) {
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+	outDir := t.TempDir()
+
+	out, code := runMainHelper(t, "deploy", "export", "--config-dir", src, "--output-dir", outDir)
+	if code != 0 {
+		t.Fatalf("default export exit code = %d, out=%s", code, out)
+	}
+	defaultPackage := filepath.Join(outDir, "clipal.json")
+	if _, err := os.Stat(defaultPackage); err != nil {
+		t.Fatalf("expected default package %s: %v", defaultPackage, err)
+	}
+	if !strings.Contains(out, defaultPackage) {
+		t.Fatalf("default package path missing from output:\n%s", out)
+	}
+
+	out, code = runMainHelper(t, "deploy", "export", "-o", filepath.Join(outDir, "prod"), "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("suffix append export exit code = %d, out=%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "prod.json")); err != nil {
+		t.Fatalf("expected suffixed package: %v", err)
+	}
+
+	out, code = runMainHelper(t, "deploy", "export", "-o", filepath.Join(outDir, "prod.conf"), "--config-dir", src)
+	if code != 2 {
+		t.Fatalf("wrong suffix exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "must use .json") {
+		t.Fatalf("expected fixed suffix error, out=%s", out)
+	}
+}
+
+func TestDeployImportRootAlias(t *testing.T) {
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+
+	packagePath := filepath.Join(t.TempDir(), "clipal.json")
+	out, code := runMainHelper(t, "export", "-o", packagePath, "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("export alias exit code = %d, out=%s", code, out)
+	}
+
+	dst := t.TempDir()
+	out, code = runMainHelper(t, "import", packagePath, "--config-dir", dst)
+	if code != 0 {
+		t.Fatalf("import alias exit code = %d, out=%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "openai.yaml")); err != nil {
+		t.Fatalf("import alias should restore openai.yaml: %v", err)
+	}
+}
+
+func TestDeployImportTemporary(t *testing.T) {
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+
+	packagePath := filepath.Join(t.TempDir(), "prod.json")
+	out, code := runMainHelper(t, "deploy", "export", "-o", packagePath, "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("export exit code = %d, out=%s", code, out)
+	}
+
+	normalTarget := t.TempDir()
+	out, code = runMainHelper(t, "deploy", "import", packagePath, "--config-dir", normalTarget, "--temporary")
+	if code != 0 {
+		t.Fatalf("temporary import exit code = %d, out=%s", code, out)
+	}
+	tmpDir := extractOutputValue(t, out, "Temporary config dir:")
+	if tmpDir == "" || tmpDir == normalTarget {
+		t.Fatalf("unexpected temporary config dir %q in output:\n%s", tmpDir, out)
+	}
+	if !strings.Contains(out, "Cleanup: rm -rf ") {
+		t.Fatalf("missing cleanup hint in output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(normalTarget, "openai.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("temporary import should not write normal config dir, err=%v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(tmpDir, "openai.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile temporary openai.yaml: %v", err)
+	}
+	if !strings.Contains(string(got), "api_key: key1") {
+		t.Fatalf("temporary import did not include secret: %s", got)
+	}
+	_ = os.RemoveAll(tmpDir)
+}
+
+func TestDeployImportAppliesTakeover(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	src := t.TempDir()
+	writeMainConfig(t, src, 4567, "")
+
+	packagePath := filepath.Join(t.TempDir(), "prod.json")
+	out, code := runMainHelper(t, "deploy", "export", "-o", packagePath, "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("export exit code = %d, out=%s", code, out)
+	}
+
+	dst := t.TempDir()
+	out, code = runMainHelper(t, "deploy", "import", packagePath, "--config-dir", dst, "--takeover", "codex")
+	if code != 0 {
+		t.Fatalf("import exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "Takeover applied: codex") {
+		t.Fatalf("missing takeover output:\n%s", out)
+	}
+	raw, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatalf("ReadFile codex config: %v", err)
+	}
+	body := string(raw)
+	if !strings.Contains(body, `model_provider = 'clipal'`) && !strings.Contains(body, `model_provider = "clipal"`) {
+		t.Fatalf("codex config missing model_provider:\n%s", body)
+	}
+	if !strings.Contains(body, "http://127.0.0.1:4567/clipal") {
+		t.Fatalf("codex config missing imported Clipal base URL:\n%s", body)
+	}
+}
+
+func TestDeployDryRunShowsOfficialInstallCommands(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	out, code := runMainHelper(t, "deploy", "--dry-run", "--agents", "codex,claude,gemini")
+	if code != 0 {
+		t.Fatalf("deploy dry-run exit code = %d, out=%s", code, out)
+	}
+	for _, want := range []string{
+		"curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+		"curl -fsSL https://claude.ai/install.sh | bash",
+		"npm install -g @google/gemini-cli",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestShellCommandStringShowsOfficialPipelineCommand(t *testing.T) {
+	t.Parallel()
+
+	got := shellCommandString([]string{"sh", "-c", "curl -fsSL https://chatgpt.com/codex/install.sh | sh"})
+	want := "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+	if got != want {
+		t.Fatalf("shellCommandString = %q, want %q", got, want)
+	}
+}
+
+func TestDeployPositionalAgentDryRun(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	out, code := runMainHelper(t, "deploy", "codex", "--dry-run")
+	if code != 0 {
+		t.Fatalf("deploy codex dry-run exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "curl -fsSL https://chatgpt.com/codex/install.sh | sh") {
+		t.Fatalf("codex install command missing:\n%s", out)
+	}
+	if strings.Contains(out, "@anthropic-ai/claude-code") || strings.Contains(out, "@google/gemini-cli") {
+		t.Fatalf("deploy codex should not include other agents:\n%s", out)
+	}
+	if !strings.Contains(out, "Would apply takeover: codex") {
+		t.Fatalf("deploy codex should include takeover:\n%s", out)
+	}
+}
+
+func TestDeployPackageAndPositionalAgentDryRun(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+	packagePath := filepath.Join(t.TempDir(), "prod.json")
+	out, code := runMainHelper(t, "export", "-o", packagePath, "--config-dir", src)
+	if code != 0 {
+		t.Fatalf("export exit code = %d, out=%s", code, out)
+	}
+
+	dst := t.TempDir()
+	out, code = runMainHelper(t, "deploy", packagePath, "codex", "--config-dir", dst, "--dry-run")
+	if code != 0 {
+		t.Fatalf("deploy package codex dry-run exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "Would import deploy config: "+packagePath+" -> "+dst) {
+		t.Fatalf("deploy should import the explicit package:\n%s", out)
+	}
+	if !strings.Contains(out, "curl -fsSL https://chatgpt.com/codex/install.sh | sh") {
+		t.Fatalf("codex install command missing:\n%s", out)
+	}
+	if strings.Contains(out, "claude.ai/install.sh") || strings.Contains(out, "@google/gemini-cli") {
+		t.Fatalf("explicit codex deploy should not include other agents:\n%s", out)
+	}
+	if !strings.Contains(out, "Would apply takeover: codex") {
+		t.Fatalf("deploy package codex should include codex takeover:\n%s", out)
+	}
+}
+
+func TestInstallAliasInstallsOnlySelectedAgent(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	out, code := runMainHelper(t, "install", "codex", "--dry-run")
+	if code != 0 {
+		t.Fatalf("install codex dry-run exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "curl -fsSL https://chatgpt.com/codex/install.sh | sh") {
+		t.Fatalf("codex install command missing:\n%s", out)
+	}
+	if strings.Contains(out, "Would apply takeover") {
+		t.Fatalf("install alias should not apply takeover:\n%s", out)
+	}
+}
+
+func TestDeployHelpShowsAgentCommands(t *testing.T) {
+	out, code := runMainHelper(t, "deploy", "--help")
+	if code != 0 {
+		t.Fatalf("deploy help exit code = %d, out=%s", code, out)
+	}
+	for _, want := range []string{
+		"clipal deploy codex",
+		"clipal install codex",
+		"clipal deploy prod.json codex",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("deploy help missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDeployImportsDefaultPackageFromCurrentDirectory(t *testing.T) {
+	src := t.TempDir()
+	writeMainConfig(t, src, 3333, "")
+
+	workDir := t.TempDir()
+	out, code := runMainHelper(t, "export", "--config-dir", src, "--output-dir", workDir)
+	if code != 0 {
+		t.Fatalf("export exit code = %d, out=%s", code, out)
+	}
+
+	dst := t.TempDir()
+	out, code = runMainHelperInDir(t, workDir, "deploy", "--config-dir", dst, "--skip-install", "--skip-takeover")
+	if code != 0 {
+		t.Fatalf("deploy exit code = %d, out=%s", code, out)
+	}
+	if !strings.Contains(out, "Imported deploy config:") {
+		t.Fatalf("deploy should import default package:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "openai.yaml")); err != nil {
+		t.Fatalf("deploy should restore openai.yaml: %v", err)
+	}
+}
+
+func extractOutputValue(t *testing.T, out, prefix string) string {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		}
+	}
+	t.Fatalf("missing output prefix %q in:\n%s", prefix, out)
+	return ""
 }
 
 func TestMainServiceHelpShowsUsage(t *testing.T) {
