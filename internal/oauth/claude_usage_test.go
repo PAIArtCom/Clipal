@@ -42,7 +42,7 @@ func (c *stubClaudeUsageProvider) FetchUsage(context.Context, *Credential) (*Cla
 
 func TestClaudeFetchUsage_ParsesQuotaWindows(t *testing.T) {
 	resetTime := "2026-05-08T12:15:00Z"
-	const wantUsageUserAgent = "claude-cli/2.1.201 (external, sdk-cli)"
+	const wantUsageUserAgent = "claude-cli/2.1.207 (external, sdk-cli)"
 
 	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Method; got != http.MethodGet {

@@ -70,7 +70,7 @@ SKIP_REFRESH_RETRY="${CLIPAL_LIVE_SKIP_REFRESH_RETRY:-0}"
 KEEP_TEMP="${CLIPAL_LIVE_KEEP_TEMP:-0}"
 VERBOSE="${CLIPAL_LIVE_VERBOSE:-0}"
 LIST_ONLY=0
-claude_code_app_version="2.1.201"
+claude_code_app_version="2.1.207"
 claude_billing_version_salt="59cf53e54c78"
 
 clipal_log_level="info"

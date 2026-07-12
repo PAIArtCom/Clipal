@@ -25,7 +25,7 @@ const (
 	defaultCodexClientID     = "app_EMoamEEZ73f0CkXaXp7hrann"
 	defaultCodexScope        = "openid profile email offline_access api.connectors.read api.connectors.invoke"
 	defaultCodexOriginator   = "codex_cli_rs"
-	defaultCodexUserAgent    = "codex_cli_rs/0.142.4 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
+	defaultCodexUserAgent    = "codex_cli_rs/0.144.1 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
 	defaultCodexCallbackHost = "localhost"
 	defaultCodexCallbackPort = 1455
 	defaultCodexCallbackPath = "/auth/callback"

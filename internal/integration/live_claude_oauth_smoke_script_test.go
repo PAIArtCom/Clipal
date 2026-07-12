@@ -41,7 +41,7 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 		`set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail and request headers/body`,
 		`seconds = min(seconds, 30)`,
 		`--compressed`,
-		`claude_code_app_version="2.1.201"`,
+		`claude_code_app_version="2.1.207"`,
 		`claude_billing_version_salt="59cf53e54c78"`,
 		`auth_type: "oauth"`,
 		`oauth_provider: "claude"`,
@@ -81,7 +81,7 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	payload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello")
 	billing := claudeSmokeBillingText(t, payload)
-	if !strings.Contains(billing, "cc_version=2.1.201.4e1; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(billing, "cc_version=2.1.207.9bb; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("billing system block = %q", billing)
 	}
 	if got := payload["stream"]; got == true {
@@ -90,13 +90,13 @@ func TestLiveClaudeOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 
 	countTokensPayload := runClaudeSmokePayloadPython(t, py, script, "claude_count_tokens_payload()", "hello")
 	countTokensBilling := claudeSmokeBillingText(t, countTokensPayload)
-	if !strings.Contains(countTokensBilling, "cc_version=2.1.201.4e1; cc_entrypoint=sdk-cli; cch=00000;") {
+	if !strings.Contains(countTokensBilling, "cc_version=2.1.207.9bb; cc_entrypoint=sdk-cli; cch=00000;") {
 		t.Fatalf("count_tokens billing system block = %q", countTokensBilling)
 	}
 
 	emojiPayload := runClaudeSmokePayloadPython(t, py, script, "claude_payload()", "hello 🌍")
 	emojiBilling := claudeSmokeBillingText(t, emojiPayload)
-	if !strings.Contains(emojiBilling, "cc_version=2.1.201.") {
+	if !strings.Contains(emojiBilling, "cc_version=2.1.207.") {
 		t.Fatalf("emoji billing system block = %q", emojiBilling)
 	}
 }
@@ -127,7 +127,7 @@ func runClaudeSmokePayloadPython(t *testing.T, py string, script string, anchor 
 	if anchor == "claude_payload()" {
 		args = append(args, "0")
 	}
-	args = append(args, "2.1.201", "59cf53e54c78")
+	args = append(args, "2.1.207", "59cf53e54c78")
 	cmd := exec.Command(py, args...)
 	cmd.Stdin = strings.NewReader(pythonScript)
 	out, err := cmd.Output()
