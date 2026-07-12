@@ -867,6 +867,25 @@ func (r *Router) ReloadProviderConfigs() error {
 	return nil
 }
 
+// CoordinateDataTransfer serializes the complete transfer transaction with
+// the config watcher. Holding reloadMu before transfer acquires telemetry.mu
+// keeps the global lock order reloadMu -> telemetry.mu.
+func (r *Router) CoordinateDataTransfer(operation func(reload func() error) error) error {
+	if operation == nil {
+		return nil
+	}
+	r.reloadMu.Lock()
+	defer r.reloadMu.Unlock()
+	reload := func() error {
+		if err := r.reloadProviderConfigsLockedWithTelemetry(false); err != nil {
+			return err
+		}
+		r.snapshotProviderConfigModTimes()
+		return nil
+	}
+	return operation(reload)
+}
+
 func (r *Router) reloadIfProviderConfigsChanged() {
 	r.reloadMu.Lock()
 	defer r.reloadMu.Unlock()
@@ -884,6 +903,10 @@ func (r *Router) reloadIfProviderConfigsChanged() {
 }
 
 func (r *Router) reloadProviderConfigsLocked() error {
+	return r.reloadProviderConfigsLockedWithTelemetry(true)
+}
+
+func (r *Router) reloadProviderConfigsLockedWithTelemetry(reconcileTelemetry bool) error {
 	newCfg, err := config.Load(r.configDir)
 	if err != nil {
 		return err
@@ -930,7 +953,9 @@ func (r *Router) reloadProviderConfigsLocked() error {
 		newProxies[ClientGemini] = newReloadedClientProxy(ClientGemini, newCfg.Gemini.Mode, newCfg.Gemini.PinnedProvider, ps, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, routingRuntimeSettingsFromConfig(newCfg.Global.Routing), globalProxyMode, globalProxyURL, oldProxies[ClientGemini], r.telemetry)
 		newProxies[ClientGemini].oauth = r.oauth
 	}
-	r.reconcileTelemetryUsage(oldCfg, newCfg)
+	if reconcileTelemetry {
+		r.reconcileTelemetryUsage(oldCfg, newCfg)
+	}
 
 	r.mu.Lock()
 	r.cfg = newCfg

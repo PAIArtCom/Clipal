@@ -346,6 +346,41 @@
                 </div>
 
                 <div class="settings-compact-grid">
+                    <section class="settings-panel" style="grid-column: 1 / -1;">
+                        <div class="settings-panel-header">
+                            <div>
+                                <h3 x-text="t('settings.transferTitle')"></h3>
+                                <p class="settings-panel-copy" x-text="t('settings.transferCopy')"></p>
+                            </div>
+                        </div>
+                        <div class="settings-panel-grid">
+                            <div class="form-group">
+                                <label class="form-label" x-text="t('settings.importFiles')"></label>
+                                <input type="file" accept="application/json,.json" multiple
+                                    @change="selectDataImportFiles($event)" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" x-text="t('settings.importMode')"></label>
+                                <select x-model="dataImportMode" class="form-select" @change="dataImportPlan = null">
+                                    <option value="" x-text="t('settings.modeAuto')"></option>
+                                    <option value="replace" x-text="t('settings.modeReplace')"></option>
+                                    <option value="merge" x-text="t('settings.modeMerge')"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="settings-form-actions">
+                            <div class="form-hint" x-show="dataImportPlan"
+                                x-text="dataImportPlan ? tf('settings.importPreview', { format: dataImportPlan.format, credentials: dataImportPlan.credentials, providers: dataImportPlan.providers, usage: dataImportPlan.usage_providers }) : ''"></div>
+                            <div class="form-hint" x-show="dataImportPlan && dataImportPlan.warnings && dataImportPlan.warnings.length"
+                                x-text="dataImportPlan && dataImportPlan.warnings ? tf('settings.importWarnings', { warnings: dataImportPlan.warnings.join('; ') }) : ''"></div>
+                            <div class="settings-toolbar-actions">
+                                <button type="button" class="btn btn-secondary" @click="previewDataImport()"
+                                    :disabled="!dataImportFiles.length" x-text="t('settings.previewImport')"></button>
+                                <button type="button" class="btn btn-primary" @click="applyDataImport()"
+                                    :disabled="!dataImportPlan" x-text="t('settings.applyImport')"></button>
+                            </div>
+                        </div>
+                    </section>
                     <section class="settings-panel">
                         <div class="settings-panel-header">
                             <div>

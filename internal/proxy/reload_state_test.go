@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -613,6 +614,61 @@ func TestReloadProviderConfigsLocked_ReconcilesTelemetryFromYAMLChanges(t *testi
 	}
 	if _, ok := router.telemetry.ProviderSnapshot("openai", "delete-me"); ok {
 		t.Fatalf("expected deleted provider telemetry to be removed")
+	}
+}
+
+func TestCoordinateDataTransferKeepsWatcherBehindTelemetryTransaction(t *testing.T) {
+	router, dir := newReloadTestRouter(t)
+	router.snapshotProviderConfigModTimes()
+	global := config.DefaultGlobalConfig()
+	global.ListenAddr = "127.0.0.1"
+	global.Port = 3333
+	reloaded := config.ClientConfig{
+		Mode: config.ClientModeAuto,
+		Providers: []config.Provider{
+			{Name: "p2", BaseURL: "https://p2.example", APIKey: "k2", Priority: 1},
+		},
+	}
+	writeProxyReloadFixture(t, dir, global, reloaded)
+
+	watcherStarted := make(chan struct{})
+	watcherDone := make(chan struct{})
+	err := router.CoordinateDataTransfer(func(reload func() error) error {
+		usageTx, err := router.telemetry.BeginTransfer()
+		if err != nil {
+			return err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = usageTx.Rollback()
+			}
+		}()
+		go func() {
+			close(watcherStarted)
+			router.reloadIfProviderConfigsChanged()
+			close(watcherDone)
+		}()
+		<-watcherStarted
+		select {
+		case <-watcherDone:
+			return fmt.Errorf("watcher entered reload while transfer session held reloadMu")
+		case <-time.After(20 * time.Millisecond):
+		}
+		if err := reload(); err != nil {
+			return err
+		}
+		usageTx.Commit()
+		committed = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-watcherDone:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not resume after transfer released reloadMu")
 	}
 }
 

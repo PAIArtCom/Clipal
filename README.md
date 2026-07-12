@@ -128,6 +128,7 @@ Dive deeper into what Clipal can do:
 - 🖥️ [Web UI Guide](docs/en/web-ui.md)
 - 🔀 [Routing & Failover Magic](docs/en/routing-and-failover.md)
 - 🛠️ [Services, Status, and Updates](docs/en/services.md)
+- 💾 [Data Import, Export, and Backup](docs/en/data-transfer.md)
 - 📚 [Docs Home](docs/en/README.md) & [Release Notes](release-notes/)
 
 ## 🔒 Security & Privacy

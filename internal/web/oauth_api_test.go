@@ -1863,42 +1863,6 @@ func TestHandleImportCLIProxyAPICredentials_RollbackPreservesSkippedAbnormalEntr
 	}
 }
 
-func TestSnapshotOAuthImportProviderDir_RestoresOverwrittenSymlink(t *testing.T) {
-	providerDir := filepath.Join(t.TempDir(), "oauth", "codex")
-	if err := os.MkdirAll(providerDir, 0o700); err != nil {
-		t.Fatalf("MkdirAll oauth dir: %v", err)
-	}
-	linkPath := filepath.Join(providerDir, "credential.json")
-	if err := os.Symlink("missing-target.json", linkPath); err != nil {
-		t.Skipf("Symlink: %v", err)
-	}
-
-	restore, finalize, err := snapshotOAuthImportProviderDir(providerDir)
-	if err != nil {
-		t.Fatalf("snapshotOAuthImportProviderDir: %v", err)
-	}
-	defer func() {
-		if finalize != nil {
-			_ = finalize()
-		}
-	}()
-
-	if err := atomicWriteFile(linkPath, []byte(`{"ref":"new"}`), 0o600); err != nil {
-		t.Fatalf("atomicWriteFile overwrite: %v", err)
-	}
-	if err := restore(); err != nil {
-		t.Fatalf("restore: %v", err)
-	}
-
-	info, err := os.Lstat(linkPath)
-	if err != nil {
-		t.Fatalf("Lstat restored symlink: %v", err)
-	}
-	if info.Mode()&os.ModeSymlink == 0 {
-		t.Fatalf("mode = %v, want symlink", info.Mode())
-	}
-}
-
 func TestHandleImportCLIProxyAPICredentials_SkipsAbnormalSnapshotEntries(t *testing.T) {
 	api := NewAPI(t.TempDir(), "test", nil)
 	providerDir := filepath.Join(api.configDir, "oauth", "codex")

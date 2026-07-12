@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/lansespirit/Clipal/internal/transfer"
 )
 
 func TestLocalOnly_RejectsNonLoopbackRemote(t *testing.T) {
@@ -284,6 +286,29 @@ func TestIntegrations_RouteIsRegistered(t *testing.T) {
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("route status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestLegacyConfigExportRouteIsNotRegistered(t *testing.T) {
+	h := NewHandler(t.TempDir(), "test", nil)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/api/config/export", nil)
+	req.Host = "localhost:3333"
+	req.RemoteAddr = "127.0.0.1:12345"
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("legacy export route status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestDataImportUsesBoundedAggregateRequestLimit(t *testing.T) {
+	if got := apiRequestBodyLimit("/api/data/import/preview"); got != transfer.MaxJSONImportRequestBytes {
+		t.Fatalf("preview body limit=%d want=%d", got, transfer.MaxJSONImportRequestBytes)
+	}
+	if transfer.MaxJSONImportRequestBytes <= transfer.MaxImportFileBytes {
+		t.Fatalf("encoded request limit=%d must exceed per-file limit=%d", transfer.MaxJSONImportRequestBytes, transfer.MaxImportFileBytes)
 	}
 }
 

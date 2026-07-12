@@ -257,36 +257,6 @@ type ReorderRequest struct {
 	Providers []string `json:"providers"` // Array of provider names in desired order
 }
 
-// ExportConfigResponse represents the full configuration export.
-// NOTE: This includes API keys and should only be used for local backup/migration.
-type ExportConfigResponse struct {
-	Global GlobalConfigResponse `json:"global"`
-	Claude ClientConfigExport   `json:"claude"`
-	OpenAI ClientConfigExport   `json:"openai"`
-	Gemini ClientConfigExport   `json:"gemini"`
-}
-
-type ClientConfigExport struct {
-	Mode           string           `json:"mode"`
-	PinnedProvider string           `json:"pinned_provider"`
-	Providers      []ProviderExport `json:"providers"`
-}
-
-type ProviderExport struct {
-	Name          string                     `json:"name"`
-	BaseURL       string                     `json:"base_url,omitempty"`
-	APIKey        string                     `json:"api_key,omitempty"`
-	APIKeys       []string                   `json:"api_keys,omitempty"`
-	AuthType      config.ProviderAuthType    `json:"auth_type"`
-	OAuthProvider config.OAuthProvider       `json:"oauth_provider,omitempty"`
-	OAuthRef      string                     `json:"oauth_ref,omitempty"`
-	ProxyMode     string                     `json:"proxy_mode,omitempty"`
-	ProxyURL      string                     `json:"proxy_url,omitempty"`
-	Priority      int                        `json:"priority"`
-	Enabled       *bool                      `json:"enabled,omitempty"`
-	Overrides     *ProviderOverridesResponse `json:"overrides,omitempty"`
-}
-
 type OAuthStartRequest struct {
 	ClientType string               `json:"client_type"`
 	Provider   config.OAuthProvider `json:"provider"`
@@ -643,34 +613,6 @@ func providerSpendForRecentDays(usage telemetry.ProviderUsage, now time.Time, da
 		total += bucket.CostMicros
 	}
 	return total
-}
-
-func toClientConfigExport(cc config.ClientConfig) ClientConfigExport {
-	out := make([]ProviderExport, 0, len(cc.Providers))
-	for _, p := range cc.Providers {
-		export := ProviderExport{
-			Name:          p.Name,
-			BaseURL:       p.BaseURL,
-			AuthType:      p.NormalizedAuthType(),
-			OAuthProvider: p.NormalizedOAuthProvider(),
-			OAuthRef:      p.NormalizedOAuthRef(),
-			ProxyMode:     string(p.NormalizedProxyMode()),
-			ProxyURL:      p.NormalizedProxyURL(),
-			Priority:      p.Priority,
-			Enabled:       p.Enabled,
-			Overrides:     mapProviderOverridesResponse(p),
-		}
-		if !p.UsesOAuth() {
-			export.APIKey = p.APIKey
-			export.APIKeys = append([]string(nil), p.APIKeys...)
-		}
-		out = append(out, export)
-	}
-	return ClientConfigExport{
-		Mode:           string(cc.Mode),
-		PinnedProvider: cc.PinnedProvider,
-		Providers:      out,
-	}
 }
 
 func proxyURLHint(raw string) string {

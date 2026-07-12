@@ -306,8 +306,22 @@ function app() {
                     footerHint: 'Saving updates `config.yaml`. Some runtime changes may require restart to take full effect.',
                     saveSettings: 'Save Settings',
                     saveSuccess: 'Configuration saved. Some changes may require restart.',
-                    exportSuccess: 'Configuration exported successfully',
-                    exportFailure: 'Failed to export configuration'
+                    exportSuccess: 'Complete backup exported successfully',
+                    exportFailure: 'Failed to export backup',
+                    transferTitle: 'Import & Backup',
+                    transferCopy: 'Export or restore configuration, credentials, and usage with clipal.data/v1. External credential exports are detected automatically.',
+                    importFiles: 'Import JSON Files',
+                    importMode: 'Import Mode',
+                    modeAuto: 'Automatic',
+                    modeReplace: 'Replace',
+                    modeMerge: 'Merge',
+                    previewImport: 'Preview Import',
+                    applyImport: 'Apply Import',
+                    importPreview: '{format}: {credentials} credentials, {providers} providers, {usage} usage records',
+                    importWarnings: 'Warnings: {warnings}',
+                    importApplied: 'Imported {credentials} credentials, {providers} providers, and {usage} usage records',
+                    importSuccess: 'Data imported successfully',
+                    importFailure: 'Failed to import data'
                 },
                 integrations: {
                     title: 'CLI Takeover',
@@ -689,8 +703,22 @@ function app() {
                     footerHint: '保存会更新 `config.yaml`。部分运行时改动需要重启后才会完全生效。',
                     saveSettings: '保存设置',
                     saveSuccess: '配置已保存。部分改动可能需要重启。',
-                    exportSuccess: '配置导出成功',
-                    exportFailure: '配置导出失败'
+                    exportSuccess: '完整备份导出成功',
+                    exportFailure: '备份导出失败',
+                    transferTitle: '导入与备份',
+                    transferCopy: '使用 clipal.data/v1 导出或恢复配置、凭据和用量；也可自动识别外部凭据导出。',
+                    importFiles: '导入 JSON 文件',
+                    importMode: '导入模式',
+                    modeAuto: '自动选择',
+                    modeReplace: '替换',
+                    modeMerge: '合并',
+                    previewImport: '预览导入',
+                    applyImport: '执行导入',
+                    importPreview: '{format}：{credentials} 个凭据、{providers} 个 Provider、{usage} 条用量记录',
+                    importWarnings: '警告：{warnings}',
+                    importApplied: '已导入 {credentials} 个凭据、{providers} 个 Provider 和 {usage} 条用量记录',
+                    importSuccess: '数据导入成功',
+                    importFailure: '数据导入失败'
                 },
                 integrations: {
                     title: 'CLI 接管',
@@ -859,6 +887,9 @@ function app() {
                 }
             }
         },
+        dataImportFiles: [],
+        dataImportMode: '',
+        dataImportPlan: null,
         status: {
             version: '',
             uptime: '',
@@ -4102,12 +4133,15 @@ function app() {
 
         async exportConfig() {
             try {
-                const response = await fetch('/api/config/export');
+                const response = await fetch('/api/data/export');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'clipal-config.json';
+                a.download = 'clipal-data.json';
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -4116,6 +4150,71 @@ function app() {
             } catch (error) {
                 this.showAlert('error', this.t('settings.exportFailure'));
                 console.error('Failed to export config:', error);
+            }
+        },
+
+        async selectDataImportFiles(event) {
+            const files = Array.from((event && event.target && event.target.files) || []);
+            try {
+                this.dataImportFiles = await Promise.all(files.map(async file => ({
+                    name: file.name,
+                    data: await file.text()
+                })));
+                this.dataImportPlan = null;
+                this.dataImportMode = '';
+            } catch (error) {
+                this.dataImportFiles = [];
+                this.dataImportPlan = null;
+                this.showAlert('error', this.t('settings.importFailure'));
+            }
+        },
+
+        dataImportPayload() {
+            const payload = {
+                files: this.dataImportFiles,
+                format: 'auto',
+                mode: this.dataImportMode
+            };
+            if (this.dataImportPlan && this.dataImportPlan.id) {
+                payload.plan_id = this.dataImportPlan.id;
+            }
+            return payload;
+        },
+
+        async previewDataImport() {
+            if (!this.dataImportFiles.length) return;
+            try {
+                this.dataImportPlan = await this.apiCall('/api/data/import/preview', {
+                    method: 'POST',
+                    body: JSON.stringify(this.dataImportPayload())
+                }, false, true);
+                this.dataImportMode = this.dataImportPlan.mode || this.dataImportMode;
+            } catch (error) {
+                this.dataImportPlan = null;
+                const message = String((error && error.message) || '').trim() || this.t('settings.importFailure');
+                this.showAlert('error', message);
+            }
+        },
+
+        async applyDataImport() {
+            if (!this.dataImportPlan || !confirm(this.t('settings.applyImport') + '?')) return;
+            try {
+                const result = await this.apiCall('/api/data/import/apply', {
+                    method: 'POST',
+                    body: JSON.stringify(this.dataImportPayload())
+                }, false, true);
+                this.showAlert('success', this.tf('settings.importApplied', {
+                    credentials: result.credentials || 0,
+                    providers: result.providers || 0,
+                    usage: result.usage_providers || 0
+                }));
+                this.dataImportPlan = null;
+                await this.loadGlobalConfig();
+                await this.loadProviders();
+                await this.refreshStatus();
+            } catch (error) {
+                const message = String((error && error.message) || '').trim() || this.t('settings.importFailure');
+                this.showAlert('error', message);
             }
         },
 

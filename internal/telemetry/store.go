@@ -72,6 +72,13 @@ type DailyCostBucket struct {
 	HasCost    bool  `json:"has_cost,omitempty"`
 }
 
+// DataSnapshot is the stable, storage-independent representation used by
+// Clipal data transfer. The storage version and persistence timestamps remain
+// internal implementation details.
+type DataSnapshot struct {
+	Clients map[string]map[string]ProviderUsage `json:"clients,omitempty"`
+}
+
 type clientUsage struct {
 	Providers map[string]ProviderUsage `json:"providers,omitempty"`
 }
@@ -97,6 +104,21 @@ type Store struct {
 	doneCh    chan struct{}
 	startOnce sync.Once
 	closeOnce sync.Once
+}
+
+// TransferTransaction serializes a data import with live telemetry writes.
+// Record calls wait until Commit or Rollback, so usage generated while an
+// import is being applied cannot be silently overwritten by the restore.
+type TransferTransaction struct {
+	store             *Store
+	before            storeState
+	fileData          []byte
+	fileMode          fs.FileMode
+	fileExists        bool
+	beforeDirty       bool
+	beforeRevision    uint64
+	beforeLastPersist time.Time
+	done              bool
 }
 
 var afterCloneForFlush func()
@@ -251,6 +273,167 @@ func (s *Store) ProviderSnapshots(clientType string) map[string]ProviderUsage {
 	out := make(map[string]ProviderUsage, len(client.Providers))
 	for name, usage := range client.Providers {
 		out[name] = cloneProviderUsage(usage)
+	}
+	return out
+}
+
+// Snapshot returns a deep copy of all persisted usage data.
+func (s *Store) Snapshot() DataSnapshot {
+	out := DataSnapshot{Clients: map[string]map[string]ProviderUsage{}}
+	if s == nil {
+		return out
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for clientName, client := range s.state.Clients {
+		providers := make(map[string]ProviderUsage, len(client.Providers))
+		for providerName, usage := range client.Providers {
+			providers[providerName] = cloneProviderUsage(usage)
+		}
+		out.Clients[clientName] = providers
+	}
+	return out
+}
+
+// BeginTransfer starts an exclusive telemetry transaction. The caller must
+// finish it with Commit or Rollback.
+func (s *Store) BeginTransfer() (*TransferTransaction, error) {
+	if s == nil {
+		return &TransferTransaction{}, nil
+	}
+	s.mu.Lock()
+	tx := &TransferTransaction{
+		store: s, before: cloneState(s.state), beforeDirty: s.dirty,
+		beforeRevision: s.revision, beforeLastPersist: s.lastPersist,
+	}
+	if strings.TrimSpace(s.path) != "" {
+		info, err := os.Stat(s.path)
+		switch {
+		case err == nil:
+			tx.fileData, err = os.ReadFile(s.path)
+			if err != nil {
+				s.mu.Unlock()
+				return nil, err
+			}
+			tx.fileMode, tx.fileExists = info.Mode().Perm(), true
+		case os.IsNotExist(err):
+		default:
+			s.mu.Unlock()
+			return nil, err
+		}
+	}
+	return tx, nil
+}
+
+// Snapshot returns the state captured when the transaction started.
+func (tx *TransferTransaction) Snapshot() DataSnapshot {
+	if tx == nil || tx.store == nil {
+		return DataSnapshot{Clients: map[string]map[string]ProviderUsage{}}
+	}
+	return dataSnapshotFromState(tx.before)
+}
+
+// Restore stages a replacement or merge inside the transaction.
+func (tx *TransferTransaction) Restore(snapshot DataSnapshot, merge bool) {
+	if tx == nil || tx.store == nil || tx.done {
+		return
+	}
+	tx.store.restoreLocked(snapshot, merge)
+}
+
+// Flush persists the staged state while keeping live writers blocked.
+func (tx *TransferTransaction) Flush() error {
+	if tx == nil || tx.store == nil || tx.done {
+		return nil
+	}
+	return tx.store.flushLocked()
+}
+
+func (tx *TransferTransaction) Commit() {
+	if tx == nil || tx.store == nil || tx.done {
+		return
+	}
+	tx.done = true
+	tx.store.mu.Unlock()
+}
+
+func (tx *TransferTransaction) Rollback() error {
+	if tx == nil || tx.store == nil || tx.done {
+		return nil
+	}
+	s := tx.store
+	s.state = cloneState(tx.before)
+	s.dirty = tx.beforeDirty
+	s.revision = tx.beforeRevision
+	s.lastPersist = tx.beforeLastPersist
+	var err error
+	if strings.TrimSpace(s.path) != "" {
+		if tx.fileExists {
+			err = atomicWriteFile(s.path, tx.fileData, tx.fileMode)
+		} else if removeErr := os.Remove(s.path); removeErr != nil && !os.IsNotExist(removeErr) {
+			err = removeErr
+		}
+	}
+	tx.done = true
+	s.mu.Unlock()
+	if tx.beforeDirty {
+		s.notifyPersist()
+	}
+	return err
+}
+
+func (s *Store) restoreLocked(snapshot DataSnapshot, merge bool) {
+	if !merge {
+		s.state.Clients = make(map[string]clientUsage, len(snapshot.Clients))
+	}
+	if s.state.Clients == nil {
+		s.state.Clients = map[string]clientUsage{}
+	}
+	for clientName, providers := range snapshot.Clients {
+		client := s.state.Clients[clientName]
+		if client.Providers == nil {
+			client.Providers = map[string]ProviderUsage{}
+		}
+		for providerName, usage := range providers {
+			if existing, ok := client.Providers[providerName]; merge && ok {
+				client.Providers[providerName] = mergeProviderUsage(existing, usage)
+			} else {
+				client.Providers[providerName] = cloneProviderUsage(usage)
+			}
+		}
+		s.state.Clients[clientName] = client
+	}
+	s.state.Version = storeVersion
+	s.state.UpdatedAt = time.Now()
+	s.dirty = true
+	s.revision++
+}
+
+func (s *Store) flushLocked() error {
+	if strings.TrimSpace(s.path) == "" || !s.dirty {
+		return nil
+	}
+	data, err := json.MarshalIndent(s.state, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := atomicWriteFile(s.path, data, 0o600); err != nil {
+		return err
+	}
+	s.lastPersist = time.Now()
+	s.dirty = false
+	return nil
+}
+
+func dataSnapshotFromState(state storeState) DataSnapshot {
+	out := DataSnapshot{Clients: make(map[string]map[string]ProviderUsage, len(state.Clients))}
+	for clientName, client := range state.Clients {
+		providers := make(map[string]ProviderUsage, len(client.Providers))
+		for providerName, usage := range client.Providers {
+			providers[providerName] = cloneProviderUsage(usage)
+		}
+		out.Clients[clientName] = providers
 	}
 	return out
 }

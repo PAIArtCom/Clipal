@@ -127,6 +127,7 @@ clipal service start
 - 🖥️ [Web UI 使用说明](docs/zh/web-ui.md)
 - 🔀 [路由与故障切换魔法](docs/zh/routing-and-failover.md)
 - 🛠️ [后台服务、状态与更新](docs/zh/services.md)
+- 💾 [数据导入、导出与备份](docs/zh/data-transfer.md)
 - 📚 [文档首页](docs/zh/README.md) & [Release Notes](release-notes/)
 
 ## 🔒 隐私与安全

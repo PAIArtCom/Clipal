@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/lansespirit/Clipal/internal/proxy"
+	"github.com/lansespirit/Clipal/internal/transfer"
 )
 
 //go:embed static/*
@@ -16,6 +17,7 @@ var staticFiles embed.FS
 
 const maxAPIRequestBytes = 1 << 20 // 1 MiB (WebUI requests are small)
 const maxOAuthImportRequestBytes = 16 << 20
+const maxDataImportRequestBytes = transfer.MaxJSONImportRequestBytes
 
 // Handler manages HTTP routes for the web management interface
 type Handler struct {
@@ -75,9 +77,17 @@ func isOAuthCLIProxyAPIImportPath(path string) bool {
 	return strings.TrimSuffix(strings.TrimSpace(path), "/") == "/api/oauth/import/cli-proxy-api"
 }
 
+func isDataImportPath(path string) bool {
+	path = strings.TrimSuffix(strings.TrimSpace(path), "/")
+	return path == "/api/data/import/preview" || path == "/api/data/import/apply"
+}
+
 func apiRequestBodyLimit(path string) int64 {
 	if isOAuthCLIProxyAPIImportPath(path) {
 		return maxOAuthImportRequestBytes
+	}
+	if isDataImportPath(path) {
+		return maxDataImportRequestBytes
 	}
 	return maxAPIRequestBytes
 }
@@ -151,7 +161,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// API routes
 	mux.HandleFunc("/api/config/global", h.localOnly(h.api.HandleGetGlobalConfig))
 	mux.HandleFunc("/api/config/global/update", h.localOnly(h.api.HandleUpdateGlobalConfig))
-	mux.HandleFunc("/api/config/export", h.localOnly(h.api.HandleExportConfig))
+	mux.HandleFunc("/api/data/export", h.localOnly(h.api.HandleDataExport))
+	mux.HandleFunc("/api/data/import/preview", h.localOnly(h.api.HandleDataImportPreview))
+	mux.HandleFunc("/api/data/import/apply", h.localOnly(h.api.HandleDataImportApply))
 	mux.HandleFunc("/api/integrations", h.localOnly(h.api.HandleListIntegrations))
 	mux.HandleFunc("/api/integrations/", h.localOnly(h.routeIntegrations))
 

@@ -76,7 +76,8 @@ Notes:
 
 ### Export
 
-- Export the current config as JSON for backup or migration
+- Export a complete `clipal.data/v1` JSON backup containing configuration, credentials, and usage
+- Preview and apply native backups or supported external credential exports from **Import & Backup**
 
 ## Common Provider States In The UI
 

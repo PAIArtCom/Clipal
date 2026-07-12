@@ -163,6 +163,18 @@ func TestResolveRootCommand(t *testing.T) {
 			wantArgs: []string{"restart"},
 		},
 		{
+			name:     "ExportCommandPassesThrough",
+			args:     []string{"export", "-o", "backup.json"},
+			wantCmd:  rootCommandExport,
+			wantArgs: []string{"-o", "backup.json"},
+		},
+		{
+			name:     "ImportCommandPassesThrough",
+			args:     []string{"import", "--dry-run", "backup.json"},
+			wantCmd:  rootCommandImport,
+			wantArgs: []string{"--dry-run", "backup.json"},
+		},
+		{
 			name:    "HelpTokenShowsRootHelp",
 			args:    []string{"help"},
 			wantCmd: rootCommandHelp,

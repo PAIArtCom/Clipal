@@ -33,6 +33,8 @@ const (
 	rootCommandUpdate      rootCommand = "update"
 	rootCommandStatus      rootCommand = "status"
 	rootCommandService     rootCommand = "service"
+	rootCommandExport      rootCommand = "export"
+	rootCommandImport      rootCommand = "import"
 	rootCommandApplyUpdate rootCommand = "__apply-update"
 )
 
@@ -73,6 +75,18 @@ func main() {
 	case rootCommandService:
 		runService(args)
 		return
+	case rootCommandExport:
+		if err := runDataExport(args, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "clipal export: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	case rootCommandImport:
+		if err := runDataImport(args, os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "clipal import: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	case rootCommandApplyUpdate:
 		runApplyUpdate(args)
 		return
@@ -99,6 +113,10 @@ func resolveRootCommand(args []string) (rootCommand, []string, error) {
 		return rootCommandStatus, args[1:], nil
 	case "service":
 		return rootCommandService, args[1:], nil
+	case "export":
+		return rootCommandExport, args[1:], nil
+	case "import":
+		return rootCommandImport, args[1:], nil
 	case "__apply-update":
 		return rootCommandApplyUpdate, args[1:], nil
 	case "restart":
@@ -120,6 +138,8 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "  status            Show runtime and service status without starting the server")
 	fmt.Fprintln(w, "  service           Install and manage the background service")
 	fmt.Fprintln(w, "  update            Check for updates or replace the current binary in place")
+	fmt.Fprintln(w, "  export            Export a complete clipal.data/v1 backup")
+	fmt.Fprintln(w, "  import            Preview and import Clipal or external credential data")
 	fmt.Fprintln(w, "  restart           Shortcut for 'clipal service restart'")
 	fmt.Fprintln(w, "  help              Show this help")
 	fmt.Fprintln(w, "")

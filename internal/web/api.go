@@ -18,6 +18,7 @@ import (
 	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
 	"github.com/lansespirit/Clipal/internal/proxy"
 	"github.com/lansespirit/Clipal/internal/telemetry"
+	transferpkg "github.com/lansespirit/Clipal/internal/transfer"
 )
 
 var startTime = time.Now()
@@ -32,6 +33,7 @@ type API struct {
 	version      string
 	runtime      *proxy.Router
 	telemetry    *telemetry.Store
+	transfer     *transferpkg.Service
 	integrations *integration.Manager
 	oauth        *oauthpkg.Service
 	oauthMu      sync.Mutex
@@ -60,7 +62,7 @@ func NewAPI(configDir, version string, runtime *proxy.Router) *API {
 			logger.Warn("failed to load usage telemetry from %s: %v", configDir, err)
 		}
 	}
-	return &API{
+	api := &API{
 		configDir:    configDir,
 		version:      version,
 		runtime:      runtime,
@@ -69,6 +71,17 @@ func NewAPI(configDir, version string, runtime *proxy.Router) *API {
 		oauth:        oauthpkg.NewService(configDir),
 		oauthTargets: make(map[string]oauthTargetClient),
 	}
+	var transferOptions []transferpkg.ServiceOption
+	if runtime != nil {
+		transferOptions = append(transferOptions, transferpkg.WithApplyCoordinator(runtime.CoordinateDataTransfer))
+	}
+	transferService, err := transferpkg.NewService(configDir, version, telemetryStore, nil, transferOptions...)
+	if err != nil {
+		logger.Warn("failed to initialize data transfer service: %v", err)
+	} else {
+		api.transfer = transferService
+	}
+	return api
 }
 
 func (a *API) reloadRuntimeProviderConfigs() error {
@@ -617,30 +630,6 @@ func (a *API) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	status.Clients["gemini"] = buildClientStatus(cfg.Gemini, cfg.Gemini.Providers, snap.Clients[proxy.ClientGemini])
 
 	writeJSON(w, status)
-}
-
-// HandleExportConfig exports all configuration as JSON
-func (a *API) HandleExportConfig(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	cfg := a.loadConfigOrWriteError(w)
-	if cfg == nil {
-		return
-	}
-
-	exportData := ExportConfigResponse{
-		Global: toGlobalConfigResponse(cfg.Global),
-		Claude: toClientConfigExport(cfg.Claude),
-		OpenAI: toClientConfigExport(cfg.OpenAI),
-		Gemini: toClientConfigExport(cfg.Gemini),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", "attachment; filename=clipal-config.json")
-	_ = json.NewEncoder(w).Encode(exportData)
 }
 
 func (a *API) HandleListIntegrations(w http.ResponseWriter, r *http.Request) {

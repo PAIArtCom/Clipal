@@ -133,6 +133,12 @@ func ParseOAuthImportEntries(data []byte) ([]ParsedImportCredential, error) {
 	return parseSub2APIExportEntries(data)
 }
 
+// ParseSub2APIExportEntries parses a sub2api account export without applying
+// the generic import format detection used by ParseOAuthImportEntries.
+func ParseSub2APIExportEntries(data []byte) ([]ParsedImportCredential, error) {
+	return parseSub2APIExportEntries(data)
+}
+
 func ParseCodexNativeAuthCredential(data []byte) (*Credential, error) {
 	if len(strings.TrimSpace(string(data))) == 0 {
 		return nil, ErrCLIProxyAPINotCredential

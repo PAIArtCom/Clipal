@@ -2002,3 +2002,77 @@ test('saveGlobalConfig normalizes and clears non-custom upstream proxy settings'
     assert.equal(calls[0].options.upstream_proxy_mode, 'direct');
     assert.equal(calls[0].options.upstream_proxy_url, '');
 });
+
+test('data import selection and preview use the shared data API', async () => {
+    const state = loadApp();
+    const calls = [];
+    state.apiCall = async (url, options) => {
+        calls.push({ url, body: JSON.parse(options.body) });
+        return { format: 'cliproxyapi', mode: 'merge', credentials: 1, providers: 0, usage_providers: 0 };
+    };
+    state.dataImportMode = 'replace';
+    await state.selectDataImportFiles({
+        target: {
+            files: [{ name: 'credential.json', text: async () => '{"type":"codex"}' }]
+        }
+    });
+    await state.previewDataImport();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, '/api/data/import/preview');
+    assert.equal(calls[0].body.format, 'auto');
+    assert.equal(calls[0].body.files[0].name, 'credential.json');
+    assert.equal(calls[0].body.files[0].data, '{"type":"codex"}');
+    assert.equal(state.dataImportMode, 'merge');
+    assert.equal(state.dataImportPlan.credentials, 1);
+});
+
+test('data import selection preserves large integers as text and resets automatic mode', async () => {
+    const state = loadApp();
+    state.dataImportMode = 'merge';
+    const raw = '{"request_count":9007199254740993}';
+    await state.selectDataImportFiles({
+        target: { files: [{ name: 'backup.json', text: async () => raw }] }
+    });
+    assert.equal(state.dataImportFiles[0].data, raw);
+    assert.equal(state.dataImportMode, '');
+});
+
+test('data import apply reports returned apply details', async () => {
+    const state = loadApp();
+    const alerts = [];
+    state.dataImportPlan = { id: 'plan' };
+    state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
+    state.apiCall = async () => ({ credentials: 2, providers: 3, usage_providers: 4 });
+    state.showAlert = (type, message) => alerts.push({ type, message });
+    state.loadGlobalConfig = async () => {};
+    state.loadProviders = async () => {};
+    state.refreshStatus = async () => {};
+    await state.applyDataImport();
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0].message, /2/);
+    assert.match(alerts[0].message, /3/);
+    assert.match(alerts[0].message, /4/);
+});
+
+test('data import apply shows the server error exactly once', async () => {
+    const state = loadApp();
+    const alerts = [];
+    const calls = [];
+    state.dataImportPlan = { id: 'plan' };
+    state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
+    state.apiCall = async (...args) => {
+        calls.push(args);
+        throw new Error('import data or mode changed after preview; preview again');
+    };
+    state.showAlert = (type, message) => alerts.push({ type, message });
+
+    await state.applyDataImport();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][3], true);
+    assert.deepEqual(alerts, [{
+        type: 'error',
+        message: 'import data or mode changed after preview; preview again'
+    }]);
+});
