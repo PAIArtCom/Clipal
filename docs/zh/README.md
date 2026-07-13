@@ -5,6 +5,7 @@ English: [docs/en/README.md](../en/README.md) | 中文: [docs/zh/README.md](READ
 ## 从哪里开始
 
 - 新用户：先看 [快速开始](getting-started.md)
+- 在服务器账号上快速完成 CLI 安装与 Clipal 初始化：[服务器初始化](server-initialization.md)
 - 需要接入客户端：看 [客户端接入](client-setup.md)
 - 需要理解配置字段：看 [配置参考](config-reference.md)
 - 想直接用图形界面：看 [Web UI 使用说明](web-ui.md)

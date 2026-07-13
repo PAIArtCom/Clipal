@@ -17,6 +17,8 @@ import (
 // GlobalConfigRequest represents a request to update global configuration
 type GlobalConfigRequest struct {
 	ListenAddr            string                      `json:"listen_addr"`
+	AllowRemoteProxy      bool                        `json:"allow_remote_proxy"`
+	AllowRemoteWebUI      bool                        `json:"allow_remote_web_ui"`
 	Port                  int                         `json:"port"`
 	LogLevel              string                      `json:"log_level"`
 	ReactivateAfter       string                      `json:"reactivate_after"`
@@ -65,6 +67,8 @@ type BusyBackpressureConfigRequest struct {
 // GlobalConfigResponse represents the global configuration returned to the UI.
 type GlobalConfigResponse struct {
 	ListenAddr            string                       `json:"listen_addr"`
+	AllowRemoteProxy      bool                         `json:"allow_remote_proxy"`
+	AllowRemoteWebUI      bool                         `json:"allow_remote_web_ui"`
 	Port                  int                          `json:"port"`
 	LogLevel              string                       `json:"log_level"`
 	ReactivateAfter       string                       `json:"reactivate_after"`
@@ -463,6 +467,8 @@ func boolPtrOrTrue(v *bool) bool {
 func toGlobalConfigResponse(gc config.GlobalConfig) GlobalConfigResponse {
 	return GlobalConfigResponse{
 		ListenAddr:            gc.ListenAddr,
+		AllowRemoteProxy:      gc.AllowRemoteProxy,
+		AllowRemoteWebUI:      gc.AllowRemoteWebUI,
 		Port:                  gc.Port,
 		LogLevel:              string(gc.LogLevel),
 		ReactivateAfter:       gc.ReactivateAfter,

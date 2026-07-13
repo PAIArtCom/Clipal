@@ -130,6 +130,8 @@ func (a *API) HandleUpdateGlobalConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Update global config
 	cfg.Global.ListenAddr = req.ListenAddr
+	cfg.Global.AllowRemoteProxy = req.AllowRemoteProxy
+	cfg.Global.AllowRemoteWebUI = req.AllowRemoteWebUI
 	cfg.Global.Port = req.Port
 	cfg.Global.LogLevel = config.LogLevel(req.LogLevel)
 	cfg.Global.ReactivateAfter = req.ReactivateAfter

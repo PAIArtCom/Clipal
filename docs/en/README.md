@@ -8,6 +8,7 @@ English: [docs/en/README.md](README.md) | 中文: [docs/zh/README.md](../zh/READ
 - Need to connect a client: see [Client Setup](client-setup.md)
 - Need config details: open [Config Reference](config-reference.md)
 - Want the GUI first: open [Web UI Guide](web-ui.md)
+- Setting up a server account: see [Server Initialization](server-initialization.md)
 
 ## Browse By Task
 

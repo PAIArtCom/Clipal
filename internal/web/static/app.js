@@ -58,6 +58,17 @@ function app() {
                     services: 'Services',
                     status: 'System Status'
                 },
+                setup: {
+                    title: 'Server Setup Checklist',
+                    service: 'Clipal service',
+                    provider: 'First provider',
+                    integrations: 'CLI takeover',
+                    done: 'Ready',
+                    todo: 'Needs attention',
+                    serviceHint: 'Open Services',
+                    providerHint: 'Add a provider',
+                    integrationHint: 'Open CLI Takeover'
+                },
                 common: {
                     none: 'None',
                     load: 'Load',
@@ -258,6 +269,9 @@ function app() {
                     runtimeTitle: 'Runtime',
                     runtimeCopy: 'Basic listener and request buffering defaults.',
                     listenAddress: 'Listen Address',
+                    allowRemoteProxy: 'Allow Remote Proxy',
+                    allowRemoteWebUI: 'Allow Remote Web UI',
+                    remoteAccessHint: 'Remote access is unauthenticated. Protect it with your firewall, VPN, or reverse proxy.',
                     port: 'Port',
                     logLevel: 'Log Level',
                     maxBodySize: 'Max Body Size',
@@ -475,6 +489,17 @@ function app() {
                     services: '服务',
                     status: '系统状态'
                 },
+                setup: {
+                    title: '服务器初始化检查清单',
+                    service: 'Clipal 服务',
+                    provider: '首个 Provider',
+                    integrations: 'CLI 接管',
+                    done: '已就绪',
+                    todo: '需要处理',
+                    serviceHint: '打开服务管理',
+                    providerHint: '添加 Provider',
+                    integrationHint: '打开 CLI 接管'
+                },
                 common: {
                     none: '无',
                     load: '加载',
@@ -674,6 +699,9 @@ function app() {
                     runtimeTitle: '运行时',
                     runtimeCopy: '基础监听配置与请求缓冲默认项。',
                     listenAddress: '监听地址',
+                    allowRemoteProxy: '允许远程代理访问',
+                    allowRemoteWebUI: '允许远程 Web UI 访问',
+                    remoteAccessHint: '远程访问没有内置认证，请使用防火墙、VPN 或反向代理进行保护。',
                     port: '端口',
                     logLevel: '日志级别',
                     maxBodySize: '最大请求体大小',
@@ -891,6 +919,8 @@ function app() {
         // during the initial render (before loadGlobalConfig completes).
         globalConfig: {
             listen_addr: '',
+            allow_remote_proxy: false,
+            allow_remote_web_ui: false,
             port: 0,
             log_level: 'info',
             reactivate_after: '',
@@ -1014,6 +1044,13 @@ function app() {
                 error: String((status && status.error) || '')
             };
         },
+
+        setupServiceReady() { return !!this.serviceStatus.running; },
+        setupProviderReady() {
+            return Object.values(this.status.clients || {}).some(client => (client.enabled_providers || []).length > 0);
+        },
+        setupIntegrationReady() { return (this.integrations || []).some(item => item.state === 'configured'); },
+        openSetupTab(tab) { this.activeTab = tab; },
 
         normalizeLocale(locale) {
             const value = String(locale || '').trim();

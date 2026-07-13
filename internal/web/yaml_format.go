@@ -126,6 +126,8 @@ func formatGlobalConfigYAML(gc config.GlobalConfig) []byte {
 	// Quote strings to avoid YAML injection via newlines/# and to keep the file
 	// parseable even if a value contains spaces or special characters.
 	writeBufferString(&b, fmt.Sprintf("listen_addr: %s\n", yamlDoubleQuote(strings.TrimSpace(gc.ListenAddr))))
+	writeBufferString(&b, fmt.Sprintf("allow_remote_proxy: %t\n", gc.AllowRemoteProxy))
+	writeBufferString(&b, fmt.Sprintf("allow_remote_web_ui: %t\n", gc.AllowRemoteWebUI))
 	writeBufferString(&b, fmt.Sprintf("port: %d\n", gc.Port))
 	writeBufferString(&b, fmt.Sprintf("log_level: %s # debug | info | warn | error\n", yamlDoubleQuote(strings.TrimSpace(string(gc.LogLevel)))))
 	writeBufferString(&b, fmt.Sprintf("reactivate_after: %s # set to 0 to disable temporary deactivation\n", yamlDoubleQuote(strings.TrimSpace(gc.ReactivateAfter))))

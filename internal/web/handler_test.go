@@ -5,6 +5,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -207,6 +209,51 @@ func TestLocalOnly_AllowsIPv6LoopbackAndEmptyHost(t *testing.T) {
 	}
 	if !called {
 		t.Fatalf("expected wrapped handler to be called")
+	}
+}
+
+func TestLocalOnly_AllowsRemoteWhenEnabledInConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("allow_remote_web_ui: true\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	h := NewHandler(dir, "test", nil)
+	called := false
+	handler := h.localOnly(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req.RemoteAddr = "192.0.2.10:12345"
+	req.Host = "example.com"
+	w := httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusNoContent || !called {
+		t.Fatalf("status=%d called=%v body=%s", w.Code, called, w.Body.String())
+	}
+	if got := w.Header().Get("X-Frame-Options"); got != "DENY" {
+		t.Fatalf("X-Frame-Options=%q", got)
+	}
+	if got := w.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Fatalf("Referrer-Policy=%q", got)
+	}
+}
+
+func TestLocalOnly_RemoteModeStillRequiresStateChangeHeader(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("allow_remote_web_ui: true\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	h := NewHandler(dir, "test", nil)
+	handler := h.localOnly(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/test", strings.NewReader(`{}`))
+	req.RemoteAddr = "192.0.2.10:12345"
+	req.Host = "example.com"
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

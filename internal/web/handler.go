@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/lansespirit/Clipal/internal/config"
 	"github.com/lansespirit/Clipal/internal/proxy"
 	"github.com/lansespirit/Clipal/internal/transfer"
 )
@@ -106,7 +107,7 @@ func (h *Handler) localOnly(next http.HandlerFunc) http.HandlerFunc {
 		//
 		// Additionally enforce a localhost Host header to mitigate DNS rebinding
 		// (attackers can resolve a public domain to 127.0.0.1 after the page loads).
-		if !isLoopbackRemote(r.RemoteAddr) || !isLocalhostHost(r.Host) {
+		if !h.remoteWebUIEnabled() && (!isLoopbackRemote(r.RemoteAddr) || !isLocalhostHost(r.Host)) {
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				writeError(w, "forbidden: management interface is localhost-only", http.StatusForbidden)
@@ -150,6 +151,16 @@ func (h *Handler) localOnly(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r)
 	}
+}
+
+func (h *Handler) remoteWebUIEnabled() bool {
+	if h.api.runtime != nil {
+		if cfg := h.api.runtime.ConfigSnapshot(); cfg != nil {
+			return cfg.Global.AllowRemoteWebUI
+		}
+	}
+	cfg, err := config.Load(h.api.configDir)
+	return err == nil && cfg.Global.AllowRemoteWebUI
 }
 
 // RegisterRoutes registers all web management routes to the provided mux

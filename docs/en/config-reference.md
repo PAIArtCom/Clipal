@@ -31,6 +31,8 @@ Matching templates:
 
 ```yaml
 listen_addr: 127.0.0.1
+allow_remote_proxy: false
+allow_remote_web_ui: false
 port: 3333
 log_level: info
 reactivate_after: 1h

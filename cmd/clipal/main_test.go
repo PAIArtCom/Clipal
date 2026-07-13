@@ -175,6 +175,12 @@ func TestResolveRootCommand(t *testing.T) {
 			wantArgs: []string{"--dry-run", "backup.json"},
 		},
 		{
+			name:     "InitCommandPassesThrough",
+			args:     []string{"init", "--dry-run"},
+			wantCmd:  rootCommandInit,
+			wantArgs: []string{"--dry-run"},
+		},
+		{
 			name:    "HelpTokenShowsRootHelp",
 			args:    []string{"help"},
 			wantCmd: rootCommandHelp,

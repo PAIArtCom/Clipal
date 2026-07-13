@@ -35,6 +35,7 @@ const (
 	rootCommandService     rootCommand = "service"
 	rootCommandExport      rootCommand = "export"
 	rootCommandImport      rootCommand = "import"
+	rootCommandInit        rootCommand = "init"
 	rootCommandApplyUpdate rootCommand = "__apply-update"
 )
 
@@ -87,6 +88,9 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	case rootCommandInit:
+		runInit(args)
+		return
 	case rootCommandApplyUpdate:
 		runApplyUpdate(args)
 		return
@@ -117,6 +121,8 @@ func resolveRootCommand(args []string) (rootCommand, []string, error) {
 		return rootCommandExport, args[1:], nil
 	case "import":
 		return rootCommandImport, args[1:], nil
+	case "init":
+		return rootCommandInit, args[1:], nil
 	case "__apply-update":
 		return rootCommandApplyUpdate, args[1:], nil
 	case "restart":
@@ -140,6 +146,7 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "  update            Check for updates or replace the current binary in place")
 	fmt.Fprintln(w, "  export            Export a complete clipal.data/v1 backup")
 	fmt.Fprintln(w, "  import            Preview and import Clipal or external credential data")
+	fmt.Fprintln(w, "  init              Bootstrap selected AI CLIs and apply safe local takeover")
 	fmt.Fprintln(w, "  restart           Shortcut for 'clipal service restart'")
 	fmt.Fprintln(w, "  help              Show this help")
 	fmt.Fprintln(w, "")
@@ -150,6 +157,10 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "        Windows: detach console window (used by Task Scheduler)")
 	fmt.Fprintln(w, "  -listen-addr string")
 	fmt.Fprintln(w, "        Override listen address from config (default: 127.0.0.1)")
+	fmt.Fprintln(w, "  -allow-remote-proxy")
+	fmt.Fprintln(w, "        Allow proxy requests from non-loopback clients")
+	fmt.Fprintln(w, "  -allow-remote-web-ui")
+	fmt.Fprintln(w, "        Allow Web UI requests from non-loopback clients")
 	fmt.Fprintln(w, "  -log-level string")
 	fmt.Fprintln(w, "        Override log level (debug/info/warn/error)")
 	fmt.Fprintln(w, "  -port int")
@@ -174,6 +185,8 @@ func runServer(args []string) {
 
 	configDir := fs.String("config-dir", "", "Configuration directory (default: ~/.clipal)")
 	listenAddr := fs.String("listen-addr", "", "Override listen address from config (default: 127.0.0.1)")
+	allowRemoteProxy := fs.Bool("allow-remote-proxy", false, "Allow proxy requests from non-loopback clients")
+	allowRemoteWebUI := fs.Bool("allow-remote-web-ui", false, "Allow Web UI requests from non-loopback clients")
 	port := fs.Int("port", 0, "Override port from config")
 	logLevel := fs.String("log-level", "", "Override log level (debug/info/warn/error)")
 	detachConsole := fs.Bool("detach-console", false, "Windows: detach console window (used by Task Scheduler)")
@@ -216,6 +229,12 @@ func runServer(args []string) {
 	// Apply command line overrides
 	if *listenAddr != "" {
 		cfg.Global.ListenAddr = *listenAddr
+	}
+	if *allowRemoteProxy {
+		cfg.Global.AllowRemoteProxy = true
+	}
+	if *allowRemoteWebUI {
+		cfg.Global.AllowRemoteWebUI = true
 	}
 	if *port > 0 {
 		cfg.Global.Port = *port

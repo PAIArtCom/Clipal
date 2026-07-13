@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -82,10 +83,12 @@ func (c CircuitBreakerConfig) OpenTimeoutDuration() (time.Duration, error) {
 
 // GlobalConfig represents the global configuration
 type GlobalConfig struct {
-	ListenAddr      string   `yaml:"listen_addr"`
-	Port            int      `yaml:"port"`
-	LogLevel        LogLevel `yaml:"log_level"`
-	ReactivateAfter string   `yaml:"reactivate_after"`
+	ListenAddr       string   `yaml:"listen_addr"`
+	AllowRemoteProxy bool     `yaml:"allow_remote_proxy"`
+	AllowRemoteWebUI bool     `yaml:"allow_remote_web_ui"`
+	Port             int      `yaml:"port"`
+	LogLevel         LogLevel `yaml:"log_level"`
+	ReactivateAfter  string   `yaml:"reactivate_after"`
 	// UpstreamIdleTimeout cancels an upstream attempt if no response body bytes are received
 	// for the duration (useful for SSE streams that may hang after headers).
 	// Set to "0" to disable.
@@ -1047,6 +1050,9 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.Global.ListenAddr) == "" {
 		return fmt.Errorf("listen_addr cannot be empty")
 	}
+	if !isLoopbackListenAddr(c.Global.ListenAddr) && !c.Global.AllowRemoteProxy {
+		return fmt.Errorf("non-loopback listen_addr requires allow_remote_proxy: true")
+	}
 	if c.Global.Port < 1 || c.Global.Port > 65535 {
 		return fmt.Errorf("invalid port: %d", c.Global.Port)
 	}
@@ -1140,6 +1146,15 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func isLoopbackListenAddr(value string) bool {
+	host := strings.Trim(strings.TrimSpace(value), "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (c *Config) ConfigDir() string {

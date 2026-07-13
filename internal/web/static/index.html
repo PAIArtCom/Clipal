@@ -409,6 +409,20 @@
                                 <input type="text" x-model="globalConfig.listen_addr" class="form-input" required>
                             </div>
                             <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="globalConfig.allow_remote_proxy">
+                                    <span x-text="t('settings.allowRemoteProxy')"></span>
+                                </label>
+                                <div class="form-hint" x-text="t('settings.remoteAccessHint')"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" x-model="globalConfig.allow_remote_web_ui">
+                                    <span x-text="t('settings.allowRemoteWebUI')"></span>
+                                </label>
+                                <div class="form-hint" x-text="t('settings.remoteAccessHint')"></div>
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label" x-text="t('settings.port')"></label>
                                 <input type="number" x-model.number="globalConfig.port" class="form-input" required
                                     min="1" max="65535">
@@ -868,6 +882,26 @@
             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
             x-transition:enter-end="opacity-100 translate-y-0">
             <div class="card-grid">
+                <div class="card status-card" style="grid-column: 1 / -1;">
+                    <div class="status-card__header"><h3 class="provider-name status-card__title" x-text="t('setup.title')"></h3></div>
+                    <div class="kv-grid">
+                        <button type="button" class="kv-item" @click="openSetupTab('services')">
+                            <div class="kv-label" x-text="t('setup.service')"></div>
+                            <div class="kv-value" x-text="setupServiceReady() ? t('setup.done') : t('setup.todo')"></div>
+                            <div class="form-hint" x-text="t('setup.serviceHint')"></div>
+                        </button>
+                        <button type="button" class="kv-item" @click="openSetupTab('providers')">
+                            <div class="kv-label" x-text="t('setup.provider')"></div>
+                            <div class="kv-value" x-text="setupProviderReady() ? t('setup.done') : t('setup.todo')"></div>
+                            <div class="form-hint" x-text="t('setup.providerHint')"></div>
+                        </button>
+                        <button type="button" class="kv-item" @click="openSetupTab('integrations')">
+                            <div class="kv-label" x-text="t('setup.integrations')"></div>
+                            <div class="kv-value" x-text="setupIntegrationReady() ? t('setup.done') : t('setup.todo')"></div>
+                            <div class="form-hint" x-text="t('setup.integrationHint')"></div>
+                        </button>
+                    </div>
+                </div>
                 <div class="card status-card status-system-card" style="grid-column: 1 / -1;">
                     <div class="status-card__header">
                         <h3 class="provider-name status-card__title" x-text="statusSystemInfoLabel()"></h3>

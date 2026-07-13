@@ -92,8 +92,8 @@ http://127.0.0.1:3333/
 
 ## 安全边界
 
-- Web UI 只允许本机访问
-- 即使代理监听在 `0.0.0.0` 或 `::`，管理界面也会拒绝非 loopback 请求
+- Web UI 默认只允许本机访问
+- 如用户在全局设置明确开启 `allow_remote_web_ui`，管理界面可远程访问；此模式没有内置认证，请使用防火墙、VPN 或反向代理保护
 - 管理 API 设计为本机使用，不提供独立认证层
 - 变更类 API 请求要求 `X-Clipal-UI: 1`
 - 带请求体的变更类 API 需要 `Content-Type: application/json`

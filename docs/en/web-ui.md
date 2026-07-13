@@ -92,8 +92,8 @@ Notes:
 
 ## Security Boundary
 
-- The Web UI is localhost-only
-- Even if the proxy listens on `0.0.0.0` or `::`, the management UI rejects non-loopback requests
+- The Web UI is localhost-only by default
+- When the user explicitly enables `allow_remote_web_ui` in Global Settings, the management UI accepts remote access. This mode has no built-in authentication; protect it with a firewall, VPN, or reverse proxy.
 - The management API is intended for local use and does not add a separate auth layer
 - State-changing API calls require `X-Clipal-UI: 1`
 - State-changing calls with a body require `Content-Type: application/json`
