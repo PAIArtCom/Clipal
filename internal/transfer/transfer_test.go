@@ -593,3 +593,174 @@ func writeTestState(t *testing.T, dir, provider, key string) {
 		}
 	}
 }
+
+func TestApplyBlocksConcurrentCredentialStoreWrites(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	saveStarted := make(chan struct{})
+	saveDone := make(chan struct{})
+	var saveErr error
+	service, err := NewService(dir, "test", nil, func() error {
+		// reload runs late in apply, after the oauth snapshot, while the
+		// transfer owns the credential store exclusively.
+		go func() {
+			defer close(saveDone)
+			close(saveStarted)
+			live := &oauth.Credential{Ref: "live", Provider: config.OAuthProviderCodex, Email: "live@example.com", AccessToken: "live-token"}
+			saveErr = oauth.NewStore(dir).Save(live)
+		}()
+		<-saveStarted
+		select {
+		case <-saveDone:
+			return errors.New("concurrent credential save completed while the transfer held the store")
+		case <-time.After(20 * time.Millisecond):
+			return nil
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "credential.json", Data: []byte(`{"type":"codex","email":"import@example.com","access_token":"token"}`)}}, FormatAuto, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-saveDone:
+	case <-time.After(time.Second):
+		t.Fatal("blocked credential save never resumed after the transfer finished")
+	}
+	if saveErr != nil {
+		t.Fatalf("blocked credential save failed: %v", saveErr)
+	}
+	if _, err := oauth.NewStore(dir).Load(config.OAuthProviderCodex, "live"); err != nil {
+		t.Fatalf("credential saved after the transfer is missing: %v", err)
+	}
+}
+
+func TestApplyPreservesOAuthBackupWhenRollbackRestoreFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("file permissions do not restrict root")
+	}
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	old := &oauth.Credential{Ref: "old", Provider: config.OAuthProviderCodex, Email: "old@example.com", AccessToken: "old-token"}
+	if err := oauth.NewStore(dir).Save(old); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(dir, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.hooks.beforeSaveCredential = func(int) error {
+		// The oauth snapshot exists by now; make its restore fail so rollback
+		// cannot copy the original credentials back.
+		backups, err := filepath.Glob(filepath.Join(dir, ".clipal-transfer-oauth-*"))
+		if err != nil || len(backups) != 1 {
+			t.Fatalf("backup directory not found: %v %v", backups, err)
+		}
+		unreadable := ""
+		walkErr := filepath.WalkDir(backups[0], func(path string, entry fs.DirEntry, err error) error {
+			if err == nil && entry.Type().IsRegular() && unreadable == "" {
+				unreadable = path
+				return os.Chmod(path, 0o000)
+			}
+			return err
+		})
+		if walkErr != nil || unreadable == "" {
+			t.Fatalf("could not make backup unreadable: %v %q", walkErr, unreadable)
+		}
+		return errors.New("boom")
+	}
+	plan, err := service.Analyze([]Input{{Name: "credential.json", Data: []byte(`{"type":"codex","email":"import@example.com","access_token":"token"}`)}}, FormatAuto, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, applyErr := service.Apply(plan)
+	if applyErr == nil {
+		t.Fatal("expected apply to fail")
+	}
+	if !strings.Contains(applyErr.Error(), "original credentials preserved at") {
+		t.Fatalf("error does not point at the preserved backup: %v", applyErr)
+	}
+	backups, err := filepath.Glob(filepath.Join(dir, ".clipal-transfer-oauth-*"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("preserved backup directory missing: %v %v", backups, err)
+	}
+	if err := os.Chmod(filepath.Join(backups[0]), 0o700); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRelinkKeepsProvidersBoundToOtherAccounts(t *testing.T) {
+	dir := t.TempDir()
+	existing := &oauth.Credential{Ref: "default", Provider: config.OAuthProviderCodex, Email: "x@example.com", AccountID: "acct-x", AccessToken: "token-x"}
+	if err := oauth.NewStore(dir).Save(existing); err != nil {
+		t.Fatal(err)
+	}
+	enabled := true
+	cfg := &config.Config{
+		Global: config.DefaultGlobalConfig(),
+		Claude: config.ClientConfig{Mode: config.ClientModeAuto},
+		OpenAI: config.ClientConfig{Mode: config.ClientModeAuto, Providers: []config.Provider{{
+			Name: "work", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef: existing.Ref, OAuthIdentity: oauth.AccountIdentityKey(existing), Priority: 1, Enabled: &enabled,
+		}}},
+		Gemini: config.ClientConfig{Mode: config.ClientModeAuto},
+	}
+	if err := writeConfig(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(dir, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	incoming := oauth.Credential{Ref: "default", Provider: config.OAuthProviderCodex, Email: "y@example.com", AccountID: "acct-y", AccessToken: "token-y"}
+	dataset, err := service.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The dataset carries only the incoming account; the "work" provider
+	// bound to account X stays in the live config and survives the merge.
+	dataset.Data.Clients["openai"] = Client{Mode: "auto", Providers: []Provider{
+		{Name: "imported", AuthType: string(config.ProviderAuthTypeOAuth), OAuthProvider: string(config.OAuthProviderCodex),
+			OAuthRef: incoming.Ref, OAuthIdentity: oauth.AccountIdentityKey(&incoming), Priority: 2, Enabled: &enabled},
+	}}
+	dataset.Data.Credentials = []Credential{credentialFromOAuth(incoming)}
+	data, err := json.Marshal(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "backup.json", Data: data}}, FormatClipal, ModeMerge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatal(err)
+	}
+	merged, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]config.Provider{}
+	for _, p := range merged.OpenAI.Providers {
+		byName[p.Name] = p
+	}
+	work, ok := byName["work"]
+	if !ok || work.NormalizedOAuthRef() != "default" {
+		t.Fatalf("provider bound to the original account was rewired: %#v", byName["work"])
+	}
+	imported, ok := byName["imported"]
+	if !ok || imported.NormalizedOAuthRef() == "default" || imported.NormalizedOAuthRef() == "" {
+		t.Fatalf("imported provider was not relinked to the disambiguated ref: %#v", byName["imported"])
+	}
+	relinked, err := oauth.NewStore(dir).Load(config.OAuthProviderCodex, imported.NormalizedOAuthRef())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oauth.AccountIdentityKey(relinked) != oauth.AccountIdentityKey(&incoming) {
+		t.Fatalf("relinked ref resolves to the wrong account: %#v", relinked)
+	}
+}

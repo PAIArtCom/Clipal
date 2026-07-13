@@ -339,8 +339,6 @@
                     <div class="settings-toolbar-actions">
                         <button type="button" @click="loadGlobalConfig()" class="btn btn-secondary"
                             x-text="t('common.reset')"></button>
-                        <button type="button" @click="exportConfig()" class="btn btn-secondary"
-                            x-text="t('common.export')"></button>
                         <button type="submit" class="btn btn-primary" x-text="t('common.save')"></button>
                     </div>
                 </div>
@@ -349,15 +347,36 @@
                     <section class="settings-panel" style="grid-column: 1 / -1;">
                         <div class="settings-panel-header">
                             <div>
-                                <h3 x-text="t('settings.transferTitle')"></h3>
-                                <p class="settings-panel-copy" x-text="t('settings.transferCopy')"></p>
+                                <h3 x-text="t('settings.exportFullBackup')"></h3>
+                                <p class="settings-panel-copy" x-text="t('settings.exportBackupCopy')"></p>
+                            </div>
+                        </div>
+                        <div class="settings-form-actions">
+                            <div class="form-hint" x-text="t('settings.exportSaveHint')"></div>
+                            <div class="settings-toolbar-actions">
+                                <button type="button" class="btn btn-primary" @click="exportConfig()"
+                                    x-text="t('settings.exportFullBackup')"></button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="settings-panel" style="grid-column: 1 / -1;">
+                        <div class="settings-panel-header">
+                            <div>
+                                <h3 x-text="t('settings.importTitle')"></h3>
+                                <p class="settings-panel-copy" x-text="t('settings.importCopy')"></p>
                             </div>
                         </div>
                         <div class="settings-panel-grid">
                             <div class="form-group">
                                 <label class="form-label" x-text="t('settings.importFiles')"></label>
-                                <input type="file" accept="application/json,.json" multiple
-                                    @change="selectDataImportFiles($event)" class="form-input">
+                                <div class="form-meta" style="margin-top: 10px; align-items: center; gap: 10px;">
+                                    <button type="button" class="btn btn-secondary btn-sm" @click="triggerDataImportPicker()"
+                                        x-text="t('settings.chooseImportFiles')"></button>
+                                    <input x-ref="dataImportInput" type="file" style="display: none;"
+                                        accept="application/json,.json" multiple @change="selectDataImportFiles($event)">
+                                    <span class="form-hint" style="margin: 0;" x-text="dataImportFilesLabel()"></span>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" x-text="t('settings.importMode')"></label>
@@ -369,10 +388,12 @@
                             </div>
                         </div>
                         <div class="settings-form-actions">
-                            <div class="form-hint" x-show="dataImportPlan"
-                                x-text="dataImportPlan ? tf('settings.importPreview', { format: dataImportPlan.format, credentials: dataImportPlan.credentials, providers: dataImportPlan.providers, usage: dataImportPlan.usage_providers }) : ''"></div>
-                            <div class="form-hint" x-show="dataImportPlan && dataImportPlan.warnings && dataImportPlan.warnings.length"
-                                x-text="dataImportPlan && dataImportPlan.warnings ? tf('settings.importWarnings', { warnings: dataImportPlan.warnings.join('; ') }) : ''"></div>
+                            <div>
+                                <div class="form-hint" x-show="dataImportPlan"
+                                    x-text="dataImportPlan ? tf('settings.importPreview', { format: dataImportPlan.format, credentials: dataImportPlan.credentials, providers: dataImportPlan.providers, usage: dataImportPlan.usage_providers }) : ''"></div>
+                                <div class="form-hint" x-show="dataImportPlan && dataImportPlan.warnings && dataImportPlan.warnings.length"
+                                    x-text="dataImportPlan && dataImportPlan.warnings ? tf('settings.importWarnings', { warnings: dataImportPlan.warnings.join('; ') }) : ''"></div>
+                            </div>
                             <div class="settings-toolbar-actions">
                                 <button type="button" class="btn btn-secondary" @click="previewDataImport()"
                                     :disabled="!dataImportFiles.length" x-text="t('settings.previewImport')"></button>
@@ -572,8 +593,6 @@
                     <div class="settings-toolbar-actions">
                         <button type="button" @click="loadGlobalConfig()" class="btn btn-secondary"
                             x-text="t('common.reset')"></button>
-                        <button type="button" @click="exportConfig()" class="btn btn-secondary"
-                            x-text="t('common.export')"></button>
                         <button type="submit" class="btn btn-primary" x-text="t('settings.saveSettings')"></button>
                     </div>
                 </div>

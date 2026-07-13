@@ -26,6 +26,42 @@ func TestSmokeScriptBuildsUpstreamBinaryBeforeLaunch(t *testing.T) {
 	}
 }
 
+func TestDataTransferSmokeScriptCoversOfflineAndDaemonPaths(t *testing.T) {
+	t.Parallel()
+
+	body, err := os.ReadFile("../../scripts/data_transfer_smoke.sh")
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+
+	script := string(body)
+	for _, want := range []string{
+		`mktemp -d`,
+		`--dry-run "$tmpdir/credential.json"`,
+		`--mode replace "$tmpdir/credential.json"`,
+		`--format clipal --mode merge`,
+		`/api/config/export`,
+		`/api/data/export`,
+		`/api/data/import/preview`,
+		`/api/data/import/apply`,
+		`stale_status`,
+		`curl -fsS "http://127.0.0.1:$src_port/health"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("data transfer smoke script missing %q", want)
+		}
+	}
+
+	makefile, err := os.ReadFile("../../Makefile")
+	if err != nil {
+		t.Fatalf("ReadFile Makefile: %v", err)
+	}
+	if !strings.Contains(string(makefile), "test-data-transfer:") ||
+		!strings.Contains(string(makefile), "./scripts/data_transfer_smoke.sh") {
+		t.Fatal("Makefile does not expose the data transfer smoke test")
+	}
+}
+
 func TestMakefileDispatchesLiveOAuthSmokeTargetByProvider(t *testing.T) {
 	t.Parallel()
 

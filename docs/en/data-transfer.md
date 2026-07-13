@@ -61,7 +61,7 @@ Imports accept regular files (including symlinks whose targets are regular files
 
 ## Web UI
 
-Open **Global Settings → Import & Backup**. Select one native backup or one or more external credential JSON files, preview the detected format and change summary, choose the import mode when appropriate, and apply the reviewed plan. Export downloads `clipal-data.json` from the same panel.
+Open **Global Settings**. In the separate **Export Full Backup** panel, select the destination and download `clipal-data.json`; it includes global and client configuration, provider API keys, OAuth access and refresh tokens, and usage data. In the separate **Import Data** panel, select one native backup or one or more external credential JSON files, preview the detected format and change summary, choose the import mode when appropriate, and apply the reviewed plan.
 
 Preview never writes data. Apply snapshots configuration, credentials, and usage first; if persistence or runtime reload fails, Clipal restores all three snapshots.
 

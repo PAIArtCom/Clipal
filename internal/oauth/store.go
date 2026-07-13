@@ -13,7 +13,8 @@ import (
 )
 
 type Store struct {
-	rootDir string
+	rootDir            string
+	bypassTransferLock bool
 }
 
 type storedCredential struct {
@@ -37,6 +38,7 @@ func (s *Store) Save(cred *Credential) error {
 	if cred == nil {
 		return fmt.Errorf("credential is nil")
 	}
+	defer s.lockShared()()
 	provider := normalizeProvider(cred.Provider)
 	ref := strings.TrimSpace(cred.Ref)
 	if provider == "" {
@@ -127,6 +129,7 @@ func (s *Store) Load(provider config.OAuthProvider, ref string) (*Credential, er
 	if s == nil {
 		return nil, fmt.Errorf("store is nil")
 	}
+	defer s.lockShared()()
 	path, err := s.resolvePath(provider, ref)
 	if err != nil {
 		return nil, err
@@ -138,6 +141,7 @@ func (s *Store) List(provider config.OAuthProvider) ([]Credential, error) {
 	if s == nil {
 		return nil, fmt.Errorf("store is nil")
 	}
+	defer s.lockShared()()
 	entries, err := s.scanCredentials(provider)
 	if err != nil {
 		return nil, err
@@ -153,6 +157,7 @@ func (s *Store) Delete(provider config.OAuthProvider, ref string) error {
 	if s == nil {
 		return fmt.Errorf("store is nil")
 	}
+	defer s.lockShared()()
 	path, err := s.resolvePath(provider, ref)
 	if os.IsNotExist(err) {
 		return nil
@@ -171,6 +176,7 @@ func (s *Store) DeleteWithRollback(provider config.OAuthProvider, ref string) (f
 	if s == nil {
 		return nil, fmt.Errorf("store is nil")
 	}
+	defer s.lockShared()()
 	path, err := s.resolvePath(provider, ref)
 	if os.IsNotExist(err) {
 		return func() error { return nil }, nil
@@ -185,7 +191,10 @@ func (s *Store) DeleteWithRollback(provider config.OAuthProvider, ref string) (f
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	return backup.restore, nil
+	return func() error {
+		defer s.lockShared()()
+		return backup.restore()
+	}, nil
 }
 
 func (s *Store) preferredPath(provider config.OAuthProvider, email string, ref string) string {

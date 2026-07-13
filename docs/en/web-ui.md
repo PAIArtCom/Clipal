@@ -74,10 +74,14 @@ Notes:
 - Re-applying an already managed integration is designed to be a no-op, so the original backup stays restorable
 - After apply or rollback, restart the client or open a new session so it reloads the updated user config
 
-### Export
+### Export Full Backup
 
-- Export a complete `clipal.data/v1` JSON backup containing configuration, credentials, and usage
-- Preview and apply native backups or supported external credential exports from **Import & Backup**
+- Use the separate **Export Full Backup** panel to download a complete `clipal.data/v1` JSON backup
+- The backup includes global and client configuration, provider API keys, OAuth access and refresh tokens, and usage data
+
+### Import Data
+
+- Use the separate **Import Data** panel to preview and apply native backups or supported external credential exports
 
 ## Common Provider States In The UI
 

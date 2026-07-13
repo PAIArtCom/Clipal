@@ -387,7 +387,14 @@ func (s *Service) RefreshWithHTTPClient(ctx context.Context, provider config.OAu
 }
 
 func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, ref string, force bool, httpClient *http.Client) (*Credential, error) {
-	cred, err := s.store.Load(provider, ref)
+	// Keep the transfer read barrier for the full refresh lifecycle. Holding it
+	// only inside Store.Load and Store.Save would let a refresh that started
+	// before a replace import save its old credential after the import releases
+	// the exclusive barrier, resurrecting a deleted account.
+	releaseStore := lockStoreForRefresh()
+	defer releaseStore()
+	store := s.store.withTransferLockBypass()
+	cred, err := store.Load(provider, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +419,7 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	s.refreshes[key] = call
 	s.mu.Unlock()
 
-	refreshed, err := s.refreshCredential(ctx, cred, httpClient)
+	refreshed, err := s.refreshCredential(ctx, store, cred, httpClient)
 
 	s.mu.Lock()
 	delete(s.refreshes, key)
@@ -427,7 +434,7 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	return refreshed.Clone(), err
 }
 
-func (s *Service) refreshCredential(ctx context.Context, cred *Credential, httpClient *http.Client) (*Credential, error) {
+func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Credential, httpClient *http.Client) (*Credential, error) {
 	client, ok := s.providerClient(cred.Provider)
 	if !ok {
 		return nil, fmt.Errorf("unsupported oauth provider %q", cred.Provider)
@@ -437,7 +444,7 @@ func (s *Service) refreshCredential(ctx context.Context, cred *Credential, httpC
 	if err != nil {
 		return nil, err
 	}
-	if err := s.store.Save(refreshed); err != nil {
+	if err := store.Save(refreshed); err != nil {
 		return nil, err
 	}
 	if refreshed.Provider == config.OAuthProviderGemini || refreshed.Provider == config.OAuthProviderAntigravity {

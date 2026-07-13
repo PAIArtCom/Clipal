@@ -218,6 +218,11 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Own the credential store for the whole transaction so concurrent token
+	// refreshes cannot land between the oauth snapshot and a later restore.
+	releaseStore := oauth.LockStoreForTransfer()
+	defer releaseStore()
+
 	current, err := config.Load(s.configDir)
 	if err != nil {
 		return nil, fmt.Errorf("load current configuration: %w", err)
@@ -241,11 +246,23 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	if err != nil {
 		return nil, fmt.Errorf("snapshot credentials: %w", err)
 	}
-	defer oauthBackup.cleanup()
+	preserveOAuthBackup := false
+	defer func() {
+		if !preserveOAuthBackup {
+			oauthBackup.cleanup()
+		}
+	}()
 	rollback := func(base error) error {
 		var failures []string
 		if err := oauthBackup.restore(); err != nil {
-			failures = append(failures, "credentials: "+err.Error())
+			message := "credentials: " + err.Error()
+			if oauthBackup.backup != "" {
+				// The live oauth directory may be partial now; keep the only
+				// intact copy of the original credentials for manual recovery.
+				preserveOAuthBackup = true
+				message += fmt.Sprintf(" (original credentials preserved at %s)", oauthBackup.backup)
+			}
+			failures = append(failures, message)
 		}
 		if err := usageTx.Rollback(); err != nil {
 			failures = append(failures, "usage: "+err.Error())
@@ -277,7 +294,7 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 		}
 	}
 
-	store := oauth.NewStore(s.configDir)
+	store := oauth.NewTransferStore(s.configDir)
 	saved := 0
 	credentialResults := make([]CredentialApplyResult, 0, len(plan.Dataset.Data.Credentials))
 	for index, transferCredential := range plan.Dataset.Data.Credentials {
@@ -292,7 +309,7 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 			return nil, rollback(fmt.Errorf("save %s credential %s: %w", cred.Provider, originalRef, err))
 		}
 		if target != nil {
-			relinkCredentialRef(target, cred.Provider, originalRef, &cred)
+			relinkCredentialRef(target, store, cred.Provider, originalRef, &cred)
 		}
 		if !plan.Native {
 			linked, action := linkExternalCredential(target, store, &cred)
@@ -384,17 +401,37 @@ func mergeClient(current, incoming config.ClientConfig) config.ClientConfig {
 	return out
 }
 
-func relinkCredentialRef(cfg *config.Config, provider config.OAuthProvider, oldRef string, cred *oauth.Credential) {
+// relinkCredentialRef repoints providers at the imported credential when the
+// store had to disambiguate its ref, but only providers that belong to the
+// same account: a provider already bound to a different identity (or whose
+// oldRef still resolves to a different account's credential) keeps its
+// binding instead of being rewired to the imported account.
+func relinkCredentialRef(cfg *config.Config, store *oauth.Store, provider config.OAuthProvider, oldRef string, cred *oauth.Credential) {
 	if cfg == nil || cred == nil {
 		return
+	}
+	identity := oauth.AccountIdentityKey(cred)
+	oldRefIdentity := ""
+	if cred.Ref != oldRef && store != nil {
+		if existing, err := store.Load(provider, oldRef); err == nil && existing != nil {
+			oldRefIdentity = oauth.AccountIdentityKey(existing)
+		}
 	}
 	for _, client := range []*config.ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Gemini} {
 		for i := range client.Providers {
 			p := &client.Providers[i]
-			if p.UsesOAuth() && p.NormalizedOAuthProvider() == provider && p.NormalizedOAuthRef() == oldRef {
-				p.OAuthRef = cred.Ref
-				p.OAuthIdentity = oauth.AccountIdentityKey(cred)
+			if !p.UsesOAuth() || p.NormalizedOAuthProvider() != provider || p.NormalizedOAuthRef() != oldRef {
+				continue
 			}
+			boundIdentity := p.NormalizedOAuthIdentity()
+			if boundIdentity == "" {
+				boundIdentity = oldRefIdentity
+			}
+			if boundIdentity != "" && boundIdentity != identity {
+				continue
+			}
+			p.OAuthRef = cred.Ref
+			p.OAuthIdentity = identity
 		}
 	}
 }

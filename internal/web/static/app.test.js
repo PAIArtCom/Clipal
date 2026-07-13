@@ -2038,17 +2038,175 @@ test('data import selection preserves large integers as text and resets automati
     assert.equal(state.dataImportMode, '');
 });
 
+test('data import picker uses the OAuth file-picker pattern and reports selected file names', () => {
+    const state = loadApp();
+    let clicked = 0;
+    state.$refs = {
+        dataImportInput: {
+            value: 'stale',
+            click() { clicked++; }
+        }
+    };
+
+    state.triggerDataImportPicker();
+
+    assert.equal(state.$refs.dataImportInput.value, '');
+    assert.equal(clicked, 1);
+    assert.equal(state.dataImportFilesLabel(), 'No files selected');
+    state.dataImportFiles = [{ name: 'backup.json' }, { name: 'oauth.json' }];
+    assert.equal(state.dataImportFilesLabel(), 'backup.json, oauth.json');
+
+    const markup = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    assert.match(markup, /class="btn btn-secondary btn-sm" @click="triggerDataImportPicker\(\)"/);
+    assert.match(markup, /x-ref="dataImportInput" type="file" style="display: none;"/);
+});
+
+test('full backup export and import use separate settings panels', () => {
+    const markup = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const panelStart = '<section class="settings-panel" style="grid-column: 1 / -1;">';
+    const exportPanelStart = markup.indexOf(panelStart);
+    const exportPanelEnd = markup.indexOf('</section>', exportPanelStart);
+    const importPanelStart = markup.indexOf(panelStart, exportPanelEnd);
+    const importPanelEnd = markup.indexOf('</section>', importPanelStart);
+    const exportPanel = markup.slice(exportPanelStart, exportPanelEnd);
+    const importPanel = markup.slice(importPanelStart, importPanelEnd);
+
+    assert.ok(exportPanelStart >= 0);
+    assert.ok(exportPanelEnd > exportPanelStart);
+    assert.ok(importPanelStart > exportPanelEnd);
+    assert.ok(importPanelEnd > importPanelStart);
+    assert.equal((markup.match(/@click="exportConfig\(\)"/g) || []).length, 1);
+    assert.doesNotMatch(markup, /settings-transfer-export/);
+    assert.match(exportPanel, /<button type="button" class="btn btn-primary" @click="exportConfig\(\)"/);
+    assert.match(exportPanel, /t\('settings\.exportFullBackup'\)/);
+    assert.match(exportPanel, /t\('settings\.exportBackupCopy'\)/);
+    assert.match(exportPanel, /t\('settings\.exportSaveHint'\)/);
+    assert.doesNotMatch(importPanel, /exportConfig/);
+    assert.match(importPanel, /t\('settings\.importTitle'\)/);
+    assert.match(importPanel, /@click="previewDataImport\(\)"/);
+    assert.match(importPanel, /@click="applyDataImport\(\)"/);
+
+    const state = loadApp();
+    assert.equal(state.t('settings.exportFullBackup'), 'Export Full Backup');
+    assert.match(state.t('settings.exportBackupCopy'), /provider API keys/i);
+    assert.match(state.t('settings.exportBackupCopy'), /OAuth access and refresh tokens/i);
+    assert.match(state.t('settings.exportBackupCopy'), /usage data/i);
+    assert.equal(state.t('settings.importTitle'), 'Import Data');
+});
+
+test('full backup export opens a save dialog and writes the selected file', async () => {
+    const pickerCalls = [];
+    const writes = [];
+    const alerts = [];
+    const state = loadApp({
+        context: {
+            fetch: async () => ({ ok: true, blob: async () => 'backup-data' }),
+            window: {
+                showSaveFilePicker: async options => {
+                    pickerCalls.push(options);
+                    return {
+                        createWritable: async () => ({
+                            write: async data => writes.push(data),
+                            close: async () => writes.push('closed')
+                        })
+                    };
+                }
+            }
+        }
+    });
+    state.showAlert = (type, message) => alerts.push({ type, message });
+
+    await state.exportConfig();
+
+    assert.equal(pickerCalls.length, 1);
+    assert.equal(pickerCalls[0].suggestedName, 'clipal-data.json');
+    assert.deepEqual([...pickerCalls[0].types[0].accept['application/json']], ['.json']);
+    assert.deepEqual(writes, ['backup-data', 'closed']);
+    assert.deepEqual(alerts, [{ type: 'success', message: 'Backup saved as clipal-data.json.' }]);
+});
+
+test('full backup export falls back to browser download and explains where to look', async () => {
+    const alerts = [];
+    const anchor = { click() { this.clicked = true; } };
+    const state = loadApp({
+        context: {
+            fetch: async () => ({ ok: true, blob: async () => 'backup-data' }),
+            document: {
+                body: {
+                    appendChild(node) { this.appended = node; },
+                    removeChild(node) { this.removed = node; }
+                },
+                createElement: tag => {
+                    assert.equal(tag, 'a');
+                    return anchor;
+                }
+            },
+            window: {
+                URL: {
+                    createObjectURL: blob => {
+                        assert.equal(blob, 'backup-data');
+                        return 'blob:clipal-backup';
+                    },
+                    revokeObjectURL(url) { this.revoked = url; }
+                }
+            }
+        }
+    });
+    state.showAlert = (type, message) => alerts.push({ type, message });
+
+    await state.exportConfig();
+
+    assert.equal(anchor.href, 'blob:clipal-backup');
+    assert.equal(anchor.download, 'clipal-data.json');
+    assert.equal(anchor.clicked, true);
+    assert.equal(state.__context.window.URL.revoked, 'blob:clipal-backup');
+    assert.deepEqual(alerts, [{
+        type: 'success',
+        message: 'Download started for clipal-data.json. Check your browser downloads for its location.'
+    }]);
+});
+
+test('full backup export treats a cancelled save dialog as a no-op', async () => {
+    const alerts = [];
+    const state = loadApp({
+        context: {
+            fetch: async () => {
+                throw new Error('export should not be requested after cancellation');
+            },
+            window: {
+                showSaveFilePicker: async () => {
+                    const error = new Error('cancelled');
+                    error.name = 'AbortError';
+                    throw error;
+                }
+            }
+        }
+    });
+    state.showAlert = (type, message) => alerts.push({ type, message });
+
+    await state.exportConfig();
+
+    assert.deepEqual(alerts, []);
+});
+
 test('data import apply reports returned apply details', async () => {
     const state = loadApp();
     const alerts = [];
+    const calls = [];
     state.dataImportPlan = { id: 'plan' };
     state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
-    state.apiCall = async () => ({ credentials: 2, providers: 3, usage_providers: 4 });
+    state.apiCall = async (url, options) => {
+        calls.push({ url, body: JSON.parse(options.body) });
+        return { credentials: 2, providers: 3, usage_providers: 4 };
+    };
     state.showAlert = (type, message) => alerts.push({ type, message });
     state.loadGlobalConfig = async () => {};
     state.loadProviders = async () => {};
     state.refreshStatus = async () => {};
     await state.applyDataImport();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, '/api/data/import/apply');
+    assert.equal(calls[0].body.plan_id, 'plan');
     assert.equal(alerts.length, 1);
     assert.match(alerts[0].message, /2/);
     assert.match(alerts[0].message, /3/);

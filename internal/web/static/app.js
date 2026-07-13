@@ -306,11 +306,18 @@ function app() {
                     footerHint: 'Saving updates `config.yaml`. Some runtime changes may require restart to take full effect.',
                     saveSettings: 'Save Settings',
                     saveSuccess: 'Configuration saved. Some changes may require restart.',
-                    exportSuccess: 'Complete backup exported successfully',
+                    exportSaved: 'Backup saved as {filename}.',
+                    exportDownloadStarted: 'Download started for {filename}. Check your browser downloads for its location.',
                     exportFailure: 'Failed to export backup',
-                    transferTitle: 'Import & Backup',
-                    transferCopy: 'Export or restore configuration, credentials, and usage with clipal.data/v1. External credential exports are detected automatically.',
+                    exportFullBackup: 'Export Full Backup',
+                    exportBackupCopy: 'Downloads global and client configuration, provider API keys, OAuth access and refresh tokens, and usage data.',
+                    exportSaveHint: 'Choose the file name and save location before the backup is created.',
+                    importTitle: 'Import Data',
+                    importCopy: 'Restore a Clipal backup or import supported external credential exports.',
                     importFiles: 'Import JSON Files',
+                    chooseImportFiles: 'Choose JSON Files',
+                    importFilesHint: 'No files selected',
+                    importFilePickerUnavailable: 'File selection is unavailable in this browser',
                     importMode: 'Import Mode',
                     modeAuto: 'Automatic',
                     modeReplace: 'Replace',
@@ -703,11 +710,18 @@ function app() {
                     footerHint: '保存会更新 `config.yaml`。部分运行时改动需要重启后才会完全生效。',
                     saveSettings: '保存设置',
                     saveSuccess: '配置已保存。部分改动可能需要重启。',
-                    exportSuccess: '完整备份导出成功',
+                    exportSaved: '备份已保存为 {filename}。',
+                    exportDownloadStarted: '已开始下载 {filename}，请在浏览器下载列表中查看保存位置。',
                     exportFailure: '备份导出失败',
-                    transferTitle: '导入与备份',
-                    transferCopy: '使用 clipal.data/v1 导出或恢复配置、凭据和用量；也可自动识别外部凭据导出。',
+                    exportFullBackup: '导出完整备份',
+                    exportBackupCopy: '下载全局与客户端配置、Provider API Key、OAuth access 和 refresh token，以及用量历史。',
+                    exportSaveHint: '创建备份前选择文件名和保存位置。',
+                    importTitle: '导入数据',
+                    importCopy: '恢复 Clipal 备份，或导入受支持的外部凭据导出。',
                     importFiles: '导入 JSON 文件',
+                    chooseImportFiles: '选择 JSON 文件',
+                    importFilesHint: '未选择文件',
+                    importFilePickerUnavailable: '当前浏览器无法选择文件',
                     importMode: '导入模式',
                     modeAuto: '自动选择',
                     modeReplace: '替换',
@@ -4132,22 +4146,49 @@ function app() {
         },
 
         async exportConfig() {
+            const filename = 'clipal-data.json';
             try {
+                const saveFile = typeof window.showSaveFilePicker === 'function'
+                    ? await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        types: [{
+                            description: 'Clipal backup (JSON)',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    })
+                    : null;
                 const response = await fetch('/api/data/export');
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
                 const blob = await response.blob();
+                if (saveFile) {
+                    const writable = await saveFile.createWritable();
+                    try {
+                        await writable.write(blob);
+                        await writable.close();
+                    } catch (error) {
+                        if (typeof writable.abort === 'function') {
+                            await writable.abort();
+                        }
+                        throw error;
+                    }
+                    this.showAlert('success', this.tf('settings.exportSaved', { filename }));
+                    return;
+                }
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'clipal-data.json';
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
-                this.showAlert('success', this.t('settings.exportSuccess'));
+                this.showAlert('success', this.tf('settings.exportDownloadStarted', { filename }));
             } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
                 this.showAlert('error', this.t('settings.exportFailure'));
                 console.error('Failed to export config:', error);
             }
@@ -4167,6 +4208,22 @@ function app() {
                 this.dataImportPlan = null;
                 this.showAlert('error', this.t('settings.importFailure'));
             }
+        },
+
+        triggerDataImportPicker() {
+            const input = this.$refs && this.$refs.dataImportInput;
+            if (!input || typeof input.click !== 'function') {
+                this.showAlert('error', this.t('settings.importFilePickerUnavailable'));
+                return;
+            }
+            input.value = '';
+            input.click();
+        },
+
+        dataImportFilesLabel() {
+            const names = (this.dataImportFiles || []).map(file => String((file && file.name) || '').trim())
+                .filter(Boolean);
+            return names.length ? names.join(', ') : this.t('settings.importFilesHint');
         },
 
         dataImportPayload() {

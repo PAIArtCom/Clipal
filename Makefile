@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-smoke test-live-oauth test-live-codex-oauth test-live-claude-oauth test-live-gemini-oauth test-oauth-authorize lint lint-fix vuln fmt install-hooks ci
+.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-live-gemini-oauth test-oauth-authorize lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
 GOBIN := $(shell $(GO) env GOPATH)/bin
@@ -15,6 +15,12 @@ test-unit:
 
 test-smoke:
 	./scripts/smoke_test.sh
+
+test-data-transfer:
+	$(GO) test -count=1 ./cmd/clipal ./internal/transfer ./internal/integration
+	$(GO) test -race -count=1 ./internal/transfer ./internal/proxy ./internal/telemetry ./internal/web
+	node --test internal/web/static/app.test.js
+	./scripts/data_transfer_smoke.sh
 
 test-live-oauth:
 ifeq ($(PROVIDER),codex)

@@ -940,6 +940,11 @@ func TestNormalizeClaudeOAuthRequestSDKPreservesExplicitControlFields(t *testing
 }
 
 func TestNormalizeClaudeOAuthRequestRegeneratesOfficialLookingSystemAndPreservesClientTools(t *testing.T) {
+	// The regenerated billing header uses CLAUDE_CODE_ENTRYPOINT when set
+	// (e.g. when tests run inside a Claude Code session), so pin it to the
+	// default for a deterministic fingerprint assertion.
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "")
+
 	tools := make([]map[string]any, 0, len(claudeOAuthToolNames()))
 	for _, name := range claudeOAuthToolNames() {
 		tools = append(tools, map[string]any{

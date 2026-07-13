@@ -23,18 +23,20 @@ import (
 )
 
 type stubProviderClient struct {
-	provider      config.OAuthProvider
-	startSession  *LoginSession
-	startErr      error
-	exchangeCred  *Credential
-	exchangeErr   error
-	exchangeCode  string
-	exchangeState *LoginSession
-	exchangeCalls int32
-	exchangeWait  chan struct{}
-	refreshCred   *Credential
-	refreshErr    error
-	refreshCalled int32
+	provider       config.OAuthProvider
+	startSession   *LoginSession
+	startErr       error
+	exchangeCred   *Credential
+	exchangeErr    error
+	exchangeCode   string
+	exchangeState  *LoginSession
+	exchangeCalls  int32
+	exchangeWait   chan struct{}
+	refreshCred    *Credential
+	refreshErr     error
+	refreshCalled  int32
+	refreshStarted chan<- struct{}
+	refreshWait    <-chan struct{}
 }
 
 func (c *stubProviderClient) Provider() config.OAuthProvider { return c.provider }
@@ -74,6 +76,12 @@ func (c *stubProviderClient) ExchangeSessionCode(ctx context.Context, session *L
 
 func (c *stubProviderClient) Refresh(_ context.Context, cred *Credential) (*Credential, error) {
 	atomic.AddInt32(&c.refreshCalled, 1)
+	if c.refreshStarted != nil {
+		c.refreshStarted <- struct{}{}
+	}
+	if c.refreshWait != nil {
+		<-c.refreshWait
+	}
 	if c.refreshErr != nil {
 		return nil, c.refreshErr
 	}
@@ -81,6 +89,81 @@ func (c *stubProviderClient) Refresh(_ context.Context, cred *Credential) (*Cred
 		return c.refreshCred.Clone(), nil
 	}
 	return cred.Clone(), nil
+}
+
+func TestRefreshBlocksTransferUntilItsCredentialSaveCompletes(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	if err := NewStore(dir).Save(&Credential{
+		Ref: "account", Provider: config.OAuthProviderCodex,
+		Email: "owner@example.com", AccessToken: "access-before", RefreshToken: "refresh-before",
+		ExpiresAt: now.Add(-time.Minute), LastRefresh: now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	refreshStarted := make(chan struct{}, 1)
+	releaseRefresh := make(chan struct{})
+	svc := NewService(dir,
+		WithNowFunc(func() time.Time { return now }),
+		WithRefreshSkew(30*time.Second),
+		WithProviderClient(&stubProviderClient{
+			provider:       config.OAuthProviderCodex,
+			refreshStarted: refreshStarted,
+			refreshWait:    releaseRefresh,
+			refreshCred: &Credential{
+				Ref: "account", Provider: config.OAuthProviderCodex,
+				Email: "owner@example.com", AccessToken: "access-after", RefreshToken: "refresh-after",
+				ExpiresAt: now.Add(time.Hour), LastRefresh: now,
+			},
+		}),
+	)
+
+	refreshDone := make(chan error, 1)
+	go func() {
+		_, err := svc.RefreshIfNeeded(context.Background(), config.OAuthProviderCodex, "account")
+		refreshDone <- err
+	}()
+	select {
+	case <-refreshStarted:
+	case <-time.After(time.Second):
+		t.Fatal("refresh did not reach the provider")
+	}
+
+	transferAcquired := make(chan func(), 1)
+	go func() {
+		transferAcquired <- LockStoreForTransfer()
+	}()
+	select {
+	case release := <-transferAcquired:
+		release()
+		t.Fatal("transfer acquired the store while refresh was in flight")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(releaseRefresh)
+	select {
+	case err := <-refreshDone:
+		if err != nil {
+			t.Fatalf("RefreshIfNeeded: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("refresh did not finish")
+	}
+	select {
+	case release := <-transferAcquired:
+		release()
+	case <-time.After(time.Second):
+		t.Fatal("transfer did not resume after refresh")
+	}
+
+	credential, err := NewStore(dir).Load(config.OAuthProviderCodex, "account")
+	if err != nil {
+		t.Fatalf("Load refreshed credential: %v", err)
+	}
+	if credential.AccessToken != "access-after" || credential.RefreshToken != "refresh-after" {
+		t.Fatalf("credential was not refreshed: %#v", credential)
+	}
 }
 
 func TestSessionPollExpiresAutomatically(t *testing.T) {

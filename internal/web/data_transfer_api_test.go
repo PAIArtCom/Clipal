@@ -203,3 +203,62 @@ func TestDataExportUsesCanonicalEnvelopeAndFilename(t *testing.T) {
 		t.Fatalf("export should not create config: %v", err)
 	}
 }
+
+func TestDataImportApplyRejectsMissingAndStalePlanID(t *testing.T) {
+	dir := t.TempDir()
+	api := NewAPI(dir, "test", nil)
+	credential := func(email string) string {
+		payload, err := json.Marshal(dataImportRequest{
+			Files:  []dataImportFileRequest{{Name: "credential.json", Data: `{"type":"codex","email":"` + email + `","access_token":"token"}`}},
+			Format: "auto",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(payload)
+	}
+
+	apply := httptest.NewRecorder()
+	api.HandleDataImportApply(apply, httptest.NewRequest(http.MethodPost, "/api/data/import/apply", strings.NewReader(credential("a@example.com"))))
+	if apply.Code != http.StatusBadRequest || !strings.Contains(apply.Body.String(), "plan_id") {
+		t.Fatalf("apply without plan_id status=%d body=%s", apply.Code, apply.Body.String())
+	}
+
+	preview := httptest.NewRecorder()
+	api.HandleDataImportPreview(preview, httptest.NewRequest(http.MethodPost, "/api/data/import/preview", strings.NewReader(credential("a@example.com"))))
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	var plan struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.ID == "" {
+		t.Fatal("preview returned empty plan id")
+	}
+
+	// The import data changed after preview, so the previewed plan is stale.
+	var stale dataImportRequest
+	if err := json.Unmarshal([]byte(credential("b@example.com")), &stale); err != nil {
+		t.Fatal(err)
+	}
+	stale.PlanID = plan.ID
+	stalePayload, err := json.Marshal(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apply = httptest.NewRecorder()
+	api.HandleDataImportApply(apply, httptest.NewRequest(http.MethodPost, "/api/data/import/apply", bytes.NewReader(stalePayload)))
+	if apply.Code != http.StatusConflict {
+		t.Fatalf("stale apply status=%d body=%s", apply.Code, apply.Body.String())
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "openai.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("rejected apply mutated configuration: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "oauth")); !os.IsNotExist(err) {
+		t.Fatalf("rejected apply created oauth state: %v", err)
+	}
+}
