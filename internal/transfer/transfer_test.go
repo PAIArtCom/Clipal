@@ -150,6 +150,9 @@ func TestServiceNativeReplaceRoundTrip(t *testing.T) {
 	if plan.Mode != ModeReplace || !plan.Native {
 		t.Fatalf("unexpected plan: %#v", plan)
 	}
+	if plan.Changes.Configuration != "replace" || plan.Changes.Providers.Added != 1 || plan.Changes.Providers.Removed != 1 || plan.Changes.Credentials.Added != 1 {
+		t.Fatalf("unexpected preview changes: %#v", plan.Changes)
+	}
 	if _, err := importer.Apply(plan); err != nil {
 		t.Fatal(err)
 	}
@@ -171,6 +174,35 @@ func TestServiceNativeReplaceRoundTrip(t *testing.T) {
 	usage := importer.usage.Snapshot().Clients["openai"]["source"]
 	if usage.TotalTokens != 10 {
 		t.Fatalf("usage total=%d", usage.TotalTokens)
+	}
+}
+
+func TestApplyRejectsPlanWhenCurrentStateChangedAfterPreview(t *testing.T) {
+	source := t.TempDir()
+	destination := t.TempDir()
+	writeTestState(t, source, "source", "source-key")
+	writeTestState(t, destination, "destination", "destination-key")
+
+	exporter, err := NewService(source, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := exporter.ExportJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	importer, err := NewService(destination, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := importer.Analyze([]Input{{Name: "backup.json", Data: data}}, FormatAuto, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writeTestState(t, destination, "changed-after-preview", "changed-key")
+	if _, err := importer.Apply(plan); !errors.Is(err, ErrImportBaseStateChanged) {
+		t.Fatalf("apply error=%v, want base-state conflict", err)
 	}
 }
 

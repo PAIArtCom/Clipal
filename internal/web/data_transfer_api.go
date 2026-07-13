@@ -95,6 +95,10 @@ func (a *API) HandleDataImportApply(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := a.transfer.Apply(plan)
 	if err != nil {
+		if errors.Is(err, transfer.ErrImportBaseStateChanged) {
+			writeError(w, err.Error(), http.StatusConflict)
+			return
+		}
 		writeError(w, fmt.Sprintf("failed to apply import: %v", err), http.StatusInternalServerError)
 		return
 	}

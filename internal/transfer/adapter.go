@@ -375,11 +375,15 @@ func importEntryLabel(file, entry string) string {
 	return file + "#" + entry
 }
 
-func planID(dataset *Dataset, format string, mode Mode) string {
+func planID(dataset *Dataset, format string, mode Mode, baseState ...string) string {
 	// The plan identity covers only behavior-affecting imported data. Adapter
 	// metadata such as detection time and producer version must not make a
 	// preview impossible to apply on a subsequent request.
 	data, _ := json.Marshal(dataset.Data)
-	sum := sha256.Sum256(append(append(data, format...), string(mode)...))
+	payload := append(append(data, format...), string(mode)...)
+	if len(baseState) > 0 {
+		payload = append(payload, baseState[0]...)
+	}
+	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:8])
 }

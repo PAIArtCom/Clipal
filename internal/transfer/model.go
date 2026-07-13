@@ -194,17 +194,35 @@ type Report struct {
 }
 
 type ImportPlan struct {
-	ID             string   `json:"id"`
-	Format         string   `json:"format"`
-	Mode           Mode     `json:"mode"`
-	Native         bool     `json:"native"`
-	Files          int      `json:"files"`
-	Clients        int      `json:"clients"`
-	Providers      int      `json:"providers"`
-	Credentials    int      `json:"credentials"`
-	UsageProviders int      `json:"usage_providers"`
-	Warnings       []string `json:"warnings,omitempty"`
-	Dataset        *Dataset `json:"-"`
+	ID             string        `json:"id"`
+	Format         string        `json:"format"`
+	Mode           Mode          `json:"mode"`
+	Native         bool          `json:"native"`
+	Files          int           `json:"files"`
+	Clients        int           `json:"clients"`
+	Providers      int           `json:"providers"`
+	Credentials    int           `json:"credentials"`
+	UsageProviders int           `json:"usage_providers"`
+	Warnings       []string      `json:"warnings,omitempty"`
+	Changes        ImportChanges `json:"changes"`
+	baseState      string        `json:"-"`
+	Dataset        *Dataset      `json:"-"`
+}
+
+// ImportChanges is the operator-facing effect summary calculated from the
+// reviewed import and the state that was present at preview time.
+type ImportChanges struct {
+	Configuration string             `json:"configuration"`
+	Clients       ImportChangeCounts `json:"clients"`
+	Providers     ImportChangeCounts `json:"providers"`
+	Credentials   ImportChangeCounts `json:"credentials"`
+	Usage         ImportChangeCounts `json:"usage"`
+}
+
+type ImportChangeCounts struct {
+	Added   int `json:"added,omitempty"`
+	Updated int `json:"updated,omitempty"`
+	Removed int `json:"removed,omitempty"`
 }
 
 type ApplyResult struct {

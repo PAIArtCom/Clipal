@@ -324,8 +324,20 @@ function app() {
                     modeMerge: 'Merge',
                     previewImport: 'Preview Import',
                     applyImport: 'Apply Import',
-                    importPreview: '{format}: {credentials} credentials, {providers} providers, {usage} usage records',
-                    importWarnings: 'Warnings: {warnings}',
+                    importPreviewTitle: 'Import Preview',
+                    importPreviewFiles: 'Files',
+                    importPreviewSource: 'Detected Source',
+                    importPreviewEffects: 'Planned Effects',
+                    importPreviewConfiguration: 'Configuration',
+                    importPreviewProviders: 'Providers',
+                    importPreviewCredentials: 'Credentials',
+                    importPreviewUsage: 'Usage Data',
+                    importPreviewWarnings: 'Warnings',
+                    importConfigReplace: 'Configuration will be replaced',
+                    importConfigMerge: 'Configuration will be merged',
+                    importConfigCredentialsOnly: 'No configuration changes',
+                    importChangeSummary: 'Added {added} · Updated {updated} · Removed {removed}',
+                    importPreviewGuard: 'If the selected data or current state changes, preview again before applying.',
                     importApplied: 'Imported {credentials} credentials, {providers} providers, and {usage} usage records',
                     importSuccess: 'Data imported successfully',
                     importFailure: 'Failed to import data'
@@ -728,8 +740,20 @@ function app() {
                     modeMerge: '合并',
                     previewImport: '预览导入',
                     applyImport: '执行导入',
-                    importPreview: '{format}：{credentials} 个凭据、{providers} 个 Provider、{usage} 条用量记录',
-                    importWarnings: '警告：{warnings}',
+                    importPreviewTitle: '导入预览',
+                    importPreviewFiles: '文件',
+                    importPreviewSource: '识别结果',
+                    importPreviewEffects: '计划影响',
+                    importPreviewConfiguration: '配置',
+                    importPreviewProviders: 'Provider',
+                    importPreviewCredentials: '凭据',
+                    importPreviewUsage: '用量数据',
+                    importPreviewWarnings: '警告',
+                    importConfigReplace: '配置将被替换',
+                    importConfigMerge: '配置将被合并',
+                    importConfigCredentialsOnly: '不会修改配置',
+                    importChangeSummary: '新增 {added} · 更新 {updated} · 移除 {removed}',
+                    importPreviewGuard: '若所选数据或当前状态发生变化，请重新预览后再执行。',
                     importApplied: '已导入 {credentials} 个凭据、{providers} 个 Provider 和 {usage} 条用量记录',
                     importSuccess: '数据导入成功',
                     importFailure: '数据导入失败'
@@ -904,6 +928,7 @@ function app() {
         dataImportFiles: [],
         dataImportMode: '',
         dataImportPlan: null,
+        showDataImportPreviewModal: false,
         status: {
             version: '',
             uptime: '',
@@ -4202,6 +4227,7 @@ function app() {
                     data: await file.text()
                 })));
                 this.dataImportPlan = null;
+                this.showDataImportPreviewModal = false;
                 this.dataImportMode = '';
             } catch (error) {
                 this.dataImportFiles = [];
@@ -4226,6 +4252,27 @@ function app() {
             return names.length ? names.join(', ') : this.t('settings.importFilesHint');
         },
 
+        dataImportChangeSummary(change) {
+            const value = change || {};
+            return this.tf('settings.importChangeSummary', {
+                added: Number(value.added || 0),
+                updated: Number(value.updated || 0),
+                removed: Number(value.removed || 0)
+            });
+        },
+
+        dataImportConfigurationSummary() {
+            const configuration = String((this.dataImportPlan && this.dataImportPlan.changes && this.dataImportPlan.changes.configuration) || 'credentials_only');
+            if (configuration === 'replace') return this.t('settings.importConfigReplace');
+            if (configuration === 'merge') return this.t('settings.importConfigMerge');
+            return this.t('settings.importConfigCredentialsOnly');
+        },
+
+        closeDataImportPreview() {
+            this.showDataImportPreviewModal = false;
+            this.dataImportPlan = null;
+        },
+
         dataImportPayload() {
             const payload = {
                 files: this.dataImportFiles,
@@ -4246,15 +4293,17 @@ function app() {
                     body: JSON.stringify(this.dataImportPayload())
                 }, false, true);
                 this.dataImportMode = this.dataImportPlan.mode || this.dataImportMode;
+                this.showDataImportPreviewModal = true;
             } catch (error) {
                 this.dataImportPlan = null;
+                this.showDataImportPreviewModal = false;
                 const message = String((error && error.message) || '').trim() || this.t('settings.importFailure');
                 this.showAlert('error', message);
             }
         },
 
         async applyDataImport() {
-            if (!this.dataImportPlan || !confirm(this.t('settings.applyImport') + '?')) return;
+            if (!this.dataImportPlan) return;
             try {
                 const result = await this.apiCall('/api/data/import/apply', {
                     method: 'POST',
@@ -4266,11 +4315,16 @@ function app() {
                     usage: result.usage_providers || 0
                 }));
                 this.dataImportPlan = null;
+                this.showDataImportPreviewModal = false;
                 await this.loadGlobalConfig();
                 await this.loadProviders();
                 await this.refreshStatus();
             } catch (error) {
                 const message = String((error && error.message) || '').trim() || this.t('settings.importFailure');
+                if (message.includes('preview again')) {
+                    this.dataImportPlan = null;
+                    this.showDataImportPreviewModal = false;
+                }
                 this.showAlert('error', message);
             }
         },

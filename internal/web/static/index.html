@@ -388,12 +388,6 @@
                             </div>
                         </div>
                         <div class="settings-form-actions">
-                            <div>
-                                <div class="form-hint" x-show="dataImportPlan"
-                                    x-text="dataImportPlan ? tf('settings.importPreview', { format: dataImportPlan.format, credentials: dataImportPlan.credentials, providers: dataImportPlan.providers, usage: dataImportPlan.usage_providers }) : ''"></div>
-                                <div class="form-hint" x-show="dataImportPlan && dataImportPlan.warnings && dataImportPlan.warnings.length"
-                                    x-text="dataImportPlan && dataImportPlan.warnings ? tf('settings.importWarnings', { warnings: dataImportPlan.warnings.join('; ') }) : ''"></div>
-                            </div>
                             <div class="settings-toolbar-actions">
                                 <button type="button" class="btn btn-secondary" @click="previewDataImport()"
                                     :disabled="!dataImportFiles.length" x-text="t('settings.previewImport')"></button>
@@ -965,6 +959,66 @@
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" :class="{'show': showDataImportPreviewModal}"
+        @keydown.escape.window="closeDataImportPreview()" @click.self="closeDataImportPreview()">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-preview-title">
+            <div class="modal-header">
+                <h2 id="import-preview-title" x-text="t('settings.importPreviewTitle')"></h2>
+                <button @click="closeDataImportPreview()" class="icon-btn" style="font-size: 18px;"
+                    :aria-label="t('common.close')">&times;</button>
+            </div>
+            <div class="modal-body" x-show="dataImportPlan">
+                <div class="form-group">
+                    <label class="form-label" x-text="t('settings.importPreviewFiles')"></label>
+                    <div class="form-hint" style="margin-top: 0;" x-text="dataImportFilesLabel()"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" x-text="t('settings.importPreviewSource')"></label>
+                    <div class="form-hint" style="margin-top: 0;"
+                        x-text="dataImportPlan ? dataImportPlan.format + ' · ' + dataImportPlan.mode : ''"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" x-text="t('settings.importPreviewEffects')"></label>
+                    <div class="settings-flag-grid" style="margin-top: 10px;">
+                        <div class="settings-flag-card">
+                            <span class="checkbox-text" x-text="t('settings.importPreviewConfiguration')"></span>
+                            <span class="form-hint" style="margin: 4px 0 0;"
+                                x-text="dataImportConfigurationSummary()"></span>
+                        </div>
+                        <div class="settings-flag-card">
+                            <span class="checkbox-text" x-text="t('settings.importPreviewProviders')"></span>
+                            <span class="form-hint" style="margin: 4px 0 0;"
+                                x-text="dataImportChangeSummary(dataImportPlan && dataImportPlan.changes ? dataImportPlan.changes.providers : null)"></span>
+                        </div>
+                        <div class="settings-flag-card">
+                            <span class="checkbox-text" x-text="t('settings.importPreviewCredentials')"></span>
+                            <span class="form-hint" style="margin: 4px 0 0;"
+                                x-text="dataImportChangeSummary(dataImportPlan && dataImportPlan.changes ? dataImportPlan.changes.credentials : null)"></span>
+                        </div>
+                        <div class="settings-flag-card">
+                            <span class="checkbox-text" x-text="t('settings.importPreviewUsage')"></span>
+                            <span class="form-hint" style="margin: 4px 0 0;"
+                                x-text="dataImportChangeSummary(dataImportPlan && dataImportPlan.changes ? dataImportPlan.changes.usage : null)"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" x-show="dataImportPlan && dataImportPlan.warnings && dataImportPlan.warnings.length">
+                    <label class="form-label" x-text="t('settings.importPreviewWarnings')"></label>
+                    <template x-for="warning in (dataImportPlan && dataImportPlan.warnings ? dataImportPlan.warnings : [])" :key="warning">
+                        <div class="form-hint" x-text="warning"></div>
+                    </template>
+                </div>
+                <div class="form-hint" x-text="t('settings.importPreviewGuard')"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" @click="closeDataImportPreview()" class="btn btn-secondary"
+                    x-text="t('common.cancel')"></button>
+                <button type="button" @click="applyDataImport()" class="btn btn-primary"
+                    :disabled="!dataImportPlan" x-text="t('settings.applyImport')"></button>
             </div>
         </div>
     </div>

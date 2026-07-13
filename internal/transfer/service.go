@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -15,6 +16,8 @@ import (
 	"github.com/lansespirit/Clipal/internal/telemetry"
 	"gopkg.in/yaml.v3"
 )
+
+var ErrImportBaseStateChanged = errors.New("current data changed since preview; preview again")
 
 type Service struct {
 	configDir       string
@@ -113,6 +116,12 @@ func (s *Service) Analyze(inputs []Input, format string, mode Mode) (*ImportPlan
 	if !native && mode != ModeMerge {
 		return nil, fmt.Errorf("%s imports are credentials-only and require merge mode", report.Format)
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, credentials, usage, err := s.currentState()
+	if err != nil {
+		return nil, err
+	}
 	plan := &ImportPlan{Format: report.Format, Mode: mode, Native: native, Files: len(inputs), Credentials: len(dataset.Data.Credentials), Warnings: append([]string(nil), report.Warnings...), Dataset: dataset}
 	for _, client := range dataset.Data.Clients {
 		if native {
@@ -121,7 +130,9 @@ func (s *Service) Analyze(inputs []Input, format string, mode Mode) (*ImportPlan
 		plan.Providers += len(client.Providers)
 	}
 	plan.UsageProviders = usageProviderCount(dataset.Data.Usage)
-	plan.ID = planID(dataset, plan.Format, plan.Mode)
+	plan.Changes = importChanges(current, credentials, usage, dataset, native, mode)
+	plan.baseState = importStateFingerprint(current, credentials, usage)
+	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
 	return plan, nil
 }
 
@@ -139,6 +150,12 @@ func (s *Service) AnalyzeCredentials(credentials []oauth.Credential, warnings []
 	if err := validateCredentials(dataset, false); err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, existingCredentials, usage, err := s.currentState()
+	if err != nil {
+		return nil, err
+	}
 	plan := &ImportPlan{
 		Format:      FormatMixed,
 		Mode:        ModeMerge,
@@ -147,7 +164,9 @@ func (s *Service) AnalyzeCredentials(credentials []oauth.Credential, warnings []
 		Warnings:    append([]string(nil), warnings...),
 		Dataset:     dataset,
 	}
-	plan.ID = planID(dataset, plan.Format, plan.Mode)
+	plan.Changes = importChanges(current, existingCredentials, usage, dataset, false, ModeMerge)
+	plan.baseState = importStateFingerprint(current, existingCredentials, usage)
+	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
 	return plan, nil
 }
 
@@ -193,7 +212,7 @@ func (s *Service) Apply(plan *ImportPlan) (*ApplyResult, error) {
 	if plan == nil || plan.Dataset == nil {
 		return nil, fmt.Errorf("analyzed import plan is required")
 	}
-	if plan.ID != planID(plan.Dataset, plan.Format, plan.Mode) {
+	if plan.ID != planID(plan.Dataset, plan.Format, plan.Mode, plan.baseState) {
 		return nil, fmt.Errorf("import plan does not match its dataset")
 	}
 	var result *ApplyResult
@@ -226,6 +245,14 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	current, err := config.Load(s.configDir)
 	if err != nil {
 		return nil, fmt.Errorf("load current configuration: %w", err)
+	}
+	store := oauth.NewTransferStore(s.configDir)
+	credentials, err := listCredentialsFromStore(store)
+	if err != nil {
+		return nil, err
+	}
+	if plan.baseState != "" && plan.baseState != importStateFingerprint(current, credentials, s.usage.Snapshot()) {
+		return nil, ErrImportBaseStateChanged
 	}
 	usageTx, err := s.usage.BeginTransfer()
 	if err != nil {
@@ -294,7 +321,6 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 		}
 	}
 
-	store := oauth.NewTransferStore(s.configDir)
 	saved := 0
 	credentialResults := make([]CredentialApplyResult, 0, len(plan.Dataset.Data.Credentials))
 	for index, transferCredential := range plan.Dataset.Data.Credentials {
@@ -351,7 +377,22 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 }
 
 func (s *Service) listCredentials() ([]oauth.Credential, error) {
-	store := oauth.NewStore(s.configDir)
+	return listCredentialsFromStore(oauth.NewStore(s.configDir))
+}
+
+func (s *Service) currentState() (*config.Config, []oauth.Credential, telemetry.DataSnapshot, error) {
+	cfg, err := config.Load(s.configDir)
+	if err != nil {
+		return nil, nil, telemetry.DataSnapshot{}, fmt.Errorf("load current configuration: %w", err)
+	}
+	credentials, err := s.listCredentials()
+	if err != nil {
+		return nil, nil, telemetry.DataSnapshot{}, err
+	}
+	return cfg, credentials, s.usage.Snapshot(), nil
+}
+
+func listCredentialsFromStore(store *oauth.Store) ([]oauth.Credential, error) {
 	providers := []config.OAuthProvider{config.OAuthProviderClaude, config.OAuthProviderCodex, config.OAuthProviderGemini, config.OAuthProviderAntigravity}
 	var out []oauth.Credential
 	for _, provider := range providers {

@@ -2025,6 +2025,7 @@ test('data import selection and preview use the shared data API', async () => {
     assert.equal(calls[0].body.files[0].data, '{"type":"codex"}');
     assert.equal(state.dataImportMode, 'merge');
     assert.equal(state.dataImportPlan.credentials, 1);
+    assert.equal(state.showDataImportPreviewModal, true);
 });
 
 test('data import selection preserves large integers as text and resets automatic mode', async () => {
@@ -2194,6 +2195,7 @@ test('data import apply reports returned apply details', async () => {
     const alerts = [];
     const calls = [];
     state.dataImportPlan = { id: 'plan' };
+    state.showDataImportPreviewModal = true;
     state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
     state.apiCall = async (url, options) => {
         calls.push({ url, body: JSON.parse(options.body) });
@@ -2211,6 +2213,7 @@ test('data import apply reports returned apply details', async () => {
     assert.match(alerts[0].message, /2/);
     assert.match(alerts[0].message, /3/);
     assert.match(alerts[0].message, /4/);
+    assert.equal(state.showDataImportPreviewModal, false);
 });
 
 test('data import apply shows the server error exactly once', async () => {
@@ -2218,6 +2221,7 @@ test('data import apply shows the server error exactly once', async () => {
     const alerts = [];
     const calls = [];
     state.dataImportPlan = { id: 'plan' };
+    state.showDataImportPreviewModal = true;
     state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
     state.apiCall = async (...args) => {
         calls.push(args);
@@ -2233,4 +2237,17 @@ test('data import apply shows the server error exactly once', async () => {
         type: 'error',
         message: 'import data or mode changed after preview; preview again'
     }]);
+    assert.equal(state.dataImportPlan, null);
+    assert.equal(state.showDataImportPreviewModal, false);
+});
+
+test('data import preview cancellation discards the reviewed plan', () => {
+    const state = loadApp();
+    state.dataImportPlan = { id: 'plan' };
+    state.showDataImportPreviewModal = true;
+
+    state.closeDataImportPreview();
+
+    assert.equal(state.dataImportPlan, null);
+    assert.equal(state.showDataImportPreviewModal, false);
 });

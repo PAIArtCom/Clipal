@@ -59,6 +59,33 @@ func TestDataImportPreviewAndApplyExternalCredential(t *testing.T) {
 	}
 }
 
+func TestDataImportApplyRejectsChangedCurrentState(t *testing.T) {
+	dir := t.TempDir()
+	api := NewAPI(dir, "test", nil)
+	body := []byte(`{"files":[{"name":"credential.json","data":"{\"type\":\"codex\",\"email\":\"web@example.com\",\"access_token\":\"token\"}"}],"format":"auto"}`)
+
+	preview := httptest.NewRecorder()
+	api.HandleDataImportPreview(preview, httptest.NewRequest(http.MethodPost, "/api/data/import/preview", bytes.NewReader(body)))
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	var plan struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.telemetry.RecordUsage("openai", "changed", telemetry.UsageSnapshot{}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte(`{"files":[{"name":"credential.json","data":"{\"type\":\"codex\",\"email\":\"web@example.com\",\"access_token\":\"token\"}"}],"format":"auto","plan_id":"` + plan.ID + `"}`)
+	apply := httptest.NewRecorder()
+	api.HandleDataImportApply(apply, httptest.NewRequest(http.MethodPost, "/api/data/import/apply", bytes.NewReader(payload)))
+	if apply.Code != http.StatusConflict {
+		t.Fatalf("apply status=%d body=%s", apply.Code, apply.Body.String())
+	}
+}
+
 func TestDataImportPreservesInt64FromRawJSONText(t *testing.T) {
 	dir := t.TempDir()
 	api := NewAPI(dir, "test", nil)
