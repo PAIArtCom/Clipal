@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/lansespirit/Clipal/internal/config"
@@ -12,9 +13,23 @@ import (
 	"github.com/lansespirit/Clipal/internal/telemetry"
 )
 
-func importStateFingerprint(cfg *config.Config, credentials []oauth.Credential, usage telemetry.DataSnapshot) string {
-	dataset := datasetFromState(cfg, credentials, usage, "", timeZero)
-	data, _ := json.Marshal(dataset.Data)
+// importStateFingerprint covers only state whose drift changes what an apply
+// would do: the configuration and the credential identity set. Usage counters
+// and token material change with routine proxied traffic and refreshes;
+// hashing them would invalidate every previewed plan on a busy server.
+func importStateFingerprint(cfg *config.Config, credentials []oauth.Credential) string {
+	dataset := datasetFromState(cfg, nil, telemetry.DataSnapshot{}, "", timeZero)
+	identities := make([]string, 0, len(credentials))
+	for _, credential := range credentials {
+		identities = append(identities, credentialIdentity(credential)+"\x00"+credential.Ref)
+	}
+	sort.Strings(identities)
+	payload := struct {
+		Global      Global            `json:"global"`
+		Clients     map[string]Client `json:"clients"`
+		Credentials []string          `json:"credentials"`
+	}{dataset.Data.Global, dataset.Data.Clients, identities}
+	data, _ := json.Marshal(payload)
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }

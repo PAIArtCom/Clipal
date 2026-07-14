@@ -131,7 +131,7 @@ func (s *Service) Analyze(inputs []Input, format string, mode Mode) (*ImportPlan
 	}
 	plan.UsageProviders = usageProviderCount(dataset.Data.Usage)
 	plan.Changes = importChanges(current, credentials, usage, dataset, native, mode)
-	plan.baseState = importStateFingerprint(current, credentials, usage)
+	plan.baseState = importStateFingerprint(current, credentials)
 	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
 	return plan, nil
 }
@@ -165,7 +165,7 @@ func (s *Service) AnalyzeCredentials(credentials []oauth.Credential, warnings []
 		Dataset:     dataset,
 	}
 	plan.Changes = importChanges(current, existingCredentials, usage, dataset, false, ModeMerge)
-	plan.baseState = importStateFingerprint(current, existingCredentials, usage)
+	plan.baseState = importStateFingerprint(current, existingCredentials)
 	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
 	return plan, nil
 }
@@ -251,7 +251,7 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	if err != nil {
 		return nil, err
 	}
-	if plan.baseState != "" && plan.baseState != importStateFingerprint(current, credentials, s.usage.Snapshot()) {
+	if plan.baseState != "" && plan.baseState != importStateFingerprint(current, credentials) {
 		return nil, ErrImportBaseStateChanged
 	}
 	usageTx, err := s.usage.BeginTransfer()

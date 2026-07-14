@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lansespirit/Clipal/internal/config"
+	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
 	"github.com/lansespirit/Clipal/internal/telemetry"
 	"github.com/lansespirit/Clipal/internal/transfer"
 )
@@ -75,7 +76,13 @@ func TestDataImportApplyRejectsChangedCurrentState(t *testing.T) {
 	if err := json.Unmarshal(preview.Body.Bytes(), &plan); err != nil {
 		t.Fatal(err)
 	}
+	// Routine usage traffic must not invalidate the previewed plan; a change
+	// to the credential set must.
 	if err := api.telemetry.RecordUsage("openai", "changed", telemetry.UsageSnapshot{}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	added := &oauthpkg.Credential{Ref: "added-after-preview", Provider: config.OAuthProviderClaude, Email: "added@example.com", AccessToken: "token"}
+	if err := oauthpkg.NewStore(dir).Save(added); err != nil {
 		t.Fatal(err)
 	}
 	payload := []byte(`{"files":[{"name":"credential.json","data":"{\"type\":\"codex\",\"email\":\"web@example.com\",\"access_token\":\"token\"}"}],"format":"auto","plan_id":"` + plan.ID + `"}`)

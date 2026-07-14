@@ -796,3 +796,59 @@ func TestRelinkKeepsProvidersBoundToOtherAccounts(t *testing.T) {
 		t.Fatalf("relinked ref resolves to the wrong account: %#v", relinked)
 	}
 }
+
+func TestApplyToleratesRoutineTrafficBetweenPreviewAndApply(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	existing := &oauth.Credential{Ref: "steady", Provider: config.OAuthProviderCodex, Email: "steady@example.com", AccountID: "acct-steady", AccessToken: "token-1", RefreshToken: "refresh-1"}
+	if err := oauth.NewStore(dir).Save(existing); err != nil {
+		t.Fatal(err)
+	}
+	usage, err := telemetry.NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(dir, "test", usage, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "credential.json", Data: []byte(`{"type":"codex","email":"import@example.com","access_token":"token"}`)}}, FormatAuto, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Routine activity while the operator reviews the plan: a proxied request
+	// lands in telemetry and a background refresh rotates token material for
+	// the same account. Neither changes what the apply will do.
+	if err := usage.RecordUsage("openai", "existing", telemetry.UsageSnapshot{ReasoningTokens: 1}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rotated := existing.Clone()
+	rotated.AccessToken, rotated.RefreshToken = "token-2", "refresh-2"
+	rotated.LastRefresh = time.Now()
+	if err := oauth.NewStore(dir).Save(rotated); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatalf("routine traffic invalidated the plan: %v", err)
+	}
+}
+
+func TestApplyRejectsPlanWhenCredentialSetChangedAfterPreview(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	service, err := NewService(dir, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "credential.json", Data: []byte(`{"type":"codex","email":"import@example.com","access_token":"token"}`)}}, FormatAuto, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := &oauth.Credential{Ref: "new-account", Provider: config.OAuthProviderClaude, Email: "new@example.com", AccountID: "acct-new", AccessToken: "token"}
+	if err := oauth.NewStore(dir).Save(added); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); !errors.Is(err, ErrImportBaseStateChanged) {
+		t.Fatalf("apply error=%v, want base-state conflict", err)
+	}
+}
