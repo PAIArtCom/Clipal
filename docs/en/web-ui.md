@@ -32,6 +32,7 @@ If you changed the port, replace `3333` with your actual port.
 ### Global Settings
 
 - Change listen address and port
+- Separately enable remote proxy access or remote Web UI access; both are disabled by default
 - Change log level
 - Configure reactivation, timeouts, and request body limits
 - Configure the circuit breaker

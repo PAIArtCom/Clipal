@@ -59,6 +59,8 @@ providers:
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `listen_addr` | string | `127.0.0.1` | 监听地址 |
+| `allow_remote_proxy` | bool | `false` | 当 `listen_addr` 不是 loopback 地址时必须开启；显式允许远程客户端使用代理。 |
+| `allow_remote_web_ui` | bool | `false` | 显式允许远程访问 Web UI 和管理 API。该模式没有内置认证，请使用防火墙、VPN 或反向代理保护。 |
 | `port` | int | `3333` | 本地代理端口 |
 | `log_level` | string | `info` | `debug` / `info` / `warn` / `error` |
 | `reactivate_after` | duration | `1h` | provider 临时禁用后的自动恢复时间；设为 `0` 可禁用基于鉴权、计费、额度错误的临时禁用 |

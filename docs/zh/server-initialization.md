@@ -19,7 +19,7 @@ scp clipal-data.json user@server:/tmp/
 clipal init --import /tmp/clipal-data.json
 ```
 
-`--import` 以 replace 模式恢复 Clipal 的 Provider、OAuth 凭据和运行配置；随后初始化会为服务器当前 Unix 用户重新执行可用 CLI 的 takeover。它不会把本机的 CLI 配置当作服务器上已生效的配置。
+`--import` 以 replace 模式恢复 Clipal 的 Provider、OAuth 凭据和可迁移运行配置；部署环境的远程访问开关不会从备份恢复。随后初始化会为服务器当前 Unix 用户重新执行可用 CLI 的 takeover。它不会把本机的 CLI 配置当作服务器上已生效的配置。
 
 默认工具是 Codex CLI、Claude Code 与 Antigravity CLI（`agy`）。Gemini CLI 保持支持，可通过 `--tools gemini` 显式选择。
 

@@ -23,9 +23,11 @@ scp clipal-data.json user@server:/tmp/
 clipal init --import /tmp/clipal-data.json
 ```
 
-`--import` restores Clipal providers, OAuth credentials, and runtime settings in
-replace mode. Initialization then applies takeover for the current server user;
-it does not treat the local machine's CLI files as active server configuration.
+`--import` restores Clipal providers, OAuth credentials, and transferable
+runtime settings in replace mode. Deployment-specific remote-access settings
+are intentionally not restored. Initialization then applies takeover for the
+current server user; it does not treat the local machine's CLI files as active
+server configuration.
 
 The default tools are Codex CLI, Claude Code, and Antigravity CLI (`agy`).
 Gemini CLI remains supported when explicitly selected with `--tools gemini`.

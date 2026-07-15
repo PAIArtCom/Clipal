@@ -59,6 +59,8 @@ OAuth-backed providers are also supported in `openai.yaml`, `claude.yaml`, and `
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `listen_addr` | string | `127.0.0.1` | Listen address |
+| `allow_remote_proxy` | bool | `false` | Required when `listen_addr` is not loopback. Explicitly permits remote clients to use the proxy. |
+| `allow_remote_web_ui` | bool | `false` | Explicitly permits remote access to the Web UI and management API. This mode has no built-in authentication; protect it with a firewall, VPN, or reverse proxy. |
 | `port` | int | `3333` | Local proxy port |
 | `log_level` | string | `info` | `debug` / `info` / `warn` / `error` |
 | `reactivate_after` | duration | `1h` | Auto-reactivation delay for temporarily deactivated providers; set `0` to disable temporary deactivation for auth, billing, and quota failures |
