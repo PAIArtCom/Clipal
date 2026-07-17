@@ -1296,6 +1296,12 @@ section {
   line-height: 1.6;
 }
 
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
 .qr-wrap {
   display: flex;
   flex-direction: column;
@@ -1316,6 +1322,13 @@ section {
   font-size: 0.8rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .qr-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .community-links {
