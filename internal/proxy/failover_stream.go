@@ -64,20 +64,30 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	if strings.TrimSpace(derivedContentType) != "" {
 		upstreamResp.Header.Set("Content-Type", derivedContentType)
 	}
+	if isEventStreamContentType(derivedContentType) && hasNonIdentityContentEncoding(upstreamResp) {
+		logger.Warn("[%s] upstream %s returned compressed SSE (%s); terminal-event early close is unavailable", cp.clientType, cp.providers[index].Name, upstreamResp.Header.Get("Content-Encoding"))
+	}
 	tracker := newProtocolTracker(cp.clientType, originalReq, upstreamResp)
+	if tracker.kind != streamProtocolNone {
+		// A terminal SSE event can intentionally end the downstream response
+		// before all upstream bytes (for example, trailing heartbeats). The
+		// upstream Content-Length would then overstate the forwarded body.
+		upstreamResp.Header.Del("Content-Length")
+		upstreamResp.ContentLength = -1
+	}
 	var capture bytes.Buffer
 	shouldCapture := !isEventStreamContentType(derivedContentType)
 	usageExtractor := usageExtractorFromRequestWithContentType(originalReq, derivedContentType)
 	if usageExtractor != nil {
 		defer usageExtractor.Cleanup()
 	}
-	total += firstN
-	tracker.append(buf[:firstN])
+	firstForwardN, terminalReached := tracker.append(buf[:firstN])
+	total += firstForwardN
 	if usageExtractor != nil {
-		usageExtractor.Append(buf[:firstN])
+		usageExtractor.Append(buf[:firstForwardN])
 	}
-	if shouldCapture && firstN > 0 && capture.Len() < protocolScanWindow {
-		_, _ = capture.Write(buf[:min(firstN, protocolScanWindow-capture.Len())])
+	if shouldCapture && firstForwardN > 0 && capture.Len() < protocolScanWindow {
+		_, _ = capture.Write(buf[:min(firstForwardN, protocolScanWindow-capture.Len())])
 	}
 
 	if firstN == 0 && firstErr != nil {
@@ -141,8 +151,8 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	w.WriteHeader(upstreamResp.StatusCode)
 
 	fw := responseBodyWriter(w, originalReq, upstreamResp)
-	if firstN > 0 {
-		if _, err := fw.Write(buf[:firstN]); err != nil {
+	if firstForwardN > 0 {
+		if _, err := fw.Write(buf[:firstForwardN]); err != nil {
 			_ = upstreamResp.Body.Close()
 			stopTimer(idleTimer)
 			cp.releaseCircuitPermit(index, allow.usedProbe)
@@ -160,41 +170,50 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	}
 
 	var copyErr error
-	for {
+	eofReached := firstN > 0 && errors.Is(firstErr, io.EOF)
+	for !terminalReached && !eofReached {
 		nr, er := upstreamResp.Body.Read(buf)
 		if nr > 0 {
 			if idleTimer != nil {
 				idleTimer.Reset(cp.upstreamIdle)
 			}
-			total += nr
-			tracker.append(buf[:nr])
+			forwardN, reachedTerminal := tracker.append(buf[:nr])
+			total += forwardN
 			if usageExtractor != nil {
-				usageExtractor.Append(buf[:nr])
+				usageExtractor.Append(buf[:forwardN])
 			}
 			if shouldCapture && capture.Len() < protocolScanWindow {
-				limit := min(nr, protocolScanWindow-capture.Len())
+				limit := min(forwardN, protocolScanWindow-capture.Len())
 				if limit > 0 {
 					_, _ = capture.Write(buf[:limit])
 				}
 			}
-			if _, ew := fw.Write(buf[:nr]); ew != nil {
-				_ = upstreamResp.Body.Close()
-				stopTimer(idleTimer)
-				cp.releaseCircuitPermit(index, allow.usedProbe)
-				cancelAttempt(nil)
-				return streamResult{
-					kind:     streamFinal,
-					delivery: deliveryClientCanceled,
-					protocol: tracker.abortedStatus(),
-					proto:    tracker.kind,
-					cause:    "client_canceled",
-					bytes:    total,
-					err:      ew,
+			if forwardN > 0 {
+				_, ew := fw.Write(buf[:forwardN])
+				if ew != nil {
+					_ = upstreamResp.Body.Close()
+					stopTimer(idleTimer)
+					cp.releaseCircuitPermit(index, allow.usedProbe)
+					cancelAttempt(nil)
+					return streamResult{
+						kind:     streamFinal,
+						delivery: deliveryClientCanceled,
+						protocol: tracker.abortedStatus(),
+						proto:    tracker.kind,
+						cause:    "client_canceled",
+						bytes:    total,
+						err:      ew,
+					}
 				}
+			}
+			terminalReached = reachedTerminal
+			if terminalReached {
+				break
 			}
 		}
 		if er != nil {
 			if errors.Is(er, io.EOF) {
+				eofReached = true
 				break
 			}
 			copyErr = er
@@ -207,6 +226,9 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 			}
 			break
 		}
+	}
+	if eofReached {
+		tracker.finishEOF()
 	}
 
 	_ = upstreamResp.Body.Close()
@@ -226,13 +248,19 @@ func (cp *ClientProxy) streamResponseToClient(w http.ResponseWriter, resp *http.
 	}
 	protocol := tracker.finalStatus()
 	if copyErr == nil {
-		if protocol == protocolIncomplete {
+		switch {
+		case protocol == protocolIncomplete && !tracker.hasTerminalEvent():
 			cp.recordCircuitFailure(time.Now(), index, allow.usedProbe, "protocol_incomplete")
-		} else {
+		case protocol == protocolCompleted || protocol == protocolNotApplicable:
 			if onSuccess != nil {
 				onSuccess(buildStreamSuccess(capture.Bytes(), usageExtractor))
 			}
 			cp.recordCircuitSuccess(time.Now(), index, allow.usedProbe)
+		default:
+			// A complete semantic failure/incomplete event proves transport
+			// delivery, but says nothing positive or negative about provider
+			// health. Preserve existing breaker evidence and release any probe.
+			cp.releaseCircuitPermit(index, allow.usedProbe)
 		}
 	} else if isUpstreamIdleTimeout(attemptCtx, copyErr) {
 		cp.recordCircuitFailure(time.Now(), index, allow.usedProbe, "idle_timeout")

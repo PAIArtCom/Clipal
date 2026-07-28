@@ -423,7 +423,8 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 				result = cp.streamResponseToClient(w, resp, req, attemptCtx, cancelAttempt, index, allow, onCommit, onSuccess)
 			}
 			if result.kind == streamFinal {
-				if result.delivery != deliveryCommittedComplete && busyProbeHeld {
+				protocolSucceeded := result.protocol == protocolCompleted || result.protocol == protocolNotApplicable
+				if (result.delivery != deliveryCommittedComplete || !protocolSucceeded) && busyProbeHeld {
 					cp.releaseProviderBusyProbe(index)
 				}
 				cp.logRequestResult(req, provider.Name, resp.StatusCode, result, false)

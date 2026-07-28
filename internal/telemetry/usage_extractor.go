@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const maxJSONCaptureBytes = 512 * 1024
+const (
+	maxJSONCaptureBytes     = 512 * 1024
+	maxSSEEventCaptureBytes = 256 * 1024
+)
 
 type usageMode int
 
@@ -29,9 +32,12 @@ type UsageExtractor struct {
 	jsonCapture []byte
 	jsonFile    *os.File
 
-	lineBuf   []byte
-	eventName string
-	dataLines []string
+	lineBuf        []byte
+	lineOverflow   bool
+	pendingCR      bool
+	eventName      string
+	eventData      []byte
+	eventOversized bool
 
 	completed bool
 	snapshot  UsageSnapshot
@@ -49,7 +55,7 @@ func NewUsageExtractor(family string, capability string, contentType string) *Us
 func detectUsageMode(family string, capability string, contentType string) usageMode {
 	isSSE := strings.Contains(strings.ToLower(contentType), "text/event-stream")
 	switch capability {
-	case "openai_compatible", "openai_chat_completions", "openai_completions", "openai_responses":
+	case "openai_compatible", "openai_chat_completions", "openai_completions", "openai_responses", "openai_images":
 		if isSSE {
 			return usageModeOpenAISSE
 		}
@@ -107,11 +113,17 @@ func (e *UsageExtractor) Finalize() (UsageSnapshot, bool) {
 	}
 	switch e.mode {
 	case usageModeOpenAISSE, usageModeClaudeSSE, usageModeGeminiSSE:
+		if e.pendingCR {
+			e.pendingCR = false
+			e.completeSSELine()
+		}
 		if len(e.lineBuf) > 0 {
-			line := strings.TrimSuffix(string(e.lineBuf), "\r")
+			line := bytes.TrimSuffix(e.lineBuf, []byte{'\r'})
+			overflow := e.lineOverflow
 			e.lineBuf = nil
-			if line != "" {
-				e.processSSELine(line)
+			e.lineOverflow = false
+			if len(line) > 0 {
+				e.processSSELine(line, overflow)
 			}
 		}
 		e.flushPendingEvent()
@@ -222,49 +234,114 @@ func (e *UsageExtractor) jsonReader() (io.Reader, bool) {
 }
 
 func (e *UsageExtractor) appendSSE(chunk []byte) {
-	e.lineBuf = append(e.lineBuf, chunk...)
-	for {
-		idx := bytes.IndexByte(e.lineBuf, '\n')
-		if idx < 0 {
+	consumed := 0
+	if e.pendingCR {
+		e.pendingCR = false
+		if len(chunk) > 0 && chunk[0] == '\n' {
+			consumed++
+		}
+		e.completeSSELine()
+	}
+	for consumed < len(chunk) {
+		lineEnd := bytes.IndexAny(chunk[consumed:], "\r\n")
+		if lineEnd < 0 {
+			e.appendSSELineFragment(chunk[consumed:])
 			return
 		}
-		line := string(e.lineBuf[:idx])
-		e.lineBuf = e.lineBuf[idx+1:]
-		line = strings.TrimSuffix(line, "\r")
-		e.processSSELine(line)
+		lineEnd += consumed
+		e.appendSSELineFragment(chunk[consumed:lineEnd])
+		lineEndingBytes := 1
+		if chunk[lineEnd] == '\r' {
+			if lineEnd+1 < len(chunk) && chunk[lineEnd+1] == '\n' {
+				lineEndingBytes = 2
+			} else if lineEnd+1 == len(chunk) {
+				e.pendingCR = true
+				return
+			}
+		}
+		consumed = lineEnd + lineEndingBytes
+		e.completeSSELine()
 	}
 }
 
-func (e *UsageExtractor) processSSELine(line string) {
-	if line == "" {
+func (e *UsageExtractor) completeSSELine() {
+	line := e.lineBuf
+	e.processSSELine(line, e.lineOverflow)
+	e.lineBuf = e.lineBuf[:0]
+	e.lineOverflow = false
+}
+
+func (e *UsageExtractor) appendSSELineFragment(fragment []byte) {
+	if len(fragment) == 0 || e.lineOverflow {
+		return
+	}
+	remaining := maxSSEEventCaptureBytes - len(e.lineBuf)
+	if remaining <= 0 {
+		e.lineOverflow = true
+		return
+	}
+	if len(fragment) > remaining {
+		e.lineBuf = append(e.lineBuf, fragment[:remaining]...)
+		e.lineOverflow = true
+		return
+	}
+	e.lineBuf = append(e.lineBuf, fragment...)
+}
+
+func (e *UsageExtractor) processSSELine(line []byte, overflow bool) {
+	if len(line) == 0 {
 		e.flushPendingEvent()
 		return
 	}
 	switch {
-	case strings.HasPrefix(line, "event:"):
-		e.eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
-	case strings.HasPrefix(line, "data:"):
-		data := strings.TrimPrefix(line, "data:")
-		data = strings.TrimPrefix(data, " ")
-		e.dataLines = append(e.dataLines, data)
+	case bytes.HasPrefix(line, []byte("event:")):
+		e.eventName = strings.TrimSpace(string(bytes.TrimPrefix(line, []byte("event:"))))
+	case bytes.HasPrefix(line, []byte("data:")):
+		if overflow {
+			e.eventOversized = true
+			e.eventData = nil
+			return
+		}
+		data := bytes.TrimPrefix(line, []byte("data:"))
+		data = bytes.TrimPrefix(data, []byte{' '})
+		extra := len(data)
+		if len(e.eventData) > 0 {
+			extra++
+		}
+		if e.eventOversized || len(e.eventData)+extra > maxSSEEventCaptureBytes {
+			e.eventOversized = true
+			e.eventData = nil
+			return
+		}
+		if len(e.eventData) > 0 {
+			e.eventData = append(e.eventData, '\n')
+		}
+		e.eventData = append(e.eventData, data...)
 	}
 }
 
 func (e *UsageExtractor) flushPendingEvent() {
-	if len(e.dataLines) == 0 {
+	e.markCompletedEventName(e.eventName)
+	if e.eventOversized {
+		e.eventName = ""
+		e.eventData = nil
+		e.eventOversized = false
+		return
+	}
+	if len(e.eventData) == 0 {
 		e.eventName = ""
 		return
 	}
 
-	data := strings.Join(e.dataLines, "\n")
-	e.dataLines = nil
+	data := e.eventData
+	e.eventData = nil
 	eventName := e.eventName
 	e.eventName = ""
 
-	if strings.TrimSpace(data) == "" || strings.TrimSpace(data) == "[DONE]" {
+	if len(bytes.TrimSpace(data)) == 0 || bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
 		return
 	}
-	payload, ok := decodeJSONObject([]byte(data))
+	payload, ok := decodeJSONObject(data)
 	if !ok {
 		return
 	}
@@ -276,6 +353,19 @@ func (e *UsageExtractor) flushPendingEvent() {
 		e.handleClaudeSSEEvent(eventName, payload)
 	case usageModeGeminiSSE:
 		e.handleGeminiSSEEvent(payload)
+	}
+}
+
+func (e *UsageExtractor) markCompletedEventName(eventName string) {
+	switch e.mode {
+	case usageModeOpenAISSE:
+		if eventName == "response.completed" || eventName == "image_generation.completed" {
+			e.completed = true
+		}
+	case usageModeClaudeSSE:
+		if eventName == "message_stop" {
+			e.completed = true
+		}
 	}
 }
 

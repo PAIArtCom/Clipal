@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -709,6 +710,61 @@ func TestSynthesizeCodexOAuthResponsesJSONReturnsFailedEventResponse(t *testing.
 	if got := upstreamErr["code"]; got != "rate_limit_exceeded" {
 		t.Fatalf("error.code = %v", got)
 	}
+}
+
+func TestCodexOAuthResponsesProtocol(t *testing.T) {
+	tests := []struct {
+		status string
+		want   protocolStatus
+	}{
+		{status: "completed", want: protocolCompleted},
+		{status: "failed", want: protocolFailed},
+		{status: "incomplete", want: protocolIncomplete},
+	}
+	for _, tc := range tests {
+		t.Run(tc.status, func(t *testing.T) {
+			body := []byte(`{"status":"` + tc.status + `"}`)
+			if got := codexOAuthResponsesProtocol(body); got != tc.want {
+				t.Fatalf("protocol=%s want=%s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReadCodexOAuthSSEBodyStopsAtTerminalEventWithoutEOF(t *testing.T) {
+	terminalEvent := "event: response.completed\n" +
+		`data: {"type":"response.completed","response":{"id":"resp_terminal","status":"completed","output":[]}}` + "\n\n"
+	body := &terminalThenBlockingBody{
+		data:   []byte(terminalEvent + ": heartbeat after completion\n\n"),
+		closed: make(chan struct{}),
+	}
+	cp := &ClientProxy{}
+	_, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	type readResult struct {
+		body []byte
+		err  error
+	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		result, err := cp.readCodexOAuthSSEBody(body, cancel)
+		resultCh <- readResult{body: result, err: err}
+	}()
+
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			t.Fatalf("readCodexOAuthSSEBody: %v", result.err)
+		}
+		if got := string(result.body); got != terminalEvent {
+			t.Fatalf("body len=%d want=%d", len(got), len(terminalEvent))
+		}
+	case <-time.After(2 * time.Second):
+		_ = body.Close()
+		t.Fatal("readCodexOAuthSSEBody waited for EOF after terminal event")
+	}
+	_ = body.Close()
 }
 
 func TestSynthesizeCodexOAuthResponsesJSONReturnsIncompleteEventResponse(t *testing.T) {

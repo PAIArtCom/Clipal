@@ -726,6 +726,7 @@ func (cp *ClientProxy) doProviderRequestWithPayload(original *http.Request, prov
 	if err != nil {
 		return nil, false, err
 	}
+	preferIdentityEncodingForStream(original, proxyReq, payload)
 	resp, err := cp.doPreparedProviderRequest(proxyReq, providerIndex)
 	if err != nil || !provider.UsesOAuth() || resp == nil || resp.StatusCode != http.StatusUnauthorized {
 		if err != nil || resp == nil {
@@ -747,12 +748,51 @@ func (cp *ClientProxy) doProviderRequestWithPayload(original *http.Request, prov
 	if err != nil {
 		return nil, false, err
 	}
+	preferIdentityEncodingForStream(original, proxyReq, payload)
 	resp, err = cp.doPreparedProviderRequest(proxyReq, providerIndex)
 	if err != nil || resp == nil {
 		return resp, true, err
 	}
 	resp, err = prepareOAuthProviderResponse(original, provider, resp)
 	return resp, true, err
+}
+
+func preferIdentityEncodingForStream(original *http.Request, proxyReq *http.Request, payload *requestPayload) {
+	if proxyReq == nil || !requestMayStreamEvents(original, proxyReq, payload) {
+		return
+	}
+	// Terminal detection and exact event-boundary forwarding operate on SSE
+	// bytes. Ask upstreams not to compress known streaming responses so the
+	// proxy can manage their lifecycle without decoding provider-specific
+	// compression formats.
+	proxyReq.Header.Set("Accept-Encoding", "identity")
+}
+
+func requestMayStreamEvents(original *http.Request, proxyReq *http.Request, payload *requestPayload) bool {
+	if proxyReq != nil && isEventStreamContentType(proxyReq.Header.Get("Accept")) {
+		return true
+	}
+	requestCtx, ok := requestContextFromRequest(original)
+	if !ok {
+		return false
+	}
+	if requestCtx.Capability == CapabilityGeminiStreamGenerate {
+		return true
+	}
+	switch requestCtx.Capability {
+	case CapabilityOpenAICompatible,
+		CapabilityOpenAIChatCompletions,
+		CapabilityOpenAICompletions,
+		CapabilityOpenAIResponses,
+		CapabilityOpenAIImages,
+		CapabilityClaudeCompatible,
+		CapabilityClaudeMessages:
+		root := payload.jsonRoot()
+		stream, _ := root["stream"].(bool)
+		return stream
+	default:
+		return false
+	}
 }
 
 func (cp *ClientProxy) oauthHTTPClientForProvider(provider config.Provider, providerIndex int) *http.Client {

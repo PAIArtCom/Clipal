@@ -69,6 +69,12 @@ func DescribeRequestOutcome(event RequestOutcomeEvent) RequestOutcomePresentatio
 			Label:  providerOutcomeLabel("Completed", provider),
 			Detail: completedResponseDetail(provider, event.Status),
 		}
+	case event.Delivery == string(deliveryCommittedComplete) && event.Protocol == string(protocolFailed):
+		return RequestOutcomePresentation{
+			Result: "failed_response",
+			Label:  providerOutcomeLabel("Failed response", provider),
+			Detail: "The upstream stream ended with a protocol-level failure event.",
+		}
 	default:
 		return RequestOutcomePresentation{
 			Result: "incomplete_response",

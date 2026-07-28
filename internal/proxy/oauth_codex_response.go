@@ -91,6 +91,7 @@ func (cp *ClientProxy) synthesizeCodexOAuthNonStreamingResponseToClient(w http.R
 			err:      err,
 		}
 	}
+	protocol := codexOAuthResponsesProtocol(responseBody)
 
 	if onCommit != nil {
 		onCommit()
@@ -115,7 +116,7 @@ func (cp *ClientProxy) synthesizeCodexOAuthNonStreamingResponseToClient(w http.R
 		}
 	}
 
-	if onSuccess != nil {
+	if onSuccess != nil && protocol == protocolCompleted {
 		usageExtractor := usageExtractorFromRequestWithContentType(originalReq, "application/json")
 		if usageExtractor != nil {
 			usageExtractor.Append(responseBody)
@@ -125,13 +126,34 @@ func (cp *ClientProxy) synthesizeCodexOAuthNonStreamingResponseToClient(w http.R
 			onSuccess(streamSuccess{responseBody: responseBody})
 		}
 	}
-	cp.recordCircuitSuccess(time.Now(), index, allow.usedProbe)
+	if protocol == protocolCompleted {
+		cp.recordCircuitSuccess(time.Now(), index, allow.usedProbe)
+	} else {
+		cp.releaseCircuitPermit(index, allow.usedProbe)
+	}
 	return streamResult{
 		kind:     streamFinal,
 		delivery: deliveryCommittedComplete,
-		protocol: protocolCompleted,
+		protocol: protocol,
 		proto:    streamProtocolOpenAI,
 		bytes:    n,
+	}
+}
+
+func codexOAuthResponsesProtocol(responseBody []byte) protocolStatus {
+	var response struct {
+		Status string `json:"status"`
+	}
+	if json.Unmarshal(responseBody, &response) != nil {
+		return protocolCompleted
+	}
+	switch strings.TrimSpace(response.Status) {
+	case "failed":
+		return protocolFailed
+	case "incomplete":
+		return protocolIncomplete
+	default:
+		return protocolCompleted
 	}
 }
 
@@ -144,16 +166,24 @@ func (cp *ClientProxy) readCodexOAuthSSEBody(body io.Reader, cancelAttempt conte
 
 	var out bytes.Buffer
 	buf := make([]byte, 32*1024)
+	tracker := &protocolTracker{kind: streamProtocolOpenAIResponses}
 	for {
 		n, err := body.Read(buf)
 		if n > 0 {
 			if idleTimer != nil {
 				idleTimer.Reset(cp.upstreamIdle)
 			}
-			_, _ = out.Write(buf[:n])
+			forwardN, terminal := tracker.append(buf[:n])
+			if forwardN > 0 {
+				_, _ = out.Write(buf[:forwardN])
+			}
+			if terminal {
+				return out.Bytes(), nil
+			}
 		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				tracker.finishEOF()
 				return out.Bytes(), nil
 			}
 			return out.Bytes(), err
