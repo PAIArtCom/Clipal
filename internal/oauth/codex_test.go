@@ -16,8 +16,8 @@ import (
 )
 
 func TestCodexRefreshMetadataMatchesInstalledRelease(t *testing.T) {
-	if !strings.HasPrefix(defaultCodexUserAgent, "codex_cli_rs/0.144.1 ") {
-		t.Fatalf("defaultCodexUserAgent = %q, want Codex 0.144.1 identity", defaultCodexUserAgent)
+	if !strings.HasPrefix(defaultCodexUserAgent, "codex_cli_rs/0.145.0 ") {
+		t.Fatalf("defaultCodexUserAgent = %q, want Codex 0.145.0 identity", defaultCodexUserAgent)
 	}
 }
 
