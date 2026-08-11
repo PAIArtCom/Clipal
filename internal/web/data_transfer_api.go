@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/lansespirit/Clipal/internal/transfer"
+	"github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
 type dataImportFileRequest struct {

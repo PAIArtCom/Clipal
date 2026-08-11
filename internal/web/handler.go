@@ -8,9 +8,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/proxy"
-	"github.com/lansespirit/Clipal/internal/transfer"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
 //go:embed static/*

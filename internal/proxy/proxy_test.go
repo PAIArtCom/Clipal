@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/logger"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/logger"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

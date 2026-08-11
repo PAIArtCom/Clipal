@@ -77,12 +77,12 @@ Clipal 现已将所有客户端入口统一规范到单一路由：`http://127.0
 如果你在使用 Claude Code、Codex CLI 等能操作终端的 AI，可以直接把下面这段话发给它：
 
 ```text
-请帮我安装并启动 Clipal。项目地址：https://github.com/lansespirit/Clipal
+请帮我安装并启动 Clipal。项目地址：https://github.com/PAIArtCom/Clipal
 
 请根据我当前的操作系统和架构，查看这个项目的 Releases 和文档，帮我完成下载、安装和启动，并确认我可以打开 Web UI 使用。需要时请参考这些官方链接：
-- Releases: https://github.com/lansespirit/Clipal/releases
-- 快速开始: https://github.com/lansespirit/Clipal/blob/main/docs/zh/getting-started.md
-- Web UI: https://github.com/lansespirit/Clipal/blob/main/docs/zh/web-ui.md
+- Releases: https://github.com/PAIArtCom/Clipal/releases
+- 快速开始: https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/getting-started.md
+- Web UI: https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/web-ui.md
 
 安装完成后，再指导我在 Web UI 里完成一键接管，并添加第一个 provider。
 ```
@@ -95,7 +95,7 @@ npm install -g clipal
 clipal --version
 ```
 
-如果你更偏好独立二进制，也可以前往 [Releases](https://github.com/lansespirit/Clipal/releases) 页面下载对应系统的文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)。
+如果你更偏好独立二进制，也可以前往 [Releases](https://github.com/PAIArtCom/Clipal/releases) 页面下载对应系统的文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)。
 
 ```bash
 chmod +x clipal*

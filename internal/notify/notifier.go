@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/gen2brain/beeep"
-	"github.com/lansespirit/Clipal/internal/config"
 )
 
 const (

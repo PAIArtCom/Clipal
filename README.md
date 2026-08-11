@@ -77,12 +77,12 @@ It natively supports the request flavors of:
 If you use a terminal-capable AI such as Claude Code or Codex CLI, you can send it the prompt below:
 
 ```text
-Please help me install and start Clipal. Project: https://github.com/lansespirit/Clipal
+Please help me install and start Clipal. Project: https://github.com/PAIArtCom/Clipal
 
 Please detect my current OS and architecture, check the project's Releases and docs, and complete the download, installation, and startup for me. Then confirm that I can open the Web UI successfully. Use these official links when needed:
-- Releases: https://github.com/lansespirit/Clipal/releases
-- Getting Started: https://github.com/lansespirit/Clipal/blob/main/docs/en/getting-started.md
-- Web UI: https://github.com/lansespirit/Clipal/blob/main/docs/en/web-ui.md
+- Releases: https://github.com/PAIArtCom/Clipal/releases
+- Getting Started: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md
+- Web UI: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/web-ui.md
 
 After that, guide me through using the Web UI to enable CLI takeover and add my first provider.
 ```
@@ -95,8 +95,8 @@ npm install -g clipal
 clipal --version
 ```
 
-Prefer a standalone binary? Download the right build from [Releases](https://github.com/lansespirit/Clipal/releases) and put it on your `PATH`.
-Latest stable release: [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
+Prefer a standalone binary? Download the right build from [Releases](https://github.com/PAIArtCom/Clipal/releases) and put it on your `PATH`.
+Latest stable release: [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 ```bash
 chmod +x clipal*

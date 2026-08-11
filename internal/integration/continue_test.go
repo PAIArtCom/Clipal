@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func TestContinueStatus_NotConfiguredWhenFileMissing(t *testing.T) {

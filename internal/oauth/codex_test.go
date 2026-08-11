@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func TestCodexRefreshMetadataMatchesInstalledRelease(t *testing.T) {

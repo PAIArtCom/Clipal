@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/bootstrap"
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/integration"
-	"github.com/lansespirit/Clipal/internal/service"
+	"github.com/PAIArtCom/Clipal/internal/bootstrap"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/service"
 )
 
 func runInit(args []string) {

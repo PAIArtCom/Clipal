@@ -8,7 +8,7 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func (m Manager) codexTargetPath() (string, error) {

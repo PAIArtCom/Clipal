@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/logger"
 )
 
 type deliveryStatus string

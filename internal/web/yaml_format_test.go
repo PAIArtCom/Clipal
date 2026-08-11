@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 	"gopkg.in/yaml.v3"
 )
 

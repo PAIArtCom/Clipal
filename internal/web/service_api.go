@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/logger"
-	"github.com/lansespirit/Clipal/internal/service"
+	"github.com/PAIArtCom/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/service"
 )
 
 const serviceActionTimeout = 30 * time.Second

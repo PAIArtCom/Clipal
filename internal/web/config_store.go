@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func (a *API) loadConfigOrWriteError(w http.ResponseWriter) *config.Config {

@@ -1,4 +1,4 @@
-module github.com/lansespirit/Clipal
+module github.com/PAIArtCom/Clipal
 
 go 1.26.5
 

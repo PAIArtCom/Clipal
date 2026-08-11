@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func TestOpenCodeStatus_NotConfiguredWhenFileMissing(t *testing.T) {

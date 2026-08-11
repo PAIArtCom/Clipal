@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/testutil"
+	"github.com/PAIArtCom/Clipal/internal/testutil"
 )
 
 func TestWriteAPIError_UsesStructuredFields(t *testing.T) {

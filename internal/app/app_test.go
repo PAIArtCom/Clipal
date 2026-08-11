@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/logger"
 )
 
 func captureFileDescriptor(t *testing.T, target **os.File, fn func()) string {

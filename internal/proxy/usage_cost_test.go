@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 func TestApplyUsageCostSnapshot_UsesDirectCostFromRaw(t *testing.T) {

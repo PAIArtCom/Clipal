@@ -8,8 +8,8 @@ The fastest path is npm:
 npm install -g clipal
 ```
 
-You can also download the right binary from [Releases](https://github.com/lansespirit/Clipal/releases) and place it on your `PATH`.
-Latest stable release: [GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
+You can also download the right binary from [Releases](https://github.com/PAIArtCom/Clipal/releases) and place it on your `PATH`.
+Latest stable release: [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 Platform-specific notes:
 

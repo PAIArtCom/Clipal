@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	integrationpkg "github.com/lansespirit/Clipal/internal/integration"
-	"github.com/lansespirit/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	integrationpkg "github.com/PAIArtCom/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 // GlobalConfigRequest represents a request to update global configuration

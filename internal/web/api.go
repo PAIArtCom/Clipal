@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/integration"
-	"github.com/lansespirit/Clipal/internal/logger"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
-	"github.com/lansespirit/Clipal/internal/proxy"
-	"github.com/lansespirit/Clipal/internal/telemetry"
-	transferpkg "github.com/lansespirit/Clipal/internal/transfer"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/logger"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
+	transferpkg "github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
 var startTime = time.Now()

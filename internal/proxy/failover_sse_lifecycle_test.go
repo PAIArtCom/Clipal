@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func newSSETrackerForCapability(t *testing.T, capability RequestCapability) *protocolTracker {

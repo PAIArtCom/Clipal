@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/transfer"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
 const maxCLIImportFileBytes = transfer.MaxImportFileBytes

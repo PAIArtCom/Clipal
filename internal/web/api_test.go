@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/logger"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
-	"github.com/lansespirit/Clipal/internal/proxy"
-	"github.com/lansespirit/Clipal/internal/telemetry"
-	"github.com/lansespirit/Clipal/internal/testutil"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/logger"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/testutil"
 )
 
 func TestHandleGetGlobalConfig_ReturnsSnakeCase(t *testing.T) {

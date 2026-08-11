@@ -3,7 +3,7 @@ package oauth
 import (
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func TestSameAccountIdentity_AllowsLegacyCodexCredentialWithoutAccountID(t *testing.T) {

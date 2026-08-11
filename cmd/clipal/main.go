@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/app"
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/selfupdate"
+	"github.com/PAIArtCom/Clipal/internal/app"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/selfupdate"
 )
 
 var (

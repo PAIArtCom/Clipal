@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func TestCleanupLastSentRemovesExpired(t *testing.T) {

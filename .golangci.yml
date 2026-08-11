@@ -19,41 +19,41 @@ linters:
           files:
             - "cmd/clipal/main.go"
           deny:
-            - pkg: github.com/lansespirit/Clipal/internal/logger
+            - pkg: github.com/PAIArtCom/Clipal/internal/logger
               desc: "cmd/clipal/main.go should configure runtime through internal/app"
-            - pkg: github.com/lansespirit/Clipal/internal/notify
+            - pkg: github.com/PAIArtCom/Clipal/internal/notify
               desc: "cmd/clipal/main.go should configure runtime through internal/app"
-            - pkg: github.com/lansespirit/Clipal/internal/proxy
+            - pkg: github.com/PAIArtCom/Clipal/internal/proxy
               desc: "cmd/clipal/main.go should configure runtime through internal/app"
-            - pkg: github.com/lansespirit/Clipal/internal/web
+            - pkg: github.com/PAIArtCom/Clipal/internal/web
               desc: "cmd/clipal/main.go should configure runtime through internal/app"
         service-no-runtime-deps:
           list-mode: original
           files:
             - "**/internal/service/**"
           deny:
-            - pkg: github.com/lansespirit/Clipal/internal/app
+            - pkg: github.com/PAIArtCom/Clipal/internal/app
               desc: "service must not depend on app bootstrap"
-            - pkg: github.com/lansespirit/Clipal/internal/proxy
+            - pkg: github.com/PAIArtCom/Clipal/internal/proxy
               desc: "service must not depend on proxy runtime"
-            - pkg: github.com/lansespirit/Clipal/internal/web
+            - pkg: github.com/PAIArtCom/Clipal/internal/web
               desc: "service must not depend on web handlers"
         config-no-runtime-deps:
           list-mode: original
           files:
             - "**/internal/config/**"
           deny:
-            - pkg: github.com/lansespirit/Clipal/internal/app
+            - pkg: github.com/PAIArtCom/Clipal/internal/app
               desc: "config must stay independent from app bootstrap"
-            - pkg: github.com/lansespirit/Clipal/internal/logger
+            - pkg: github.com/PAIArtCom/Clipal/internal/logger
               desc: "config must stay independent from logger"
-            - pkg: github.com/lansespirit/Clipal/internal/notify
+            - pkg: github.com/PAIArtCom/Clipal/internal/notify
               desc: "config must stay independent from notify"
-            - pkg: github.com/lansespirit/Clipal/internal/proxy
+            - pkg: github.com/PAIArtCom/Clipal/internal/proxy
               desc: "config must stay independent from proxy runtime"
-            - pkg: github.com/lansespirit/Clipal/internal/service
+            - pkg: github.com/PAIArtCom/Clipal/internal/service
               desc: "config must stay independent from service runtime"
-            - pkg: github.com/lansespirit/Clipal/internal/web
+            - pkg: github.com/PAIArtCom/Clipal/internal/web
               desc: "config must stay independent from web handlers"
     gosec:
       excludes:

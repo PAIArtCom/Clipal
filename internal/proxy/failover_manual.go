@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/logger"
 )
 
 func (cp *ClientProxy) forwardManual(w http.ResponseWriter, req *http.Request, path string) {

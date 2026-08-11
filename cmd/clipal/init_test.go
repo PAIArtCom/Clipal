@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/bootstrap"
-	"github.com/lansespirit/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/bootstrap"
+	"github.com/PAIArtCom/Clipal/internal/integration"
 )
 
 func TestInitIntegrationProduct(t *testing.T) {

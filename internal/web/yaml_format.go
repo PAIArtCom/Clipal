@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func writeBufferString(b *bytes.Buffer, s string) {

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/proxy"
 )
 
 func TestHandleListIntegrations_ReturnsSupportedProducts(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 // Level represents log levels as integers for comparison

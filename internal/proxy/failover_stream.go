@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/logger"
-	"github.com/lansespirit/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 type streamResultKind int

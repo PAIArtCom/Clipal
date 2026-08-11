@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/service"
+	"github.com/PAIArtCom/Clipal/internal/service"
 )
 
 func TestHandleServiceStatus_InstalledButStoppedIsNotOK(t *testing.T) {

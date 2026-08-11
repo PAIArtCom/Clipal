@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/logger"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/logger"
 )
 
 type circuitState string

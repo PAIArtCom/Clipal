@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
-	transferpkg "github.com/lansespirit/Clipal/internal/transfer"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	transferpkg "github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
 const (

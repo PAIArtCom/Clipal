@@ -10,7 +10,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lansespirit/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 const (

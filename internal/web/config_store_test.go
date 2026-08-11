@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/proxy"
-	"github.com/lansespirit/Clipal/internal/testutil"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/testutil"
 )
 
 func writeConfigFixture(t *testing.T, dir string, cfg *config.Config) {

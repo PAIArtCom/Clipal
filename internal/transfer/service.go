@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	"github.com/lansespirit/Clipal/internal/oauth"
-	"github.com/lansespirit/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 	"gopkg.in/yaml.v3"
 )
 

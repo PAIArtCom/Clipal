@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansespirit/Clipal/internal/config"
-	oauthpkg "github.com/lansespirit/Clipal/internal/oauth"
-	proxypkg "github.com/lansespirit/Clipal/internal/proxy"
-	"github.com/lansespirit/Clipal/internal/telemetry"
+	"github.com/PAIArtCom/Clipal/internal/config"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	proxypkg "github.com/PAIArtCom/Clipal/internal/proxy"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 type oauthProviderAction string

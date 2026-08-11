@@ -8,8 +8,8 @@
 npm install -g clipal
 ```
 
-你也可以从 [Releases](https://github.com/lansespirit/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
-最新稳定版：[GitHub Releases latest](https://github.com/lansespirit/Clipal/releases/latest)
+你也可以从 [Releases](https://github.com/PAIArtCom/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
+最新稳定版：[GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 平台细节：
 
