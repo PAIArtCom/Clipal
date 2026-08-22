@@ -12,6 +12,12 @@ import (
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
+func TestAntigravityOAuthFallbackVersionMatchesCurrentRelease(t *testing.T) {
+	if antigravityOAuthFallbackVersion != "2.9.1" {
+		t.Fatalf("antigravityOAuthFallbackVersion = %q, want 2.9.1", antigravityOAuthFallbackVersion)
+	}
+}
+
 func TestCreateProxyRequest_AntigravityOAuthRebuildsUpstreamContextAndWrapsGenerate(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)

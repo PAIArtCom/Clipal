@@ -16,8 +16,8 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.145.0"
-	codexOAuthUserAgent      = "codex_cli_rs/0.145.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
+	codexOAuthVersion        = "0.149.0"
+	codexOAuthUserAgent      = "codex_cli_rs/0.149.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
 	codexOAuthOriginator     = "codex_cli_rs"
 )
 

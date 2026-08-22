@@ -13,6 +13,12 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
+func TestAntigravityFallbackVersionMatchesCurrentRelease(t *testing.T) {
+	if defaultAntigravityVersionLabel != "2.9.1" {
+		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.9.1", defaultAntigravityVersionLabel)
+	}
+}
+
 func TestAntigravityGenerateAuthURLUsesAntigravityClientAndScopes(t *testing.T) {
 	client := &AntigravityClient{
 		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",

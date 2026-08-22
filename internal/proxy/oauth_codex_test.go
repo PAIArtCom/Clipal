@@ -19,11 +19,11 @@ import (
 )
 
 func TestCodexOAuthMetadataMatchesInstalledRelease(t *testing.T) {
-	if codexOAuthVersion != "0.145.0" {
-		t.Fatalf("codexOAuthVersion = %q, want 0.145.0", codexOAuthVersion)
+	if codexOAuthVersion != "0.149.0" {
+		t.Fatalf("codexOAuthVersion = %q, want 0.149.0", codexOAuthVersion)
 	}
-	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.145.0 ") {
-		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.145.0 identity", codexOAuthUserAgent)
+	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.149.0 ") {
+		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.149.0 identity", codexOAuthUserAgent)
 	}
 }
 
@@ -1219,7 +1219,7 @@ func TestCreateProxyRequest_CodexOAuthOfficialLookingReadyBodyStillNormalizes(t 
 	}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
-	original.Header.Set("User-Agent", "codex_cli_rs/0.145.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
+	original.Header.Set("User-Agent", "codex_cli_rs/0.149.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
 	original.Header.Set("Originator", "codex_cli_rs")
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientOpenAI,
