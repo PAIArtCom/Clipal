@@ -2,11 +2,13 @@ package proxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
@@ -23,6 +25,94 @@ func TestApplyUsageCostSnapshot_UsesDirectCostFromRaw(t *testing.T) {
 	}
 	if snapshot.CostMicros != 32_380 {
 		t.Fatalf("cost_micros = %d", snapshot.CostMicros)
+	}
+	if snapshot.CostSource != telemetry.CostSourceUpstream || snapshot.CatalogVersion != "" {
+		t.Fatalf("attribution = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_RejectsOverflowingDirectCost(t *testing.T) {
+	t.Parallel()
+	snapshot := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{
+		Usage: map[string]any{"costUSD": "1e100"},
+	})
+	if snapshot.HasCost {
+		t.Fatalf("accepted overflowing direct cost: %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_RoundsDirectDecimalCostExactly(t *testing.T) {
+	t.Parallel()
+	snapshot := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{Usage: map[string]any{"costUSD": "0.0001245"}})
+	if !snapshot.HasCost || snapshot.CostMicros != 125 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_RejectsExcessiveDirectMicros(t *testing.T) {
+	t.Parallel()
+	snapshot := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{Usage: map[string]any{"cost_micros": json.Number("9223372036854775807")}})
+	if snapshot.HasCost {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_AcceptsDirectMicrosAtLimit(t *testing.T) {
+	t.Parallel()
+	snapshot := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{Usage: map[string]any{"cost_micros": json.Number("1000000000000")}})
+	if !snapshot.HasCost || snapshot.CostMicros != maxRecordedCostMicros {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_RejectsExcessivePresetCost(t *testing.T) {
+	t.Parallel()
+	snapshot := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{
+		HasCost: true, CostMicros: maxRecordedCostMicros + 1, CostSource: telemetry.CostSourceUpstream,
+	})
+	if snapshot.HasCost || snapshot.CostMicros != 0 || snapshot.CostSource != "" {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_EnforcesUSDCostLimit(t *testing.T) {
+	t.Parallel()
+	atLimit := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{Usage: map[string]any{"costUSD": "1000000"}})
+	if !atLimit.HasCost || atLimit.CostMicros != maxRecordedCostMicros {
+		t.Fatalf("at-limit snapshot = %#v", atLimit)
+	}
+	aboveLimit := applyUsageCostSnapshot(nil, RequestContext{}, config.Provider{}, nil, telemetry.UsageSnapshot{Usage: map[string]any{"costUSD": "1000000.000001"}})
+	if aboveLimit.HasCost {
+		t.Fatalf("above-limit snapshot = %#v", aboveLimit)
+	}
+}
+
+func TestUsageCostCalculation_IgnoresInvalidCounters(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		family     ProtocolFamily
+		capability RequestCapability
+		model      string
+		usage      map[string]any
+	}{
+		{name: "openai malformed input", family: ProtocolFamilyOpenAI, capability: CapabilityOpenAIChatCompletions, model: "gpt-5.4", usage: map[string]any{"prompt_tokens": "bad", "completion_tokens": 100}},
+		{name: "openai total only", family: ProtocolFamilyOpenAI, capability: CapabilityOpenAIChatCompletions, model: "gpt-5.4", usage: map[string]any{"total_tokens": 100}},
+		{name: "claude negative cache", family: ProtocolFamilyClaude, capability: CapabilityClaudeMessages, model: "claude-opus-4-6", usage: map[string]any{"input_tokens": 100, "output_tokens": 100, "cache_read_input_tokens": -1}},
+		{name: "claude total only", family: ProtocolFamilyClaude, capability: CapabilityClaudeMessages, model: "claude-opus-4-6", usage: map[string]any{"total_tokens": 100}},
+		{name: "gemini malformed details", family: ProtocolFamilyGemini, capability: CapabilityGeminiGenerateContent, model: "gemini-2.5-flash", usage: map[string]any{"promptTokenCount": 100, "candidatesTokenCount": 100, "promptTokensDetails": []any{"bad"}}},
+		{name: "gemini total only", family: ProtocolFamilyGemini, capability: CapabilityGeminiGenerateContent, model: "gemini-2.5-flash", usage: map[string]any{"totalTokenCount": 100}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
+			model := tc.model
+			provider := config.Provider{Overrides: &config.ProviderOverrides{Model: &model}}
+			snapshot := applyUsageCostSnapshot(request, RequestContext{Family: tc.family, Capability: tc.capability}, provider, nil, telemetry.UsageSnapshot{Usage: tc.usage})
+			if snapshot.HasCost || snapshot.CostMicros != 0 {
+				t.Fatalf("invalid auxiliary usage was priced: %#v", snapshot)
+			}
+		})
 	}
 }
 
@@ -62,6 +152,9 @@ func TestApplyUsageCostSnapshot_CodexUsesProviderOverrideAndCachedTokens(t *test
 	}
 	if snapshot.CostMicros != 493_750 {
 		t.Fatalf("cost_micros = %d", snapshot.CostMicros)
+	}
+	if snapshot.CostSource != telemetry.CostSourceCatalog || snapshot.CatalogVersion != pricing.CatalogMetadata().Version {
+		t.Fatalf("attribution = %#v", snapshot)
 	}
 }
 
@@ -138,6 +231,52 @@ func TestApplyUsageCostSnapshot_ClaudeUsesRawCacheAndWebSearchUsage(t *testing.T
 	}
 }
 
+func TestApplyUsageCostSnapshot_ClaudeUsesOneHourCachePrice(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"claude-opus-4-6","messages":[{"role":"user","content":[{"type":"text","text":"cached","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/claude/v1/messages", bytes.NewReader(body))
+	requestCtx := RequestContext{ClientType: ClientClaude, Family: ProtocolFamilyClaude, Capability: CapabilityClaudeMessages, UpstreamPath: "/v1/messages"}
+	snapshot := applyUsageCostSnapshot(req, requestCtx, config.Provider{}, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{"cache_creation_input_tokens": 1000.0}})
+	if !snapshot.HasCost || snapshot.CostMicros != 10_000 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestCalculateClaudeCostMicros_UsesCacheCreationBreakdown(t *testing.T) {
+	t.Parallel()
+	raw := map[string]any{
+		"cache_creation_input_tokens": 1000.0,
+		"cache_creation":              map[string]any{"ephemeral_5m_input_tokens": 400.0, "ephemeral_1h_input_tokens": 600.0},
+	}
+	cost, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, nil, pricing.ServiceTierStandard)
+	if !ok || cost != 8_500 {
+		t.Fatalf("cost = %d, ok = %v", cost, ok)
+	}
+}
+
+func TestCalculateClaudeCostMicros_RejectsIncompleteCacheCreationBreakdown(t *testing.T) {
+	t.Parallel()
+	raw := map[string]any{
+		"cache_creation_input_tokens": 1000.0,
+		"cache_creation":              map[string]any{"ephemeral_1h_input_tokens": 600.0},
+	}
+	if _, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, nil, pricing.ServiceTierStandard); ok {
+		t.Fatal("priced incomplete cache creation breakdown")
+	}
+}
+
+func TestCalculateClaudeCostMicros_RejectsMixedTTLWithoutBreakdown(t *testing.T) {
+	t.Parallel()
+	raw := map[string]any{"cache_creation_input_tokens": 1000.0}
+	root := map[string]any{"content": []any{
+		map[string]any{"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}},
+		map[string]any{"cache_control": map[string]any{"type": "ephemeral"}},
+	}}
+	if _, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, root, pricing.ServiceTierStandard); ok {
+		t.Fatal("priced mixed cache TTLs without a usage breakdown")
+	}
+}
+
 func TestApplyUsageCostSnapshot_GeminiUsesThoughtTokensAndLargePromptTier(t *testing.T) {
 	t.Parallel()
 
@@ -171,8 +310,124 @@ func TestApplyUsageCostSnapshot_GeminiUsesThoughtTokensAndLargePromptTier(t *tes
 	if !snapshot.HasCost {
 		t.Fatalf("expected gemini cost to be tracked")
 	}
-	if snapshot.CostMicros != 758_000 {
+	if snapshot.CostMicros != 737_500 {
 		t.Fatalf("cost_micros = %d", snapshot.CostMicros)
+	}
+}
+
+func TestApplyUsageCostSnapshot_ExactModelDoesNotInheritFamilyPrice(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4-pro","input":"hello"}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	requestCtx := RequestContext{
+		ClientType:   ClientOpenAI,
+		Family:       ProtocolFamilyOpenAI,
+		Capability:   CapabilityOpenAIResponses,
+		UpstreamPath: "/v1/responses",
+	}
+
+	snapshot := applyUsageCostSnapshot(req, requestCtx, config.Provider{AuthType: config.ProviderAuthTypeAPIKey}, newRequestPayload(body), telemetry.UsageSnapshot{
+		Usage: map[string]any{
+			"input_tokens":  100000.0,
+			"output_tokens": 20000.0,
+		},
+	})
+	if !snapshot.HasCost || snapshot.CostMicros != 6_600_000 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_OpenRouterUsesProviderSpecificPrice(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"deepseek/deepseek-chat","messages":[]}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/chat/completions", bytes.NewReader(body))
+	requestCtx := RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIChatCompletions, UpstreamPath: "/v1/chat/completions"}
+	provider := config.Provider{Name: "fallback", BaseURL: "https://openrouter.ai/api", AuthType: config.ProviderAuthTypeAPIKey}
+	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{"prompt_tokens": 1_000_000.0, "completion_tokens": 1_000_000.0}})
+	if !snapshot.HasCost || snapshot.CostMicros != 420_000 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_DeepSeekUsesCacheHitTokens(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"deepseek-chat","messages":[]}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/chat/completions", bytes.NewReader(body))
+	requestCtx := RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIChatCompletions, UpstreamPath: "/v1/chat/completions"}
+	provider := config.Provider{BaseURL: "https://api.deepseek.com", AuthType: config.ProviderAuthTypeAPIKey}
+	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{"prompt_tokens": 1_000_000.0, "prompt_cache_hit_tokens": 1_000_000.0}})
+	if !snapshot.HasCost || snapshot.CostMicros != 28_000 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_CompatibleProviderUsesReasoningRate(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"qwen-plus-2025-04-28","messages":[]}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/chat/completions", bytes.NewReader(body))
+	requestCtx := RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIChatCompletions, UpstreamPath: "/v1/chat/completions"}
+	provider := config.Provider{BaseURL: "https://dashscope.aliyuncs.com/compatible-mode", AuthType: config.ProviderAuthTypeAPIKey}
+	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{
+		"completion_tokens":         1_000_000.0,
+		"completion_tokens_details": map[string]any{"reasoning_tokens": 1_000_000.0},
+	}})
+	if !snapshot.HasCost || snapshot.CostMicros != 4_000_000 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestApplyUsageCostSnapshot_UnknownModelHasNoInferredCost(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4-unknown","input":"hello"}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	requestCtx := RequestContext{
+		ClientType:   ClientOpenAI,
+		Family:       ProtocolFamilyOpenAI,
+		Capability:   CapabilityOpenAIResponses,
+		UpstreamPath: "/v1/responses",
+	}
+
+	snapshot := applyUsageCostSnapshot(req, requestCtx, config.Provider{AuthType: config.ProviderAuthTypeAPIKey}, newRequestPayload(body), telemetry.UsageSnapshot{
+		Usage: map[string]any{"input_tokens": 1000.0, "output_tokens": 100.0},
+	})
+	if snapshot.HasCost {
+		t.Fatalf("unexpected inferred cost: %#v", snapshot)
+	}
+}
+
+func TestCalculateClaudeCostMicros_FastMultiplierOnlyAppliesToOpus46(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{"input_tokens": 1000.0, "speed": "fast"}
+	fastCost, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, nil, pricing.ServiceTierStandard)
+	if !ok || fastCost != 30_000 {
+		t.Fatalf("opus 4.6 fast cost = %d, ok = %v", fastCost, ok)
+	}
+	regularCost, ok := calculateClaudeCostMicros("claude-opus-4-8", raw, nil, pricing.ServiceTierStandard)
+	if !ok || regularCost != 5_000 {
+		t.Fatalf("opus 4.8 cost = %d, ok = %v", regularCost, ok)
+	}
+}
+
+func TestCalculateClaudeCostMicros_FastMultiplierCoversTokenRatesButNotSearch(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{
+		"input_tokens":            1000.0,
+		"output_tokens":           1000.0,
+		"cache_read_input_tokens": 1000.0,
+		"server_tool_use":         map[string]any{"web_search_requests": 1.0},
+		"speed":                   "fast",
+	}
+	cost, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, nil, pricing.ServiceTierStandard)
+	// Token costs are (5,000 + 25,000 + 500) micros at catalog rates, then
+	// multiplied by 6. The separate 10,000-micro search charge is unchanged.
+	if !ok || cost != 193_000 {
+		t.Fatalf("opus 4.6 fast cost with cache and search = %d, ok = %v", cost, ok)
 	}
 }
 

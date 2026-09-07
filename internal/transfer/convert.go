@@ -149,9 +149,9 @@ func usageFromTelemetry(in telemetry.DataSnapshot) Usage {
 		for providerName, usage := range providers {
 			daily := make(map[string]DailyCostBucket, len(usage.DailyCosts))
 			for day, bucket := range usage.DailyCosts {
-				daily[day] = DailyCostBucket{CostMicros: bucket.CostMicros, HasCost: bucket.HasCost}
+				daily[day] = DailyCostBucket{CostMicros: bucket.CostMicros, HasCost: bucket.HasCost, CostSources: append([]string(nil), bucket.CostSources...), CatalogVersions: append([]string(nil), bucket.CatalogVersions...)}
 			}
-			next[providerName] = ProviderUsage{RequestCount: usage.RequestCount, SuccessCount: usage.SuccessCount, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, TotalTokens: usage.TotalTokens, ReasoningTokens: usage.ReasoningTokens, ThoughtsTokens: usage.ThoughtsTokens, TotalCostMicros: usage.TotalCostMicros, LastUsedAt: usage.LastUsedAt, Usage: cloneAnyMap(usage.Usage), DailyCosts: daily, HasCost: usage.HasCost}
+			next[providerName] = ProviderUsage{RequestCount: usage.RequestCount, SuccessCount: usage.SuccessCount, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, TotalTokens: usage.TotalTokens, ReasoningTokens: usage.ReasoningTokens, ThoughtsTokens: usage.ThoughtsTokens, TotalCostMicros: usage.TotalCostMicros, LastUsedAt: usage.LastUsedAt, Usage: cloneAnyMap(usage.Usage), DailyCosts: daily, HasCost: usage.HasCost, CostSources: append([]string(nil), usage.CostSources...), CatalogVersions: append([]string(nil), usage.CatalogVersions...)}
 		}
 		out.Clients[clientName] = next
 	}
@@ -165,9 +165,9 @@ func (in Usage) toTelemetry() telemetry.DataSnapshot {
 		for providerName, usage := range providers {
 			daily := make(map[string]telemetry.DailyCostBucket, len(usage.DailyCosts))
 			for day, bucket := range usage.DailyCosts {
-				daily[day] = telemetry.DailyCostBucket{CostMicros: bucket.CostMicros, HasCost: bucket.HasCost}
+				daily[day] = telemetry.DailyCostBucket{CostMicros: bucket.CostMicros, HasCost: bucket.HasCost, CostSources: append([]string(nil), bucket.CostSources...), CatalogVersions: append([]string(nil), bucket.CatalogVersions...)}
 			}
-			next[providerName] = telemetry.ProviderUsage{RequestCount: usage.RequestCount, SuccessCount: usage.SuccessCount, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, TotalTokens: usage.TotalTokens, ReasoningTokens: usage.ReasoningTokens, ThoughtsTokens: usage.ThoughtsTokens, TotalCostMicros: usage.TotalCostMicros, LastUsedAt: usage.LastUsedAt, Usage: cloneAnyMap(usage.Usage), DailyCosts: daily, HasCost: usage.HasCost}
+			next[providerName] = telemetry.ProviderUsage{RequestCount: usage.RequestCount, SuccessCount: usage.SuccessCount, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, TotalTokens: usage.TotalTokens, ReasoningTokens: usage.ReasoningTokens, ThoughtsTokens: usage.ThoughtsTokens, TotalCostMicros: usage.TotalCostMicros, LastUsedAt: usage.LastUsedAt, Usage: cloneAnyMap(usage.Usage), DailyCosts: daily, HasCost: usage.HasCost, CostSources: append([]string(nil), usage.CostSources...), CatalogVersions: append([]string(nil), usage.CatalogVersions...)}
 		}
 		out.Clients[clientName] = next
 	}

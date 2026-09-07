@@ -11,6 +11,7 @@ import (
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 	integrationpkg "github.com/PAIArtCom/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
@@ -224,6 +225,8 @@ type ProviderUsageResponse struct {
 	LastUsedAt       string                        `json:"last_used_at,omitempty"`
 	HasUsage         bool                          `json:"has_usage,omitempty"`
 	HasCost          bool                          `json:"has_cost,omitempty"`
+	CostSources      []string                      `json:"cost_sources,omitempty"`
+	CatalogVersions  []string                      `json:"pricing_catalog_versions,omitempty"`
 }
 
 type ProviderUsageBreakdownEntry struct {
@@ -335,10 +338,11 @@ type OAuthImportFileResultResponse struct {
 
 // StatusResponse represents the system status
 type StatusResponse struct {
-	Version   string                  `json:"version"`
-	Uptime    string                  `json:"uptime"`
-	ConfigDir string                  `json:"config_dir"`
-	Clients   map[string]ClientStatus `json:"clients"`
+	Version        string                  `json:"version"`
+	Uptime         string                  `json:"uptime"`
+	ConfigDir      string                  `json:"config_dir"`
+	PricingCatalog pricing.Metadata        `json:"pricing_catalog"`
+	Clients        map[string]ClientStatus `json:"clients"`
 }
 
 // ClientStatus represents the status of a client proxy
@@ -584,6 +588,8 @@ func mapProviderUsageResponse(usage telemetry.ProviderUsage) *ProviderUsageRespo
 		SpendWeekMicros:  spendWeekMicros,
 		HasUsage:         usage.Usage != nil,
 		HasCost:          usage.HasCost,
+		CostSources:      append([]string(nil), usage.CostSources...),
+		CatalogVersions:  append([]string(nil), usage.CatalogVersions...),
 	}
 	if usage.ReasoningTokens > 0 {
 		resp.UsageBreakdowns = append(resp.UsageBreakdowns, ProviderUsageBreakdownEntry{
@@ -616,9 +622,23 @@ func providerSpendForRecentDays(usage telemetry.ProviderUsage, now time.Time, da
 		if !ok || !bucket.HasCost {
 			continue
 		}
-		total += bucket.CostMicros
+		total = addNonNegativeInt64(total, bucket.CostMicros)
 	}
 	return total
+}
+
+func addNonNegativeInt64(left, right int64) int64 {
+	if left < 0 {
+		left = 0
+	}
+	if right <= 0 {
+		return left
+	}
+	const maxInt64 = int64(^uint64(0) >> 1)
+	if left > maxInt64-right {
+		return maxInt64
+	}
+	return left + right
 }
 
 func proxyURLHint(raw string) string {

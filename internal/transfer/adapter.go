@@ -8,18 +8,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 const (
-	FormatAuto        = "auto"
-	FormatClipal      = "clipal-v1"
-	FormatCLIProxyAPI = "cliproxyapi"
-	FormatSub2API     = "sub2api"
-	FormatCodexAuth   = "codex-auth"
-	FormatMixed       = "mixed"
+	FormatAuto                 = "auto"
+	FormatClipal               = "clipal-v1"
+	FormatCLIProxyAPI          = "cliproxyapi"
+	FormatSub2API              = "sub2api"
+	FormatCodexAuth            = "codex-auth"
+	FormatMixed                = "mixed"
+	maxCatalogVersionsPerUsage = 64
 )
 
 type Decoder interface {
@@ -205,6 +209,21 @@ func normalizeFormat(format string) string {
 
 type nativeAdapter struct{}
 
+type nativeDatasetWire struct {
+	Schema        string         `json:"schema"`
+	SchemaVersion int            `json:"schema_version"`
+	ExportedAt    time.Time      `json:"exported_at"`
+	Producer      Producer       `json:"producer"`
+	Data          nativeDataWire `json:"data"`
+}
+
+type nativeDataWire struct {
+	Global      Global            `json:"global"`
+	Clients     map[string]Client `json:"clients"`
+	Credentials []Credential      `json:"credentials"`
+	Usage       json.RawMessage   `json:"usage"`
+}
+
 func (nativeAdapter) ID() string { return FormatClipal }
 func (nativeAdapter) Detect(inputs []Input) Confidence {
 	if len(inputs) != 1 {
@@ -225,23 +244,33 @@ func (nativeAdapter) Decode(inputs []Input, _ DecodeOptions) (*Dataset, *Report,
 	}
 	dec := json.NewDecoder(bytes.NewReader(inputs[0].Data))
 	dec.DisallowUnknownFields()
-	var dataset Dataset
-	if err := dec.Decode(&dataset); err != nil {
+	dec.UseNumber()
+	var wire nativeDatasetWire
+	if err := dec.Decode(&wire); err != nil {
 		return nil, nil, fmt.Errorf("decode %s: %w", FormatClipal, err)
 	}
 	if err := requireJSONEOF(dec); err != nil {
 		return nil, nil, fmt.Errorf("decode %s: %w", FormatClipal, err)
 	}
-	if err := validateDataset(&dataset); err != nil {
+	dataset := &Dataset{
+		Schema: wire.Schema, SchemaVersion: wire.SchemaVersion, ExportedAt: wire.ExportedAt, Producer: wire.Producer,
+		Data: Data{Global: wire.Data.Global, Clients: wire.Data.Clients, Credentials: wire.Data.Credentials},
+	}
+	usage, warnings := decodeAndSanitizeUsage(wire.Data.Usage)
+	dataset.Data.Usage = usage
+	if err := validateDataset(dataset); err != nil {
 		return nil, nil, err
 	}
-	return &dataset, &Report{Format: FormatClipal}, nil
+	return dataset, &Report{Format: FormatClipal, Warnings: warnings}, nil
 }
 func (nativeAdapter) Encode(dataset *Dataset, _ EncodeOptions) ([]byte, error) {
 	if err := validateDataset(dataset); err != nil {
 		return nil, err
 	}
-	data, err := json.MarshalIndent(dataset, "", "  ")
+	clean := *dataset
+	clean.Data = dataset.Data
+	clean.Data.Usage, _ = sanitizeUsage(dataset.Data.Usage)
+	data, err := json.MarshalIndent(&clean, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode %s: %w", FormatClipal, err)
 	}
@@ -292,9 +321,221 @@ func validateDataset(dataset *Dataset) error {
 		return fmt.Errorf("data.credentials is required")
 	}
 	if dataset.Data.Usage.Clients == nil {
-		return fmt.Errorf("data.usage.clients is required")
+		dataset.Data.Usage.Clients = map[string]map[string]ProviderUsage{}
 	}
 	return nil
+}
+
+func decodeAndSanitizeUsage(raw json.RawMessage) (Usage, []string) {
+	empty := Usage{Clients: map[string]map[string]ProviderUsage{}}
+	if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return empty, []string{"ignored missing usage history"}
+	}
+	var root struct {
+		Clients map[string]json.RawMessage `json:"clients"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&root); err != nil || root.Clients == nil {
+		return empty, []string{"ignored malformed usage history"}
+	}
+	out := Usage{Clients: make(map[string]map[string]ProviderUsage, len(root.Clients))}
+	warnings := []string{}
+	clients := sortedRawKeys(root.Clients)
+	for _, client := range clients {
+		var providers map[string]json.RawMessage
+		if err := decodeUseNumber(root.Clients[client], &providers); err != nil {
+			warnings = append(warnings, fmt.Sprintf("ignored malformed usage client %q", client))
+			continue
+		}
+		cleanProviders := make(map[string]ProviderUsage, len(providers))
+		for _, provider := range sortedRawKeys(providers) {
+			var usage ProviderUsage
+			if err := decodeUseNumber(providers[provider], &usage); err != nil {
+				warnings = append(warnings, fmt.Sprintf("ignored malformed usage for %s/%s", client, provider))
+				continue
+			}
+			clean, itemWarnings := sanitizeProviderUsage(client, provider, usage)
+			warnings = append(warnings, itemWarnings...)
+			cleanProviders[provider] = clean
+		}
+		out.Clients[client] = cleanProviders
+	}
+	return out, warnings
+}
+
+func sanitizeUsage(usage Usage) (Usage, []string) {
+	out := Usage{Clients: make(map[string]map[string]ProviderUsage, len(usage.Clients))}
+	warnings := []string{}
+	for _, client := range sortedRawKeys(usage.Clients) {
+		providers := usage.Clients[client]
+		cleanProviders := make(map[string]ProviderUsage, len(providers))
+		for _, provider := range sortedRawKeys(providers) {
+			clean, itemWarnings := sanitizeProviderUsage(client, provider, providers[provider])
+			warnings = append(warnings, itemWarnings...)
+			cleanProviders[provider] = clean
+		}
+		out.Clients[client] = cleanProviders
+	}
+	return out, warnings
+}
+
+func decodeUseNumber(data []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	return decoder.Decode(target)
+}
+
+func sortedRawKeys[T any](values map[string]T) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sanitizeProviderUsage(client, provider string, usage ProviderUsage) (ProviderUsage, []string) {
+	path := client + "/" + provider
+	warnings := []string{}
+	counters := []*int64{&usage.RequestCount, &usage.SuccessCount, &usage.InputTokens, &usage.OutputTokens, &usage.TotalTokens, &usage.ReasoningTokens, &usage.ThoughtsTokens}
+	for _, counter := range counters {
+		if *counter < 0 {
+			*counter = 0
+			warnings = appendUniqueWarning(warnings, "ignored negative usage counters for "+path)
+		}
+	}
+	if usage.TotalCostMicros < 0 {
+		usage.TotalCostMicros, usage.HasCost = 0, false
+		warnings = append(warnings, "ignored negative usage cost for "+path)
+	} else if usage.TotalCostMicros > 0 && !usage.HasCost {
+		usage.HasCost = true
+		warnings = append(warnings, "preserved unattributed usage cost for "+path)
+	}
+	var changed bool
+	usage.CostSources, usage.CatalogVersions, changed = sanitizeCostAttribution(usage.HasCost, usage.CostSources, usage.CatalogVersions)
+	if changed {
+		warnings = append(warnings, "normalized usage cost attribution for "+path)
+	}
+	cleanDaily := make(map[string]DailyCostBucket, len(usage.DailyCosts))
+	for _, day := range sortedRawKeys(usage.DailyCosts) {
+		bucket := usage.DailyCosts[day]
+		parsed, err := time.Parse("2006-01-02", day)
+		if err != nil || parsed.Format("2006-01-02") != day || bucket.CostMicros < 0 {
+			warnings = append(warnings, fmt.Sprintf("ignored invalid daily usage bucket %s/%s", path, day))
+			continue
+		}
+		if bucket.CostMicros > 0 && !bucket.HasCost {
+			bucket.HasCost = true
+		}
+		bucket.CostSources, bucket.CatalogVersions, changed = sanitizeCostAttribution(bucket.HasCost, bucket.CostSources, bucket.CatalogVersions)
+		if changed {
+			warnings = append(warnings, fmt.Sprintf("normalized daily cost attribution for %s/%s", path, day))
+		}
+		cleanDaily[day] = bucket
+		if bucket.HasCost {
+			usage.HasCost = true
+			usage.CostSources = appendStringSet(usage.CostSources, bucket.CostSources...)
+			usage.CatalogVersions = appendStringSet(usage.CatalogVersions, bucket.CatalogVersions...)
+		}
+	}
+	usage.DailyCosts = cleanDaily
+	if usage.HasCost && len(usage.CostSources) == 0 {
+		usage.CostSources = []string{telemetry.CostSourceLegacyUnknown}
+	}
+	return usage, warnings
+}
+
+func sanitizeCostAttribution(hasCost bool, sources, versions []string) ([]string, []string, bool) {
+	if !hasCost {
+		return nil, nil, len(sources) > 0 || len(versions) > 0
+	}
+	originalSources, originalVersions := append([]string(nil), sources...), append([]string(nil), versions...)
+	cleanSources := []string{}
+	for _, source := range sources {
+		source = strings.TrimSpace(source)
+		switch source {
+		case telemetry.CostSourceUpstream, telemetry.CostSourceCatalog, telemetry.CostSourceLegacyUnknown:
+			cleanSources = appendStringSet(cleanSources, source)
+		}
+	}
+	cleanVersions := []string{}
+	for _, version := range versions {
+		version = strings.TrimSpace(version)
+		if len(version) == 12 && version == strings.ToLower(version) {
+			if _, err := hex.DecodeString(version); err == nil {
+				cleanVersions = appendStringSet(cleanVersions, version)
+			}
+		}
+	}
+	if len(cleanVersions) > maxCatalogVersionsPerUsage {
+		cleanVersions = nil
+	}
+	hasCatalog := containsString(cleanSources, telemetry.CostSourceCatalog)
+	if !hasCatalog {
+		cleanVersions = nil
+	} else if len(cleanVersions) == 0 {
+		cleanSources = removeString(cleanSources, telemetry.CostSourceCatalog)
+		cleanSources = appendStringSet(cleanSources, telemetry.CostSourceLegacyUnknown)
+	}
+	if len(cleanSources) == 0 {
+		cleanSources = []string{telemetry.CostSourceLegacyUnknown}
+	}
+	changed := !equalStrings(originalSources, cleanSources) || !equalStrings(originalVersions, cleanVersions)
+	return cleanSources, cleanVersions, changed
+}
+
+func appendStringSet(values []string, candidates ...string) []string {
+	seen := make(map[string]struct{}, len(values)+len(candidates))
+	for _, value := range append(append([]string(nil), values...), candidates...) {
+		if value = strings.TrimSpace(value); value != "" {
+			seen[value] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for value := range seen {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func appendUniqueWarning(values []string, warning string) []string {
+	if containsString(values, warning) {
+		return values
+	}
+	return append(values, warning)
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(values []string, target string) []string {
+	out := values[:0]
+	for _, value := range values {
+		if value != target {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func requireJSONEOF(dec *json.Decoder) error {
@@ -386,4 +627,21 @@ func planID(dataset *Dataset, format string, mode Mode, baseState ...string) str
 	}
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:8])
+}
+
+func cloneImportPlan(plan *ImportPlan) (*ImportPlan, error) {
+	data, err := json.Marshal(plan.Dataset)
+	if err != nil {
+		return nil, fmt.Errorf("clone import plan: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var dataset Dataset
+	if err := decoder.Decode(&dataset); err != nil {
+		return nil, fmt.Errorf("clone import plan: %w", err)
+	}
+	out := *plan
+	out.Dataset = &dataset
+	out.Warnings = append([]string(nil), plan.Warnings...)
+	return &out, nil
 }

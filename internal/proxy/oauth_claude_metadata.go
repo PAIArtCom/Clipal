@@ -9,7 +9,7 @@ import (
 
 const (
 	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.240"
+	claudeOAuthAppVersion              = "2.1.263"
 	claudeOAuthDefaultEntrypoint       = "sdk-cli"
 	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
 	claudeOAuthClientApp               = "claude-code"

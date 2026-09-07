@@ -22,13 +22,28 @@ const maxDataImportRequestBytes = transfer.MaxJSONImportRequestBytes
 
 // Handler manages HTTP routes for the web management interface
 type Handler struct {
-	api *API
+	api                  *API
+	dataImportInProgress chan struct{}
 }
 
 // NewHandler creates a new web handler
 func NewHandler(configDir, version string, runtime *proxy.Router) *Handler {
 	return &Handler{
-		api: NewAPI(configDir, version, runtime),
+		api:                  NewAPI(configDir, version, runtime),
+		dataImportInProgress: make(chan struct{}, 1),
+	}
+}
+
+func (h *Handler) limitDataImportConcurrency(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case h.dataImportInProgress <- struct{}{}:
+			defer func() { <-h.dataImportInProgress }()
+			next(w, r)
+		default:
+			w.Header().Set("Retry-After", "1")
+			writeError(w, "another data import is already in progress", http.StatusTooManyRequests)
+		}
 	}
 }
 
@@ -173,8 +188,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/config/global", h.localOnly(h.api.HandleGetGlobalConfig))
 	mux.HandleFunc("/api/config/global/update", h.localOnly(h.api.HandleUpdateGlobalConfig))
 	mux.HandleFunc("/api/data/export", h.localOnly(h.api.HandleDataExport))
-	mux.HandleFunc("/api/data/import/preview", h.localOnly(h.api.HandleDataImportPreview))
-	mux.HandleFunc("/api/data/import/apply", h.localOnly(h.api.HandleDataImportApply))
+	mux.HandleFunc("/api/data/import/preview", h.localOnly(h.limitDataImportConcurrency(h.api.HandleDataImportPreview)))
+	mux.HandleFunc("/api/data/import/apply", h.localOnly(h.limitDataImportConcurrency(h.api.HandleDataImportApply)))
 	mux.HandleFunc("/api/integrations", h.localOnly(h.api.HandleListIntegrations))
 	mux.HandleFunc("/api/integrations/", h.localOnly(h.routeIntegrations))
 

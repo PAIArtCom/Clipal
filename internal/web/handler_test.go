@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -358,6 +359,46 @@ func TestDataImportUsesBoundedAggregateRequestLimit(t *testing.T) {
 		t.Fatalf("encoded request limit=%d must exceed per-file limit=%d", transfer.MaxJSONImportRequestBytes, transfer.MaxImportFileBytes)
 	}
 }
+
+func TestHandlerRejectsConcurrentDataImportBeforeReadingBody(t *testing.T) {
+	h := NewHandler(t.TempDir(), "test", nil)
+	h.dataImportInProgress <- struct{}{}
+	defer func() { <-h.dataImportInProgress }()
+
+	read := false
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/api/data/import/preview", nil)
+	req.Body = trackingReadCloser{onRead: func() { read = true }}
+	req.Host = "localhost:3333"
+	req.RemoteAddr = "127.0.0.1:12345"
+	req.Header.Set("X-Clipal-UI", "1")
+	req.Header.Set("Content-Type", "application/json")
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Retry-After") != "1" {
+		t.Fatalf("Retry-After=%q", w.Header().Get("Retry-After"))
+	}
+	if read {
+		t.Fatal("rejected import request body was read")
+	}
+}
+
+type trackingReadCloser struct {
+	onRead func()
+}
+
+func (r trackingReadCloser) Read([]byte) (int, error) {
+	r.onRead()
+	return 0, io.EOF
+}
+
+func (r trackingReadCloser) Close() error { return nil }
 
 func TestLocalOnly_APIBodyLimit(t *testing.T) {
 	h := NewHandler(t.TempDir(), "test", nil)

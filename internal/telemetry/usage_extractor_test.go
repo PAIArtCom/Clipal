@@ -1,6 +1,9 @@
 package telemetry
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestUsageExtractorJSON_OpenAI(t *testing.T) {
 	extractor := NewUsageExtractor("openai", "openai_responses", "application/json")
@@ -17,6 +20,58 @@ func TestUsageExtractorJSON_OpenAI(t *testing.T) {
 	}
 	if usage.Usage["input_tokens_details"] == nil {
 		t.Fatalf("expected raw usage payload to be preserved")
+	}
+}
+
+func TestUsageExtractorJSON_PreservesLargeIntegerCost(t *testing.T) {
+	tests := []struct {
+		name, client, capability, body string
+	}{
+		{name: "openai", client: "openai", capability: "openai_responses", body: `{"usage":{"input_tokens":1,"cost_micros":9007199254740993}}`},
+		{name: "claude", client: "claude", capability: "claude_messages", body: `{"usage":{"input_tokens":1,"cost_micros":9007199254740993}}`},
+		{name: "gemini", client: "gemini", capability: "gemini_generate_content", body: `{"usageMetadata":{"promptTokenCount":1,"cost_micros":9007199254740993}}`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			extractor := NewUsageExtractor(tc.client, tc.capability, "application/json")
+			extractor.Append([]byte(tc.body))
+			usage, ok := extractor.Finalize()
+			if !ok {
+				t.Fatal("expected usage")
+			}
+			value, ok := usage.Usage["cost_micros"].(json.Number)
+			if !ok || value.String() != "9007199254740993" {
+				t.Fatalf("cost_micros = %#v", usage.Usage["cost_micros"])
+			}
+			cloned := cloneMap(usage.Usage)
+			value, ok = cloned["cost_micros"].(json.Number)
+			if !ok || value.String() != "9007199254740993" {
+				t.Fatalf("cloned cost_micros = %#v", cloned["cost_micros"])
+			}
+		})
+	}
+}
+
+func TestUsageExtractorJSON_SaturatesCompositeInputTokens(t *testing.T) {
+	const maxInt64 = "9223372036854775807"
+	tests := []struct {
+		name       string
+		client     string
+		capability string
+		body       string
+	}{
+		{name: "claude", client: "claude", capability: "claude_messages", body: `{"usage":{"input_tokens":` + maxInt64 + `,"cache_creation_input_tokens":1}}`},
+		{name: "gemini", client: "gemini", capability: "gemini_generate_content", body: `{"usageMetadata":{"promptTokenCount":` + maxInt64 + `,"toolUsePromptTokenCount":1}}`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			extractor := NewUsageExtractor(tc.client, tc.capability, "application/json")
+			extractor.Append([]byte(tc.body))
+			usage, ok := extractor.Finalize()
+			if !ok || usage.InputTokens != int64(^uint64(0)>>1) {
+				t.Fatalf("usage = %#v, ok = %v", usage, ok)
+			}
+		})
 	}
 }
 

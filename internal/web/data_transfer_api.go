@@ -78,24 +78,15 @@ func (a *API) HandleDataImportApply(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.configMu.Lock()
-	defer a.configMu.Unlock()
-	plan, err := a.transfer.Analyze(inputs, req.Format, req.Mode)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	if strings.TrimSpace(req.PlanID) == "" {
 		writeError(w, "plan_id from import preview is required", http.StatusBadRequest)
 		return
 	}
-	if req.PlanID != plan.ID {
-		writeError(w, "import data or mode changed after preview; preview again", http.StatusConflict)
-		return
-	}
-	result, err := a.transfer.Apply(plan)
+	a.configMu.Lock()
+	defer a.configMu.Unlock()
+	result, err := a.transfer.ApplyReviewed(req.PlanID, inputs, req.Format, req.Mode)
 	if err != nil {
-		if errors.Is(err, transfer.ErrImportBaseStateChanged) {
+		if errors.Is(err, transfer.ErrImportBaseStateChanged) || errors.Is(err, transfer.ErrImportPlanMismatch) || errors.Is(err, transfer.ErrImportPlanUnavailable) {
 			writeError(w, err.Error(), http.StatusConflict)
 			return
 		}

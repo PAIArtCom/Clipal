@@ -18,6 +18,7 @@ English: [docs/en/README.md](README.md) | 中文: [docs/zh/README.md](../zh/READ
 - [Web UI Guide](web-ui.md)
 - [Data Import, Export, and Backup](data-transfer.md)
 - [Routing and Failover](routing-and-failover.md)
+- [Usage Cost Calculation](pricing.md)
 - [Services, Status, and Updates](services.md)
 - [Troubleshooting](troubleshooting.md)
 

@@ -157,11 +157,15 @@ type ProviderUsage struct {
 	Usage           map[string]any             `json:"usage,omitempty"`
 	DailyCosts      map[string]DailyCostBucket `json:"daily_costs,omitempty"`
 	HasCost         bool                       `json:"has_cost,omitempty"`
+	CostSources     []string                   `json:"cost_sources,omitempty"`
+	CatalogVersions []string                   `json:"pricing_catalog_versions,omitempty"`
 }
 
 type DailyCostBucket struct {
-	CostMicros int64 `json:"cost_micros,omitempty"`
-	HasCost    bool  `json:"has_cost,omitempty"`
+	CostMicros      int64    `json:"cost_micros,omitempty"`
+	HasCost         bool     `json:"has_cost,omitempty"`
+	CostSources     []string `json:"cost_sources,omitempty"`
+	CatalogVersions []string `json:"pricing_catalog_versions,omitempty"`
 }
 
 type Mode string

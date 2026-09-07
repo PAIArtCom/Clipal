@@ -14,8 +14,8 @@ import (
 )
 
 func TestAntigravityFallbackVersionMatchesCurrentRelease(t *testing.T) {
-	if defaultAntigravityVersionLabel != "2.9.1" {
-		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.9.1", defaultAntigravityVersionLabel)
+	if defaultAntigravityVersionLabel != "2.12.2" {
+		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.12.2", defaultAntigravityVersionLabel)
 	}
 }
 

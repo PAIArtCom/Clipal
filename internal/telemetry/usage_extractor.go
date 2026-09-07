@@ -148,7 +148,7 @@ func (e *UsageExtractor) extractFromJSON() (UsageSnapshot, bool) {
 		var payload struct {
 			Usage map[string]any `json:"usage"`
 		}
-		if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		if err := decodeJSONUseNumber(reader, &payload); err != nil {
 			return UsageSnapshot{}, false
 		}
 		return snapshotFromKnownUsageObject(payload.Usage, normalizeOpenAIUsage)
@@ -159,7 +159,7 @@ func (e *UsageExtractor) extractFromJSON() (UsageSnapshot, bool) {
 				Usage map[string]any `json:"usage"`
 			} `json:"message"`
 		}
-		if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		if err := decodeJSONUseNumber(reader, &payload); err != nil {
 			return UsageSnapshot{}, false
 		}
 		if payload.Usage != nil {
@@ -170,7 +170,7 @@ func (e *UsageExtractor) extractFromJSON() (UsageSnapshot, bool) {
 		var payload struct {
 			UsageMetadata map[string]any `json:"usageMetadata"`
 		}
-		if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		if err := decodeJSONUseNumber(reader, &payload); err != nil {
 			return UsageSnapshot{}, false
 		}
 		return snapshotFromKnownUsageObject(payload.UsageMetadata, normalizeGeminiUsage)
@@ -487,7 +487,7 @@ func normalizeClaudeUsage(raw map[string]any) UsageDelta {
 	cacheCreationTokens := int64Value(raw["cache_creation_input_tokens"])
 	cacheReadTokens := int64Value(raw["cache_read_input_tokens"])
 	return UsageDelta{
-		InputTokens:  inputTokens + cacheCreationTokens + cacheReadTokens,
+		InputTokens:  addMetric(addMetric(inputTokens, cacheCreationTokens), cacheReadTokens),
 		OutputTokens: int64Value(raw["output_tokens"]),
 		TotalTokens:  int64Value(raw["total_tokens"]),
 	}.normalized()
@@ -496,15 +496,23 @@ func normalizeClaudeUsage(raw map[string]any) UsageDelta {
 func normalizeGeminiUsage(raw map[string]any) UsageDelta {
 	outputTokens := int64Value(raw["candidatesTokenCount"], raw["responseTokenCount"])
 	return UsageDelta{
-		InputTokens:  int64Value(raw["promptTokenCount"]) + int64Value(raw["toolUsePromptTokenCount"]),
+		InputTokens:  addMetric(int64Value(raw["promptTokenCount"]), int64Value(raw["toolUsePromptTokenCount"])),
 		OutputTokens: outputTokens,
 		TotalTokens:  int64Value(raw["totalTokenCount"]),
 	}.normalized()
 }
 
+func decodeJSONUseNumber(reader io.Reader, target any) error {
+	decoder := json.NewDecoder(reader)
+	decoder.UseNumber()
+	return decoder.Decode(target)
+}
+
 func decodeJSONObject(data []byte) (map[string]any, bool) {
 	var decoded any
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&decoded); err != nil {
 		return nil, false
 	}
 	obj, ok := decoded.(map[string]any)

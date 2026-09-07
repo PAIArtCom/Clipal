@@ -3,70 +3,60 @@ package proxy
 import (
 	"encoding/json"
 	"math"
+	"math/big"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
 const (
-	usdMicrosPerDollar          int64 = 1_000_000
-	tokensPerMillion            int64 = 1_000_000
-	openAILongContextThreshold  int64 = 272_000
-	geminiLargePromptThreshold  int64 = 200_000
-	claudeWebSearchMicrosPerUse int64 = 10_000
+	maxRecordedCostMicros int64 = 1_000_000_000_000
+
+	// Anthropic reports fast mode in usage metadata instead of using a
+	// separately priced model ID. It multiplies Opus 4.6 token rates,
+	// including cache rates; per-query search charges remain unchanged by the
+	// token-only multiplier.
+	claudeOpus46FastTokenRateMultiplier int64 = 6
 )
-
-type openAICostRates struct {
-	InputPerMTokMicros       int64
-	CachedInputPerMTokMicros int64
-	OutputPerMTokMicros      int64
-	LongContextThreshold     int64
-	LongInputPerMTokMicros   int64
-	LongCachedPerMTokMicros  int64
-	LongOutputPerMTokMicros  int64
-}
-
-type claudeCostRates struct {
-	InputPerMTokMicros      int64
-	OutputPerMTokMicros     int64
-	CacheWritePerMTokMicros int64
-	CacheReadPerMTokMicros  int64
-}
-
-type geminiTierRates struct {
-	TextInputPerMTokMicros  int64
-	AudioInputPerMTokMicros int64
-	OutputPerMTokMicros     int64
-	TextCachePerMTokMicros  int64
-	AudioCachePerMTokMicros int64
-}
-
-type geminiCostRates struct {
-	ThresholdTokens int64
-	Standard        geminiTierRates
-	LargePrompt     geminiTierRates
-}
 
 func applyUsageCostSnapshot(original *http.Request, requestCtx RequestContext, provider config.Provider, payload *requestPayload, snapshot telemetry.UsageSnapshot) telemetry.UsageSnapshot {
 	if snapshot.HasCost {
-		return snapshot
+		if validRecordedCost(snapshot.CostMicros) {
+			if snapshot.CostSource == "" {
+				snapshot.CostSource = telemetry.CostSourceUpstream
+			}
+			return snapshot
+		}
+		snapshot.CostMicros = 0
+		snapshot.HasCost = false
+		snapshot.CostSource = ""
+		snapshot.CatalogVersion = ""
 	}
 	if costMicros, ok := usageCostMicrosFromRaw(snapshot.Usage); ok {
 		snapshot.CostMicros = costMicros
 		snapshot.HasCost = true
+		snapshot.CostSource = telemetry.CostSourceUpstream
 		return snapshot
 	}
 
 	costMicros, ok := inferredUsageCostMicros(original, requestCtx, provider, payload, snapshot)
-	if !ok {
+	if !ok || !validRecordedCost(costMicros) {
 		return snapshot
 	}
 	snapshot.CostMicros = costMicros
 	snapshot.HasCost = true
+	snapshot.CostSource = telemetry.CostSourceCatalog
+	snapshot.CatalogVersion = pricing.CatalogMetadata().Version
 	return snapshot
+}
+
+func validRecordedCost(costMicros int64) bool {
+	return costMicros >= 0 && costMicros <= maxRecordedCostMicros
 }
 
 func inferredUsageCostMicros(original *http.Request, requestCtx RequestContext, provider config.Provider, payload *requestPayload, snapshot telemetry.UsageSnapshot) (int64, bool) {
@@ -74,67 +64,82 @@ func inferredUsageCostMicros(original *http.Request, requestCtx RequestContext, 
 		return 0, false
 	}
 
-	model := effectiveUsageCostModel(original, requestCtx, provider, payload)
+	root := effectiveUsageCostRequestRoot(original, requestCtx, provider, payload)
+	model := effectiveUsageCostModel(requestCtx, provider, root)
 	if model == "" {
 		return 0, false
 	}
+	serviceTier := usageCostServiceTier(root)
 
 	switch requestCtx.Family {
 	case ProtocolFamilyOpenAI:
 		if !isOpenAIGenerationCapability(requestCtx.Capability) {
 			return 0, false
 		}
-		return calculateOpenAICostMicros(model, snapshot.Usage)
+		return calculateOpenAICostMicros(model, snapshot.Usage, serviceTier, pricingProviderHint(provider))
 	case ProtocolFamilyClaude:
 		if requestCtx.Capability != CapabilityClaudeMessages {
 			return 0, false
 		}
-		return calculateClaudeCostMicros(model, snapshot.Usage)
+		return calculateClaudeCostMicros(model, snapshot.Usage, root, serviceTier)
 	case ProtocolFamilyGemini:
 		if requestCtx.Capability != CapabilityGeminiGenerateContent && requestCtx.Capability != CapabilityGeminiStreamGenerate {
 			return 0, false
 		}
-		return calculateGeminiCostMicros(model, snapshot.Usage)
+		return calculateGeminiCostMicros(model, snapshot.Usage, serviceTier)
 	default:
 		return 0, false
 	}
 }
 
-func effectiveUsageCostModel(original *http.Request, requestCtx RequestContext, provider config.Provider, payload *requestPayload) string {
-	var root map[string]any
+func effectiveUsageCostRequestRoot(original *http.Request, requestCtx RequestContext, provider config.Provider, payload *requestPayload) map[string]any {
 	if payload != nil {
 		if rewritten, ok := payload.providerRoot(original, requestCtx, provider); ok {
-			root = rewritten
-		} else {
-			root = payload.jsonRoot()
+			return rewritten
 		}
+		return payload.jsonRoot()
 	}
+	return nil
+}
 
+func effectiveUsageCostModel(requestCtx RequestContext, provider config.Provider, root map[string]any) string {
 	model := strings.TrimSpace(stickyModelName(requestCtx, root))
 	if model == "" {
 		model = provider.ModelOverride()
 	}
-	return normalizeUsageCostModel(model)
+	return strings.ToLower(strings.TrimSpace(model))
 }
 
-func normalizeUsageCostModel(model string) string {
-	model = strings.ToLower(strings.TrimSpace(model))
-	if model == "" {
-		return ""
+func usageCostServiceTier(root map[string]any) pricing.ServiceTier {
+	tier := strings.ToLower(strings.TrimSpace(stringValueRaw(root["service_tier"])))
+	if tier == "" {
+		tier = strings.ToLower(strings.TrimSpace(stringValueRaw(root["processing_mode"])))
 	}
-	model = strings.TrimPrefix(model, "/")
-	for _, prefix := range []string{
-		"models/",
-		"model/",
-		"openai/",
-		"anthropic/",
-		"google/",
-		"gemini/",
-		"claude/",
-	} {
-		model = strings.TrimPrefix(model, prefix)
+	switch tier {
+	case "batch":
+		return pricing.ServiceTierBatch
+	case "priority":
+		return pricing.ServiceTierPriority
+	case "flex":
+		return pricing.ServiceTierFlex
+	default:
+		return pricing.ServiceTierStandard
 	}
-	return strings.TrimSpace(model)
+}
+
+func pricingProviderHint(provider config.Provider) string {
+	if parsed, err := url.Parse(strings.TrimSpace(provider.BaseURL)); err == nil {
+		host := strings.ToLower(parsed.Hostname())
+		for _, candidate := range []struct{ marker, hint string }{
+			{"openrouter", "openrouter"}, {"deepseek", "deepseek"}, {"mistral", "mistral"},
+			{"dashscope", "dashscope"}, {"together", "together_ai"}, {"groq", "groq"},
+		} {
+			if strings.Contains(host, candidate.marker) {
+				return candidate.hint
+			}
+		}
+	}
+	return strings.Trim(strings.ToLower(strings.TrimSpace(provider.Name)), "/")
 }
 
 func usageCostMicrosFromRaw(raw map[string]any) (int64, bool) {
@@ -143,12 +148,12 @@ func usageCostMicrosFromRaw(raw map[string]any) (int64, bool) {
 	}
 
 	for _, key := range []string{"cost_micros", "costMicros", "cost_usd_micros", "costUsdMicros"} {
-		if micros, ok := int64ValueRaw(raw[key]); ok && micros >= 0 {
+		if micros, ok := int64ValueRaw(raw[key]); ok && validRecordedCost(micros) {
 			return micros, true
 		}
 	}
 	for _, key := range []string{"cost_usd", "costUSD", "costUsd"} {
-		if micros, ok := usdMicrosValue(raw[key]); ok {
+		if micros, ok := usdMicrosValue(raw[key]); ok && validRecordedCost(micros) {
 			return micros, true
 		}
 	}
@@ -162,26 +167,35 @@ func usageCostMicrosFromRaw(raw map[string]any) (int64, bool) {
 		if currency != "" && currency != "USD" {
 			return 0, false
 		}
-		if micros, ok := usdMicrosValue(costMap["amount"]); ok {
+		if micros, ok := usdMicrosValue(costMap["amount"]); ok && validRecordedCost(micros) {
 			return micros, true
 		}
 	}
-	return usdMicrosValue(costValue)
+	micros, ok := usdMicrosValue(costValue)
+	return micros, ok && validRecordedCost(micros)
 }
 
-func calculateOpenAICostMicros(model string, raw map[string]any) (int64, bool) {
+func calculateOpenAICostMicros(model string, raw map[string]any, serviceTier pricing.ServiceTier, providerHint string) (int64, bool) {
 	if !hasOpenAIUsageFields(raw) {
 		return 0, false
 	}
-
-	rates, ok := openAICostRatesForModel(model)
-	if !ok {
+	if !validNonNegativeIntFields(raw, "prompt_tokens", "input_tokens", "completion_tokens", "output_tokens", "prompt_cache_hit_tokens") ||
+		!validNestedNonNegativeIntField(raw, "input_tokens_details", "cached_tokens") ||
+		!validNestedNonNegativeIntField(raw, "prompt_tokens_details", "cached_tokens") ||
+		!validNestedNonNegativeIntField(raw, "output_tokens_details", "reasoning_tokens") ||
+		!validNestedNonNegativeIntField(raw, "completion_tokens_details", "reasoning_tokens") {
 		return 0, false
 	}
 
 	promptTokens, _ := int64Lookup(raw, "prompt_tokens", "input_tokens")
 	outputTokens, _ := int64Lookup(raw, "completion_tokens", "output_tokens")
-	cachedTokens, _ := nestedInt64Lookup(raw, "input_tokens_details", "cached_tokens")
+	cachedTokens, ok := nestedInt64Lookup(raw, "input_tokens_details", "cached_tokens")
+	if !ok {
+		cachedTokens, _ = nestedInt64Lookup(raw, "prompt_tokens_details", "cached_tokens")
+	}
+	if cachedTokens == 0 {
+		cachedTokens, _ = int64Lookup(raw, "prompt_cache_hit_tokens")
+	}
 	if cachedTokens < 0 {
 		cachedTokens = 0
 	}
@@ -189,167 +203,123 @@ func calculateOpenAICostMicros(model string, raw map[string]any) (int64, bool) {
 		cachedTokens = promptTokens
 	}
 
-	if rates.LongContextThreshold > 0 && promptTokens > rates.LongContextThreshold {
-		rates.InputPerMTokMicros = rates.LongInputPerMTokMicros
-		rates.CachedInputPerMTokMicros = rates.LongCachedPerMTokMicros
-		rates.OutputPerMTokMicros = rates.LongOutputPerMTokMicros
+	reasoningTokens, ok := nestedInt64Lookup(raw, "output_tokens_details", "reasoning_tokens")
+	if !ok {
+		reasoningTokens, _ = nestedInt64Lookup(raw, "completion_tokens_details", "reasoning_tokens")
 	}
-
-	billablePromptTokens := promptTokens - cachedTokens
-	total := costMicrosForTokens(billablePromptTokens, rates.InputPerMTokMicros)
-	total += costMicrosForTokens(cachedTokens, rates.CachedInputPerMTokMicros)
-	total += costMicrosForTokens(outputTokens, rates.OutputPerMTokMicros)
-	return total, true
+	return pricing.CostMicrosForProvider(model, pricing.PlatformOpenAI, providerHint, pricing.Usage{
+		UncachedInputTokens: promptTokens - cachedTokens,
+		CachedInputTokens:   cachedTokens,
+		OutputTokens:        outputTokens,
+		ReasoningTokens:     reasoningTokens,
+		ServiceTier:         serviceTier,
+	})
 }
 
-func openAICostRatesForModel(model string) (openAICostRates, bool) {
-	switch {
-	case strings.HasPrefix(model, "gpt-5.5"):
-		return openAICostRates{
-			InputPerMTokMicros:       5_000_000,
-			CachedInputPerMTokMicros: 500_000,
-			OutputPerMTokMicros:      30_000_000,
-			LongContextThreshold:     openAILongContextThreshold,
-			LongInputPerMTokMicros:   10_000_000,
-			LongCachedPerMTokMicros:  1_000_000,
-			LongOutputPerMTokMicros:  45_000_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-5.4-mini"):
-		return openAICostRates{
-			InputPerMTokMicros:       750_000,
-			CachedInputPerMTokMicros: 75_000,
-			OutputPerMTokMicros:      4_500_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-5.4"):
-		return openAICostRates{
-			InputPerMTokMicros:       2_500_000,
-			CachedInputPerMTokMicros: 250_000,
-			OutputPerMTokMicros:      15_000_000,
-			LongContextThreshold:     openAILongContextThreshold,
-			LongInputPerMTokMicros:   5_000_000,
-			LongCachedPerMTokMicros:  500_000,
-			LongOutputPerMTokMicros:  22_500_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-5.3-codex"), strings.HasPrefix(model, "gpt-5.2-codex"), strings.HasPrefix(model, "gpt-5.2"):
-		return openAICostRates{
-			InputPerMTokMicros:       1_750_000,
-			CachedInputPerMTokMicros: 175_000,
-			OutputPerMTokMicros:      14_000_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-5"):
-		return openAICostRates{
-			InputPerMTokMicros:       1_250_000,
-			CachedInputPerMTokMicros: 125_000,
-			OutputPerMTokMicros:      10_000_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-4.1-mini"):
-		return openAICostRates{
-			InputPerMTokMicros:       400_000,
-			CachedInputPerMTokMicros: 100_000,
-			OutputPerMTokMicros:      1_600_000,
-		}, true
-	case strings.HasPrefix(model, "gpt-4.1"):
-		return openAICostRates{
-			InputPerMTokMicros:       2_000_000,
-			CachedInputPerMTokMicros: 500_000,
-			OutputPerMTokMicros:      8_000_000,
-		}, true
-	default:
-		return openAICostRates{}, false
-	}
-}
-
-func calculateClaudeCostMicros(model string, raw map[string]any) (int64, bool) {
+func calculateClaudeCostMicros(model string, raw map[string]any, requestRoot map[string]any, serviceTier pricing.ServiceTier) (int64, bool) {
 	if !hasClaudeUsageFields(raw) {
 		return 0, false
 	}
-
-	speedFast := strings.EqualFold(strings.TrimSpace(stringValueRaw(raw["speed"])), "fast")
-	rates, ok := claudeCostRatesForModel(model, speedFast)
-	if !ok {
+	if !validNonNegativeIntFields(raw, "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens") ||
+		!validNestedNonNegativeIntField(raw, "cache_creation", "ephemeral_5m_input_tokens") ||
+		!validNestedNonNegativeIntField(raw, "cache_creation", "ephemeral_1h_input_tokens") ||
+		!validNestedNonNegativeIntField(raw, "server_tool_use", "web_search_requests") {
 		return 0, false
 	}
 
 	inputTokens, _ := int64Lookup(raw, "input_tokens")
 	outputTokens, _ := int64Lookup(raw, "output_tokens")
-	cacheWriteTokens, _ := int64Lookup(raw, "cache_creation_input_tokens")
+	cacheWriteTokens, cacheWrite1HTokens, ok := claudeCacheWriteTokens(raw, requestRoot)
+	if !ok {
+		return 0, false
+	}
 	cacheReadTokens, _ := int64Lookup(raw, "cache_read_input_tokens")
 	webSearchRequests, _ := nestedInt64Lookup(raw, "server_tool_use", "web_search_requests")
 
-	total := costMicrosForTokens(inputTokens, rates.InputPerMTokMicros)
-	total += costMicrosForTokens(outputTokens, rates.OutputPerMTokMicros)
-	total += costMicrosForTokens(cacheWriteTokens, rates.CacheWritePerMTokMicros)
-	total += costMicrosForTokens(cacheReadTokens, rates.CacheReadPerMTokMicros)
-	if webSearchRequests > 0 {
-		total += webSearchRequests * claudeWebSearchMicrosPerUse
-	}
-	return total, true
+	return pricing.CostMicros(model, pricing.PlatformAnthropic, pricing.Usage{
+		UncachedInputTokens: inputTokens,
+		CachedInputTokens:   cacheReadTokens,
+		CacheWriteTokens:    cacheWriteTokens,
+		CacheWrite1HTokens:  cacheWrite1HTokens,
+		OutputTokens:        outputTokens,
+		SearchQueries:       webSearchRequests,
+		SearchContextSize:   "medium",
+		ServiceTier:         serviceTier,
+		TokenRateMultiplier: claudeFastTokenRateMultiplier(model, raw),
+	})
 }
 
-func claudeCostRatesForModel(model string, speedFast bool) (claudeCostRates, bool) {
-	switch {
-	case containsAny(model, "haiku-4.5", "haiku-4-5"):
-		return claudeCostRates{
-			InputPerMTokMicros:      1_000_000,
-			OutputPerMTokMicros:     5_000_000,
-			CacheWritePerMTokMicros: 1_250_000,
-			CacheReadPerMTokMicros:  100_000,
-		}, true
-	case containsAny(model, "haiku-3.5", "haiku-3-5"):
-		return claudeCostRates{
-			InputPerMTokMicros:      800_000,
-			OutputPerMTokMicros:     4_000_000,
-			CacheWritePerMTokMicros: 1_000_000,
-			CacheReadPerMTokMicros:  80_000,
-		}, true
-	case containsAny(model, "opus-4.7", "opus-4-7", "opus-4.5", "opus-4-5"):
-		return claudeCostRates{
-			InputPerMTokMicros:      5_000_000,
-			OutputPerMTokMicros:     25_000_000,
-			CacheWritePerMTokMicros: 6_250_000,
-			CacheReadPerMTokMicros:  500_000,
-		}, true
-	case containsAny(model, "opus-4.6", "opus-4-6"):
-		if speedFast {
-			return claudeCostRates{
-				InputPerMTokMicros:      30_000_000,
-				OutputPerMTokMicros:     150_000_000,
-				CacheWritePerMTokMicros: 37_500_000,
-				CacheReadPerMTokMicros:  3_000_000,
-			}, true
+func claudeCacheWriteTokens(raw map[string]any, requestRoot map[string]any) (int64, int64, bool) {
+	total, _ := int64Lookup(raw, "cache_creation_input_tokens")
+	total = max(total, 0)
+	fiveMinute, hasFiveMinute := nestedInt64Lookup(raw, "cache_creation", "ephemeral_5m_input_tokens")
+	oneHour, hasOneHour := nestedInt64Lookup(raw, "cache_creation", "ephemeral_1h_input_tokens")
+	if hasFiveMinute || hasOneHour {
+		fiveMinute = max(fiveMinute, 0)
+		oneHour = max(oneHour, 0)
+		if total == 0 {
+			total = fiveMinute + oneHour
 		}
-		return claudeCostRates{
-			InputPerMTokMicros:      5_000_000,
-			OutputPerMTokMicros:     25_000_000,
-			CacheWritePerMTokMicros: 6_250_000,
-			CacheReadPerMTokMicros:  500_000,
-		}, true
-	case containsAny(model, "opus-4.1", "opus-4-1", "opus-4"):
-		return claudeCostRates{
-			InputPerMTokMicros:      15_000_000,
-			OutputPerMTokMicros:     75_000_000,
-			CacheWritePerMTokMicros: 18_750_000,
-			CacheReadPerMTokMicros:  1_500_000,
-		}, true
-	case containsAny(model, "sonnet-4.6", "sonnet-4-6", "sonnet-4.5", "sonnet-4-5", "sonnet-4", "3.7-sonnet", "3-7-sonnet", "3.5-sonnet", "3-5-sonnet"):
-		return claudeCostRates{
-			InputPerMTokMicros:      3_000_000,
-			OutputPerMTokMicros:     15_000_000,
-			CacheWritePerMTokMicros: 3_750_000,
-			CacheReadPerMTokMicros:  300_000,
-		}, true
+		if fiveMinute > total || oneHour > total-fiveMinute || fiveMinute+oneHour != total {
+			return 0, 0, false
+		}
+		return total - oneHour, oneHour, true
+	}
+
+	hasOneHourTTL, hasDefaultTTL := claudeCacheTTLs(requestRoot)
+	if hasOneHourTTL && hasDefaultTTL {
+		return 0, 0, false
+	}
+	if hasOneHourTTL {
+		return 0, total, true
+	}
+	return total, 0, true
+}
+
+func claudeCacheTTLs(value any) (bool, bool) {
+	var oneHour, defaultTTL bool
+	var visit func(any)
+	visit = func(current any) {
+		switch typed := current.(type) {
+		case map[string]any:
+			if cacheControl, ok := typed["cache_control"].(map[string]any); ok {
+				if strings.EqualFold(strings.TrimSpace(stringValueRaw(cacheControl["ttl"])), "1h") {
+					oneHour = true
+				} else {
+					defaultTTL = true
+				}
+			}
+			for _, child := range typed {
+				visit(child)
+			}
+		case []any:
+			for _, child := range typed {
+				visit(child)
+			}
+		}
+	}
+	visit(value)
+	return oneHour, defaultTTL
+}
+
+func claudeFastTokenRateMultiplier(model string, raw map[string]any) int64 {
+	if !strings.EqualFold(strings.TrimSpace(stringValueRaw(raw["speed"])), "fast") {
+		return 1
+	}
+	model = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(model)), "anthropic/")
+	switch model {
+	case "claude-opus-4-6", "claude-opus-4-6-20260205":
+		return claudeOpus46FastTokenRateMultiplier
 	default:
-		return claudeCostRates{}, false
+		return 1
 	}
 }
 
-func calculateGeminiCostMicros(model string, raw map[string]any) (int64, bool) {
+func calculateGeminiCostMicros(model string, raw map[string]any, serviceTier pricing.ServiceTier) (int64, bool) {
 	if !hasGeminiUsageFields(raw) {
 		return 0, false
 	}
-
-	rates, ok := geminiCostRatesForModel(model)
-	if !ok {
+	if !validNonNegativeIntFields(raw, "promptTokenCount", "toolUsePromptTokenCount", "candidatesTokenCount", "responseTokenCount", "thoughtsTokenCount", "totalTokenCount", "cachedContentTokenCount") || !validGeminiPromptTokenDetails(raw) {
 		return 0, false
 	}
 
@@ -359,7 +329,7 @@ func calculateGeminiCostMicros(model string, raw map[string]any) (int64, bool) {
 	thoughtTokens, _ := int64Lookup(raw, "thoughtsTokenCount")
 	totalTokens, _ := int64Lookup(raw, "totalTokenCount")
 	cachedTokens, _ := int64Lookup(raw, "cachedContentTokenCount")
-	effectivePromptTokens := promptTokens + toolUsePromptTokens
+	effectivePromptTokens := addUsageCount(promptTokens, toolUsePromptTokens)
 	if cachedTokens < 0 {
 		cachedTokens = 0
 	}
@@ -367,7 +337,7 @@ func calculateGeminiCostMicros(model string, raw map[string]any) (int64, bool) {
 		cachedTokens = effectivePromptTokens
 	}
 
-	outputTokens := candidateTokens + thoughtTokens
+	outputTokens := addUsageCount(candidateTokens, thoughtTokens)
 	if totalTokens > effectivePromptTokens {
 		residualOutput := totalTokens - effectivePromptTokens
 		if residualOutput > outputTokens {
@@ -375,107 +345,16 @@ func calculateGeminiCostMicros(model string, raw map[string]any) (int64, bool) {
 		}
 	}
 
-	textLikePromptTokens, audioPromptTokens := geminiPromptTokenCounts(raw, promptTokens)
-	textLikePromptTokens += toolUsePromptTokens
-	cachedTextTokens, cachedAudioTokens := geminiCachedTokenSplit(cachedTokens, textLikePromptTokens, audioPromptTokens)
-	billableTextTokens := textLikePromptTokens - cachedTextTokens
-	billableAudioTokens := audioPromptTokens - cachedAudioTokens
-	billablePromptTokens := effectivePromptTokens - cachedTokens
-	if remainder := billablePromptTokens - billableTextTokens - billableAudioTokens; remainder > 0 {
-		billableTextTokens += remainder
-	}
-
-	tier := rates.Standard
-	if rates.ThresholdTokens > 0 && effectivePromptTokens > rates.ThresholdTokens {
-		tier = rates.LargePrompt
-	}
-
-	total := costMicrosForTokens(billableTextTokens, tier.TextInputPerMTokMicros)
-	total += costMicrosForTokens(billableAudioTokens, tier.AudioInputPerMTokMicros)
-	total += costMicrosForTokens(cachedTextTokens, tier.TextCachePerMTokMicros)
-	total += costMicrosForTokens(cachedAudioTokens, tier.AudioCachePerMTokMicros)
-	total += costMicrosForTokens(outputTokens, tier.OutputPerMTokMicros)
-	return total, true
-}
-
-func geminiCostRatesForModel(model string) (geminiCostRates, bool) {
-	switch {
-	case strings.HasPrefix(model, "gemini-3.1-pro"), strings.HasPrefix(model, "gemini-3-pro"):
-		return geminiCostRates{
-			Standard: geminiTierRates{
-				TextInputPerMTokMicros:  3_500_000,
-				AudioInputPerMTokMicros: 1_000_000,
-				OutputPerMTokMicros:     15_000_000,
-				TextCachePerMTokMicros:  875_000,
-				AudioCachePerMTokMicros: 250_000,
-			},
-		}, true
-	case strings.HasPrefix(model, "gemini-3.1-flash"), strings.HasPrefix(model, "gemini-3-flash"):
-		return geminiCostRates{
-			Standard: geminiTierRates{
-				TextInputPerMTokMicros:  250_000,
-				AudioInputPerMTokMicros: 500_000,
-				OutputPerMTokMicros:     1_500_000,
-				TextCachePerMTokMicros:  50_000,
-				AudioCachePerMTokMicros: 100_000,
-			},
-		}, true
-	case strings.HasPrefix(model, "gemini-2.5-pro"):
-		return geminiCostRates{
-			ThresholdTokens: geminiLargePromptThreshold,
-			Standard: geminiTierRates{
-				TextInputPerMTokMicros:  1_250_000,
-				AudioInputPerMTokMicros: 3_000_000,
-				OutputPerMTokMicros:     10_000_000,
-				TextCachePerMTokMicros:  125_000,
-				AudioCachePerMTokMicros: 300_000,
-			},
-			LargePrompt: geminiTierRates{
-				TextInputPerMTokMicros:  2_500_000,
-				AudioInputPerMTokMicros: 3_000_000,
-				OutputPerMTokMicros:     15_000_000,
-				TextCachePerMTokMicros:  250_000,
-				AudioCachePerMTokMicros: 300_000,
-			},
-		}, true
-	case strings.HasPrefix(model, "gemini-2.5-flash-lite"):
-		return geminiCostRates{
-			Standard: geminiTierRates{
-				TextInputPerMTokMicros:  100_000,
-				AudioInputPerMTokMicros: 300_000,
-				OutputPerMTokMicros:     400_000,
-				TextCachePerMTokMicros:  10_000,
-				AudioCachePerMTokMicros: 30_000,
-			},
-			LargePrompt: geminiTierRates{
-				TextInputPerMTokMicros:  100_000,
-				AudioInputPerMTokMicros: 300_000,
-				OutputPerMTokMicros:     400_000,
-				TextCachePerMTokMicros:  10_000,
-				AudioCachePerMTokMicros: 30_000,
-			},
-		}, true
-	case strings.HasPrefix(model, "gemini-2.5-flash"):
-		return geminiCostRates{
-			ThresholdTokens: geminiLargePromptThreshold,
-			Standard: geminiTierRates{
-				TextInputPerMTokMicros:  300_000,
-				AudioInputPerMTokMicros: 1_000_000,
-				OutputPerMTokMicros:     2_500_000,
-				TextCachePerMTokMicros:  75_000,
-				AudioCachePerMTokMicros: 250_000,
-			},
-			LargePrompt: geminiTierRates{
-				TextInputPerMTokMicros:  600_000,
-				AudioInputPerMTokMicros: 1_000_000,
-				OutputPerMTokMicros:     3_500_000,
-				TextCachePerMTokMicros:  150_000,
-				AudioCachePerMTokMicros: 250_000,
-			},
-		}, true
-	default:
-		return geminiCostRates{}, false
-	}
+	_, audioPromptTokens := geminiPromptTokenCounts(raw, promptTokens)
+	_, cachedAudioTokens := geminiCachedTokenSplit(cachedTokens, effectivePromptTokens-audioPromptTokens, audioPromptTokens)
+	return pricing.CostMicros(model, pricing.PlatformGemini, pricing.Usage{
+		UncachedInputTokens: effectivePromptTokens - cachedTokens,
+		CachedInputTokens:   cachedTokens,
+		AudioInputTokens:    audioPromptTokens - cachedAudioTokens,
+		OutputTokens:        outputTokens,
+		ReasoningTokens:     thoughtTokens,
+		ServiceTier:         serviceTier,
+	})
 }
 
 func geminiPromptTokenCounts(raw map[string]any, promptTokens int64) (int64, int64) {
@@ -496,19 +375,19 @@ func geminiPromptTokenCounts(raw map[string]any, promptTokens int64) (int64, int
 		if !ok || tokenCount <= 0 {
 			continue
 		}
-		detailedTotal += tokenCount
+		detailedTotal = addUsageCount(detailedTotal, tokenCount)
 		switch strings.ToUpper(strings.TrimSpace(stringValueRaw(entry["modality"]))) {
 		case "AUDIO":
-			audioTokens += tokenCount
+			audioTokens = addUsageCount(audioTokens, tokenCount)
 		default:
-			textLikeTokens += tokenCount
+			textLikeTokens = addUsageCount(textLikeTokens, tokenCount)
 		}
 	}
 	if detailedTotal <= 0 {
 		return promptTokens, 0
 	}
 	if detailedTotal < promptTokens {
-		textLikeTokens += promptTokens - detailedTotal
+		textLikeTokens = addUsageCount(textLikeTokens, promptTokens-detailedTotal)
 	}
 	return textLikeTokens, audioTokens
 }
@@ -524,12 +403,19 @@ func geminiCachedTokenSplit(cachedTokens int64, textLikeTokens int64, audioToken
 		return 0, cachedTokens
 	}
 
-	totalPromptTokens := textLikeTokens + audioTokens
+	totalPromptTokens := addUsageCount(textLikeTokens, audioTokens)
 	if totalPromptTokens <= 0 {
 		return cachedTokens, 0
 	}
 
-	cachedAudioTokens := int64(math.Round(float64(cachedTokens) * float64(audioTokens) / float64(totalPromptTokens)))
+	numerator := new(big.Int).Mul(big.NewInt(cachedTokens), big.NewInt(audioTokens))
+	denominator := big.NewInt(totalPromptTokens)
+	quotient, remainder := new(big.Int), new(big.Int)
+	quotient.QuoRem(numerator, denominator, remainder)
+	if new(big.Int).Lsh(remainder, 1).Cmp(denominator) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	cachedAudioTokens := quotient.Int64()
 	if cachedAudioTokens > audioTokens {
 		cachedAudioTokens = audioTokens
 	}
@@ -545,16 +431,26 @@ func geminiCachedTokenSplit(cachedTokens int64, textLikeTokens int64, audioToken
 	return cachedTextTokens, cachedAudioTokens
 }
 
+func addUsageCount(left, right int64) int64 {
+	left = max(left, 0)
+	right = max(right, 0)
+	const maxInt64 = int64(^uint64(0) >> 1)
+	if left > maxInt64-right {
+		return maxInt64
+	}
+	return left + right
+}
+
 func hasOpenAIUsageFields(raw map[string]any) bool {
-	return raw != nil && (hasAnyKey(raw, "prompt_tokens", "input_tokens", "completion_tokens", "output_tokens", "total_tokens") || hasNestedKey(raw, "input_tokens_details"))
+	return raw != nil && (hasAnyKey(raw, "prompt_tokens", "input_tokens", "completion_tokens", "output_tokens") || hasNestedKey(raw, "input_tokens_details"))
 }
 
 func hasClaudeUsageFields(raw map[string]any) bool {
-	return raw != nil && hasAnyKey(raw, "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "total_tokens")
+	return raw != nil && hasAnyKey(raw, "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 }
 
 func hasGeminiUsageFields(raw map[string]any) bool {
-	return raw != nil && (hasAnyKey(raw, "promptTokenCount", "candidatesTokenCount", "responseTokenCount", "thoughtsTokenCount", "toolUsePromptTokenCount", "totalTokenCount", "cachedContentTokenCount") || hasNestedKey(raw, "promptTokensDetails"))
+	return raw != nil && (hasAnyKey(raw, "promptTokenCount", "candidatesTokenCount", "responseTokenCount", "thoughtsTokenCount", "toolUsePromptTokenCount", "cachedContentTokenCount") || hasNestedKey(raw, "promptTokensDetails"))
 }
 
 func hasAnyKey(raw map[string]any, keys ...string) bool {
@@ -571,20 +467,48 @@ func hasNestedKey(raw map[string]any, key string) bool {
 	return ok
 }
 
-func containsAny(value string, fragments ...string) bool {
-	for _, fragment := range fragments {
-		if strings.Contains(value, fragment) {
-			return true
+func validNonNegativeIntFields(raw map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		value, present := raw[key]
+		if !present {
+			continue
+		}
+		parsed, ok := int64ValueRaw(value)
+		if !ok || parsed < 0 {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
-func costMicrosForTokens(tokens int64, perMillionMicros int64) int64 {
-	if tokens <= 0 || perMillionMicros <= 0 {
-		return 0
+func validNestedNonNegativeIntField(raw map[string]any, parent, key string) bool {
+	value, present := raw[parent]
+	if !present {
+		return true
 	}
-	return (tokens*perMillionMicros + tokensPerMillion/2) / tokensPerMillion
+	nested, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	return validNonNegativeIntFields(nested, key)
+}
+
+func validGeminiPromptTokenDetails(raw map[string]any) bool {
+	value, present := raw["promptTokensDetails"]
+	if !present {
+		return true
+	}
+	details, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	for _, item := range details {
+		entry, ok := item.(map[string]any)
+		if !ok || !validNonNegativeIntFields(entry, "tokenCount") {
+			return false
+		}
+	}
+	return true
 }
 
 func int64Lookup(raw map[string]any, keys ...string) (int64, bool) {
@@ -623,34 +547,32 @@ func nestedValue(raw map[string]any, path ...string) (any, bool) {
 }
 
 func usdMicrosValue(value any) (int64, bool) {
-	parsed, ok := float64ValueRaw(value)
-	if !ok || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
-		return 0, false
-	}
-	return int64(math.Round(parsed * float64(usdMicrosPerDollar))), true
-}
-
-func float64ValueRaw(value any) (float64, bool) {
+	var raw string
 	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case int32:
-		return float64(typed), true
-	case json.Number:
-		parsed, err := typed.Float64()
-		return parsed, err == nil
 	case string:
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
-		return parsed, err == nil
+		raw = typed
+	case json.Number:
+		raw = typed.String()
+	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) {
+			return 0, false
+		}
+		raw = strconv.FormatFloat(typed, 'g', -1, 64)
+	case float32:
+		if math.IsNaN(float64(typed)) || math.IsInf(float64(typed), 0) {
+			return 0, false
+		}
+		raw = strconv.FormatFloat(float64(typed), 'g', -1, 32)
+	case int:
+		raw = strconv.Itoa(typed)
+	case int64:
+		raw = strconv.FormatInt(typed, 10)
+	case int32:
+		raw = strconv.FormatInt(int64(typed), 10)
 	default:
 		return 0, false
 	}
+	return pricing.DollarsToMicros(strings.TrimSpace(raw))
 }
 
 func int64ValueRaw(value any) (int64, bool) {
@@ -662,15 +584,18 @@ func int64ValueRaw(value any) (int64, bool) {
 	case int:
 		return int64(typed), true
 	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) || typed < math.MinInt64 || typed >= float64(uint64(1)<<63) || math.Trunc(typed) != typed {
+			return 0, false
+		}
 		return int64(typed), true
 	case float32:
-		return int64(typed), true
+		return int64ValueRaw(float64(typed))
 	case json.Number:
 		if parsed, err := typed.Int64(); err == nil {
 			return parsed, true
 		}
 		if parsed, err := typed.Float64(); err == nil {
-			return int64(parsed), true
+			return int64ValueRaw(parsed)
 		}
 		return 0, false
 	case string:
@@ -682,7 +607,7 @@ func int64ValueRaw(value any) (int64, bool) {
 			return parsed, true
 		}
 		if parsed, err := strconv.ParseFloat(text, 64); err == nil {
-			return int64(parsed), true
+			return int64ValueRaw(parsed)
 		}
 		return 0, false
 	default:

@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -23,6 +26,8 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 		ThoughtsTokens:  3,
 		CostMicros:      1_250_000,
 		HasCost:         true,
+		CostSource:      CostSourceCatalog,
+		CatalogVersion:  "catalog-v1",
 	}, now); err != nil {
 		t.Fatalf("RecordUsage: %v", err)
 	}
@@ -45,6 +50,9 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	}
 	if !got.HasCost || got.TotalCostMicros != 1_250_000 {
 		t.Fatalf("expected spend to be preserved: %#v", got)
+	}
+	if !reflect.DeepEqual(got.CostSources, []string{CostSourceCatalog}) || !reflect.DeepEqual(got.CatalogVersions, []string{"catalog-v1"}) {
+		t.Fatalf("expected cost attribution, got %#v", got)
 	}
 	if bucket, ok := got.DailyCosts["2026-04-08"]; !ok || !bucket.HasCost || bucket.CostMicros != 1_250_000 {
 		t.Fatalf("expected daily spend bucket, got %#v", got.DailyCosts)
@@ -84,6 +92,136 @@ func TestStoreRecordRenameDeleteAndReload(t *testing.T) {
 	}
 	if string(data) == "" {
 		t.Fatalf("expected persisted data")
+	}
+}
+
+func TestRecordUsageSaturatesCostInsteadOfOverflowing(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	const maxInt64 = int64(^uint64(0) >> 1)
+	for _, cost := range []int64{maxInt64 - 10, 20} {
+		if err := store.RecordUsage("openai", "p1", UsageSnapshot{CostMicros: cost, HasCost: true}, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, ok := store.ProviderSnapshot("openai", "p1")
+	if !ok || got.TotalCostMicros != maxInt64 || got.DailyCosts[usageDayBucket(now)].CostMicros != maxInt64 {
+		t.Fatalf("cost did not saturate: %#v", got)
+	}
+}
+
+func TestRecordUsageSaturatesAllCounters(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const maxInt64 = int64(^uint64(0) >> 1)
+	store.state.Clients["openai"] = clientUsage{Providers: map[string]ProviderUsage{"p1": {
+		RequestCount: maxInt64, SuccessCount: maxInt64, InputTokens: maxInt64, OutputTokens: maxInt64,
+		TotalTokens: maxInt64, ReasoningTokens: maxInt64, ThoughtsTokens: maxInt64,
+	}}}
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{UsageDelta: UsageDelta{InputTokens: 1, OutputTokens: 1, TotalTokens: 1}, ReasoningTokens: 1, ThoughtsTokens: 1}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.ProviderSnapshot("openai", "p1")
+	if got.RequestCount != maxInt64 || got.SuccessCount != maxInt64 || got.InputTokens != maxInt64 || got.OutputTokens != maxInt64 || got.TotalTokens != maxInt64 || got.ReasoningTokens != maxInt64 || got.ThoughtsTokens != maxInt64 {
+		t.Fatalf("counter overflow: %#v", got)
+	}
+}
+
+func TestStoreTracksMixedCostAttribution(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for _, snapshot := range []UsageSnapshot{
+		{CostMicros: 1, HasCost: true, CostSource: CostSourceCatalog, CatalogVersion: "v1"},
+		{CostMicros: 2, HasCost: true, CostSource: CostSourceCatalog, CatalogVersion: "v2"},
+		{CostMicros: 3, HasCost: true, CostSource: CostSourceUpstream},
+	} {
+		if err := store.RecordUsage("openai", "p1", snapshot, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, _ := store.ProviderSnapshot("openai", "p1")
+	if !reflect.DeepEqual(got.CostSources, []string{CostSourceCatalog, CostSourceUpstream}) || !reflect.DeepEqual(got.CatalogVersions, []string{"v1", "v2"}) {
+		t.Fatalf("mixed attribution = %#v", got)
+	}
+	bucket := got.DailyCosts[usageDayBucket(now)]
+	if !reflect.DeepEqual(bucket.CostSources, got.CostSources) || !reflect.DeepEqual(bucket.CatalogVersions, got.CatalogVersions) {
+		t.Fatalf("daily attribution = %#v", bucket)
+	}
+}
+
+func TestStoreIgnoresInvalidCostAndDowngradesInvalidAttribution(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for _, snapshot := range []UsageSnapshot{
+		{CostMicros: -1, HasCost: true, CostSource: CostSourceUpstream},
+		{CostMicros: 2, HasCost: true, CostSource: "untrusted"},
+		{CostMicros: 3, HasCost: true, CostSource: CostSourceCatalog},
+	} {
+		if err := store.RecordUsage("openai", "p1", snapshot, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, _ := store.ProviderSnapshot("openai", "p1")
+	if got.TotalCostMicros != 5 || !got.HasCost {
+		t.Fatalf("invalid cost was not ignored: %#v", got)
+	}
+	if !reflect.DeepEqual(got.CostSources, []string{CostSourceLegacyUnknown}) || len(got.CatalogVersions) != 0 {
+		t.Fatalf("invalid attribution was not downgraded: %#v", got)
+	}
+	bucket := got.DailyCosts[usageDayBucket(now)]
+	if bucket.CostMicros != 5 || !reflect.DeepEqual(bucket.CostSources, []string{CostSourceLegacyUnknown}) {
+		t.Fatalf("daily attribution was not sanitized: %#v", bucket)
+	}
+}
+
+func TestStoreMarksLegacyCostAttributionUnknown(t *testing.T) {
+	dir := t.TempDir()
+	legacy := `{"version":3,"clients":{"openai":{"providers":{"p1":{"total_cost_micros":7,"has_cost":true,"daily_costs":{"2026-01-01":{"cost_micros":7,"has_cost":true}}}}}}}`
+	if err := os.WriteFile(filepath.Join(dir, storeFilename), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.ProviderSnapshot("openai", "p1")
+	if !reflect.DeepEqual(got.CostSources, []string{CostSourceLegacyUnknown}) || !reflect.DeepEqual(got.DailyCosts["2026-01-01"].CostSources, []string{CostSourceLegacyUnknown}) {
+		t.Fatalf("legacy attribution = %#v", got)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := os.ReadFile(filepath.Join(dir, storeFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(persisted), `"version": 4`) || !strings.Contains(string(persisted), `"legacy_unknown"`) {
+		t.Fatalf("migration was not persisted: %s", persisted)
+	}
+}
+
+func TestNormalizeCostAttributionSortsAndDeduplicates(t *testing.T) {
+	usage := normalizeCostAttribution(ProviderUsage{
+		HasCost: true, CostSources: []string{CostSourceUpstream, CostSourceCatalog, CostSourceCatalog}, CatalogVersions: []string{"v2", "v1", "v2"},
+		DailyCosts: map[string]DailyCostBucket{"2026-01-01": {HasCost: true, CostSources: []string{CostSourceUpstream, CostSourceUpstream}, CatalogVersions: []string{"v2", "v1", "v1"}}},
+	})
+	if !reflect.DeepEqual(usage.CostSources, []string{CostSourceCatalog, CostSourceUpstream}) || !reflect.DeepEqual(usage.CatalogVersions, []string{"v1", "v2"}) {
+		t.Fatalf("provider attribution = %#v", usage)
+	}
+	bucket := usage.DailyCosts["2026-01-01"]
+	if !reflect.DeepEqual(bucket.CostSources, []string{CostSourceUpstream}) || !reflect.DeepEqual(bucket.CatalogVersions, []string{"v1", "v2"}) {
+		t.Fatalf("daily attribution = %#v", bucket)
 	}
 }
 
@@ -144,6 +282,123 @@ func TestStoreFlushPersistsConcurrentMutation(t *testing.T) {
 	}
 }
 
+func TestConcurrentFlushesCannotWriteOutOfOrder(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.persistInterval = time.Hour
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{UsageDelta: UsageDelta{TotalTokens: 1}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	firstClone := make(chan struct{})
+	secondClone := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	var calls atomic.Int32
+	afterCloneForFlush = func() {
+		switch calls.Add(1) {
+		case 1:
+			close(firstClone)
+			<-releaseFirst
+		case 2:
+			close(secondClone)
+		}
+	}
+	defer func() { afterCloneForFlush = nil }()
+	errs := make(chan error, 2)
+	go func() { errs <- store.Flush() }()
+	<-firstClone
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{UsageDelta: UsageDelta{TotalTokens: 2}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	go func() { errs <- store.Flush() }()
+	select {
+	case <-secondClone:
+		t.Fatal("second flush cloned state while first flush was writing")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseFirst)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	reloaded, err := NewStore(filepath.Dir(store.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := reloaded.ProviderSnapshot("openai", "p1")
+	if got.TotalTokens != 3 {
+		t.Fatalf("persisted stale state: %#v", got)
+	}
+}
+
+func TestTransferWaitsForInFlightFlush(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.persistInterval = time.Hour
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{UsageDelta: UsageDelta{TotalTokens: 1}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	cloned := make(chan struct{})
+	release := make(chan struct{})
+	var calls atomic.Int32
+	afterCloneForFlush = func() {
+		if calls.Add(1) == 1 {
+			close(cloned)
+			<-release
+		}
+	}
+	defer func() { afterCloneForFlush = nil }()
+	flushDone := make(chan error, 1)
+	go func() { flushDone <- store.Flush() }()
+	<-cloned
+	txReady := make(chan *TransferTransaction, 1)
+	txErr := make(chan error, 1)
+	go func() {
+		tx, err := store.BeginTransfer()
+		if err != nil {
+			txErr <- err
+			return
+		}
+		txReady <- tx
+	}()
+	select {
+	case <-txReady:
+		t.Fatal("transfer started while an older flush was in flight")
+	case err := <-txErr:
+		t.Fatal(err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	if err := <-flushDone; err != nil {
+		t.Fatal(err)
+	}
+	var tx *TransferTransaction
+	select {
+	case tx = <-txReady:
+	case err := <-txErr:
+		t.Fatal(err)
+	}
+	tx.Restore(DataSnapshot{Clients: map[string]map[string]ProviderUsage{"openai": {"p2": {TotalTokens: 2}}}}, false)
+	if err := tx.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	tx.Commit()
+	reloaded, err := NewStore(filepath.Dir(store.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := reloaded.ProviderSnapshot("openai", "p1"); ok {
+		t.Fatal("stale pre-transfer state was persisted")
+	}
+	if got, ok := reloaded.ProviderSnapshot("openai", "p2"); !ok || got.TotalTokens != 2 {
+		t.Fatalf("transfer state missing: %#v, %v", got, ok)
+	}
+}
+
 func TestStoreRenameProviderPrefersLatestUsagePayload(t *testing.T) {
 	dir := t.TempDir()
 	store, err := NewStore(dir)
@@ -171,8 +426,34 @@ func TestStoreRenameProviderPrefersLatestUsagePayload(t *testing.T) {
 	if !got.LastUsedAt.Equal(newer) {
 		t.Fatalf("last_used_at = %v want %v", got.LastUsedAt, newer)
 	}
-	if got.Usage["total_tokens"] != float64(30) {
+	if int64Value(got.Usage["total_tokens"]) != 30 {
 		t.Fatalf("usage = %#v", got.Usage)
+	}
+}
+
+func TestStoreReloadPreservesLargeRawUsageInteger(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordUsage("openai", "p1", UsageSnapshot{Usage: map[string]any{"cost_micros": json.Number("9007199254740993")}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	usage, ok := reloaded.ProviderSnapshot("openai", "p1")
+	if !ok {
+		t.Fatal("missing provider")
+	}
+	value, ok := usage.Usage["cost_micros"].(json.Number)
+	if !ok || value.String() != "9007199254740993" {
+		t.Fatalf("cost_micros = %#v", usage.Usage["cost_micros"])
 	}
 }
 
@@ -326,7 +607,7 @@ func TestStoreDeleteProvidersWithRollbackRestoresDeletedUsage(t *testing.T) {
 	if !got.LastUsedAt.Equal(newer) {
 		t.Fatalf("last_used_at = %v want %v", got.LastUsedAt, newer)
 	}
-	if got.Usage["total_tokens"] != float64(30) {
+	if int64Value(got.Usage["total_tokens"]) != 30 {
 		t.Fatalf("usage = %#v", got.Usage)
 	}
 

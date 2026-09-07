@@ -13,10 +13,9 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
-// importStateFingerprint covers only state whose drift changes what an apply
-// would do: the configuration and the credential identity set. Usage counters
-// and token material change with routine proxied traffic and refreshes;
-// hashing them would invalidate every previewed plan on a busy server.
+// importStateFingerprint covers only state whose drift changes the core import
+// result. Live usage is deliberately excluded: imported history is always
+// added to the latest counters inside the telemetry transaction.
 func importStateFingerprint(cfg *config.Config, credentials []oauth.Credential) string {
 	dataset := datasetFromState(cfg, nil, telemetry.DataSnapshot{}, "", timeZero)
 	identities := make([]string, 0, len(credentials))
@@ -49,7 +48,7 @@ func importChanges(current *config.Config, currentCredentials []oauth.Credential
 			target = mergeConfig(current, target)
 		}
 		changes.Providers = providerChanges(current, target)
-		changes.Usage = usageChanges(currentUsage, incoming.Data.Usage.toTelemetry(), mode)
+		changes.Usage = usageChanges(currentUsage, incoming.Data.Usage.toTelemetry())
 	} else {
 		changes.Providers = externalProviderChanges(current, currentCredentials, incoming.Data.Credentials)
 	}
@@ -122,7 +121,7 @@ func credentialIdentity(credential oauth.Credential) string {
 	return string(credential.Provider) + "\x00" + credential.Ref
 }
 
-func usageChanges(current, incoming telemetry.DataSnapshot, mode Mode) ImportChangeCounts {
+func usageChanges(current, incoming telemetry.DataSnapshot) ImportChangeCounts {
 	changes := ImportChangeCounts{}
 	for client, providers := range incoming.Clients {
 		for provider := range providers {
@@ -130,15 +129,6 @@ func usageChanges(current, incoming telemetry.DataSnapshot, mode Mode) ImportCha
 				changes.Updated++
 			} else {
 				changes.Added++
-			}
-		}
-	}
-	if mode == ModeReplace {
-		for client, providers := range current.Clients {
-			for provider := range providers {
-				if _, ok := incoming.Clients[client][provider]; !ok {
-					changes.Removed++
-				}
 			}
 		}
 	}

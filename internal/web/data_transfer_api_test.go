@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,86 @@ func TestDataImportPreservesInt64FromRawJSONText(t *testing.T) {
 	got := api.telemetry.Snapshot().Clients["openai"]["large"].RequestCount
 	if got != large {
 		t.Fatalf("request_count=%d want=%d", got, large)
+	}
+}
+
+func TestDataImportApplySanitizesUsageWarningsAndIsIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	api := NewAPI(dir, "test", nil)
+	if err := api.telemetry.RecordUsage("openai", "shared", telemetry.UsageSnapshot{
+		UsageDelta: telemetry.UsageDelta{TotalTokens: 3},
+	}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	dataset, err := api.transfer.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset.Data.Usage.Clients["openai"] = map[string]transfer.ProviderUsage{
+		"shared": {
+			RequestCount:    -4,
+			TotalTokens:     10,
+			HasCost:         true,
+			TotalCostMicros: 9,
+			CostSources:     []string{"untrusted"},
+			DailyCosts: map[string]transfer.DailyCostBucket{
+				"2026-01-01": {HasCost: true, CostMicros: 4, CostSources: []string{telemetry.CostSourceUpstream}},
+				"2026-02-30": {HasCost: true, CostMicros: 5, CostSources: []string{telemetry.CostSourceUpstream}},
+			},
+		},
+	}
+	raw, err := json.Marshal(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(dataImportRequest{
+		Files:  []dataImportFileRequest{{Name: "backup.json", Data: string(raw)}},
+		Format: "clipal",
+		Mode:   transfer.ModeReplace,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := httptest.NewRecorder()
+	api.HandleDataImportPreview(preview, httptest.NewRequest(http.MethodPost, "/api/data/import/preview", bytes.NewReader(payload)))
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	var plan struct {
+		ID       string   `json:"id"`
+		Warnings []string `json:"warnings"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.ID == "" || len(plan.Warnings) == 0 {
+		t.Fatalf("preview did not expose usage warnings: %#v", plan)
+	}
+	var request dataImportRequest
+	if err := json.Unmarshal(payload, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.PlanID = plan.ID
+	applyPayload, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for attempt := 1; attempt <= 2; attempt++ {
+		apply := httptest.NewRecorder()
+		api.HandleDataImportApply(apply, httptest.NewRequest(http.MethodPost, "/api/data/import/apply", bytes.NewReader(applyPayload)))
+		if apply.Code != http.StatusOK {
+			t.Fatalf("apply attempt %d status=%d body=%s", attempt, apply.Code, apply.Body.String())
+		}
+	}
+	got := api.telemetry.Snapshot().Clients["openai"]["shared"]
+	if got.TotalTokens != 13 || got.RequestCount != 1 || got.TotalCostMicros != 9 {
+		t.Fatalf("sanitized usage was not accumulated exactly once: %#v", got)
+	}
+	if _, ok := got.DailyCosts["2026-02-30"]; ok {
+		t.Fatalf("invalid daily bucket survived apply: %#v", got.DailyCosts)
+	}
+	if !reflect.DeepEqual(got.CostSources, []string{telemetry.CostSourceLegacyUnknown, telemetry.CostSourceUpstream}) {
+		t.Fatalf("unexpected normalized attribution: %#v", got.CostSources)
 	}
 }
 
@@ -294,5 +375,49 @@ func TestDataImportApplyRejectsMissingAndStalePlanID(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "oauth")); !os.IsNotExist(err) {
 		t.Fatalf("rejected apply created oauth state: %v", err)
+	}
+}
+
+func TestDataImportApplyRejectsModeRemovedAfterNativeMergePreview(t *testing.T) {
+	dir := t.TempDir()
+	api := NewAPI(dir, "test", nil)
+	dataset, err := api.transfer.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := dataImportRequest{
+		Files:  []dataImportFileRequest{{Name: "backup.json", Data: string(raw)}},
+		Format: "clipal",
+		Mode:   transfer.ModeMerge,
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := httptest.NewRecorder()
+	api.HandleDataImportPreview(preview, httptest.NewRequest(http.MethodPost, "/api/data/import/preview", bytes.NewReader(payload)))
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	var plan struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	request.PlanID = plan.ID
+	request.Mode = ""
+	payload, err = json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apply := httptest.NewRecorder()
+	api.HandleDataImportApply(apply, httptest.NewRequest(http.MethodPost, "/api/data/import/apply", bytes.NewReader(payload)))
+	if apply.Code != http.StatusConflict {
+		t.Fatalf("apply status=%d body=%s", apply.Code, apply.Body.String())
 	}
 }

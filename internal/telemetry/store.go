@@ -1,11 +1,13 @@
 package telemetry
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -13,8 +15,14 @@ import (
 
 const (
 	storeFilename          = "usage.json"
-	storeVersion           = 3
+	storeVersion           = 4
 	defaultPersistInterval = 3 * time.Second
+)
+
+const (
+	CostSourceUpstream      = "upstream"
+	CostSourceCatalog       = "catalog"
+	CostSourceLegacyUnknown = "legacy_unknown"
 )
 
 type UsageDelta struct {
@@ -30,6 +38,8 @@ type UsageSnapshot struct {
 	ThoughtsTokens  int64          `json:"thoughts_tokens,omitempty"`
 	CostMicros      int64          `json:"cost_micros,omitempty"`
 	HasCost         bool           `json:"has_cost,omitempty"`
+	CostSource      string         `json:"cost_source,omitempty"`
+	CatalogVersion  string         `json:"pricing_catalog_version,omitempty"`
 }
 
 type ProviderRef struct {
@@ -43,8 +53,11 @@ type RecordOptions struct {
 }
 
 func (u UsageDelta) normalized() UsageDelta {
+	u.InputTokens = max(u.InputTokens, 0)
+	u.OutputTokens = max(u.OutputTokens, 0)
+	u.TotalTokens = max(u.TotalTokens, 0)
 	if u.TotalTokens <= 0 {
-		total := u.InputTokens + u.OutputTokens
+		total := addMetric(u.InputTokens, u.OutputTokens)
 		if total > 0 {
 			u.TotalTokens = total
 		}
@@ -65,11 +78,15 @@ type ProviderUsage struct {
 	Usage           map[string]any             `json:"usage,omitempty"`
 	DailyCosts      map[string]DailyCostBucket `json:"daily_costs,omitempty"`
 	HasCost         bool                       `json:"has_cost,omitempty"`
+	CostSources     []string                   `json:"cost_sources,omitempty"`
+	CatalogVersions []string                   `json:"pricing_catalog_versions,omitempty"`
 }
 
 type DailyCostBucket struct {
-	CostMicros int64 `json:"cost_micros,omitempty"`
-	HasCost    bool  `json:"has_cost,omitempty"`
+	CostMicros      int64    `json:"cost_micros,omitempty"`
+	HasCost         bool     `json:"has_cost,omitempty"`
+	CostSources     []string `json:"cost_sources,omitempty"`
+	CatalogVersions []string `json:"pricing_catalog_versions,omitempty"`
 }
 
 // DataSnapshot is the stable, storage-independent representation used by
@@ -93,6 +110,7 @@ type Store struct {
 	path            string
 	persistInterval time.Duration
 
+	flushMu     sync.Mutex
 	mu          sync.RWMutex
 	state       storeState
 	dirty       bool
@@ -143,6 +161,9 @@ func NewStore(configDir string) (*Store, error) {
 	if err := s.load(); err != nil {
 		return s, err
 	}
+	if s.dirty {
+		s.notifyPersist()
+	}
 	return s, nil
 }
 
@@ -158,22 +179,27 @@ func (s *Store) load() error {
 		return nil
 	}
 	var state storeState
-	if err := json.Unmarshal(data, &state); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&state); err != nil {
 		return err
 	}
-	if state.Version == 0 {
-		state.Version = storeVersion
-	}
+	needsMigration := state.Version != storeVersion
+	state.Version = storeVersion
 	if state.Clients == nil {
 		state.Clients = map[string]clientUsage{}
 	}
 	for client, usage := range state.Clients {
 		if usage.Providers == nil {
 			usage.Providers = map[string]ProviderUsage{}
-			state.Clients[client] = usage
 		}
+		for provider, entry := range usage.Providers {
+			usage.Providers[provider] = normalizeCostAttribution(entry)
+		}
+		state.Clients[client] = usage
 	}
 	s.state = state
+	s.dirty = needsMigration
 	return nil
 }
 
@@ -203,26 +229,47 @@ func (s *Store) Record(clientType string, provider string, snapshot UsageSnapsho
 	}
 	entry := client.Providers[provider]
 	if options.CountRequest {
-		entry.RequestCount++
+		entry.RequestCount = addMetric(entry.RequestCount, 1)
 	}
 	if options.CountSuccess {
-		entry.SuccessCount++
+		entry.SuccessCount = addMetric(entry.SuccessCount, 1)
 	}
-	entry.InputTokens += delta.InputTokens
-	entry.OutputTokens += delta.OutputTokens
-	entry.TotalTokens += delta.TotalTokens
-	entry.ReasoningTokens += snapshot.ReasoningTokens
-	entry.ThoughtsTokens += snapshot.ThoughtsTokens
-	if snapshot.HasCost {
-		entry.TotalCostMicros += snapshot.CostMicros
+	entry.InputTokens = addMetric(entry.InputTokens, delta.InputTokens)
+	entry.OutputTokens = addMetric(entry.OutputTokens, delta.OutputTokens)
+	entry.TotalTokens = addMetric(entry.TotalTokens, delta.TotalTokens)
+	entry.ReasoningTokens = addMetric(entry.ReasoningTokens, max(snapshot.ReasoningTokens, 0))
+	entry.ThoughtsTokens = addMetric(entry.ThoughtsTokens, max(snapshot.ThoughtsTokens, 0))
+	if snapshot.HasCost && snapshot.CostMicros >= 0 {
+		entry.TotalCostMicros = addCostMicros(entry.TotalCostMicros, snapshot.CostMicros)
 		entry.HasCost = true
+		source := strings.TrimSpace(snapshot.CostSource)
+		catalogVersion := strings.TrimSpace(snapshot.CatalogVersion)
+		switch source {
+		case CostSourceUpstream, CostSourceLegacyUnknown:
+			catalogVersion = ""
+		case CostSourceCatalog:
+			if catalogVersion == "" {
+				source = CostSourceLegacyUnknown
+			}
+		default:
+			source = CostSourceLegacyUnknown
+			catalogVersion = ""
+		}
+		entry.CostSources = appendUnique(entry.CostSources, source)
+		if source == CostSourceCatalog {
+			entry.CatalogVersions = appendUnique(entry.CatalogVersions, catalogVersion)
+		}
 		if entry.DailyCosts == nil {
 			entry.DailyCosts = make(map[string]DailyCostBucket)
 		}
 		day := usageDayBucket(when)
 		bucket := entry.DailyCosts[day]
-		bucket.CostMicros += snapshot.CostMicros
+		bucket.CostMicros = addCostMicros(bucket.CostMicros, snapshot.CostMicros)
 		bucket.HasCost = true
+		bucket.CostSources = appendUnique(bucket.CostSources, source)
+		if source == CostSourceCatalog {
+			bucket.CatalogVersions = appendUnique(bucket.CatalogVersions, catalogVersion)
+		}
 		entry.DailyCosts[day] = bucket
 	}
 	entry.LastUsedAt = when
@@ -301,6 +348,7 @@ func (s *Store) BeginTransfer() (*TransferTransaction, error) {
 	if s == nil {
 		return &TransferTransaction{}, nil
 	}
+	s.flushMu.Lock()
 	s.mu.Lock()
 	tx := &TransferTransaction{
 		store: s, before: cloneState(s.state), beforeDirty: s.dirty,
@@ -313,12 +361,14 @@ func (s *Store) BeginTransfer() (*TransferTransaction, error) {
 			tx.fileData, err = os.ReadFile(s.path)
 			if err != nil {
 				s.mu.Unlock()
+				s.flushMu.Unlock()
 				return nil, err
 			}
 			tx.fileMode, tx.fileExists = info.Mode().Perm(), true
 		case os.IsNotExist(err):
 		default:
 			s.mu.Unlock()
+			s.flushMu.Unlock()
 			return nil, err
 		}
 	}
@@ -355,6 +405,7 @@ func (tx *TransferTransaction) Commit() {
 	}
 	tx.done = true
 	tx.store.mu.Unlock()
+	tx.store.flushMu.Unlock()
 }
 
 func (tx *TransferTransaction) Rollback() error {
@@ -376,6 +427,7 @@ func (tx *TransferTransaction) Rollback() error {
 	}
 	tx.done = true
 	s.mu.Unlock()
+	s.flushMu.Unlock()
 	if tx.beforeDirty {
 		s.notifyPersist()
 	}
@@ -395,6 +447,7 @@ func (s *Store) restoreLocked(snapshot DataSnapshot, merge bool) {
 			client.Providers = map[string]ProviderUsage{}
 		}
 		for providerName, usage := range providers {
+			usage = normalizeCostAttribution(usage)
 			if existing, ok := client.Providers[providerName]; merge && ok {
 				client.Providers[providerName] = mergeProviderUsage(existing, usage)
 			} else {
@@ -533,6 +586,8 @@ func (s *Store) Flush() error {
 	if s == nil || strings.TrimSpace(s.path) == "" {
 		return nil
 	}
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
 
 	for {
 		s.mu.Lock()
@@ -768,12 +823,16 @@ func (s *Store) restoreProviders(deleted map[string]map[string]ProviderUsage) er
 }
 
 func cloneProviderUsage(usage ProviderUsage) ProviderUsage {
+	usage.CostSources = append([]string(nil), usage.CostSources...)
+	usage.CatalogVersions = append([]string(nil), usage.CatalogVersions...)
 	if usage.Usage != nil {
 		usage.Usage = cloneMap(usage.Usage)
 	}
 	if usage.DailyCosts != nil {
 		cloned := make(map[string]DailyCostBucket, len(usage.DailyCosts))
 		for key, bucket := range usage.DailyCosts {
+			bucket.CostSources = append([]string(nil), bucket.CostSources...)
+			bucket.CatalogVersions = append([]string(nil), bucket.CatalogVersions...)
 			cloned[key] = bucket
 		}
 		usage.DailyCosts = cloned
@@ -782,24 +841,30 @@ func cloneProviderUsage(usage ProviderUsage) ProviderUsage {
 }
 
 func mergeProviderUsage(left ProviderUsage, right ProviderUsage) ProviderUsage {
+	left = normalizeCostAttribution(left)
+	right = normalizeCostAttribution(right)
 	out := cloneProviderUsage(left)
-	out.RequestCount += right.RequestCount
-	out.SuccessCount += right.SuccessCount
-	out.InputTokens += right.InputTokens
-	out.OutputTokens += right.OutputTokens
-	out.TotalTokens += right.TotalTokens
-	out.ReasoningTokens += right.ReasoningTokens
-	out.ThoughtsTokens += right.ThoughtsTokens
-	out.TotalCostMicros += right.TotalCostMicros
+	out.RequestCount = addMetric(out.RequestCount, right.RequestCount)
+	out.SuccessCount = addMetric(out.SuccessCount, right.SuccessCount)
+	out.InputTokens = addMetric(out.InputTokens, right.InputTokens)
+	out.OutputTokens = addMetric(out.OutputTokens, right.OutputTokens)
+	out.TotalTokens = addMetric(out.TotalTokens, right.TotalTokens)
+	out.ReasoningTokens = addMetric(out.ReasoningTokens, right.ReasoningTokens)
+	out.ThoughtsTokens = addMetric(out.ThoughtsTokens, right.ThoughtsTokens)
+	out.TotalCostMicros = addCostMicros(out.TotalCostMicros, right.TotalCostMicros)
 	out.HasCost = out.HasCost || right.HasCost
+	out.CostSources = appendUnique(out.CostSources, right.CostSources...)
+	out.CatalogVersions = appendUnique(out.CatalogVersions, right.CatalogVersions...)
 	if len(right.DailyCosts) > 0 {
 		if out.DailyCosts == nil {
 			out.DailyCosts = make(map[string]DailyCostBucket, len(right.DailyCosts))
 		}
 		for day, bucket := range right.DailyCosts {
 			current := out.DailyCosts[day]
-			current.CostMicros += bucket.CostMicros
+			current.CostMicros = addCostMicros(current.CostMicros, bucket.CostMicros)
 			current.HasCost = current.HasCost || bucket.HasCost
+			current.CostSources = appendUnique(current.CostSources, bucket.CostSources...)
+			current.CatalogVersions = appendUnique(current.CatalogVersions, bucket.CatalogVersions...)
 			out.DailyCosts[day] = current
 		}
 	}
@@ -815,6 +880,63 @@ func mergeProviderUsage(left ProviderUsage, right ProviderUsage) ProviderUsage {
 	return out
 }
 
+func normalizeCostAttribution(usage ProviderUsage) ProviderUsage {
+	usage.CostSources = appendUnique(usage.CostSources)
+	usage.CatalogVersions = appendUnique(usage.CatalogVersions)
+	if usage.HasCost && len(usage.CostSources) == 0 {
+		usage.CostSources = []string{CostSourceLegacyUnknown}
+	}
+	for day, bucket := range usage.DailyCosts {
+		bucket.CostSources = appendUnique(bucket.CostSources)
+		bucket.CatalogVersions = appendUnique(bucket.CatalogVersions)
+		if bucket.HasCost && len(bucket.CostSources) == 0 {
+			bucket.CostSources = []string{CostSourceLegacyUnknown}
+		}
+		usage.CostSources = appendUnique(usage.CostSources, bucket.CostSources...)
+		usage.CatalogVersions = appendUnique(usage.CatalogVersions, bucket.CatalogVersions...)
+		usage.DailyCosts[day] = bucket
+	}
+	return usage
+}
+
+func appendUnique(values []string, candidates ...string) []string {
+	seen := make(map[string]struct{}, len(values)+len(candidates))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			seen[value] = struct{}{}
+		}
+	}
+	for _, value := range candidates {
+		if value = strings.TrimSpace(value); value != "" {
+			seen[value] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for value := range seen {
+		out = append(out, value)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func addCostMicros(left, right int64) int64 {
+	return addMetric(left, right)
+}
+
+func addMetric(left, right int64) int64 {
+	if left < 0 {
+		left = 0
+	}
+	if right <= 0 {
+		return left
+	}
+	const maxInt64 = int64(^uint64(0) >> 1)
+	if left > maxInt64-right {
+		return maxInt64
+	}
+	return left + right
+}
+
 func usageDayBucket(when time.Time) string {
 	return when.Format("2006-01-02")
 }
@@ -828,7 +950,9 @@ func cloneMap(in map[string]any) map[string]any {
 		return nil
 	}
 	var out map[string]any
-	if err := json.Unmarshal(data, &out); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&out); err != nil {
 		return nil
 	}
 	return out

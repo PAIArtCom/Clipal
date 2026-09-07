@@ -48,6 +48,8 @@ Tired of hitting rate limits or empty balances mid-generation?
 ### 🎛️ **Beautiful Local Web UI**
 Manage your AI workflows visually. Add, edit, enable, or disable providers, pin a specific model, and manage global settings with a modern dashboard. All changes are hot-reloaded—no restarts required.
 
+Usage costs prefer upstream-reported values and otherwise use an offline, embedded snapshot of [`PAIArtCom/model-specs`](https://github.com/PAIArtCom/model-specs). Model prices are matched exactly, including cache and long-context tiers; catalog updates never retroactively reprice stored history. See [Usage Cost Calculation](docs/en/pricing.md).
+
 ![Clipal Web UI](assets/webUI.png)
 
 ### ⚡ **Frictionless Background Service**

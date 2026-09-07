@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-live-gemini-oauth test-oauth-authorize lint lint-fix vuln fmt install-hooks ci
+.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-live-gemini-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
 GOBIN := $(shell $(GO) env GOPATH)/bin
@@ -95,6 +95,9 @@ test-live-gemini-oauth:
 
 test-oauth-authorize:
 	./scripts/oauth_authorize_smoke.sh --mock
+
+update-model-specs:
+	./scripts/update_model_specs.sh
 
 lint:
 	$(GOLANGCI_LINT) run ./...

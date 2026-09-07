@@ -16,6 +16,7 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/integration"
 	"github.com/PAIArtCom/Clipal/internal/logger"
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/proxy"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 	transferpkg "github.com/PAIArtCom/Clipal/internal/transfer"
@@ -621,10 +622,11 @@ func (a *API) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := StatusResponse{
-		Version:   a.version,
-		Uptime:    time.Since(startTime).String(),
-		ConfigDir: a.configDir,
-		Clients:   make(map[string]ClientStatus),
+		Version:        a.version,
+		Uptime:         time.Since(startTime).String(),
+		ConfigDir:      a.configDir,
+		PricingCatalog: pricing.CatalogMetadata(),
+		Clients:        make(map[string]ClientStatus),
 	}
 
 	status.Clients["claude"] = buildClientStatus(cfg.Claude, cfg.Claude.Providers, snap.Clients[proxy.ClientClaude])

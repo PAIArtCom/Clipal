@@ -1,6 +1,8 @@
 package transfer
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,6 +20,21 @@ import (
 )
 
 var ErrImportBaseStateChanged = errors.New("current data changed since preview; preview again")
+var ErrImportPlanUnavailable = errors.New("reviewed import plan is unavailable; preview again")
+var ErrImportPlanMismatch = errors.New("import data, format, or mode changed after preview; preview again")
+
+const (
+	reviewedPlanTTL      = 15 * time.Minute
+	maxReviewedPlanCount = 32
+)
+
+type reviewedPlan struct {
+	plan        *ImportPlan
+	inputDigest string
+	format      string
+	expiresAt   time.Time
+	result      *ApplyResult
+}
 
 type Service struct {
 	configDir       string
@@ -27,6 +44,8 @@ type Service struct {
 	reload          func() error
 	coordinateApply func(func(reload func() error) error) error
 	mu              sync.Mutex
+	plansMu         sync.Mutex
+	reviewedPlans   map[string]*reviewedPlan
 	hooks           serviceHooks
 }
 
@@ -58,7 +77,7 @@ func NewService(configDir, version string, usage *telemetry.Store, reload func()
 			return nil, fmt.Errorf("load usage data: %w", err)
 		}
 	}
-	service := &Service{configDir: configDir, version: version, registry: NewRegistry(), usage: usage, reload: reload}
+	service := &Service{configDir: configDir, version: version, registry: NewRegistry(), usage: usage, reload: reload, reviewedPlans: make(map[string]*reviewedPlan)}
 	for _, option := range options {
 		if option != nil {
 			option(service)
@@ -133,6 +152,7 @@ func (s *Service) Analyze(inputs []Input, format string, mode Mode) (*ImportPlan
 	plan.Changes = importChanges(current, credentials, usage, dataset, native, mode)
 	plan.baseState = importStateFingerprint(current, credentials)
 	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
+	s.rememberReviewedPlan(plan, inputs, format)
 	return plan, nil
 }
 
@@ -167,7 +187,123 @@ func (s *Service) AnalyzeCredentials(credentials []oauth.Credential, warnings []
 	plan.Changes = importChanges(current, existingCredentials, usage, dataset, false, ModeMerge)
 	plan.baseState = importStateFingerprint(current, existingCredentials)
 	plan.ID = planID(dataset, plan.Format, plan.Mode, plan.baseState)
+	s.rememberReviewedPlan(plan, nil, FormatMixed)
 	return plan, nil
+}
+
+// ApplyReviewed applies the immutable plan produced by Preview after confirming
+// that the submitted input, format, and mode still match what was reviewed.
+func (s *Service) ApplyReviewed(planID string, inputs []Input, format string, mode Mode) (*ApplyResult, error) {
+	s.plansMu.Lock()
+	s.cleanupReviewedPlansLocked(time.Now())
+	reviewed := s.reviewedPlans[strings.TrimSpace(planID)]
+	if reviewed == nil {
+		s.plansMu.Unlock()
+		return nil, ErrImportPlanUnavailable
+	}
+	submittedMode := mode
+	if submittedMode == "" {
+		if reviewed.plan.Native {
+			submittedMode = ModeReplace
+		} else {
+			submittedMode = ModeMerge
+		}
+	}
+	if inputDigest(inputs) != reviewed.inputDigest || normalizeFormat(format) != reviewed.format || submittedMode != reviewed.plan.Mode {
+		s.plansMu.Unlock()
+		return nil, ErrImportPlanMismatch
+	}
+	if reviewed.result != nil {
+		result := cloneApplyResult(reviewed.result)
+		s.plansMu.Unlock()
+		return result, nil
+	}
+	plan, err := cloneImportPlan(reviewed.plan)
+	s.plansMu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return s.Apply(plan)
+}
+
+func (s *Service) rememberReviewedPlan(plan *ImportPlan, inputs []Input, format string) {
+	frozen, err := cloneImportPlan(plan)
+	if err != nil {
+		return
+	}
+	s.plansMu.Lock()
+	defer s.plansMu.Unlock()
+	now := time.Now()
+	s.cleanupReviewedPlansLocked(now)
+	if len(s.reviewedPlans) >= maxReviewedPlanCount {
+		var oldestID string
+		var oldest time.Time
+		for id, candidate := range s.reviewedPlans {
+			created := candidate.expiresAt.Add(-reviewedPlanTTL)
+			if oldestID == "" || created.Before(oldest) {
+				oldestID, oldest = id, created
+			}
+		}
+		delete(s.reviewedPlans, oldestID)
+	}
+	s.reviewedPlans[plan.ID] = &reviewedPlan{
+		plan: frozen, inputDigest: inputDigest(inputs), format: normalizeFormat(format), expiresAt: now.Add(reviewedPlanTTL),
+	}
+}
+
+func (s *Service) cleanupReviewedPlansLocked(now time.Time) {
+	for id, plan := range s.reviewedPlans {
+		if !plan.expiresAt.After(now) {
+			delete(s.reviewedPlans, id)
+		}
+	}
+}
+
+func (s *Service) completedResult(planID string) *ApplyResult {
+	s.plansMu.Lock()
+	defer s.plansMu.Unlock()
+	s.cleanupReviewedPlansLocked(time.Now())
+	if reviewed := s.reviewedPlans[planID]; reviewed != nil && reviewed.result != nil {
+		return cloneApplyResult(reviewed.result)
+	}
+	return nil
+}
+
+func (s *Service) rememberCompletedResult(result *ApplyResult) {
+	if result == nil {
+		return
+	}
+	s.plansMu.Lock()
+	defer s.plansMu.Unlock()
+	if reviewed := s.reviewedPlans[result.PlanID]; reviewed != nil {
+		reviewed.result = cloneApplyResult(result)
+		reviewed.expiresAt = time.Now().Add(reviewedPlanTTL)
+	}
+}
+
+func inputDigest(inputs []Input) string {
+	hash := sha256.New()
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(inputs)))
+	_, _ = hash.Write(length[:])
+	for _, input := range inputs {
+		binary.BigEndian.PutUint64(length[:], uint64(len(input.Name)))
+		_, _ = hash.Write(length[:])
+		_, _ = hash.Write([]byte(input.Name))
+		binary.BigEndian.PutUint64(length[:], uint64(len(input.Data)))
+		_, _ = hash.Write(length[:])
+		_, _ = hash.Write(input.Data)
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+func cloneApplyResult(result *ApplyResult) *ApplyResult {
+	if result == nil {
+		return nil
+	}
+	out := *result
+	out.CredentialResults = append([]CredentialApplyResult(nil), result.CredentialResults...)
+	return &out
 }
 
 func validateCredentials(dataset *Dataset, native bool) error {
@@ -212,13 +348,23 @@ func (s *Service) Apply(plan *ImportPlan) (*ApplyResult, error) {
 	if plan == nil || plan.Dataset == nil {
 		return nil, fmt.Errorf("analyzed import plan is required")
 	}
-	if plan.ID != planID(plan.Dataset, plan.Format, plan.Mode, plan.baseState) {
+	frozenPlan, err := cloneImportPlan(plan)
+	if err != nil {
+		return nil, err
+	}
+	if frozenPlan.ID != planID(frozenPlan.Dataset, frozenPlan.Format, frozenPlan.Mode, frozenPlan.baseState) {
 		return nil, fmt.Errorf("import plan does not match its dataset")
 	}
+	if result := s.completedResult(frozenPlan.ID); result != nil {
+		return result, nil
+	}
+	var usageWarnings []string
+	frozenPlan.Dataset.Data.Usage, usageWarnings = sanitizeUsage(frozenPlan.Dataset.Data.Usage)
+	frozenPlan.Warnings = append(frozenPlan.Warnings, usageWarnings...)
 	var result *ApplyResult
 	operation := func(reload func() error) error {
 		var err error
-		result, err = s.apply(plan, reload)
+		result, err = s.apply(frozenPlan, reload)
 		return err
 	}
 	if s.coordinateApply != nil {
@@ -236,6 +382,9 @@ func (s *Service) Apply(plan *ImportPlan) (*ApplyResult, error) {
 func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if result := s.completedResult(plan.ID); result != nil {
+		return result, nil
+	}
 
 	// Own the credential store for the whole transaction so concurrent token
 	// refreshes cannot land between the oauth snapshot and a later restore.
@@ -251,9 +400,6 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	if err != nil {
 		return nil, err
 	}
-	if plan.baseState != "" && plan.baseState != importStateFingerprint(current, credentials) {
-		return nil, ErrImportBaseStateChanged
-	}
 	usageTx, err := s.usage.BeginTransfer()
 	if err != nil {
 		return nil, fmt.Errorf("start usage transaction: %w", err)
@@ -264,6 +410,12 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 			_ = usageTx.Rollback()
 		}
 	}()
+	if err := validateDataset(plan.Dataset); err != nil {
+		return nil, fmt.Errorf("validate import plan: %w", err)
+	}
+	if plan.baseState != "" && plan.baseState != importStateFingerprint(current, credentials) {
+		return nil, ErrImportBaseStateChanged
+	}
 	backupNames := config.WatchedConfigFilenames()
 	configBackup, err := snapshotFiles(s.configDir, backupNames)
 	if err != nil {
@@ -356,7 +508,7 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 		return nil, rollback(fmt.Errorf("save imported configuration: %w", err))
 	}
 	if plan.Native {
-		usageTx.Restore(plan.Dataset.Data.Usage.toTelemetry(), plan.Mode == ModeMerge)
+		usageTx.Restore(plan.Dataset.Data.Usage.toTelemetry(), true)
 		if s.hooks.beforeUsageFlush != nil {
 			if err := s.hooks.beforeUsageFlush(); err != nil {
 				return nil, rollback(fmt.Errorf("save imported usage: %w", err))
@@ -373,7 +525,9 @@ func (s *Service) apply(plan *ImportPlan, reload func() error) (*ApplyResult, er
 	}
 	usageTx.Commit()
 	usageFinished = true
-	return &ApplyResult{PlanID: plan.ID, Mode: plan.Mode, Providers: plan.Providers, Credentials: saved, UsageProviders: plan.UsageProviders, CredentialResults: credentialResults}, nil
+	result := &ApplyResult{PlanID: plan.ID, Mode: plan.Mode, Providers: plan.Providers, Credentials: saved, UsageProviders: plan.UsageProviders, CredentialResults: credentialResults}
+	s.rememberCompletedResult(result)
+	return result, nil
 }
 
 func (s *Service) listCredentials() ([]oauth.Credential, error) {

@@ -48,6 +48,8 @@
 ### 🎛️ **美观且强大的本地 Web UI**
 可视化管理你的 AI 工作流。在这里增删、停用 provider，或者在“手动模式”下置顶特定模型，亦或调整全局运行参数。所有更改**热重载**生效，无需重启服务。
 
+用量费用会优先采用上游直接返回的值，否则使用离线内置的 [`PAIArtCom/model-specs`](https://github.com/PAIArtCom/model-specs) 快照。模型价格采用精确匹配，并支持缓存和长上下文阶梯；更新目录不会追溯修改已保存的历史费用。详见[用量费用计算](docs/zh/pricing.md)。
+
 ![Clipal Web UI](assets/webUI.png)
 
 ### ⚡ **无感知的后台守护服务**

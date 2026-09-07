@@ -2470,18 +2470,6 @@ func TestForwardWithFailover_OAuthRetryAfterNotCappedAtOneHour(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	svc := oauthpkg.NewService(dir)
-	if err := svc.Store().Save(&oauthpkg.Credential{
-		Ref:         "claude-sean-example-com",
-		Provider:    config.OAuthProviderClaude,
-		Email:       "sean@example.com",
-		AccountID:   "acct_123",
-		AccessToken: "access-1",
-		ExpiresAt:   time.Now().Add(time.Hour),
-	}); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Host {
 		case "api.anthropic.com":
@@ -2495,6 +2483,20 @@ func TestForwardWithFailover_OAuthRetryAfterNotCappedAtOneHour(t *testing.T) {
 			return nil, errors.New("unexpected host")
 		}
 	})
+	svc := oauthpkg.NewService(dir, oauthpkg.WithClaudeClient(&oauthpkg.ClaudeClient{
+		UsageURL:   "https://api.anthropic.com/api/oauth/usage",
+		HTTPClient: &http.Client{Transport: rt},
+	}))
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "claude-sean-example-com",
+		Provider:    config.OAuthProviderClaude,
+		Email:       "sean@example.com",
+		AccountID:   "acct_123",
+		AccessToken: "access-1",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
 
 	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
 		{

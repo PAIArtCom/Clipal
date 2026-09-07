@@ -30,7 +30,7 @@ const (
 	defaultAntigravityFreeTierID         = "free-tier"
 	defaultAntigravityCloudCodeRetry     = defaultGeminiCloudCodeRetryAttempts
 	defaultAntigravityCloudCodeRetryWait = defaultGeminiCloudCodeRetryDelay
-	defaultAntigravityVersionLabel       = "2.9.1"
+	defaultAntigravityVersionLabel       = "2.12.2"
 	defaultAntigravityInfoPlist          = "/Applications/Antigravity.app/Contents/Info.plist"
 )
 

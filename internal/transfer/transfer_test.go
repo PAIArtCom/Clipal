@@ -3,6 +3,7 @@ package transfer
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -37,6 +38,74 @@ func TestNativeCodecRoundTripAndRejectsLegacyShape(t *testing.T) {
 	}
 }
 
+func TestNativeCodecPreservesLargeRawUsageInteger(t *testing.T) {
+	dataset := emptyDataset()
+	dataset.Producer.Version = "test"
+	dataset.Data.Global = globalFromConfig(config.DefaultGlobalConfig())
+	dataset.Data.Usage.Clients["openai"] = map[string]ProviderUsage{"p1": {Usage: map[string]any{"cost_micros": json.Number("9007199254740993")}}}
+	encoded, err := (nativeAdapter{}).Encode(dataset, EncodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err := (nativeAdapter{}).Decode([]Input{{Name: "backup.json", Data: encoded}}, DecodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, ok := decoded.Data.Usage.Clients["openai"]["p1"].Usage["cost_micros"].(json.Number)
+	if !ok || value.String() != "9007199254740993" {
+		t.Fatalf("cost_micros = %#v", value)
+	}
+}
+
+func TestServiceImportPersistExportPreservesLargeRawUsageInteger(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	service, err := NewService(dir, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset := emptyDataset()
+	dataset.Producer.Version = "test"
+	dataset.Data.Global = globalFromConfig(config.DefaultGlobalConfig())
+	for _, client := range []string{"openai", "claude", "gemini"} {
+		dataset.Data.Usage.Clients[client] = map[string]ProviderUsage{"p1": {Usage: map[string]any{"cost_micros": json.Number("9007199254740993")}}}
+	}
+	encoded, err := (nativeAdapter{}).Encode(dataset, EncodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "backup.json", Data: encoded}}, FormatClipal, ModeReplace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatal(err)
+	}
+	exported, err := service.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, client := range []string{"openai", "claude", "gemini"} {
+		value, ok := exported.Data.Usage.Clients[client]["p1"].Usage["cost_micros"].(json.Number)
+		if !ok || value.String() != "9007199254740993" {
+			t.Fatalf("%s cost_micros = %#v", client, value)
+		}
+	}
+}
+
+func TestUsageCostAttributionConversionRoundTrip(t *testing.T) {
+	original := telemetry.DataSnapshot{Clients: map[string]map[string]telemetry.ProviderUsage{
+		"openai": {"p1": {
+			HasCost: true, TotalCostMicros: 7,
+			CostSources: []string{telemetry.CostSourceCatalog}, CatalogVersions: []string{"a8be6f9ad46d"},
+			DailyCosts: map[string]telemetry.DailyCostBucket{"2026-01-01": {HasCost: true, CostMicros: 7, CostSources: []string{telemetry.CostSourceCatalog}, CatalogVersions: []string{"a8be6f9ad46d"}}},
+		}},
+	}}
+	if roundTrip := usageFromTelemetry(original).toTelemetry(); !reflect.DeepEqual(roundTrip, original) {
+		t.Fatalf("usage attribution changed: got %#v want %#v", roundTrip, original)
+	}
+}
+
 func TestNativeCodecRejectsTrailingJSONAndUnknownClient(t *testing.T) {
 	dataset := emptyDataset()
 	dataset.Producer.Version = "test"
@@ -56,6 +125,61 @@ func TestNativeCodecRejectsTrailingJSONAndUnknownClient(t *testing.T) {
 	if _, _, err := (nativeAdapter{}).Decode([]Input{{Name: "unknown-client.json", Data: encoded}}, DecodeOptions{}); err == nil {
 		t.Fatal("unknown schema-v1 client should be rejected")
 	}
+}
+
+func TestValidateDatasetAllowsAuxiliaryUsageAnomalies(t *testing.T) {
+	dataset := emptyDataset()
+	dataset.Data.Usage.Clients["openai"] = map[string]ProviderUsage{"p1": {TotalCostMicros: -1, HasCost: true}}
+	if err := validateDataset(dataset); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateDatasetAllowsAuxiliaryUsageAttributionAnomalies(t *testing.T) {
+	valid := ProviderUsage{
+		HasCost: true, TotalCostMicros: 1,
+		CostSources:     []string{telemetry.CostSourceCatalog},
+		CatalogVersions: []string{"a8be6f9ad46d"},
+	}
+	tests := []struct {
+		name  string
+		usage ProviderUsage
+	}{
+		{name: "unknown source", usage: ProviderUsage{HasCost: true, CostSources: []string{"trusted"}}},
+		{name: "duplicate source", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceUpstream, telemetry.CostSourceUpstream}}},
+		{name: "catalog without version", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceCatalog}}},
+		{name: "version without catalog", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceUpstream}, CatalogVersions: []string{"a8be6f9ad46d"}}},
+		{name: "invalid version", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceCatalog}, CatalogVersions: []string{"NOT-A-HASH"}}},
+		{name: "duplicate version", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceCatalog}, CatalogVersions: []string{"a8be6f9ad46d", "a8be6f9ad46d"}}},
+		{name: "too many versions", usage: ProviderUsage{HasCost: true, CostSources: []string{telemetry.CostSourceCatalog}, CatalogVersions: repeatStrings("a8be6f9ad46d", maxCatalogVersionsPerUsage+1)}},
+		{name: "cost while absent", usage: ProviderUsage{TotalCostMicros: 1}},
+		{name: "attribution while absent", usage: ProviderUsage{CostSources: []string{telemetry.CostSourceUpstream}}},
+		{name: "invalid daily date", usage: withDailyCost(valid, "2026-02-30", DailyCostBucket{HasCost: true, CostMicros: 1, CostSources: []string{telemetry.CostSourceUpstream}})},
+		{name: "daily attribution", usage: withDailyCost(valid, "2026-01-01", DailyCostBucket{HasCost: true, CostMicros: 1, CostSources: []string{"trusted"}})},
+		{name: "daily missing from provider", usage: withDailyCost(valid, "2026-01-01", DailyCostBucket{HasCost: true, CostMicros: 1, CostSources: []string{telemetry.CostSourceUpstream}})},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dataset := emptyDataset()
+			dataset.Data.Usage.Clients["openai"] = map[string]ProviderUsage{"p1": tc.usage}
+			if err := validateDataset(dataset); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func repeatStrings(_ string, count int) []string {
+	out := make([]string, count)
+	for i := range out {
+		out[i] = fmt.Sprintf("%012x", i)
+	}
+	return out
+}
+
+func withDailyCost(usage ProviderUsage, day string, bucket DailyCostBucket) ProviderUsage {
+	usage.DailyCosts = map[string]DailyCostBucket{day: bucket}
+	return usage
 }
 
 func TestImportInputLimits(t *testing.T) {
@@ -89,6 +213,17 @@ func TestImportInputLimits(t *testing.T) {
 				t.Fatal("expected input limit error")
 			}
 		})
+	}
+}
+
+func TestInputDigestFramesNamesDataAndFileBoundaries(t *testing.T) {
+	left := []Input{{Name: "a", Data: []byte("b\x00c")}}
+	right := []Input{{Name: "a\x00b", Data: []byte("c")}}
+	if inputDigest(left) == inputDigest(right) {
+		t.Fatal("input digest is ambiguous across name and data boundaries")
+	}
+	if inputDigest([]Input{{Name: "a", Data: []byte("b")}, {Name: "c", Data: nil}}) == inputDigest([]Input{{Name: "a", Data: []byte("b\x00c")}}) {
+		t.Fatal("input digest is ambiguous across file boundaries")
 	}
 }
 
@@ -203,6 +338,125 @@ func TestApplyRejectsPlanWhenCurrentStateChangedAfterPreview(t *testing.T) {
 	writeTestState(t, destination, "changed-after-preview", "changed-key")
 	if _, err := importer.Apply(plan); !errors.Is(err, ErrImportBaseStateChanged) {
 		t.Fatalf("apply error=%v, want base-state conflict", err)
+	}
+}
+
+func TestNativeMergePlanCannotBeAppliedTwice(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "shared", "key")
+	usageStore, err := telemetry.NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := usageStore.RecordUsage("openai", "shared", telemetry.UsageSnapshot{UsageDelta: telemetry.UsageDelta{TotalTokens: 5}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := usageStore.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(dir, "test", usageStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := service.ExportJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.Analyze([]Input{{Name: "merge.json", Data: data}}, FormatClipal, ModeMerge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatal(err)
+	}
+	if got := usageStore.Snapshot().Clients["openai"]["shared"].TotalTokens; got != 10 {
+		t.Fatalf("first merge total = %d", got)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatalf("second apply error = %v", err)
+	}
+	if got := usageStore.Snapshot().Clients["openai"]["shared"].TotalTokens; got != 10 {
+		t.Fatalf("replayed merge changed total to %d", got)
+	}
+}
+
+func TestNativePlanIgnoresRoutineUsageBetweenPreviewAndApply(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "shared", "key")
+	usageStore, err := telemetry.NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(dir, "test", usageStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset, err := service.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset.Data.Usage.Clients["openai"] = map[string]ProviderUsage{"shared": {TotalTokens: 10}}
+	raw, _ := json.Marshal(dataset)
+	plan, err := service.Analyze([]Input{{Name: "backup.json", Data: raw}}, FormatClipal, ModeReplace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := usageStore.RecordUsage("openai", "shared", telemetry.UsageSnapshot{UsageDelta: telemetry.UsageDelta{TotalTokens: 7}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatalf("routine usage invalidated native plan: %v", err)
+	}
+	if got := usageStore.Snapshot().Clients["openai"]["shared"].TotalTokens; got != 17 {
+		t.Fatalf("total tokens=%d want=17", got)
+	}
+}
+
+func TestApplyFreezesPlanBeforeCoordinatorAndSanitizesInsideTransaction(t *testing.T) {
+	dir := t.TempDir()
+	writeTestState(t, dir, "shared", "key")
+	var reviewedPlan *ImportPlan
+	coordinator := func(operation func(reload func() error) error) error {
+		reviewedPlan.Dataset.Data.Usage.Clients["openai"]["shared"] = ProviderUsage{
+			HasCost: true, TotalCostMicros: 1, CostSources: []string{"forged"},
+		}
+		return operation(nil)
+	}
+	service, err := NewService(dir, "test", nil, nil, WithApplyCoordinator(coordinator))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset, err := service.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset.Data.Usage.Clients["openai"] = map[string]ProviderUsage{"shared": {
+		HasCost: true, TotalCostMicros: 1, CostSources: []string{telemetry.CostSourceUpstream},
+	}}
+	data, err := json.Marshal(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewedPlan, err = service.Analyze([]Input{{Name: "replace.json", Data: data}}, FormatClipal, ModeReplace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(reviewedPlan); err != nil {
+		t.Fatalf("frozen reviewed plan failed: %v", err)
+	}
+	usage := service.usage.Snapshot().Clients["openai"]["shared"]
+	if !reflect.DeepEqual(usage.CostSources, []string{telemetry.CostSourceUpstream}) {
+		t.Fatalf("coordinator mutation reached apply: %#v", usage)
+	}
+
+	invalidPlan, err := service.Analyze([]Input{{Name: "replace.json", Data: data}}, FormatClipal, ModeReplace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalidPlan.Dataset.Data.Usage.Clients["openai"]["shared"] = ProviderUsage{HasCost: true, CostSources: []string{"forged"}}
+	invalidPlan.ID = planID(invalidPlan.Dataset, invalidPlan.Format, invalidPlan.Mode, invalidPlan.baseState)
+	if _, err := service.Apply(invalidPlan); err != nil {
+		t.Fatalf("transaction rejected auxiliary anomaly: %v", err)
 	}
 }
 

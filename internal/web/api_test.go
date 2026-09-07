@@ -18,6 +18,7 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/PAIArtCom/Clipal/internal/logger"
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/proxy"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 	"github.com/PAIArtCom/Clipal/internal/testutil"
@@ -216,6 +217,8 @@ func TestMapProviderUsageResponse_IncludesSpendRollups(t *testing.T) {
 		ThoughtsTokens:  22,
 		TotalCostMicros: 11_250_000,
 		HasCost:         true,
+		CostSources:     []string{telemetry.CostSourceCatalog, telemetry.CostSourceUpstream},
+		CatalogVersions: []string{"v1", "v2"},
 		DailyCosts: map[string]telemetry.DailyCostBucket{
 			now.Format("2006-01-02"): {
 				CostMicros: 1_250_000,
@@ -238,6 +241,9 @@ func TestMapProviderUsageResponse_IncludesSpendRollups(t *testing.T) {
 	if !resp.HasCost {
 		t.Fatalf("expected has_cost=true: %#v", resp)
 	}
+	if !reflect.DeepEqual(resp.CostSources, []string{telemetry.CostSourceCatalog, telemetry.CostSourceUpstream}) || !reflect.DeepEqual(resp.CatalogVersions, []string{"v1", "v2"}) {
+		t.Fatalf("cost attribution = %#v", resp)
+	}
 	if resp.ReasoningTokens != 11 || resp.ThoughtsTokens != 22 {
 		t.Fatalf("expected reasoning/thought tokens: %#v", resp)
 	}
@@ -255,6 +261,18 @@ func TestMapProviderUsageResponse_IncludesSpendRollups(t *testing.T) {
 	}
 	if resp.SpendWeekMicros != 4_250_000 {
 		t.Fatalf("spend_week_micros = %d", resp.SpendWeekMicros)
+	}
+}
+
+func TestProviderSpendForRecentDaysSaturates(t *testing.T) {
+	now := time.Now()
+	const maxInt64 = int64(^uint64(0) >> 1)
+	usage := telemetry.ProviderUsage{DailyCosts: map[string]telemetry.DailyCostBucket{
+		now.Format("2006-01-02"):                   {CostMicros: maxInt64, HasCost: true},
+		now.AddDate(0, 0, -1).Format("2006-01-02"): {CostMicros: 1, HasCost: true},
+	}}
+	if got := providerSpendForRecentDays(usage, now, 7); got != maxInt64 {
+		t.Fatalf("weekly spend = %d", got)
 	}
 }
 
@@ -2331,6 +2349,11 @@ providers:
 	got := testutil.DecodeJSONMap(t, w.Body.Bytes())
 	if got["version"] != "test-version" {
 		t.Fatalf("body=%#v", got)
+	}
+	pricingCatalog, ok := got["pricing_catalog"].(map[string]any)
+	metadata := pricing.CatalogMetadata()
+	if !ok || pricingCatalog["version"] != metadata.Version || pricingCatalog["upstream_source"] != metadata.UpstreamSource || pricingCatalog["model_specs_commit"] != metadata.ModelSpecsCommit {
+		t.Fatalf("pricing_catalog=%T %#v", got["pricing_catalog"], got["pricing_catalog"])
 	}
 	clients, ok := got["clients"].(map[string]any)
 	if !ok {
