@@ -40,7 +40,7 @@ func captureStdout(t *testing.T, fn func()) string {
 
 func writeStatusConfig(t *testing.T, dir string, port int) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(fmt.Sprintf("listen_addr: \"127.0.0.1\"\nport: %d\nlog_level: \"info\"\nreactivate_after: \"1h\"\nupstream_idle_timeout: \"3m\"\nresponse_header_timeout: \"2m\"\nmax_request_body_bytes: 33554432\nlog_dir: \"\"\nlog_retention_days: 7\nlog_stdout: true\nnotifications:\n  enabled: false\n  min_level: \"error\"\n  provider_switch: true\ncircuit_breaker:\n  failure_threshold: 4\n  success_threshold: 2\n  open_timeout: \"60s\"\n  half_open_max_inflight: 1\nignore_count_tokens_failover: false\n", port)), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(fmt.Sprintf("listen_addr: \"127.0.0.1\"\nport: %d\nlog_level: \"info\"\nreactivate_after: \"1h\"\nupstream_idle_timeout: \"5m\"\nresponse_header_timeout: \"5m\"\nmax_request_body_bytes: 67108864\nlog_dir: \"\"\nlog_retention_days: 7\nlog_stdout: true\nnotifications:\n  enabled: false\n  min_level: \"error\"\n  provider_switch: true\ncircuit_breaker:\n  failure_threshold: 4\n  success_threshold: 2\n  open_timeout: \"60s\"\n  half_open_max_inflight: 1\nignore_count_tokens_failover: false\n", port)), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 }

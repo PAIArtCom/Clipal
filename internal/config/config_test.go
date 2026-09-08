@@ -322,11 +322,11 @@ func TestGlobalConfigRuntimeDurations(t *testing.T) {
 	if got.ReactivateAfter != time.Hour {
 		t.Fatalf("ReactivateAfter = %s, want %s", got.ReactivateAfter, time.Hour)
 	}
-	if got.UpstreamIdleTimeout != 3*time.Minute {
-		t.Fatalf("UpstreamIdleTimeout = %s, want %s", got.UpstreamIdleTimeout, 3*time.Minute)
+	if got.UpstreamIdleTimeout != 5*time.Minute {
+		t.Fatalf("UpstreamIdleTimeout = %s, want %s", got.UpstreamIdleTimeout, 5*time.Minute)
 	}
-	if got.ResponseHeaderTimeout != 2*time.Minute {
-		t.Fatalf("ResponseHeaderTimeout = %s, want %s", got.ResponseHeaderTimeout, 2*time.Minute)
+	if got.ResponseHeaderTimeout != 5*time.Minute {
+		t.Fatalf("ResponseHeaderTimeout = %s, want %s", got.ResponseHeaderTimeout, 5*time.Minute)
 	}
 }
 
@@ -774,8 +774,8 @@ func TestGlobalConfigRuntimeDurations_ErrorsAndBoundaryValues(t *testing.T) {
 			},
 			wantDur: RuntimeDurations{
 				ReactivateAfter:       -1 * time.Hour,
-				UpstreamIdleTimeout:   -3 * time.Minute,
-				ResponseHeaderTimeout: -2 * time.Minute,
+				UpstreamIdleTimeout:   5 * time.Minute,
+				ResponseHeaderTimeout: 5 * time.Minute,
 			},
 		},
 		{
@@ -813,10 +813,59 @@ func TestGlobalConfigRuntimeDurations_ErrorsAndBoundaryValues(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigEnforceRuntimeMinimums(t *testing.T) {
+	t.Parallel()
+
+	low := DefaultGlobalConfig()
+	low.UpstreamIdleTimeout = "1m"
+	low.ResponseHeaderTimeout = "30s"
+	low.MaxRequestBody = 1024
+	low.EnforceRuntimeMinimums()
+	if low.UpstreamIdleTimeout != "5m" || low.ResponseHeaderTimeout != "5m" || low.MaxRequestBody != 64*1024*1024 {
+		t.Fatalf("low config was not raised to runtime minimums: %#v", low)
+	}
+
+	high := DefaultGlobalConfig()
+	high.UpstreamIdleTimeout = "10m"
+	high.ResponseHeaderTimeout = "15m"
+	high.MaxRequestBody = 128 * 1024 * 1024
+	high.EnforceRuntimeMinimums()
+	if high.UpstreamIdleTimeout != "10m" || high.ResponseHeaderTimeout != "15m" || high.MaxRequestBody != 128*1024*1024 {
+		t.Fatalf("higher config should be preserved: %#v", high)
+	}
+
+	disabled := DefaultGlobalConfig()
+	disabled.UpstreamIdleTimeout = "0"
+	disabled.ResponseHeaderTimeout = "0"
+	disabled.MaxRequestBody = 0
+	disabled.EnforceRuntimeMinimums()
+	if disabled.UpstreamIdleTimeout != "0" || disabled.ResponseHeaderTimeout != "0" || disabled.MaxRequestBody != 64*1024*1024 {
+		t.Fatalf("zero timeout exemptions or body minimum were not preserved: %#v", disabled)
+	}
+}
+
+func TestLoadEnforcesRuntimeMinimums(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("upstream_idle_timeout: 1m\nresponse_header_timeout: 30s\nmax_request_body_bytes: 1024\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile config.yaml: %v", err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Global.UpstreamIdleTimeout != "5m" || cfg.Global.ResponseHeaderTimeout != "5m" || cfg.Global.MaxRequestBody != 64*1024*1024 {
+		t.Fatalf("loaded config was not raised to runtime minimums: %#v", cfg.Global)
+	}
+}
+
 func TestDefaultGlobalConfig_IncludesRoutingDefaults(t *testing.T) {
 	t.Parallel()
 
 	cfg := DefaultGlobalConfig()
+	if got := cfg.MaxRequestBody; got != 64*1024*1024 {
+		t.Fatalf("max_request_body_bytes: got %d want %d", got, 64*1024*1024)
+	}
 
 	if !cfg.Routing.StickySessions.Enabled {
 		t.Fatalf("sticky_sessions.enabled: got false want true")

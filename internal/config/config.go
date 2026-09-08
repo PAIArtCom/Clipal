@@ -18,8 +18,8 @@ func ptr[T any](v T) *T { return &v }
 
 const (
 	defaultReactivateAfter       = time.Hour
-	defaultUpstreamIdleTimeout   = 3 * time.Minute
-	defaultResponseHeaderTimeout = 2 * time.Minute
+	defaultUpstreamIdleTimeout   = 5 * time.Minute
+	defaultResponseHeaderTimeout = 5 * time.Minute
 	defaultCircuitOpenTimeout    = 60 * time.Second
 )
 
@@ -91,10 +91,11 @@ type GlobalConfig struct {
 	ReactivateAfter  string   `yaml:"reactivate_after"`
 	// UpstreamIdleTimeout cancels an upstream attempt if no response body bytes are received
 	// for the duration (useful for SSE streams that may hang after headers).
-	// Set to "0" to disable.
+	// Set to "0" to disable; positive values below the runtime default are raised to it.
 	UpstreamIdleTimeout string `yaml:"upstream_idle_timeout"`
 	// ResponseHeaderTimeout controls how long we wait for the upstream to return
-	// response headers after the request is fully written. Set to "0" to disable.
+	// response headers after the request is fully written. Set to "0" to disable;
+	// positive values below the runtime default are raised to it.
 	ResponseHeaderTimeout string                  `yaml:"response_header_timeout"`
 	UpstreamProxyMode     GlobalUpstreamProxyMode `yaml:"upstream_proxy_mode,omitempty"`
 	UpstreamProxyURL      string                  `yaml:"upstream_proxy_url,omitempty"`
@@ -743,13 +744,13 @@ func DefaultGlobalConfig() GlobalConfig {
 		Port:                  3333,
 		LogLevel:              LogLevelInfo,
 		ReactivateAfter:       "1h",
-		UpstreamIdleTimeout:   "3m",
-		ResponseHeaderTimeout: "2m",
+		UpstreamIdleTimeout:   "5m",
+		ResponseHeaderTimeout: "5m",
 		UpstreamProxyMode:     GlobalUpstreamProxyModeEnvironment,
 		UpstreamProxyURL:      "",
-		// Default body limit: 32 MiB. clipal buffers request bodies to support retries,
+		// Default body limit: 64 MiB. clipal buffers request bodies to support retries,
 		// so a hard cap prevents unbounded memory usage.
-		MaxRequestBody:   32 * 1024 * 1024,
+		MaxRequestBody:   64 * 1024 * 1024,
 		LogDir:           "",
 		LogRetentionDays: 7,
 		LogStdout:        ptr(true),
@@ -794,6 +795,24 @@ func DefaultRuntimeDurations() RuntimeDurations {
 	}
 }
 
+// EnforceRuntimeMinimums raises configured request limits below Clipal's runtime
+// defaults to those defaults. Larger user-specified values are preserved.
+func (g *GlobalConfig) EnforceRuntimeMinimums() {
+	if g == nil {
+		return
+	}
+	defaults := DefaultGlobalConfig()
+	if timeout, err := time.ParseDuration(strings.TrimSpace(g.UpstreamIdleTimeout)); err == nil && timeout != 0 && timeout < defaultUpstreamIdleTimeout {
+		g.UpstreamIdleTimeout = defaults.UpstreamIdleTimeout
+	}
+	if timeout, err := time.ParseDuration(strings.TrimSpace(g.ResponseHeaderTimeout)); err == nil && timeout != 0 && timeout < defaultResponseHeaderTimeout {
+		g.ResponseHeaderTimeout = defaults.ResponseHeaderTimeout
+	}
+	if g.MaxRequestBody < defaults.MaxRequestBody {
+		g.MaxRequestBody = defaults.MaxRequestBody
+	}
+}
+
 // Load loads the configuration from the specified directory
 func Load(configDir string) (*Config, error) {
 	cfg := &Config{
@@ -807,6 +826,7 @@ func Load(configDir string) (*Config, error) {
 		return nil, fmt.Errorf("failed to load global config: %w", err)
 	}
 	NormalizeUpstreamProxySettings(&cfg.Global)
+	cfg.Global.EnforceRuntimeMinimums()
 
 	if err := migrateLegacyClientConfigFiles(configDir); err != nil {
 		return nil, err
@@ -1002,6 +1022,7 @@ func applyClientDefaults(cc *ClientConfig) {
 
 // RuntimeDurations parses the runtime timing values from global config.
 func (g GlobalConfig) RuntimeDurations() (RuntimeDurations, error) {
+	g.EnforceRuntimeMinimums()
 	out := DefaultRuntimeDurations()
 
 	reactivateAfter, err := time.ParseDuration(strings.TrimSpace(g.ReactivateAfter))

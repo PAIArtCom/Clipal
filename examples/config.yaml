@@ -10,16 +10,16 @@ log_level: info # debug | info | warn | error
 reactivate_after: 1h
 
 # Cancel an upstream attempt if no response body bytes are received for this long.
-# Useful for SSE streams that can hang after headers. Set to 0 to disable.
-upstream_idle_timeout: 3m
+# Useful for SSE streams that can hang after headers. Set to 0 to disable; positive values below 5m are raised to 5m.
+upstream_idle_timeout: 5m
 
 # How long to wait for upstream response headers after the request is written.
-# Set to 0 to disable.
-response_header_timeout: 2m
+# Set to 0 to disable; positive values below 5m are raised to 5m.
+response_header_timeout: 5m
 
 # Max request body size in bytes (Clipal buffers request bodies for retries).
-# Default: 33554432 (32 MiB)
-# max_request_body_bytes: 33554432
+# Default: 67108864 (64 MiB)
+# max_request_body_bytes: 67108864
 
 # Default: <config-dir>/logs (for example ~/.clipal/logs)
 # log_dir: ""

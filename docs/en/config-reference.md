@@ -64,11 +64,11 @@ OAuth-backed providers are also supported in `openai.yaml`, `claude.yaml`, and `
 | `port` | int | `3333` | Local proxy port |
 | `log_level` | string | `info` | `debug` / `info` / `warn` / `error` |
 | `reactivate_after` | duration | `1h` | Auto-reactivation delay for temporarily deactivated providers; set `0` to disable temporary deactivation for auth, billing, and quota failures |
-| `upstream_idle_timeout` | duration | `3m` | Abort the current upstream attempt if no response body bytes arrive for too long |
-| `response_header_timeout` | duration | `2m` | Timeout while waiting for upstream response headers |
+| `upstream_idle_timeout` | duration | `5m` | Abort the current upstream attempt if no response body bytes arrive for too long; `0` disables it, while positive values below `5m` are raised to `5m` |
+| `response_header_timeout` | duration | `5m` | Timeout while waiting for upstream response headers; `0` disables it, while positive values below `5m` are raised to `5m` |
 | `upstream_proxy_mode` | string | `environment` | Default upstream proxy mode for providers that use `proxy_mode: default`; `environment` / `direct` / `custom` |
 | `upstream_proxy_url` | string | empty | Required when `upstream_proxy_mode: custom`; supports `http://`, `https://`, `socks5://`, and `socks5h://` proxy URLs |
-| `max_request_body_bytes` | int | `33554432` | Request body size limit, default 32 MiB |
+| `max_request_body_bytes` | int | `67108864` | Request body size limit, default 64 MiB; lower values are raised to this limit |
 | `log_dir` | string | `<config-dir>/logs` | Log directory |
 | `log_retention_days` | int | `7` | Log retention days; `0` keeps logs forever; default is 7 days |
 | `log_stdout` | bool | `true` | Also log to stdout; long-running background setups usually prefer `false` |

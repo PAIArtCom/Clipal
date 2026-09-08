@@ -213,7 +213,7 @@ func NewRouter(cfg *config.Config) *Router {
 	durations, err := cfg.Global.RuntimeDurations()
 	if err != nil {
 		durations = config.DefaultRuntimeDurations()
-		logger.Warn("invalid runtime durations; defaulting to reactivate_after=1h upstream_idle_timeout=3m response_header_timeout=2m: %v", err)
+		logger.Warn("invalid runtime durations; defaulting to reactivate_after=1h upstream_idle_timeout=5m response_header_timeout=5m: %v", err)
 	}
 	cbCfg := normalizeCircuitBreakerConfig(cfg.Global.CircuitBreaker)
 	routingCfg := routingRuntimeSettingsFromConfig(cfg.Global.Routing)
@@ -934,7 +934,7 @@ func (r *Router) reloadProviderConfigsLockedWithTelemetry(reconcileTelemetry boo
 	durations, err := newCfg.Global.RuntimeDurations()
 	if err != nil {
 		durations = config.DefaultRuntimeDurations()
-		logger.Warn("invalid runtime durations; defaulting to reactivate_after=1h upstream_idle_timeout=3m response_header_timeout=2m: %v", err)
+		logger.Warn("invalid runtime durations; defaulting to reactivate_after=1h upstream_idle_timeout=5m response_header_timeout=5m: %v", err)
 	}
 	cbCfg := normalizeCircuitBreakerConfig(newCfg.Global.CircuitBreaker)
 	globalProxyMode := newCfg.Global.NormalizedUpstreamProxyMode()

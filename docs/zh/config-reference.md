@@ -64,11 +64,11 @@ providers:
 | `port` | int | `3333` | 本地代理端口 |
 | `log_level` | string | `info` | `debug` / `info` / `warn` / `error` |
 | `reactivate_after` | duration | `1h` | provider 临时禁用后的自动恢复时间；设为 `0` 可禁用基于鉴权、计费、额度错误的临时禁用 |
-| `upstream_idle_timeout` | duration | `3m` | 上游响应 body 长时间无字节时中断当前尝试 |
-| `response_header_timeout` | duration | `2m` | 等待上游响应头的超时 |
+| `upstream_idle_timeout` | duration | `5m` | 上游响应 body 长时间无字节时中断当前尝试；`0` 表示关闭，其他低于 `5m` 的正值会自动提升为 `5m` |
+| `response_header_timeout` | duration | `5m` | 等待上游响应头的超时；`0` 表示关闭，其他低于 `5m` 的正值会自动提升为 `5m` |
 | `upstream_proxy_mode` | string | `environment` | 作为默认值应用到 `proxy_mode: default` 的 provider；可选 `environment` / `direct` / `custom` |
 | `upstream_proxy_url` | string | 空 | 当 `upstream_proxy_mode: custom` 时必填；支持 `http://`、`https://`、`socks5://` 和 `socks5h://` 代理 URL |
-| `max_request_body_bytes` | int | `33554432` | 请求体大小上限，默认 32 MiB |
+| `max_request_body_bytes` | int | `67108864` | 请求体大小上限，默认 64 MiB；低于该值会自动提升为该上限 |
 | `log_dir` | string | `<config-dir>/logs` | 日志目录 |
 | `log_retention_days` | int | `7` | 日志保留天数；`0` 表示永久保留；默认保留 7 天 |
 | `log_stdout` | bool | `true` | 是否同时输出到 stdout；长期后台运行通常建议设为 `false` |

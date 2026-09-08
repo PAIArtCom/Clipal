@@ -410,6 +410,16 @@ func TestHandleUpdateGlobalConfig_AcceptsSnakeCaseNotifications(t *testing.T) {
 			if cfg.Global.Notifications.ProviderSwitch == nil || *cfg.Global.Notifications.ProviderSwitch {
 				t.Fatalf("expected notifications.provider_switch=false, got %v", cfg.Global.Notifications.ProviderSwitch)
 			}
+			if cfg.Global.UpstreamIdleTimeout != "5m" || cfg.Global.ResponseHeaderTimeout != "5m" || cfg.Global.MaxRequestBody != 64*1024*1024 {
+				t.Fatalf("expected request limits to be raised to minimums, got %#v", cfg.Global)
+			}
+			rawConfig, err := os.ReadFile(filepath.Join(dir, "config.yaml"))
+			if err != nil {
+				t.Fatalf("read saved config: %v", err)
+			}
+			if !bytes.Contains(rawConfig, []byte("upstream_idle_timeout: \"5m\"")) || !bytes.Contains(rawConfig, []byte("response_header_timeout: \"5m\"")) || !bytes.Contains(rawConfig, []byte("max_request_body_bytes: 67108864")) {
+				t.Fatalf("saved config did not persist raised minimums: %s", rawConfig)
+			}
 			if !cfg.Global.Routing.StickySessions.Enabled {
 				t.Fatalf("expected routing.sticky_sessions.enabled=true")
 			}

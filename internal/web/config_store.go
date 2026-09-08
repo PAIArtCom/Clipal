@@ -20,6 +20,7 @@ func (a *API) loadConfigOrWriteError(w http.ResponseWriter) *config.Config {
 }
 
 func (a *API) saveGlobalConfigOrWriteError(w http.ResponseWriter, cfg *config.Config) bool {
+	cfg.Global.EnforceRuntimeMinimums()
 	if err := cfg.Validate(); err != nil {
 		writeAPIError(w, newAPIError(http.StatusBadRequest, fmt.Sprintf("invalid configuration: %v", err), err))
 		return false

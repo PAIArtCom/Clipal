@@ -59,9 +59,9 @@ func writeMainConfig(t *testing.T, dir string, port int, configYAML string) {
 port: %d
 log_level: "info"
 reactivate_after: "1h"
-upstream_idle_timeout: "3m"
-response_header_timeout: "2m"
-max_request_body_bytes: 33554432
+upstream_idle_timeout: "5m"
+response_header_timeout: "5m"
+max_request_body_bytes: 67108864
 log_dir: ""
 log_retention_days: 7
 log_stdout: true
@@ -334,9 +334,9 @@ func TestMainConfigValidationFailure(t *testing.T) {
 port: 0
 log_level: "info"
 reactivate_after: "1h"
-upstream_idle_timeout: "3m"
-response_header_timeout: "2m"
-max_request_body_bytes: 33554432
+upstream_idle_timeout: "5m"
+response_header_timeout: "5m"
+max_request_body_bytes: 67108864
 log_dir: ""
 log_retention_days: 7
 log_stdout: true
