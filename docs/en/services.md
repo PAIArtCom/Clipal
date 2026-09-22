@@ -65,6 +65,16 @@ clipal update --dry-run
 clipal update
 ```
 
+During an update, Clipal reports the release check, checksum download, binary download, SHA256 verification, and installation stages. An interactive terminal refreshes download percentage, transferred size, speed, and ETA in place. Redirected output and CI runs receive stable line-oriented stage logs instead. Progress is written to stderr while the final result remains on stdout, preserving the existing final-output contract for scripts.
+
+Scripts that do not need progress output can use:
+
+```bash
+clipal update --quiet
+```
+
+On Windows, Clipal first reports that the update is scheduled. The updater helper replaces the binary after the current process exits; its final `clipal: update applied` message confirms that replacement completed.
+
 ## Long-Running Setup Advice
 
 For background operation, this is a good default in `config.yaml`:

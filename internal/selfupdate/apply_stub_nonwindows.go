@@ -4,7 +4,7 @@ package selfupdate
 
 import "fmt"
 
-func applyWindows(exePath string, newBinPath string, relaunch bool) error {
+func applyWindows(exePath string, newBinPath string, relaunch bool, quiet bool) error {
 	return fmt.Errorf("windows self-update not supported on this platform")
 }
 
@@ -14,6 +14,7 @@ type ApplyUpdateOptions struct {
 	Dst      string
 	Helper   string
 	Relaunch bool
+	Progress func(message string)
 }
 
 func ApplyUpdateWindows(opts ApplyUpdateOptions) error {

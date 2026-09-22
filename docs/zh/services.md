@@ -65,6 +65,16 @@ clipal update --dry-run
 clipal update
 ```
 
+更新过程中会显示版本检查、校验文件下载、二进制下载、SHA256 校验和安装阶段。交互式终端会原地刷新下载百分比、已下载大小、速度和预计剩余时间；输出被重定向或在 CI 中运行时，则使用稳定的逐行阶段日志。过程信息写入 stderr，最终结果仍写入 stdout，因此不会改变现有脚本读取最终结果的方式。
+
+如果脚本不需要过程信息，可以使用：
+
+```bash
+clipal update --quiet
+```
+
+Windows 会先显示更新已安排，当前进程退出后由 updater helper 完成二进制替换；helper 最终输出 `clipal: update applied` 才表示替换完成。
+
 ## 长期后台运行建议
 
 建议在 `config.yaml` 中设置：

@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func applyWindows(exePath string, newBinPath string, relaunch bool) error {
+func applyWindows(exePath string, newBinPath string, relaunch bool, quiet bool) error {
 	helperPath := filepath.Join(os.TempDir(), fmt.Sprintf("clipal-updater-%d.exe", time.Now().UnixNano()))
 	if err := copyFile(helperPath, exePath, 0o700); err != nil {
 		return err
@@ -31,6 +31,9 @@ func applyWindows(exePath string, newBinPath string, relaunch bool) error {
 	}
 	if relaunch {
 		args = append(args, "--relaunch")
+	}
+	if quiet {
+		args = append(args, "--quiet")
 	}
 
 	cmd := exec.Command(helperPath, args...)
@@ -53,6 +56,7 @@ type ApplyUpdateOptions struct {
 	Dst      string
 	Helper   string
 	Relaunch bool
+	Progress func(message string)
 }
 
 func ApplyUpdateWindows(opts ApplyUpdateOptions) error {
@@ -63,10 +67,12 @@ func ApplyUpdateWindows(opts ApplyUpdateOptions) error {
 		return fmt.Errorf("missing src/dst")
 	}
 
+	emitApplyProgress(opts.Progress, "Waiting for Clipal to exit")
 	if err := waitForPID(opts.PID, 5*time.Minute); err != nil {
 		return err
 	}
 
+	emitApplyProgress(opts.Progress, "Replacing executable")
 	dstOld := opts.Dst + ".old"
 	_ = os.Remove(dstOld)
 
@@ -104,7 +110,14 @@ func ApplyUpdateWindows(opts ApplyUpdateOptions) error {
 		}
 		_ = cmd.Start()
 	}
+	emitApplyProgress(opts.Progress, "Update replacement completed")
 	return nil
+}
+
+func emitApplyProgress(progress func(string), message string) {
+	if progress != nil {
+		progress(message)
+	}
 }
 
 func waitForPID(pid int, timeout time.Duration) error {

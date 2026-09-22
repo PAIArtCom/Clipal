@@ -141,7 +141,7 @@ func TestUpdateCheckDryRunForceAndFailures(t *testing.T) {
 	fetchLatestReleaseFunc = func(ctx context.Context, client *http.Client) (*Release, error) {
 		return testRelease("v1.1.0"), nil
 	}
-	downloadToTempFileFunc = func(ctx context.Context, client *http.Client, url string, prefix string) (string, error) {
+	downloadToTempFileFunc = func(ctx context.Context, client *http.Client, url string, prefix string, expectedSize int64, progress func(int64, int64)) (string, error) {
 		return "", errors.New("download failed")
 	}
 	if _, _, err := Update(context.Background(), "v1.0.0", Options{Timeout: time.Second}); err == nil || !strings.Contains(err.Error(), "download failed") {
@@ -153,7 +153,7 @@ func TestUpdateCheckDryRunForceAndFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expectedBinaryAssetName: %v", err)
 	}
-	downloadToTempFileFunc = func(ctx context.Context, client *http.Client, url string, prefix string) (string, error) {
+	downloadToTempFileFunc = func(ctx context.Context, client *http.Client, url string, prefix string, expectedSize int64, progress func(int64, int64)) (string, error) {
 		downloadCalls++
 		tmp, err := os.CreateTemp("", prefix)
 		if err != nil {
@@ -176,13 +176,87 @@ func TestUpdateCheckDryRunForceAndFailures(t *testing.T) {
 	}
 }
 
+func TestUpdateReportsProgressPhases(t *testing.T) {
+	withSelfUpdateStubs(t)
+
+	binName, err := expectedBinaryAssetName()
+	if err != nil {
+		t.Fatalf("expectedBinaryAssetName: %v", err)
+	}
+	fetchLatestReleaseFunc = func(ctx context.Context, client *http.Client) (*Release, error) {
+		return &Release{
+			TagName: "v1.1.0",
+			Assets: []Asset{
+				{Name: binName, BrowserDownloadURL: "https://example.com/bin", Size: 6},
+				{Name: ChecksumsAssetName, BrowserDownloadURL: "https://example.com/checksums", Size: 64},
+			},
+		}, nil
+	}
+	osExecutableFunc = func() (string, error) { return "/tmp/clipal", nil }
+	filepathAbsFunc = func(path string) (string, error) { return path, nil }
+
+	var downloadCalls int
+	downloadToTempFileFunc = func(ctx context.Context, client *http.Client, url string, prefix string, expectedSize int64, progress func(int64, int64)) (string, error) {
+		downloadCalls++
+		file, err := os.CreateTemp("", prefix)
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = file.Close() }()
+		if progress != nil {
+			progress(expectedSize, expectedSize)
+		}
+		if downloadCalls == 1 {
+			_, _ = file.WriteString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  " + binName + "\n")
+		} else {
+			_, _ = file.WriteString("binary")
+		}
+		return file.Name(), nil
+	}
+	sha256FileFunc = func(path string) (string, error) {
+		return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil
+	}
+	applyUnixFunc = func(exePath string, newBinPath string) error { return nil }
+	applyWindowsFunc = func(exePath string, newBinPath string, relaunch bool, quiet bool) error { return nil }
+
+	var phases []ProgressPhase
+	var previous ProgressPhase
+	_, changed, err := Update(context.Background(), "v1.0.0", Options{
+		Timeout: time.Second,
+		Progress: func(event ProgressEvent) {
+			if event.Phase != previous {
+				phases = append(phases, event.Phase)
+				previous = event.Phase
+			}
+		},
+	})
+	if err != nil || !changed {
+		t.Fatalf("Update() = changed %v, err %v", changed, err)
+	}
+	want := []ProgressPhase{
+		ProgressCheckingRelease,
+		ProgressDownloadingChecksum,
+		ProgressDownloadingBinary,
+		ProgressVerifyingChecksum,
+		ProgressInstalling,
+	}
+	if len(phases) != len(want) {
+		t.Fatalf("progress phases = %v, want %v", phases, want)
+	}
+	for i := range want {
+		if phases[i] != want[i] {
+			t.Fatalf("progress phases = %v, want %v", phases, want)
+		}
+	}
+}
+
 func TestDownloadToTempFile(t *testing.T) {
 	t.Run("Non2xx", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "nope", http.StatusBadGateway)
 		}))
 		defer srv.Close()
-		if _, err := downloadToTempFile(context.Background(), srv.Client(), srv.URL, "clipal-test-"); err == nil {
+		if _, err := downloadToTempFile(context.Background(), srv.Client(), srv.URL, "clipal-test-", 0, nil); err == nil {
 			t.Fatalf("expected non-2xx error")
 		}
 	})
@@ -190,7 +264,7 @@ func TestDownloadToTempFile(t *testing.T) {
 	t.Run("ContextCanceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		if _, err := downloadToTempFile(ctx, http.DefaultClient, "http://example.com", "clipal-test-"); err == nil {
+		if _, err := downloadToTempFile(ctx, http.DefaultClient, "http://example.com", "clipal-test-", 0, nil); err == nil {
 			t.Fatalf("expected context error")
 		}
 	})
@@ -206,13 +280,42 @@ func TestDownloadToTempFile(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		path, err := downloadToTempFile(context.Background(), srv.Client(), srv.URL, "clipal-test-")
+		path, err := downloadToTempFile(context.Background(), srv.Client(), srv.URL, "clipal-test-", 0, nil)
 		if err != nil {
 			t.Fatalf("downloadToTempFile: %v", err)
 		}
 		defer func() { _ = os.Remove(path) }()
 		if gotAuth != "Bearer secret" {
 			t.Fatalf("Authorization = %q", gotAuth)
+		}
+	})
+
+	t.Run("ReportsProgressWithExpectedSizeFallback", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Transfer-Encoding", "chunked")
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+			_, _ = io.WriteString(w, "hello")
+		}))
+		defer srv.Close()
+
+		var events [][2]int64
+		path, err := downloadToTempFile(context.Background(), srv.Client(), srv.URL, "clipal-test-", 5, func(completed int64, total int64) {
+			events = append(events, [2]int64{completed, total})
+		})
+		if err != nil {
+			t.Fatalf("downloadToTempFile: %v", err)
+		}
+		defer func() { _ = os.Remove(path) }()
+		if len(events) < 2 {
+			t.Fatalf("progress events = %v", events)
+		}
+		if got := events[0]; got != [2]int64{0, 5} {
+			t.Fatalf("first progress event = %v, want [0 5]", got)
+		}
+		if got := events[len(events)-1]; got != [2]int64{5, 5} {
+			t.Fatalf("last progress event = %v, want [5 5]", got)
 		}
 	})
 }

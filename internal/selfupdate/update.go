@@ -96,10 +96,14 @@ func Update(ctx context.Context, currentVersion string, opts Options) (*Plan, bo
 	defer cancel()
 
 	client := newHTTPClientFunc(opts.Timeout)
+	emitProgress(opts.Progress, ProgressEvent{
+		Phase:   ProgressCheckingRelease,
+		Message: "Checking latest release",
+	})
 
 	plan, err := BuildPlan(ctx, client, currentVersion)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("check latest release: %w", err)
 	}
 
 	needs, comparable := NeedsUpdate(plan.CurrentVersion, plan.LatestVersion)
@@ -116,9 +120,21 @@ func Update(ctx context.Context, currentVersion string, opts Options) (*Plan, bo
 		return plan, needs, nil
 	}
 
-	checksumsPath, err := downloadToTempFileFunc(ctx, client, plan.ChecksumsAsset.BrowserDownloadURL, "clipal-checksums-")
+	emitProgress(opts.Progress, ProgressEvent{
+		Phase:      ProgressDownloadingChecksum,
+		Message:    "Downloading " + plan.ChecksumsAsset.Name,
+		TotalBytes: plan.ChecksumsAsset.Size,
+	})
+	checksumsPath, err := downloadToTempFileFunc(
+		ctx,
+		client,
+		plan.ChecksumsAsset.BrowserDownloadURL,
+		"clipal-checksums-",
+		plan.ChecksumsAsset.Size,
+		downloadProgress(opts.Progress, ProgressDownloadingChecksum, "Downloading "+plan.ChecksumsAsset.Name),
+	)
 	if err != nil {
-		return plan, false, err
+		return plan, false, fmt.Errorf("download checksums: %w", err)
 	}
 	defer func() { _ = os.Remove(checksumsPath) }()
 
@@ -136,9 +152,21 @@ func Update(ctx context.Context, currentVersion string, opts Options) (*Plan, bo
 		return plan, false, fmt.Errorf("checksums.txt missing entry for %q", plan.BinaryAsset.Name)
 	}
 
-	newBinPath, err := downloadToTempFileFunc(ctx, client, plan.BinaryAsset.BrowserDownloadURL, "clipal-bin-")
+	emitProgress(opts.Progress, ProgressEvent{
+		Phase:      ProgressDownloadingBinary,
+		Message:    "Downloading " + plan.BinaryAsset.Name,
+		TotalBytes: plan.BinaryAsset.Size,
+	})
+	newBinPath, err := downloadToTempFileFunc(
+		ctx,
+		client,
+		plan.BinaryAsset.BrowserDownloadURL,
+		"clipal-bin-",
+		plan.BinaryAsset.Size,
+		downloadProgress(opts.Progress, ProgressDownloadingBinary, "Downloading "+plan.BinaryAsset.Name),
+	)
 	if err != nil {
-		return plan, false, err
+		return plan, false, fmt.Errorf("download binary: %w", err)
 	}
 	cleanupNew := runtime.GOOS != "windows"
 	defer func() {
@@ -147,26 +175,54 @@ func Update(ctx context.Context, currentVersion string, opts Options) (*Plan, bo
 		}
 	}()
 
+	emitProgress(opts.Progress, ProgressEvent{
+		Phase:   ProgressVerifyingChecksum,
+		Message: "Verifying SHA256 checksum",
+	})
 	gotSum, err := sha256FileFunc(newBinPath)
 	if err != nil {
-		return plan, false, err
+		return plan, false, fmt.Errorf("verify SHA256 checksum: %w", err)
 	}
 	if !strings.EqualFold(gotSum, wantSum) {
 		return plan, false, fmt.Errorf("sha256 mismatch for %s: got %s want %s", plan.BinaryAsset.Name, gotSum, wantSum)
 	}
 
+	emitProgress(opts.Progress, ProgressEvent{
+		Phase:   ProgressInstalling,
+		Message: "Installing update",
+	})
 	switch runtime.GOOS {
 	case "windows":
-		if err := applyWindowsFunc(plan.ExecutablePath, newBinPath, opts.Relaunch); err != nil {
-			return plan, false, err
+		if err := applyWindowsFunc(plan.ExecutablePath, newBinPath, opts.Relaunch, opts.Progress == nil); err != nil {
+			return plan, false, fmt.Errorf("schedule update installation: %w", err)
 		}
 	default:
 		if err := applyUnixFunc(plan.ExecutablePath, newBinPath); err != nil {
-			return plan, false, err
+			return plan, false, fmt.Errorf("install update: %w", err)
 		}
 	}
 
 	return plan, true, nil
+}
+
+func emitProgress(progress func(ProgressEvent), event ProgressEvent) {
+	if progress != nil {
+		progress(event)
+	}
+}
+
+func downloadProgress(progress func(ProgressEvent), phase ProgressPhase, message string) func(int64, int64) {
+	if progress == nil {
+		return nil
+	}
+	return func(completed int64, total int64) {
+		progress(ProgressEvent{
+			Phase:          phase,
+			Message:        message,
+			CompletedBytes: completed,
+			TotalBytes:     total,
+		})
+	}
 }
 
 func copyFile(dst string, src string, mode os.FileMode) error {

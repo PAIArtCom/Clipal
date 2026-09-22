@@ -21,7 +21,7 @@ const (
 	defaultClaudeClientID     = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	defaultClaudeScope        = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 	defaultClaudeRefreshBeta  = "oauth-2025-04-20"
-	defaultClaudeRefreshUA    = "anthropic-sdk-typescript/0.94.0 userOAuthProvider"
+	defaultClaudeRefreshUA    = "anthropic-sdk-typescript/0.208.0 userOAuthProvider"
 	defaultClaudeCallbackHost = "localhost"
 	defaultClaudeCallbackPort = 54545
 	defaultClaudeCallbackPath = "/callback"

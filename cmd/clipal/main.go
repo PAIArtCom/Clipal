@@ -295,10 +295,12 @@ func runUpdate(args []string) {
 	dryRun := fs.Bool("dry-run", false, "Show what would be downloaded and replaced")
 	timeout := fs.Duration("timeout", 2*time.Minute, "Overall update timeout")
 	relaunch := fs.Bool("relaunch", false, "Windows: relaunch clipal after updating")
+	quiet := fs.Bool("quiet", false, "Suppress update progress output")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)
 	}
 
+	progress := newUpdateProgressRenderer(os.Stderr, !*quiet, isInteractiveTerminal(os.Stderr))
 	opts := selfupdate.Options{
 		Check:    *check,
 		Force:    *force,
@@ -306,8 +308,12 @@ func runUpdate(args []string) {
 		Timeout:  *timeout,
 		Relaunch: *relaunch,
 	}
+	if !*quiet {
+		opts.Progress = progress.Handle
+	}
 
 	plan, needsOrUpdated, err := selfupdate.Update(context.Background(), version, opts)
+	progress.Finish(err == nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clipal update failed: %v\n", err)
 		os.Exit(1)
