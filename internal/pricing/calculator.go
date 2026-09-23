@@ -1,12 +1,22 @@
 package pricing
 
-import "math/big"
+import (
+	"math/big"
+	"strings"
+)
 
 const (
 	above200KThreshold int64 = 200_000
 	above272KThreshold int64 = 272_000
 	microsPerDollar    int64 = 1_000_000
 )
+
+// Claude Opus 4.6 fast mode is priced at 6x its token rates, but model-specs
+// does not carry a fast-mode multiplier for it. Catalog values take precedence.
+var fastModeFallbackUplift = map[string]int64{
+	"claude-opus-4-6":          6,
+	"claude-opus-4-6-20260205": 6,
+}
 
 type tokenRates struct {
 	input      rate
@@ -24,11 +34,11 @@ func CostMicros(model string, platform Platform, usage Usage) (int64, bool) {
 func CostMicrosForProvider(model string, platform Platform, providerHint string, usage Usage) (int64, bool) {
 	if usage.UncachedInputTokens < 0 || usage.CachedInputTokens < 0 || usage.CacheWriteTokens < 0 ||
 		usage.CacheWrite1HTokens < 0 || usage.AudioInputTokens < 0 || usage.OutputTokens < 0 ||
-		usage.ReasoningTokens < 0 || usage.SearchQueries < 0 || usage.TokenRateMultiplier < 0 ||
+		usage.ReasoningTokens < 0 || usage.SearchQueries < 0 ||
 		usage.AudioInputTokens > usage.UncachedInputTokens || usage.ReasoningTokens > usage.OutputTokens {
 		return 0, false
 	}
-	_, spec, ok := resolveModelWithProvider(model, platform, providerHint)
+	modelID, spec, ok := resolveModelWithProvider(model, platform, providerHint)
 	if !ok {
 		return 0, false
 	}
@@ -57,10 +67,7 @@ func CostMicrosForProvider(model string, platform Platform, providerHint string,
 		return 0, false
 	}
 
-	multiplier := usage.TokenRateMultiplier
-	if multiplier <= 0 {
-		multiplier = 1
-	}
+	multiplier := tokenRateMultiplier(modelID, spec, usage)
 	total := new(big.Rat)
 	addTokenCost(total, textInput, rates.input, multiplier)
 	addTokenCost(total, audioInput, firstRate(rates.audioInput, rates.input), multiplier)
@@ -82,6 +89,23 @@ func DollarsToMicros(raw string) (int64, bool) {
 	return roundRatChecked(value)
 }
 
+// tokenRateMultiplier combines the premiums that scale every token rate,
+// including cache rates. Per-query search charges are not multiplied.
+func tokenRateMultiplier(modelID string, spec modelSpec, usage Usage) *big.Rat {
+	multiplier := big.NewRat(1, 1)
+	if usage.FastMode {
+		if spec.FastModeUplift.value != nil {
+			multiplier.Mul(multiplier, spec.FastModeUplift.value)
+		} else if fallback, ok := fastModeFallbackUplift[modelID]; ok {
+			multiplier.Mul(multiplier, big.NewRat(fallback, 1))
+		}
+	}
+	if strings.EqualFold(strings.TrimSpace(usage.InferenceGeo), "us") && spec.RegionalUSUplift.value != nil {
+		multiplier.Mul(multiplier, spec.RegionalUSUplift.value)
+	}
+	return multiplier
+}
+
 func cacheWrite1HRate(spec modelSpec, rates tokenRates) rate {
 	if spec.CacheWrite1H.value == nil || spec.Input.value == nil || rates.input.value == nil {
 		return firstRate(spec.CacheWrite1H, rates.cacheWrite, rates.input)
@@ -100,6 +124,8 @@ func ratesForUsage(spec modelSpec, usage Usage) (tokenRates, bool) {
 	case ServiceTierBatch:
 		rates.input = firstRate(spec.BatchInput, rates.input)
 		rates.output = firstRate(spec.BatchOutput, rates.output)
+		rates.cacheRead = firstRate(spec.BatchCacheRead, rates.cacheRead)
+		rates.cacheWrite = firstRate(spec.BatchCacheWrite, rates.cacheWrite)
 	case ServiceTierPriority:
 		rates.input = firstRate(spec.PriorityInput, rates.input)
 		rates.output = firstRate(spec.PriorityOutput, rates.output)
@@ -116,13 +142,13 @@ func ratesForUsage(spec modelSpec, usage Usage) (tokenRates, bool) {
 	if inputTokens > above272KThreshold && hasAnyRate(spec.Above272KInput, spec.Above272KOutput, spec.Above272KCacheRead, spec.Above272KCacheWrite) {
 		switch usage.ServiceTier {
 		case ServiceTierBatch:
-			if tierRatesAffectUsage(spec, usage) {
+			if !combinedRatesCoverUsage(usage, spec.BatchInput, spec.BatchOutput, spec.BatchCacheRead, spec.BatchCacheWrite, spec.Above272KBatchInput, spec.Above272KBatchOutput, spec.Above272KBatchCacheRead, spec.Above272KBatchCacheWrite) {
 				return tokenRates{}, false
 			}
-			rates.input = firstRate(spec.Above272KInput, rates.input)
-			rates.output = firstRate(spec.Above272KOutput, rates.output)
-			rates.cacheRead = firstRate(spec.Above272KCacheRead, rates.cacheRead)
-			rates.cacheWrite = firstRate(spec.Above272KCacheWrite, rates.cacheWrite)
+			rates.input = firstRate(spec.Above272KBatchInput, spec.Above272KInput, rates.input)
+			rates.output = firstRate(spec.Above272KBatchOutput, spec.Above272KOutput, rates.output)
+			rates.cacheRead = firstRate(spec.Above272KBatchCacheRead, spec.Above272KCacheRead, rates.cacheRead)
+			rates.cacheWrite = firstRate(spec.Above272KBatchCacheWrite, spec.Above272KCacheWrite, rates.cacheWrite)
 		case ServiceTierPriority:
 			if !combinedRatesCoverUsage(usage, spec.PriorityInput, spec.PriorityOutput, spec.PriorityCacheRead, spec.PriorityCacheWrite, spec.Above272KPriorityInput, spec.Above272KPriorityOutput, spec.Above272KPriorityCacheRead, spec.Above272KPriorityCacheWrite) {
 				return tokenRates{}, false
@@ -160,7 +186,7 @@ func ratesForUsage(spec modelSpec, usage Usage) (tokenRates, bool) {
 func tierRatesAffectUsage(spec modelSpec, usage Usage) bool {
 	switch usage.ServiceTier {
 	case ServiceTierBatch:
-		return ((usage.UncachedInputTokens > 0 || usage.CacheWrite1HTokens > 0) && spec.BatchInput.value != nil) || (usage.OutputTokens > 0 && spec.BatchOutput.value != nil)
+		return usageUsesRates(usage, spec.BatchInput, spec.BatchOutput, spec.BatchCacheRead, spec.BatchCacheWrite)
 	case ServiceTierPriority:
 		return usageUsesRates(usage, spec.PriorityInput, spec.PriorityOutput, spec.PriorityCacheRead, spec.PriorityCacheWrite)
 	case ServiceTierFlex:
@@ -184,13 +210,13 @@ func usageUsesRates(usage Usage, input, output, cacheRead, cacheWrite rate) bool
 		((usage.CacheWriteTokens > 0 || usage.CacheWrite1HTokens > 0) && cacheWrite.value != nil)
 }
 
-func addTokenCost(total *big.Rat, units int64, price rate, multiplier int64) {
+func addTokenCost(total *big.Rat, units int64, price rate, multiplier *big.Rat) {
 	if units <= 0 || price.value == nil {
 		return
 	}
 	amount := new(big.Rat).Mul(price.value, new(big.Rat).SetInt64(units))
 	amount.Mul(amount, new(big.Rat).SetInt64(microsPerDollar))
-	amount.Mul(amount, new(big.Rat).SetInt64(multiplier))
+	amount.Mul(amount, multiplier)
 	total.Add(total, amount)
 }
 
@@ -199,7 +225,7 @@ func addSearchCost(total *big.Rat, prices map[string]rate, usage Usage) {
 		return
 	}
 	price := searchRate(prices, usage.SearchContextSize)
-	addTokenCost(total, usage.SearchQueries, price, 1)
+	addTokenCost(total, usage.SearchQueries, price, big.NewRat(1, 1))
 }
 
 func searchRate(prices map[string]rate, contextSize string) rate {

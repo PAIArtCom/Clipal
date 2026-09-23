@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	claudeUsageUserAgent = "claude-cli/2.1.278 (external, sdk-cli)"
+	claudeUsageUserAgent = "claude-cli/2.1.280 (external, sdk-cli)"
 	claudeUsageBeta      = "oauth-2025-04-20"
 )
 

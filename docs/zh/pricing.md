@@ -18,9 +18,9 @@ Clipal 使用整数微美元记录用量费用（`1 USD = 1,000,000 micros`）�
 
 价格目录嵌入 Clipal 二进制，请求处理期间不会下载可变的在线价格。模型会在移除 `models/`、`openai/`、`anthropic/`、`gemini/` 等协议包装后进行精确匹配。Claude 和 Gemini 原生请求必须匹配对应目录平台；OpenAI-compatible 请求可以使用任意目录平台，Clipal 会根据 provider 的 base URL 或名称优先选择 `openrouter/deepseek/deepseek-chat` 这类 provider 专用条目，再考虑无前缀模型条目。Clipal 不按模型名前缀继承价格；例如 `gpt-5.4-pro` 使用自己的目录条目，未知的 `gpt-5.4-*` 名称保持未计价。
 
-计算器支持标准、batch、priority、flex token 价格，缓存读取与写入，音频输入与推理输出价格，200K/272K 上下文阶梯，以及响应报告查询次数时的按次搜索费用。单一专用价格缺失时，只会回退到同一精确模型定义的对应基础价格，不会回退到其他模型。如果请求同时使用 service tier 和长上下文阶梯，但目录没有定义所需的组合价格，Clipal 会保留用量但不计算费用，避免混用不同阶梯的价格。
+计算器支持标准、batch、priority、flex token 价格（包括各 tier 专用的缓存价格），缓存读取与写入，音频输入与推理输出价格，200K/272K 上下文阶梯，以及响应报告查询次数时的按次搜索费用。单一专用价格缺失时，只会回退到同一精确模型定义的对应基础价格，不会回退到其他模型。如果请求同时使用 service tier 和长上下文阶梯，但目录没有定义所需的组合价格，Clipal 会保留用量但不计算费用，避免混用不同阶梯的价格。
 
-Anthropic 通过 `usage.speed=fast` 报告 Claude Opus 4.6 fast 模式，而不是使用单独定价的模型 ID。对于 `claude-opus-4-6` 和 `claude-opus-4-6-20260205`，Clipal 会将目录中的全部 token 费率（包括缓存费率）乘以 6；按次搜索费用不乘以该倍率。由于目录只提供模型基础费率，这项协议专用倍率由 Claude 响应适配代码维护。
+Anthropic 通过 `usage.speed=fast` 报告 fast 模式、通过 `usage.inference_geo` 报告推理地域，而不是使用单独定价的模型 ID。fast 模式下，Clipal 会将目录中的全部 token 费率（包括缓存费率）乘以该模型目录中的 `fast_mode_uplift_multiplier`（Claude Opus 4.8、Opus 5、Opus 5.5 为 2）。Claude Opus 4.6（`claude-opus-4-6` 和 `claude-opus-4-6-20260205`）在目录中没有该倍率，因此计算器为其保留本地 6 倍回退值；目录值始终优先。两者都没有的模型保持基础费率。当 `usage.inference_geo` 为 `us` 时，token 费率还会乘以该模型的 `regional_processing_uplift_multiplier_us`（Claude 4.6 及之后为 1.1），两种溢价叠加。按次搜索费用不乘以任何溢价。
 
 `GET /api/status` 的 `pricing_catalog` 会返回当前目录版本和来源提交。
 

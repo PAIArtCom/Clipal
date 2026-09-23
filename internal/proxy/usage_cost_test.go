@@ -346,7 +346,7 @@ func TestApplyUsageCostSnapshot_OpenRouterUsesProviderSpecificPrice(t *testing.T
 	requestCtx := RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIChatCompletions, UpstreamPath: "/v1/chat/completions"}
 	provider := config.Provider{Name: "fallback", BaseURL: "https://openrouter.ai/api", AuthType: config.ProviderAuthTypeAPIKey}
 	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{"prompt_tokens": 1_000_000.0, "completion_tokens": 1_000_000.0}})
-	if !snapshot.HasCost || snapshot.CostMicros != 420_000 {
+	if !snapshot.HasCost || snapshot.CostMicros != 1_210_000 {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 }
@@ -399,17 +399,50 @@ func TestApplyUsageCostSnapshot_UnknownModelHasNoInferredCost(t *testing.T) {
 	}
 }
 
-func TestCalculateClaudeCostMicros_FastMultiplierOnlyAppliesToOpus46(t *testing.T) {
+func TestCalculateClaudeCostMicros_FastMultiplierUsesModelPremium(t *testing.T) {
 	t.Parallel()
 
 	raw := map[string]any{"input_tokens": 1000.0, "speed": "fast"}
-	fastCost, ok := calculateClaudeCostMicros("claude-opus-4-6", raw, nil, pricing.ServiceTierStandard)
-	if !ok || fastCost != 30_000 {
-		t.Fatalf("opus 4.6 fast cost = %d, ok = %v", fastCost, ok)
+	tests := []struct {
+		model string
+		want  int64
+	}{
+		// Opus 4.6 has no catalog multiplier and uses the 6x fallback.
+		{model: "claude-opus-4-6", want: 30_000},
+		// Opus 4.8 and 5.5 carry fast_mode_uplift_multiplier=2 in the catalog.
+		{model: "claude-opus-4-8", want: 10_000},
+		{model: "claude-opus-5-5", want: 8_000},
+		// Models without a fast-mode premium keep their base rates.
+		{model: "claude-sonnet-4-6", want: 3_000},
 	}
-	regularCost, ok := calculateClaudeCostMicros("claude-opus-4-8", raw, nil, pricing.ServiceTierStandard)
-	if !ok || regularCost != 5_000 {
-		t.Fatalf("opus 4.8 cost = %d, ok = %v", regularCost, ok)
+	for _, tc := range tests {
+		cost, ok := calculateClaudeCostMicros(tc.model, raw, nil, pricing.ServiceTierStandard)
+		if !ok || cost != tc.want {
+			t.Fatalf("%s fast cost = %d, ok = %v, want %d", tc.model, cost, ok, tc.want)
+		}
+	}
+}
+
+func TestCalculateClaudeCostMicros_USInferenceGeoStacksWithFastMode(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{
+		"input_tokens":    1000.0,
+		"output_tokens":   1000.0,
+		"server_tool_use": map[string]any{"web_search_requests": 1.0},
+		"inference_geo":   "us",
+		"speed":           "fast",
+	}
+	cost, ok := calculateClaudeCostMicros("claude-opus-5-5", raw, nil, pricing.ServiceTierStandard)
+	// Token costs are (4,000 + 20,000) micros, multiplied by 2 for fast mode
+	// and 1.1 for US inference. The 10,000-micro search charge is unchanged.
+	if !ok || cost != 62_800 {
+		t.Fatalf("opus 5.5 fast US cost = %d, ok = %v", cost, ok)
+	}
+	raw["inference_geo"] = "global"
+	delete(raw, "speed")
+	if cost, ok := calculateClaudeCostMicros("claude-opus-5-5", raw, nil, pricing.ServiceTierStandard); !ok || cost != 34_000 {
+		t.Fatalf("opus 5.5 global cost = %d, ok = %v", cost, ok)
 	}
 }
 

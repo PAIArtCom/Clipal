@@ -222,6 +222,19 @@ func TestCostMicrosRejectsAmbiguousLongContextServiceTier(t *testing.T) {
 	}
 }
 
+func TestCostMicrosUsesBatchCacheAndLongContextBatchRates(t *testing.T) {
+	usage := Usage{UncachedInputTokens: 100_000, CachedInputTokens: 100_000, OutputTokens: 10_000, ServiceTier: ServiceTierBatch}
+	// Batch rates: input $1, cache read $0.10, output $5 per MTok.
+	if cost, ok := CostMicros("gpt-6-sol", PlatformOpenAI, usage); !ok || cost != 160_000 {
+		t.Fatalf("batch cost = %d, ok = %v", cost, ok)
+	}
+	usage.UncachedInputTokens = 300_000
+	// Batch above 272K: input $2, cache read $0.20, output $7.50 per MTok.
+	if cost, ok := CostMicros("gpt-6-sol", PlatformOpenAI, usage); !ok || cost != 695_000 {
+		t.Fatalf("long-context batch cost = %d, ok = %v", cost, ok)
+	}
+}
+
 func TestCostMicrosFallsBackToInputRateForCacheRead(t *testing.T) {
 	cost, ok := CostMicros("gpt-3.5-turbo", PlatformOpenAI, Usage{CachedInputTokens: 1_000})
 	if !ok || cost != 500 {
@@ -275,7 +288,7 @@ func TestCostMicrosScalesOneHourCacheWriteForLongContext(t *testing.T) {
 func TestCostMicrosPrefersProviderSpecificEntry(t *testing.T) {
 	usage := Usage{UncachedInputTokens: 1_000_000, OutputTokens: 1_000_000}
 	cost, ok := CostMicrosForProvider("deepseek/deepseek-chat", PlatformOpenAI, "openrouter", usage)
-	if !ok || cost != 420_000 {
+	if !ok || cost != 1_210_000 {
 		t.Fatalf("OpenRouter cost = %d, ok = %v", cost, ok)
 	}
 }

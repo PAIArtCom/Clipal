@@ -53,7 +53,12 @@ type Usage struct {
 	SearchQueries       int64
 	SearchContextSize   string
 	ServiceTier         ServiceTier
-	TokenRateMultiplier int64
+	// FastMode marks Anthropic fast-mode usage; token rates are multiplied by
+	// the model's fast-mode premium.
+	FastMode bool
+	// InferenceGeo is the Anthropic inference geography reported in usage;
+	// "us" applies the model's US regional processing premium to token rates.
+	InferenceGeo string
 }
 
 type Metadata struct {
@@ -88,6 +93,8 @@ type modelSpec struct {
 	ReasoningOutput             rate            `json:"output_cost_per_reasoning_token"`
 	BatchInput                  rate            `json:"input_cost_per_token_batches"`
 	BatchOutput                 rate            `json:"output_cost_per_token_batches"`
+	BatchCacheRead              rate            `json:"cache_read_input_token_cost_batches"`
+	BatchCacheWrite             rate            `json:"cache_creation_input_token_cost_batches"`
 	PriorityInput               rate            `json:"input_cost_per_token_priority"`
 	PriorityOutput              rate            `json:"output_cost_per_token_priority"`
 	PriorityCacheRead           rate            `json:"cache_read_input_token_cost_priority"`
@@ -112,7 +119,13 @@ type modelSpec struct {
 	Above272KPriorityOutput     rate            `json:"output_cost_per_token_above_272k_tokens_priority"`
 	Above272KPriorityCacheRead  rate            `json:"cache_read_input_token_cost_above_272k_tokens_priority"`
 	Above272KPriorityCacheWrite rate            `json:"cache_creation_input_token_cost_above_272k_tokens_priority"`
+	Above272KBatchInput         rate            `json:"input_cost_per_token_above_272k_tokens_batches"`
+	Above272KBatchOutput        rate            `json:"output_cost_per_token_above_272k_tokens_batches"`
+	Above272KBatchCacheRead     rate            `json:"cache_read_input_token_cost_above_272k_tokens_batches"`
+	Above272KBatchCacheWrite    rate            `json:"cache_creation_input_token_cost_above_272k_tokens_batches"`
 	SearchContext               map[string]rate `json:"search_context_cost_per_query"`
+	FastModeUplift              rate            `json:"fast_mode_uplift_multiplier"`
+	RegionalUSUplift            rate            `json:"regional_processing_uplift_multiplier_us"`
 }
 
 type rate struct {

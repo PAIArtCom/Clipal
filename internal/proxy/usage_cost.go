@@ -16,12 +16,6 @@ import (
 
 const (
 	maxRecordedCostMicros int64 = 1_000_000_000_000
-
-	// Anthropic reports fast mode in usage metadata instead of using a
-	// separately priced model ID. It multiplies Opus 4.6 token rates,
-	// including cache rates; per-query search charges remain unchanged by the
-	// token-only multiplier.
-	claudeOpus46FastTokenRateMultiplier int64 = 6
 )
 
 func applyUsageCostSnapshot(original *http.Request, requestCtx RequestContext, provider config.Provider, payload *requestPayload, snapshot telemetry.UsageSnapshot) telemetry.UsageSnapshot {
@@ -245,7 +239,8 @@ func calculateClaudeCostMicros(model string, raw map[string]any, requestRoot map
 		SearchQueries:       webSearchRequests,
 		SearchContextSize:   "medium",
 		ServiceTier:         serviceTier,
-		TokenRateMultiplier: claudeFastTokenRateMultiplier(model, raw),
+		FastMode:            strings.EqualFold(strings.TrimSpace(stringValueRaw(raw["speed"])), "fast"),
+		InferenceGeo:        stringValueRaw(raw["inference_geo"]),
 	})
 }
 
@@ -300,19 +295,6 @@ func claudeCacheTTLs(value any) (bool, bool) {
 	}
 	visit(value)
 	return oneHour, defaultTTL
-}
-
-func claudeFastTokenRateMultiplier(model string, raw map[string]any) int64 {
-	if !strings.EqualFold(strings.TrimSpace(stringValueRaw(raw["speed"])), "fast") {
-		return 1
-	}
-	model = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(model)), "anthropic/")
-	switch model {
-	case "claude-opus-4-6", "claude-opus-4-6-20260205":
-		return claudeOpus46FastTokenRateMultiplier
-	default:
-		return 1
-	}
 }
 
 func calculateGeminiCostMicros(model string, raw map[string]any, serviceTier pricing.ServiceTier) (int64, bool) {
