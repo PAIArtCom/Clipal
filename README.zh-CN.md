@@ -45,6 +45,8 @@
 - **优先级自动容灾**：当主模型/服务商不可用时，基于预设优先级秒级无缝切换到备用模型，自带断路器和并发阻断机制。
 - **OAuth 上游**：可以在 Web UI 里授权接入 Codex、Claude 和 Antigravity-backed Google 账号，并继续复用同一套排序、置顶、启停与 failover 逻辑；只要有 `refresh_token`，Clipal 也会自动刷新 access token。Antigravity OAuth 支持 Gemini-compatible 文本、流式、token 计数、模型列表，以及通过 `generateContent` 调用 Gemini 图片模型；Imagen/Veo `predict*` 端点仍走 Google AI Studio API key 或 Vertex 路由。Claude 和 Codex OAuth 对普通客户端默认使用 Agent SDK 兼容包装，并由 Clipal 处理必要传输字段。请求里显式传入的 `tools`、thinking/reasoning、输出控制等字段在目标模型支持时优先于 Clipal 默认值。
 
+OAuth 账号请求配置在添加时默认 US / `America/New_York`，国家和 IANA 时区可修改，来源为 `default` 或 `user`。导入保留原值，未核验的旧地区需要确认。代理遵循标准 HTTP/HTTPS/SOCKS5 接口并保留域名，不探测软件控制器，也不按出口推断账号地区。自动 DNS 在有标准代理时交给代理解析，无显式代理时使用 Cloudflare → Google DoH；代理下的公共 DoH 仅作可选、非阻断参考诊断，见 [Web UI](docs/zh/web-ui.md#oauth-账号请求环境)。
+
 ### 🎛️ **美观且强大的本地 Web UI**
 可视化管理你的 AI 工作流。在这里增删、停用 provider，或者在“手动模式”下置顶特定模型，亦或调整全局运行参数。所有更改**热重载**生效，无需重启服务。
 

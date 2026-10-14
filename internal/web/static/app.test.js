@@ -1107,6 +1107,7 @@ test('saveProvider starts OAuth authorization flow for oauth provider', async ()
     assert.deepEqual(calls[0].options, {
         client_type: 'openai',
         provider: 'codex',
+        request_environment: { country: 'US', timezone: 'America/New_York', source: 'default' },
         proxy_mode: 'default'
     });
 });
@@ -1303,6 +1304,7 @@ test('startOAuthProviderAuthorization opens the real auth URL in a new window an
         assert.deepEqual(JSON.parse(options.body), {
             client_type: 'openai',
             provider: 'codex',
+            request_environment: { country: 'US', timezone: 'America/New_York', source: 'default' },
             proxy_mode: 'default'
         });
         return {
@@ -1357,13 +1359,16 @@ test('startOAuthProviderAuthorization opens the real auth URL in a new window an
     ]);
 });
 
-test('startOAuthProviderAuthorization sends custom proxy settings', async () => {
+test('startOAuthProviderAuthorization sends chosen region and custom proxy settings', async () => {
     const state = loadApp();
     state.selectedClient = 'openai';
     state.providerForm = {
         ...state.providerForm,
         auth_type: 'oauth',
         oauth_provider: 'codex',
+        request_country: 'JP',
+        request_timezone: 'Asia/Tokyo',
+        request_environment_source: 'user',
         proxy_mode: 'custom',
         proxy_url: ' http://127.0.0.1:7890 '
     };
@@ -1372,6 +1377,7 @@ test('startOAuthProviderAuthorization sends custom proxy settings', async () => 
         assert.deepEqual(JSON.parse(options.body), {
             client_type: 'openai',
             provider: 'codex',
+            request_environment: { country: 'JP', timezone: 'Asia/Tokyo', source: 'user' },
             proxy_mode: 'custom',
             proxy_url: 'http://127.0.0.1:7890'
         });
@@ -2250,4 +2256,119 @@ test('data import preview cancellation discards the reviewed plan', () => {
 
     assert.equal(state.dataImportPlan, null);
     assert.equal(state.showDataImportPreviewModal, false);
+});
+
+test('OAuth environment separates configured preferences from diagnosis', async () => {
+    const state = loadApp();
+    state.selectedClient = 'claude';
+    const requests = [];
+    state.apiCall = async (url, options = {}) => {
+        requests.push({ url, method: options.method || 'GET' });
+        if (url.endsWith('/oauth-environment')) return { account_id: 'acct', environment: { device_id: 'stable', dns: 'auto' } };
+        return { environment: { device_id: 'stable', country: 'JP', dns: 'auto' }, checks: [] };
+    };
+    await state.openEnvironment({ name: 'account / owner', auth_type: 'oauth' });
+    assert.equal(state.environmentProfile.dns, 'auto');
+    assert.equal(state.environmentBusy, false);
+    assert.equal(state.environmentAccount, 'acct');
+    await state.diagnoseEnvironment();
+    assert.equal(state.environmentProfile.country, 'JP');
+    assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
+    assert.equal(requests[0].url, '/api/providers/claude/account%20%2F%20owner/oauth-environment');
+    assert.equal(typeof state.saveEnvironment, 'function');
+});
+
+test('OAuth environment ignores stale account responses and recovers from API errors', async () => {
+    const state = loadApp();
+    let completeFirst;
+    state.apiCall = url => url.includes('/first/')
+        ? new Promise(resolve => { completeFirst = resolve; })
+        : Promise.resolve({ account_id: 'second', environment: { device_id: 'second-id', dns: 'auto' } });
+    const first = state.openEnvironment({ name: 'first', auth_type: 'oauth' });
+    await state.openEnvironment({ name: 'second', auth_type: 'oauth' });
+    completeFirst({ account_id: 'first', environment: { device_id: 'wrong' } });
+    await first;
+    assert.equal(state.environmentProfile.device_id, 'second-id');
+    state.apiCall = async () => { throw new Error('unavailable'); };
+    await state.diagnoseEnvironment();
+    assert.equal(state.environmentBusy, false);
+    assert.equal(state.environmentProfile.device_id, 'second-id');
+});
+
+test('OAuth diagnostic explanations follow the management locale', () => {
+    const state = loadApp();
+    const check = { detail: 'google DoH succeeded on the selected entry.' };
+    state.locale = 'zh-CN';
+    assert.match(state.environmentCheckDetail(check), /Google DoH 已通过/);
+    state.environmentDiagnostics = { bootstrap_dns: 'DoH is not used for proxy requests; system DNS resolves the first-hop proxy hostname' };
+    assert.match(state.environmentBootstrapDetail(), /代理域名第一跳/);
+    state.environmentDiagnostics = { bootstrap_dns: 'DoH is not used for proxy requests' };
+    assert.match(state.environmentBootstrapDetail(), /由代理解析/);
+    state.environmentDiagnostics = { bootstrap_dns: 'DoH is not used' };
+    assert.equal(state.environmentBootstrapDetail(), '未使用 DoH');
+    assert.doesNotMatch(state.environmentCheckDetail(check), /目标连接使用解析结果/);
+    assert.match(state.environmentCheckDetail({ detail: 'Target hostnames are delegated to the standard proxy; public DoH is not required.' }), /不依赖公共 DoH/);
+    assert.match(state.environmentCheckDetail({ detail: 'Optional DoH reference lookup failed; proxy requests do not depend on it.' }), /不依赖此查询/);
+    assert.match(state.environmentCheckDetail({ detail: 'cloudflare DoH reference lookup succeeded; it does not verify proxy DNS or target egress.' }), /不能证明代理实际 DNS/);
+    state.locale = 'en';
+    assert.equal(state.environmentCheckDetail(check), check.detail);
+});
+
+test('public DoH reference is optional per dialog and never saved as account configuration', async () => {
+    const state = loadApp();
+    const profile = { device_id: 'stable', country: 'US', timezone: 'America/New_York', source: 'user', dns: 'auto' };
+    const requests = [];
+    state.apiCall = async (url, options = {}) => {
+        requests.push({ url, options });
+        if (url.endsWith('/oauth-environment')) return { account_identity: 'account-a', environment: { ...profile } };
+        return { environment: { ...profile }, checks: [{ name: 'doh_reference', status: 'pending', detail: 'Optional DoH reference lookup failed; proxy requests do not depend on it.' }] };
+    };
+    await state.openEnvironment({ name: 'owner', auth_type: 'oauth' });
+    assert.equal(state.environmentCheckDoH, false);
+    await state.diagnoseEnvironment();
+    assert.deepEqual(JSON.parse(requests[1].options.body), { check_doh: false });
+    state.environmentCheckDoH = true;
+    await state.diagnoseEnvironment();
+    assert.deepEqual(JSON.parse(requests[2].options.body), { check_doh: true });
+    assert.equal(state.environmentBusy, false);
+    assert.equal(state.environmentProfile.dns, 'auto');
+    assert.equal(state.environmentProfile.device_id, 'stable');
+    await state.saveEnvironment();
+    assert.deepEqual(JSON.parse(requests[3].options.body), { country: 'US', timezone: 'America/New_York', account_identity: 'account-a' });
+    await state.openEnvironment({ name: 'other', auth_type: 'oauth' });
+    assert.equal(state.environmentCheckDoH, false);
+    assert.match(state.environmentDNSLabel(), /proxy|代理/);
+    state.environmentProfile.dns = 'google';
+    assert.match(state.environmentDNSLabel(), /Google/);
+    assert.match(state.environmentDNSLabel(), /proxy|代理/);
+});
+
+
+test('OAuth account region confirmation sends identity and preserves DNS policy', async () => {
+    const state = loadApp();
+    state.selectedClient = 'openai';
+    const calls = [];
+    state.apiCall = async (url, options = {}) => {
+        calls.push({ url, options });
+        if (options.method === 'PUT') {
+            return { environment: { country: 'US', timezone: 'America/New_York', source: 'user', needs_confirmation: false, dns: 'google' } };
+        }
+        return {
+            account_identity: 'account-a', account_id: 'a',
+            environment: { country: 'US', timezone: 'America/Los_Angeles', dns: 'google', needs_confirmation: true },
+            upstream_region: { country_code: 'JP' }
+        };
+    };
+    await state.openEnvironment({ name: 'owner', auth_type: 'oauth' });
+    assert.equal(state.environmentForm.timezone, 'America/Los_Angeles');
+    assert.equal(state.environmentUpstream.country_code, 'JP');
+    assert.match(state.environmentSourceLabel(), /确认|confirmation/);
+    state.environmentForm.timezone = 'America/New_York';
+    await state.saveEnvironment();
+    const payload = JSON.parse(calls[1].options.body);
+    assert.deepEqual(payload, { country: 'US', timezone: 'America/New_York', account_identity: 'account-a' });
+    assert.equal('dns' in payload, false);
+    assert.equal(state.environmentProfile.dns, 'google');
+    assert.equal(state.environmentProfile.source, 'user');
+    assert.equal(state.environmentBusy, false);
 });

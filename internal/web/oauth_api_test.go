@@ -66,6 +66,23 @@ func TestHandleStartOAuthProvider_RejectsInvalidProxySettings(t *testing.T) {
 	}
 }
 
+func TestHandleStartOAuthProvider_RejectsInvalidRequestRegion(t *testing.T) {
+	api := newTestOAuthAPI(t)
+	for _, options := range []oauthpkg.RegionOptions{
+		{Country: "USA", Timezone: "America/New_York"},
+		{Country: "US", Timezone: "UTC-5"},
+		{Country: "US", Timezone: "America/New_York", Source: "exit"},
+	} {
+		body, _ := json.Marshal(OAuthStartRequest{ClientType: "openai", Provider: "codex", RequestEnvironment: &options})
+		req := httptest.NewRequest(http.MethodPost, "/api/oauth/providers/start", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		api.HandleStartOAuthProvider(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("invalid region accepted: %s", w.Body.String())
+		}
+	}
+}
+
 func TestHandleStartOAuthProvider_RejectsDownlinedGeminiOAuth(t *testing.T) {
 	api := newTestOAuthAPI(t)
 

@@ -20,6 +20,9 @@ import (
 
 type oauthProviderAction string
 
+// Includes DoH failover, token refresh and usage I/O.
+const providerOAuthMetadataTimeout = 30 * time.Second
+
 const (
 	oauthProviderActionCreated  oauthProviderAction = "created"
 	oauthProviderActionReused   oauthProviderAction = "reused"
@@ -83,6 +86,10 @@ func (a *API) HandleStartOAuthProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, fmt.Sprintf("oauth_provider %q is no longer available for new %s authorizations", provider, clientType), http.StatusBadRequest)
 		return
 	}
+	if _, err := oauthpkg.NewAccountEnvironment(&oauthpkg.Credential{Provider: provider}, req.RequestEnvironment); err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	proxySettings, err := oauthProxySettingsFromStartRequest(req)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -96,7 +103,7 @@ func (a *API) HandleStartOAuthProvider(w http.ResponseWriter, r *http.Request) {
 		ProxyMode:       proxySettings.Mode,
 		ProxyURL:        proxySettings.URL,
 	}
-	session, err := a.oauth.StartLoginWithHTTPClient(provider, a.oauthHTTPClientForTarget(target, provider))
+	session, err := a.oauth.StartLoginWithEnvironment(provider, a.oauthHTTPClientForTarget(target, provider), req.RequestEnvironment)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -352,7 +359,7 @@ func (a *API) HandleGetProviderOAuthMetadata(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	usageCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	usageCtx, cancel := context.WithTimeout(r.Context(), providerOAuthMetadataTimeout)
 	httpClient := proxypkg.NewOAuthHTTPClientForProvider(*provider, cfg.Global)
 	var resp ProviderOAuthMetadataResponse
 	var metadataErr error

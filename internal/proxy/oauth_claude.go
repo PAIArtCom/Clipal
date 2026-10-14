@@ -63,7 +63,7 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 	}
 	proxyReq.ContentLength = int64(len(body))
 	proxyReq.Header.Del("Content-Length")
-	return proxyReq, nil
+	return applyOAuthEnvironment(proxyReq, cred)
 }
 
 func copyHeaderAllowingApplicationAuth(dst http.Header, src http.Header) {

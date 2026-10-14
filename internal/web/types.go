@@ -11,6 +11,7 @@ import (
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 	integrationpkg "github.com/PAIArtCom/Clipal/internal/integration"
+	"github.com/PAIArtCom/Clipal/internal/oauth"
 	"github.com/PAIArtCom/Clipal/internal/pricing"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
@@ -265,10 +266,11 @@ type ReorderRequest struct {
 }
 
 type OAuthStartRequest struct {
-	ClientType string               `json:"client_type"`
-	Provider   config.OAuthProvider `json:"provider"`
-	ProxyMode  *string              `json:"proxy_mode,omitempty"`
-	ProxyURL   *string              `json:"proxy_url,omitempty"`
+	RequestEnvironment *oauth.RegionOptions `json:"request_environment,omitempty"`
+	ClientType         string               `json:"client_type"`
+	Provider           config.OAuthProvider `json:"provider"`
+	ProxyMode          *string              `json:"proxy_mode,omitempty"`
+	ProxyURL           *string              `json:"proxy_url,omitempty"`
 }
 
 type OAuthProviderOptionResponse struct {

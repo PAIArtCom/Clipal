@@ -283,6 +283,17 @@ func (h *Handler) routeProviders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientType, providerName, subresource := extractClientProviderSubresource(path)
+	if clientType != "" && providerName != "" {
+		switch subresource {
+		case "oauth-environment":
+			h.api.HandleProviderEnvironment(w, r)
+			return
+		case "oauth-diagnostics":
+			h.api.HandleProviderDiagnostics(w, r)
+			return
+		}
+	}
+
 	if clientType != "" && providerName != "" && subresource == "oauth-metadata" {
 		switch r.Method {
 		case http.MethodGet:

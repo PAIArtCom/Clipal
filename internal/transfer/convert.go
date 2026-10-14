@@ -124,11 +124,11 @@ func (in Provider) toConfig() config.Provider {
 }
 
 func credentialFromOAuth(in oauth.Credential) Credential {
-	return Credential{Ref: in.Ref, Provider: string(in.Provider), Email: in.Email, AccountID: in.AccountID, AccessToken: in.AccessToken, RefreshToken: in.RefreshToken, ExpiresAt: in.ExpiresAt, LastRefresh: in.LastRefresh, Metadata: cloneStrings(in.Metadata)}
+	return Credential{Ref: in.Ref, Provider: string(in.Provider), Email: in.Email, AccountID: in.AccountID, AccessToken: in.AccessToken, RefreshToken: in.RefreshToken, ExpiresAt: in.ExpiresAt, LastRefresh: in.LastRefresh, Metadata: cloneStrings(in.Metadata), Environment: in.Environment.Clone()}
 }
 
 func (in Credential) toOAuth() oauth.Credential {
-	return oauth.Credential{Ref: strings.TrimSpace(in.Ref), Provider: config.OAuthProvider(strings.ToLower(strings.TrimSpace(in.Provider))), Email: strings.TrimSpace(in.Email), AccountID: strings.TrimSpace(in.AccountID), AccessToken: strings.TrimSpace(in.AccessToken), RefreshToken: strings.TrimSpace(in.RefreshToken), ExpiresAt: in.ExpiresAt, LastRefresh: in.LastRefresh, Metadata: cloneStrings(in.Metadata)}
+	return oauth.Credential{Ref: strings.TrimSpace(in.Ref), Provider: config.OAuthProvider(strings.ToLower(strings.TrimSpace(in.Provider))), Email: strings.TrimSpace(in.Email), AccountID: strings.TrimSpace(in.AccountID), AccessToken: strings.TrimSpace(in.AccessToken), RefreshToken: strings.TrimSpace(in.RefreshToken), ExpiresAt: in.ExpiresAt, LastRefresh: in.LastRefresh, Metadata: cloneStrings(in.Metadata), Environment: in.Environment.Clone()}
 }
 
 func cloneStrings(in map[string]string) map[string]string {

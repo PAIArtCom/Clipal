@@ -198,6 +198,8 @@ providers:
 | `reasoning_effort` | string | no | OpenAI only. For `/v1/responses*`, Clipal writes `reasoning.effort`; for chat/completions it only replaces an existing `reasoning_effort` field |
 | `thinking_budget_tokens` | int | no | Claude only. Clipal writes `thinking = {type: "enabled", budget_tokens: ...}` on supported requests |
 
+- OAuth request preferences are stored in credential `request_environment`. New-account defaults are US / `America/New_York`; source is `default` or `user`. Imports retain values and legacy regions require confirmation. Proxy selection uses provider/global/environment configuration and `NO_PROXY`, without controller discovery. Account DNS `auto` delegates resolution to any standard proxy and uses Cloudflare → Google DoH without an explicit proxy. Saved `cloudflare`/`google` values select no-proxy DNS and optional diagnostic services; they do not enable strict proxy preflight. Optional proxy DoH reference checks are per-request diagnostics, not stored configuration. See [Web UI](web-ui.md#oauth-account-request-environment).
+
 ### OAuth Providers
 
 OAuth providers stay in the same `providers[]` list as API-key providers. They participate in the same ordering, pinning, enable/disable, and failover behavior.

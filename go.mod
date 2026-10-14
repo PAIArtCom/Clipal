@@ -1,14 +1,15 @@
 module github.com/PAIArtCom/Clipal
 
-go 1.26.7
+go 1.26.9
 
 require (
 	github.com/gen2brain/beeep v0.11.2
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/refraction-networking/utls v1.8.2
 	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
-	golang.org/x/net v0.58.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/net v0.60.0
+	golang.org/x/sys v0.48.0
+	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -28,7 +29,6 @@ require (
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/xyproto/randomstring v1.2.0 // indirect
-	golang.org/x/crypto v0.56.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

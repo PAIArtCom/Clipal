@@ -9,15 +9,17 @@ import (
 )
 
 type Credential struct {
-	Ref          string               `json:"ref"`
-	Provider     config.OAuthProvider `json:"provider"`
-	Email        string               `json:"email,omitempty"`
-	AccountID    string               `json:"account_id,omitempty"`
-	AccessToken  string               `json:"access_token"`
-	RefreshToken string               `json:"refresh_token,omitempty"`
-	ExpiresAt    time.Time            `json:"expires_at,omitempty"`
-	LastRefresh  time.Time            `json:"last_refresh,omitempty"`
-	Metadata     map[string]string    `json:"metadata,omitempty"`
+	Ref                     string               `json:"ref"`
+	Provider                config.OAuthProvider `json:"provider"`
+	Email                   string               `json:"email,omitempty"`
+	AccountID               string               `json:"account_id,omitempty"`
+	AccessToken             string               `json:"access_token"`
+	RefreshToken            string               `json:"refresh_token,omitempty"`
+	ExpiresAt               time.Time            `json:"expires_at,omitempty"`
+	LastRefresh             time.Time            `json:"last_refresh,omitempty"`
+	Metadata                map[string]string    `json:"metadata,omitempty"`
+	Environment             *RequestEnvironment  `json:"request_environment,omitempty"`
+	environmentPendingWrite bool
 }
 
 func (c *Credential) Clone() *Credential {
@@ -25,6 +27,7 @@ func (c *Credential) Clone() *Credential {
 		return nil
 	}
 	clone := *c
+	clone.Environment = c.Environment.Clone()
 	if c.Metadata != nil {
 		clone.Metadata = make(map[string]string, len(c.Metadata))
 		for k, v := range c.Metadata {
@@ -69,10 +72,11 @@ type LoginSession struct {
 	Error         string               `json:"error,omitempty"`
 	ExpiresAt     time.Time            `json:"expires_at,omitempty"`
 
-	pkce        PKCECodes
-	redirectURI string
-	callback    *callbackServer
-	httpClient  *http.Client
+	pkce               PKCECodes
+	redirectURI        string
+	callback           *callbackServer
+	httpClient         *http.Client
+	requestEnvironment *RequestEnvironment
 
 	completionDone chan struct{}
 	terminalAt     time.Time
@@ -83,6 +87,7 @@ func (s *LoginSession) Clone() *LoginSession {
 		return nil
 	}
 	clone := *s
+	clone.requestEnvironment = s.requestEnvironment.Clone()
 	clone.callback = nil
 	clone.completionDone = nil
 	clone.terminalAt = time.Time{}

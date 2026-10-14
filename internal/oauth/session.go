@@ -191,6 +191,14 @@ func (s *Service) StartLogin(provider config.OAuthProvider) (*LoginSession, erro
 }
 
 func (s *Service) StartLoginWithHTTPClient(provider config.OAuthProvider, httpClient *http.Client) (*LoginSession, error) {
+	return s.StartLoginWithEnvironment(provider, httpClient, nil)
+}
+
+func (s *Service) StartLoginWithEnvironment(provider config.OAuthProvider, httpClient *http.Client, options *RegionOptions) (*LoginSession, error) {
+	env, err := NewAccountEnvironment(&Credential{Provider: provider}, options)
+	if err != nil {
+		return nil, err
+	}
 	provider = normalizeProvider(provider)
 	client, ok := s.providerClient(provider)
 	if !ok {
@@ -211,6 +219,7 @@ func (s *Service) StartLoginWithHTTPClient(provider config.OAuthProvider, httpCl
 		return nil, err
 	}
 	session.httpClient = httpClient
+	session.requestEnvironment = env
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -439,7 +448,12 @@ func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Cre
 	if !ok {
 		return nil, fmt.Errorf("unsupported oauth provider %q", cred.Provider)
 	}
-	client = providerClientWithHTTPClient(client, httpClient)
+	cred = s.prepareEnvironment(store, cred)
+	client, err := providerClientWithEnvironment(client, httpClient, cred.Environment)
+	if err != nil {
+		return nil, err
+	}
+	defer closeEnvironmentClient(client)
 	refreshed, err := client.Refresh(ctx, cred)
 	if err != nil {
 		return nil, err
@@ -447,6 +461,8 @@ func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Cre
 	if err := store.Save(refreshed); err != nil {
 		return nil, err
 	}
+	// Save preserves the established environment and normalizes identity if the
+	// provider has supplied an account ID for a legacy credential.
 	if refreshed.Provider == config.OAuthProviderGemini || refreshed.Provider == config.OAuthProviderAntigravity {
 		s.invalidateGeminiUsageCache(refreshed.Ref)
 	}
@@ -709,6 +725,14 @@ func (s *Service) completeSessionWithCode(ctx context.Context, sessionSnapshot *
 	defer cancel()
 
 	cred, err := client.ExchangeSessionCode(exchangeCtx, sessionSnapshot, code)
+	if err != nil {
+		return s.finishSessionWithError(sessionSnapshot.ID, err.Error(), callback)
+	}
+	if sessionSnapshot.requestEnvironment == nil {
+		cred.Environment, err = NewAccountEnvironment(cred, nil)
+	} else {
+		cred.Environment, err = NormalizeEnvironment(cred, sessionSnapshot.requestEnvironment)
+	}
 	if err != nil {
 		return s.finishSessionWithError(sessionSnapshot.ID, err.Error(), callback)
 	}

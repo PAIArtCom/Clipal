@@ -182,7 +182,7 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	applyCodexOAuthHeaders(proxyReq, cred, stream, codexCtx, targetPath)
 	proxyReq.ContentLength = int64(len(requestBody))
 	proxyReq.Header.Del("Content-Length")
-	return proxyReq, nil
+	return applyOAuthEnvironment(proxyReq, cred)
 }
 
 func buildCodexOAuthRequest(path string, body []byte) (string, bool, []byte, error) {
@@ -816,5 +816,10 @@ func (cp *ClientProxy) doPreparedProviderRequest(proxyReq *http.Request, provide
 		return nil, fmt.Errorf("proxy request is nil")
 	}
 	//nolint:gosec // proxyReq.URL is controlled by buildCodexOAuthRequest, not user input
-	return cp.upstreamHTTPClient(providerIndex).Do(proxyReq)
+	client, err := cp.accountHTTPClient(proxyReq, providerIndex)
+	if err != nil {
+		return nil, err
+	}
+	//nolint:gosec // Adapter-built upstream URL; account environment never changes the target URL.
+	return client.Do(proxyReq)
 }

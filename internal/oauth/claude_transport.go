@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"context"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PAIArtCom/Clipal/internal/outbound"
 	tls "github.com/refraction-networking/utls"
 	"golang.org/x/net/http2"
 )
@@ -22,11 +25,16 @@ type anthropicFallbackRoundTripper struct {
 	fallback  http.RoundTripper
 }
 
+//nolint:staticcheck // The native uTLS adapter needs x/net's already-negotiated connection API.
+type anthropicClientConn = http2.ClientConn
+
 type anthropicUTLSRoundTripper struct {
 	mu          sync.Mutex
-	connections map[string]*http2.ClientConn
+	connections map[string]*anthropicClientConn
 	pending     map[string]*sync.Cond
 	dialer      net.Dialer
+	dialContext outbound.DialContext
+	rootCAs     *x509.CertPool
 }
 
 func newAnthropicHTTPClient(timeout time.Duration) *http.Client {
@@ -48,7 +56,7 @@ func newAnthropicHTTPClient(timeout time.Duration) *http.Client {
 
 func newAnthropicUTLSRoundTripper() *anthropicUTLSRoundTripper {
 	return &anthropicUTLSRoundTripper{
-		connections: make(map[string]*http2.ClientConn),
+		connections: make(map[string]*anthropicClientConn),
 		pending:     make(map[string]*sync.Cond),
 		dialer: net.Dialer{
 			Timeout:   30 * time.Second,
@@ -94,7 +102,7 @@ func (rt *anthropicUTLSRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		addr = net.JoinHostPort(addr, "443")
 	}
 
-	conn, err := rt.getOrCreateConnection(cacheKey, serverName, addr)
+	conn, err := rt.getOrCreateConnection(req.Context(), cacheKey, serverName, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +119,7 @@ func (rt *anthropicUTLSRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	return resp, nil
 }
 
-func (rt *anthropicUTLSRoundTripper) getOrCreateConnection(cacheKey string, serverName string, addr string) (*http2.ClientConn, error) {
+func (rt *anthropicUTLSRoundTripper) getOrCreateConnection(ctx context.Context, cacheKey string, serverName string, addr string) (*anthropicClientConn, error) {
 	rt.mu.Lock()
 	if conn, ok := rt.connections[cacheKey]; ok && conn.CanTakeNewRequest() {
 		rt.mu.Unlock()
@@ -129,7 +137,7 @@ func (rt *anthropicUTLSRoundTripper) getOrCreateConnection(cacheKey string, serv
 	rt.pending[cacheKey] = cond
 	rt.mu.Unlock()
 
-	conn, err := rt.createConnection(serverName, addr)
+	conn, err := rt.createConnection(ctx, serverName, addr)
 
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -142,22 +150,67 @@ func (rt *anthropicUTLSRoundTripper) getOrCreateConnection(cacheKey string, serv
 	return conn, nil
 }
 
-func (rt *anthropicUTLSRoundTripper) createConnection(serverName string, addr string) (*http2.ClientConn, error) {
-	rawConn, err := rt.dialer.Dial("tcp", addr)
+func (rt *anthropicUTLSRoundTripper) createConnection(ctx context.Context, serverName string, addr string) (*anthropicClientConn, error) {
+	dial := rt.dialContext
+	if dial == nil {
+		dial = rt.dialer.DialContext
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	rawConn, err := dial(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsConn := tls.UClient(rawConn, &tls.Config{ServerName: serverName}, tls.HelloChrome_Auto)
-	if err := tlsConn.Handshake(); err != nil {
+	tlsConn := tls.UClient(rawConn, &tls.Config{ServerName: serverName, RootCAs: rt.rootCAs}, tls.HelloChrome_Auto)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		_ = rawConn.Close()
 		return nil, err
 	}
 
+	//nolint:staticcheck // Reuse the negotiated uTLS connection rather than create another TLS session.
 	conn, err := (&http2.Transport{}).NewClientConn(tlsConn)
 	if err != nil {
 		_ = tlsConn.Close()
 		return nil, err
 	}
 	return conn, nil
+}
+
+// Keep the existing Anthropic TLS profile when account DNS supplies the dialer.
+func (rt *anthropicFallbackRoundTripper) WithDialContext(dial outbound.DialContext) http.RoundTripper {
+	ant := newAnthropicUTLSRoundTripper()
+	ant.dialContext = dial
+	fallback := (&http.Transport{ForceAttemptHTTP2: true}).Clone()
+	if base, ok := http.DefaultTransport.(*http.Transport); ok {
+		fallback = base.Clone()
+	}
+	if old, ok := rt.fallback.(*http.Transport); ok {
+		fallback = old.Clone()
+		if old.TLSClientConfig != nil {
+			ant.rootCAs = old.TLSClientConfig.RootCAs
+		}
+	}
+	fallback.Proxy = nil
+	fallback.DialTLSContext = nil
+	//nolint:staticcheck // Prevent the deprecated hook from bypassing the account dialer.
+	fallback.DialTLS = nil
+	fallback.DialContext = dial
+	return &anthropicFallbackRoundTripper{anthropic: ant, fallback: fallback}
+}
+
+func (rt *anthropicFallbackRoundTripper) CloseIdleConnections() {
+	if closer, ok := rt.fallback.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+	if ant, ok := rt.anthropic.(*anthropicUTLSRoundTripper); ok {
+		ant.mu.Lock()
+		defer ant.mu.Unlock()
+		for key, conn := range ant.connections {
+			if conn.State().StreamsActive == 0 {
+				_ = conn.Close()
+				delete(ant.connections, key)
+			}
+		}
+	}
 }

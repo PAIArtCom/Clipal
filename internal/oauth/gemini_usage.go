@@ -194,7 +194,13 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		s.finishGeminiUsageFetch(cacheKey, nil, err, false)
 		return details, err
 	}
-	client = providerClientWithHTTPClient(client, httpClient)
+	cred = s.PrepareEnvironment(cred)
+	client, err = providerClientWithEnvironment(client, httpClient, cred.Environment)
+	if err != nil {
+		s.finishGeminiUsageFetch(cacheKey, nil, err, false)
+		return details, err
+	}
+	defer closeEnvironmentClient(client)
 	fetcher, ok := client.(geminiUsageFetcher)
 	if !ok {
 		err := fmt.Errorf("oauth provider %q does not support usage retrieval", provider)

@@ -18,6 +18,100 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
 
+func TestImportPreviewDoesNotMigrateLegacyCredentials(t *testing.T) {
+	for _, focused := range []bool{false, true} {
+		t.Run(fmt.Sprintf("focused=%t", focused), func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestState(t, dir, "existing", "key")
+			path := filepath.Join(dir, "oauth", "codex", "account--legacy.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(`{"provider":"codex","ref":"legacy","account_id":"old","access_token":"existing-token"}`), 0640); err != nil {
+				t.Fatal(err)
+			}
+			service, err := NewService(dir, "test", nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := snapshotTestTree(t, dir)
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if focused {
+				_, err = service.AnalyzeCredentials([]oauth.Credential{{Provider: config.OAuthProviderCodex, Ref: "incoming", AccountID: "new", AccessToken: "new-token"}}, nil, 1)
+			} else {
+				dataset := emptyDataset()
+				dataset.Data.Global = globalFromConfig(config.DefaultGlobalConfig())
+				encoded, encodeErr := (nativeAdapter{}).Encode(dataset, EncodeOptions{})
+				if encodeErr != nil {
+					t.Fatal(encodeErr)
+				}
+				_, err = service.Analyze([]Input{{Name: "backup.json", Data: encoded}}, FormatClipal, ModeReplace)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after := snapshotTestTree(t, dir); !reflect.DeepEqual(before, after) {
+				t.Fatal("preview changed existing files, permissions or directory contents")
+			}
+			afterInfo, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !info.ModTime().Equal(afterInfo.ModTime()) {
+				t.Fatal("preview changed legacy credential mtime")
+			}
+		})
+	}
+}
+
+func TestCredentialImportPreservesRegionWithoutApplyingLoginDefaults(t *testing.T) {
+	for _, source := range []string{"default", "user", "exit_inferred", ""} {
+		t.Run(source, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestState(t, dir, "existing", "key")
+			service, err := NewService(dir, "test", nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			incoming := oauth.Credential{Provider: config.OAuthProviderCodex, Ref: "incoming", AccountID: "id", AccessToken: "token", Metadata: map[string]string{"country_code": "JP"}}
+			if source != "" {
+				incoming.Environment = &oauth.RequestEnvironment{Country: "CA", Timezone: "America/Vancouver", Language: "fr-CA", Locale: "fr-CA", DNS: "google", Source: source}
+			}
+			plan, err := service.AnalyzeCredentials([]oauth.Credential{incoming}, nil, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.Apply(plan); err != nil {
+				t.Fatal(err)
+			}
+			saved, err := oauth.NewStore(dir).Load(incoming.Provider, incoming.Ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if saved.Metadata["country_code"] != "JP" || saved.AccessToken != "token" {
+				t.Fatal("import changed upstream attributes or tokens")
+			}
+			if source == "" {
+				if saved.Environment.Country != "" || saved.Environment.Timezone != "" || !saved.Environment.NeedsConfirmation {
+					t.Fatal("import applied new-login defaults")
+				}
+			} else if saved.Environment.Country != "CA" || saved.Environment.Timezone != "America/Vancouver" || saved.Environment.Language != "fr-CA" || saved.Environment.DNS != "google" {
+				t.Fatalf("import replaced existing preferences: %+v", saved.Environment)
+			}
+			if source == "exit_inferred" {
+				if saved.Environment.Source != "" || !saved.Environment.NeedsConfirmation || saved.Environment.ForRequests().Country != "" {
+					t.Fatal("import silently confirmed inferred region")
+				}
+			} else if source != "" && (saved.Environment.Source != source || saved.Environment.NeedsConfirmation) {
+				t.Fatal("import changed confirmed provenance")
+			}
+		})
+	}
+}
+
 func TestNativeCodecRoundTripAndRejectsLegacyShape(t *testing.T) {
 	dataset := emptyDataset()
 	dataset.Producer.Version = "v1.2.3"
@@ -261,7 +355,7 @@ func TestServiceNativeReplaceRoundTrip(t *testing.T) {
 	if err := sourceUsage.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	cred := &oauth.Credential{Ref: "account", Provider: config.OAuthProviderCodex, Email: "owner@example.com", AccessToken: "secret-token"}
+	cred := &oauth.Credential{Ref: "account", Provider: config.OAuthProviderCodex, Email: "owner@example.com", AccessToken: "secret-token", Environment: &oauth.RequestEnvironment{Country: "JP", DNS: "auto"}}
 	if err := oauth.NewStore(source).Save(cred); err != nil {
 		t.Fatal(err)
 	}
@@ -305,6 +399,9 @@ func TestServiceNativeReplaceRoundTrip(t *testing.T) {
 	}
 	if len(credentials) != 1 || credentials[0].Email != "owner@example.com" {
 		t.Fatalf("credentials not restored: %#v", credentials)
+	}
+	if credentials[0].Environment == nil || *credentials[0].Environment != *cred.Environment {
+		t.Fatal("account environment was not restored")
 	}
 	usage := importer.usage.Snapshot().Clients["openai"]["source"]
 	if usage.TotalTokens != 10 {

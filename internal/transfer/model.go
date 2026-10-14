@@ -4,6 +4,8 @@ package transfer
 
 import (
 	"time"
+
+	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 const (
@@ -129,15 +131,16 @@ type ClaudeOverrides struct {
 }
 
 type Credential struct {
-	Ref          string            `json:"ref"`
-	Provider     string            `json:"provider"`
-	Email        string            `json:"email,omitempty"`
-	AccountID    string            `json:"account_id,omitempty"`
-	AccessToken  string            `json:"access_token"`
-	RefreshToken string            `json:"refresh_token,omitempty"`
-	ExpiresAt    time.Time         `json:"expires_at,omitempty"`
-	LastRefresh  time.Time         `json:"last_refresh,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
+	Ref          string                    `json:"ref"`
+	Provider     string                    `json:"provider"`
+	Email        string                    `json:"email,omitempty"`
+	AccountID    string                    `json:"account_id,omitempty"`
+	AccessToken  string                    `json:"access_token"`
+	RefreshToken string                    `json:"refresh_token,omitempty"`
+	ExpiresAt    time.Time                 `json:"expires_at,omitempty"`
+	LastRefresh  time.Time                 `json:"last_refresh,omitempty"`
+	Metadata     map[string]string         `json:"metadata,omitempty"`
+	Environment  *oauth.RequestEnvironment `json:"request_environment,omitempty"`
 }
 
 type Usage struct {

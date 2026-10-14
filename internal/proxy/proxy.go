@@ -172,6 +172,7 @@ type ClientProxy struct {
 	httpClient            *http.Client
 	providerHTTPClients   []*http.Client
 	providerProxyPolicies []upstreamProxyPolicyKey
+	accountHTTPClients    map[string]*http.Client
 	deactivated           []providerDeactivation
 	keyDeactivated        [][]providerDeactivation
 	providerBusy          []providerBusyState
@@ -201,6 +202,11 @@ func (cp *ClientProxy) Close() {
 		}
 		seen[client] = struct{}{}
 		client.CloseIdleConnections()
+	}
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	for _, client := range cp.accountHTTPClients {
+		closeClient(client)
 	}
 	closeClient(cp.httpClient)
 	for _, client := range cp.providerHTTPClients {

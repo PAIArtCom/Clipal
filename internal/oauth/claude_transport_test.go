@@ -2,10 +2,14 @@ package oauth
 
 import (
 	"context"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -112,5 +116,93 @@ func TestClaudeExchangeCode_DefaultClientSupportsLocalTokenOverride(t *testing.T
 	}
 	if got := cred.Email; got != "sean@example.com" {
 		t.Fatalf("email = %q, want sean@example.com", got)
+	}
+}
+
+func TestAnthropicAccountDialerPreservesTLSRootsAndHost(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor != 2 || r.Host != "example.com" || r.TLS.ServerName != "example.com" {
+			t.Errorf("protocol/Host/SNI=%d/%s/%s", r.ProtoMajor, r.Host, r.TLS.ServerName)
+		}
+		_, _ = io.WriteString(w, "ok")
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	base := &anthropicFallbackRoundTripper{fallback: server.Client().Transport}
+	configured, ok := base.WithDialContext(func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, strings.TrimPrefix(server.URL, "https://"))
+	}).(*anthropicFallbackRoundTripper)
+	if !ok {
+		t.Fatal("expected Anthropic transport")
+	}
+	defer configured.CloseIdleConnections()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.com/", nil)
+	// Exercise the native TLS adapter itself while retaining original Host/SNI.
+	resp, err := configured.anthropic.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if string(data) != "ok" {
+		t.Fatalf("response=%q", data)
+	}
+}
+
+func TestNativeClaudeAccountClientRetainsTargetProxyPolicy(t *testing.T) {
+	entry, err := url.Parse("http://127.0.0.1:3128")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var addresses []string
+	fallback := &http.Transport{
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			if req.URL.Hostname() == "no-proxy.example" {
+				return nil, nil
+			}
+			return entry, nil
+		},
+		DialContext: func(_ context.Context, _, addr string) (net.Conn, error) {
+			mu.Lock()
+			addresses = append(addresses, addr)
+			mu.Unlock()
+			return nil, errors.New("fixture dial failure")
+		},
+	}
+	original := &http.Client{Transport: &anthropicFallbackRoundTripper{anthropic: newAnthropicUTLSRoundTripper(), fallback: fallback}}
+	client, err := EnvironmentHTTPClient(original, &RequestEnvironment{DNS: "auto"}, "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdleConnections()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.anthropic.com/", nil)
+	if _, err := client.Do(req); err == nil {
+		t.Fatal("expected fixture connection failure")
+	}
+	mu.Lock()
+	got := append([]string(nil), addresses...)
+	addresses = nil
+	mu.Unlock()
+	if len(got) != 1 || got[0] != "127.0.0.1:3128" {
+		t.Fatalf("proxy business request bypassed its entry or queried DoH: %v", got)
+	}
+	req, _ = http.NewRequestWithContext(ctx, http.MethodGet, "https://no-proxy.example/", nil)
+	if _, err := client.Do(req); err == nil {
+		t.Fatal("expected fixture DNS failure")
+	}
+	mu.Lock()
+	got = append([]string(nil), addresses...)
+	mu.Unlock()
+	if len(got) != 2 || got[0] != "1.1.1.1:443" || got[1] != "8.8.8.8:443" {
+		t.Fatalf("no-proxy route did not retain automatic DNS: %v", got)
+	}
+	if fallback.Proxy == nil {
+		t.Fatal("account wrapper mutated the original transport")
 	}
 }

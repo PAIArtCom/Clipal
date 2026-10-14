@@ -8,9 +8,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 )
+
+var credentialWriteMu sync.Mutex
 
 type Store struct {
 	rootDir            string
@@ -39,6 +42,8 @@ func (s *Store) Save(cred *Credential) error {
 		return fmt.Errorf("credential is nil")
 	}
 	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
 	provider := normalizeProvider(cred.Provider)
 	ref := strings.TrimSpace(cred.Ref)
 	if provider == "" {
@@ -61,6 +66,13 @@ func (s *Store) Save(cred *Credential) error {
 		toSave.Ref = s.disambiguateRef(entries, toSave)
 	}
 
+	if existing != nil && existing.Environment != nil {
+		toSave.Environment = existing.Environment.Clone()
+	}
+	toSave.Environment, err = NormalizeEnvironment(toSave, toSave.Environment)
+	if err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(toSave, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal credential: %w", err)
@@ -76,6 +88,7 @@ func (s *Store) Save(cred *Credential) error {
 			return err
 		}
 	}
+	toSave.environmentPendingWrite = false
 	*cred = *toSave.Clone()
 	return nil
 }
@@ -130,6 +143,8 @@ func (s *Store) Load(provider config.OAuthProvider, ref string) (*Credential, er
 		return nil, fmt.Errorf("store is nil")
 	}
 	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
 	path, err := s.resolvePath(provider, ref)
 	if err != nil {
 		return nil, err
@@ -142,6 +157,8 @@ func (s *Store) List(provider config.OAuthProvider) ([]Credential, error) {
 		return nil, fmt.Errorf("store is nil")
 	}
 	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
 	entries, err := s.scanCredentials(provider)
 	if err != nil {
 		return nil, err
@@ -158,6 +175,8 @@ func (s *Store) Delete(provider config.OAuthProvider, ref string) error {
 		return fmt.Errorf("store is nil")
 	}
 	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
 	path, err := s.resolvePath(provider, ref)
 	if os.IsNotExist(err) {
 		return nil
@@ -177,6 +196,8 @@ func (s *Store) DeleteWithRollback(provider config.OAuthProvider, ref string) (f
 		return nil, fmt.Errorf("store is nil")
 	}
 	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
 	path, err := s.resolvePath(provider, ref)
 	if os.IsNotExist(err) {
 		return func() error { return nil }, nil
@@ -193,6 +214,8 @@ func (s *Store) DeleteWithRollback(provider config.OAuthProvider, ref string) (f
 	}
 	return func() error {
 		defer s.lockShared()()
+		credentialWriteMu.Lock()
+		defer credentialWriteMu.Unlock()
 		return backup.restore()
 	}, nil
 }
@@ -270,6 +293,16 @@ func (s *Store) loadFile(path string) (*Credential, error) {
 	}
 	cred.Provider = normalizeProvider(cred.Provider)
 	cred.Ref = strings.TrimSpace(cred.Ref)
+	if cred.Provider != "" && cred.Ref != "" {
+		env, err := NormalizeEnvironment(&cred, cred.Environment)
+		if err != nil {
+			return nil, err
+		}
+		// Loading/listing, including transfer preview and export, is read-only.
+		// Save or explicit request initialization persists this normalized profile.
+		cred.environmentPendingWrite = cred.Environment == nil || *cred.Environment != *env
+		cred.Environment = env
+	}
 	return cred.Clone(), nil
 }
 
@@ -504,4 +537,72 @@ func atomicWriteFile(path string, data []byte, perm fs.FileMode) error {
 	}
 	success = true
 	return nil
+}
+
+// UpdateEnvironment changes only account-owned request settings. Serializing it
+// with Save prevents a concurrent token refresh from overwriting the profile.
+func (s *Store) UpdateEnvironment(provider config.OAuthProvider, ref string, environment *RequestEnvironment) (*Credential, error) {
+	return s.updateEnvironment(provider, ref, func(cred *Credential) (*RequestEnvironment, error) {
+		return NormalizeEnvironment(cred, environment)
+	})
+}
+
+// PersistEnvironment saves normalization without changing request preferences or tokens.
+func (s *Store) PersistEnvironment(snapshot *Credential) (*Credential, error) {
+	return s.updateAccountEnvironment(snapshot, func(cred *Credential) (*RequestEnvironment, error) { return cred.Environment.Clone(), nil })
+}
+
+// ConfigureRegion explicitly confirms or edits the account's shared preferences.
+func (s *Store) ConfigureRegion(snapshot *Credential, options RegionOptions) (*Credential, error) {
+	options.Source = "user"
+	return s.updateAccountEnvironment(snapshot, func(cred *Credential) (*RequestEnvironment, error) {
+		env, err := NewAccountEnvironment(cred, &options)
+		if err != nil {
+			return nil, err
+		}
+		env.DNS = cred.Environment.DNS
+		if env.Country == cred.Environment.Country {
+			env.Language = cred.Environment.Language
+			env.Locale = cred.Environment.Locale
+		}
+		return NormalizeEnvironment(cred, env)
+	})
+}
+func (s *Store) updateAccountEnvironment(snapshot *Credential, update func(*Credential) (*RequestEnvironment, error)) (*Credential, error) {
+	if snapshot == nil {
+		return nil, fmt.Errorf("credential is required")
+	}
+	return s.updateEnvironment(snapshot.Provider, snapshot.Ref, func(cred *Credential) (*RequestEnvironment, error) {
+		if AccountEnvironmentIdentity(cred) != AccountEnvironmentIdentity(snapshot) {
+			return nil, fmt.Errorf("OAuth account changed while editing environment")
+		}
+		return update(cred)
+	})
+}
+
+func (s *Store) updateEnvironment(provider config.OAuthProvider, ref string, update func(*Credential) (*RequestEnvironment, error)) (*Credential, error) {
+	defer s.lockShared()()
+	credentialWriteMu.Lock()
+	defer credentialWriteMu.Unlock()
+	path, err := s.resolvePath(provider, ref)
+	if err != nil {
+		return nil, err
+	}
+	cred, err := s.loadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	cred.Environment, err = update(cred)
+	if err != nil {
+		return nil, err
+	}
+	data, err := json.MarshalIndent(cred, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if err := atomicWriteFile(path, append(data, '\n'), 0o600); err != nil {
+		return nil, err
+	}
+	cred.environmentPendingWrite = false
+	return cred.Clone(), nil
 }

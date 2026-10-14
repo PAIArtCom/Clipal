@@ -55,7 +55,7 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 	applyAntigravityOAuthHeaderDefaults(proxyReq, requestCtx.Capability, accessToken)
 	proxyReq.ContentLength = int64(len(rewrittenBody))
 	proxyReq.Header.Del("Content-Length")
-	return proxyReq, nil
+	return applyOAuthEnvironment(proxyReq, cred)
 }
 
 func antigravityOAuthBaseURL() string {

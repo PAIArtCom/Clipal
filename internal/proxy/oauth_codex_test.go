@@ -240,6 +240,7 @@ func TestCreateCodexOAuthRequest_RefreshUsesProviderCustomProxy(t *testing.T) {
 		RefreshToken: "refresh-1",
 		ExpiresAt:    now.Add(-time.Minute),
 		LastRefresh:  now.Add(-time.Hour),
+		Environment:  &oauthpkg.RequestEnvironment{Country: "US", DNS: "system"},
 	}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -407,7 +408,7 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if got := proxyReq.Header.Get("Thread-Id"); got != "thread-123" {
 		t.Fatalf("Thread-Id = %q", got)
 	}
-	if got := proxyReq.Header.Get("X-Codex-Installation-Id"); got != "install-123" {
+	if got := proxyReq.Header.Get("X-Codex-Installation-Id"); got != oauthpkg.AccountDeviceID(&oauthpkg.Credential{Provider: config.OAuthProviderCodex, Ref: "codex-sean-example-com", Email: "sean@example.com", AccountID: "acct_123"}) {
 		t.Fatalf("X-Codex-Installation-Id = %q", got)
 	}
 	if got := proxyReq.Header.Get("X-Codex-Window-Id"); got != "thread-123:0" {
@@ -457,7 +458,7 @@ func TestCreateProxyRequest_CodexOAuthStreamingUsesResponsesEndpoint(t *testing.
 	if !ok {
 		t.Fatalf("client_metadata = %T %#v", root["client_metadata"], root["client_metadata"])
 	}
-	if got := metadata["x-codex-installation-id"]; got != "install-123" {
+	if got := metadata["x-codex-installation-id"]; got != proxyReq.Header.Get("X-Codex-Installation-Id") {
 		t.Fatalf("client_metadata.x-codex-installation-id = %v", got)
 	}
 }
@@ -1068,7 +1069,7 @@ func TestCreateProxyRequest_CodexOAuthPreservesClientContextIdentifiers(t *testi
 	for key, want := range map[string]string{
 		"Session-Id":               "user@example.com",
 		"Thread-Id":                "sk-secret-thread",
-		"X-Codex-Installation-Id":  "provider.customer.raw_ref",
+		"X-Codex-Installation-Id":  oauthpkg.AccountDeviceID(&oauthpkg.Credential{Provider: config.OAuthProviderCodex, Ref: "codex-sean-example-com", Email: "sean@example.com"}),
 		"X-Codex-Parent-Thread-Id": "customer@example.com",
 		"X-Client-Request-Id":      "sk-secret-thread",
 		"X-Codex-Window-Id":        "sk-secret-thread:0",
@@ -1097,7 +1098,7 @@ func TestCreateProxyRequest_CodexOAuthPreservesClientContextIdentifiers(t *testi
 	if !ok {
 		t.Fatalf("client_metadata = %T %#v", root["client_metadata"], root["client_metadata"])
 	}
-	if got := metadata["x-codex-installation-id"]; got != "provider.customer.raw_ref" {
+	if got := metadata["x-codex-installation-id"]; got != proxyReq.Header.Get("X-Codex-Installation-Id") {
 		t.Fatalf("client_metadata.x-codex-installation-id = %v", got)
 	}
 }
@@ -1159,7 +1160,7 @@ func TestCreateProxyRequest_CodexOAuthPreservesAndCompletesBodyContext(t *testin
 	if !ok {
 		t.Fatalf("client_metadata = %T %#v", root["client_metadata"], root["client_metadata"])
 	}
-	if got := metadata["x-codex-installation-id"]; got != "client-install" {
+	if got := metadata["x-codex-installation-id"]; got != proxyReq.Header.Get("X-Codex-Installation-Id") {
 		t.Fatalf("client_metadata.x-codex-installation-id = %v", got)
 	}
 	if got := metadata["custom"]; got != "keep" {

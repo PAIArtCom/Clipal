@@ -431,7 +431,7 @@ else
   maybe_open_browser "$auth_url"
 fi
 
-echo "test: poll oauth session until provider is added"
+echo "test: poll oauth session until authorization completes"
 deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
 session_json=""
 while true; do
@@ -455,6 +455,14 @@ PY
   fi
   sleep 1
 done
+
+echo "test: explicitly link the authorized account to its provider"
+session_json="$(curl -fsS \
+  -X POST \
+  -H 'X-Clipal-UI: 1' \
+  -H 'Content-Type: application/json' \
+  --data '{"client_type":"openai"}' \
+  "http://127.0.0.1:$clipal_port/api/oauth/sessions/$session_id/link")"
 
 provider_name="$("$PY" - "$session_json" <<'PY'
 import json, sys

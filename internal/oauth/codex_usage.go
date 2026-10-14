@@ -118,7 +118,12 @@ func (s *Service) GetCodexUsageWithHTTPClient(ctx context.Context, ref string, h
 	if !ok {
 		return details, fmt.Errorf("unsupported oauth provider %q", config.OAuthProviderCodex)
 	}
-	client = providerClientWithHTTPClient(client, httpClient)
+	cred = s.PrepareEnvironment(cred)
+	client, err = providerClientWithEnvironment(client, httpClient, cred.Environment)
+	if err != nil {
+		return details, err
+	}
+	defer closeEnvironmentClient(client)
 	fetcher, ok := client.(codexUsageFetcher)
 	if !ok {
 		return details, fmt.Errorf("oauth provider %q does not support usage retrieval", config.OAuthProviderCodex)

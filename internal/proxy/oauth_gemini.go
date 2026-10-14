@@ -64,7 +64,7 @@ func (cp *ClientProxy) createGeminiOAuthRequestWithPayloadForProvider(original *
 	applyGeminiOAuthHeaders(proxyReq, modelName, requestCtx.Capability, accessToken)
 	proxyReq.ContentLength = int64(len(rewrittenBody))
 	proxyReq.Header.Del("Content-Length")
-	return proxyReq, nil
+	return applyOAuthEnvironment(proxyReq, cred)
 }
 
 func buildGeminiOAuthRequest(capability RequestCapability, path string, body []byte, projectID string) (string, string, []byte, error) {

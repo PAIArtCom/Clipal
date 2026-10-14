@@ -212,6 +212,7 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Antigravity` 直接发起授权
 - Add Provider 对话框也可以导入已有 OAuth 授权文件：Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。导入时会按当前选择的 OAuth 服务过滤账号。
 - 授权成功后，后端会根据账号身份生成稳定的内部 `name`，UI 里显示邮箱作为可读标签
+- OAuth 请求配置保存在凭据 `request_environment` 中。添加账号默认 US / `America/New_York`，来源为 `default` 或 `user`；导入保留原值，旧地区需要确认。代理使用 provider、全局和环境配置及 `NO_PROXY`，不探测控制器。账号 DNS 的 `auto` 有标准代理时由代理解析，无显式代理时使用 Cloudflare → Google DoH。保存的 `cloudflare`／`google` 值选择无代理时的 DNS 及可选诊断服务，不启用严格代理预检。代理 DoH 参考检查仅是单次诊断选项，不作为账号配置保存。见 [Web UI](web-ui.md#oauth-账号请求环境)。
 - OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
 - 只要存在 `refresh_token`，Clipal 会在 access token 临近过期时自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
 - 已创建的 OAuth provider 可以像普通 provider 一样排序、置顶、启停，但凭据修改需要重新授权，不走通用编辑表单

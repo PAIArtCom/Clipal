@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 const (
@@ -415,10 +417,14 @@ func ensureClaudeOAuthMetadata(root map[string]any, sessionID string) string {
 	return sessionID
 }
 
-func formatClaudeOAuthMetadataUserID(raw any, sessionID string) string {
+func formatClaudeOAuthMetadataUserID(raw any, sessionID string, accounts ...*oauthpkg.Credential) string {
 	existing := parseClaudeOAuthJSONObject(stringValue(raw))
 	deviceID := strings.TrimSpace(stringValue(existing["device_id"]))
 	accountUUID := strings.TrimSpace(stringValue(existing["account_uuid"]))
+	if len(accounts) > 0 && accounts[0] != nil && accounts[0].Environment != nil {
+		deviceID = accounts[0].Environment.DeviceID
+		accountUUID = accounts[0].AccountID
+	}
 	if deviceID == "" {
 		seed := accountUUID
 		if seed == "" {

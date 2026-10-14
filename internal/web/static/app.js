@@ -40,9 +40,64 @@ function app() {
         oauthAuthorization: defaultOAuthAuthorizationState(),
         integrations: [],
         integrationBusyProduct: '',
+        environmentVisible: false,
+        environmentBusy: false,
+        environmentCheckDoH: false,
+        environmentPath: '',
+        environmentAccount: '',
+        environmentIdentity: '',
+        environmentForm: { country: 'US', timezone: 'America/New_York' },
+        environmentUpstream: {},
+        environmentProfile: {},
+        environmentDiagnostics: null,
+        environmentGeneration: 0,
         serviceBusyAction: '',
         messages: {
             en: {
+                requestEnv: {
+                    "title": "OAuth request environment",
+                    "open": "Account environment",
+                    "country": "Request country / region",
+                    "source": "Configuration source",
+                    "pendingSource": "Unverified legacy values — confirmation required",
+                    "sources": { "default": "Default request configuration", "user": "User configuration", "unknown": "Not configured" },
+                    "confirmHint": "Legacy values may have been inferred from an exit. Review or change them, then save to confirm. Unconfirmed regions are not applied to requests.",
+                    "save": "Save / confirm account preferences",
+                    "upstream": "Credential region attributes (separate record)",
+                    "reference": "Reference service only — target exit unverified",
+                    "language": "Request language",
+                    "locale": "Locale",
+                    "timezone": "Request timezone (IANA)",
+                    "dns": "DNS resolution",
+                    "automatic": "Automatic: proxy resolution; Cloudflare → Google DoH without an explicit proxy",
+                    "resolverChoice": "No explicit proxy: {resolver} DoH; otherwise proxy resolution",
+                    "checkDoH": "Include public DoH reference for proxy routes",
+                    "checkDoHHint": "Optional when using a proxy. Failure does not block requests and results cannot verify the proxy's DNS or target exit.",
+                    "waiting": "Not configured",
+                    "direct": "No explicit proxy (system / TUN may apply)",
+                    "systemDNS": "System / proxy resolver",
+                    "device": "Stable account device ID",
+                    "fallbackIdentity": "Stable account identity (account ID unavailable)",
+                    "hint": "New accounts default to US / America/New_York; these request preferences do not prove registration or billing country. IANA timezones follow daylight saving automatically. Providers linked to the same account share saved settings. Imports preserve existing values. No system or Desktop changes.",
+                    "diagnose": "Check consistency",
+                    "checks": {
+                        "account_identity": "Account / device identity",
+                        "identity_source": "Identity source",
+                        "region": "Stored request region",
+                        "dns": "DNS route",
+                        "doh_reference": "Optional public DoH reference",
+                        "target_dns": "Final target DNS",
+                        "network_exit": "Network exit",
+                        "connection": "Target connection",
+                        "reference_exit": "Reference observation",
+                        "upstream_auth": "Upstream authentication"
+                    },
+                    "statuses": {
+                        "ok": "Verified",
+                        "pending": "Not verified",
+                        "mismatch": "Mismatch"
+                    }
+                },
                 meta: {
                     title: 'Clipal Management'
                 },
@@ -474,6 +529,50 @@ function app() {
                 }
             },
             'zh-CN': {
+                requestEnv: {
+                    "title": "OAuth 请求环境",
+                    "open": "账号环境",
+                    "country": "请求国家 / 地区",
+                    "source": "配置来源",
+                    "pendingSource": "旧值来源未核验，需要确认",
+                    "sources": { "default": "默认请求配置", "user": "用户配置", "unknown": "尚未配置" },
+                    "confirmHint": "旧值可能来自出口推断，请检查或修改后保存确认。未确认的地区不应用到请求。",
+                    "save": "保存 / 确认账号请求配置",
+                    "upstream": "凭据地区属性（单独记录）",
+                    "reference": "仅为参考服务观测，目标出口未核验",
+                    "language": "请求语言",
+                    "locale": "地区格式",
+                    "timezone": "请求时区（IANA）",
+                    "dns": "DNS 解析",
+                    "automatic": "自动：有代理时由代理解析；无显式代理时 Cloudflare → Google DoH",
+                    "resolverChoice": "无显式代理时使用 {resolver} DoH；有代理时由代理解析",
+                    "checkDoH": "代理下附加公共 DoH 参考诊断",
+                    "checkDoHHint": "使用代理时可选。失败不阻断请求，结果不能核验代理实际 DNS 或目标出口。",
+                    "waiting": "尚未配置",
+                    "direct": "未指定代理（系统 / TUN 可能生效）",
+                    "systemDNS": "系统 / 代理解析器",
+                    "device": "稳定账号设备标识",
+                    "fallbackIdentity": "稳定账号身份（尚无账号 ID）",
+                    "hint": "新账号默认 US / America/New_York，属于请求配置，不能证明注册地或账单国家。IANA 时区自动处理夏令时。同一账号关联的 provider 共享已保存设置；导入保留原值，不修改系统或 Desktop。",
+                    "diagnose": "检查一致性",
+                    "checks": {
+                        "account_identity": "账号 / 设备身份",
+                        "identity_source": "身份来源",
+                        "region": "已保存请求地区",
+                        "dns": "DNS 路径",
+                        "doh_reference": "可选公共 DoH 参考",
+                        "target_dns": "目标最终解析",
+                        "network_exit": "网络出口",
+                        "connection": "目标连接",
+                        "reference_exit": "参考观测",
+                        "upstream_auth": "上游认证"
+                    },
+                    "statuses": {
+                        "ok": "已核验",
+                        "pending": "尚未核验",
+                        "mismatch": "存在差异"
+                    }
+                },
                 meta: {
                     title: 'Clipal 管理界面'
                 },
@@ -993,6 +1092,9 @@ function app() {
             auth_type: 'api_key',
             oauth_provider: 'codex',
             oauth_ref: '',
+            request_country: 'US',
+            request_timezone: 'America/New_York',
+            request_environment_source: 'default',
             name: '',
             base_url: '',
             proxy_mode: 'default',
@@ -1986,6 +2088,114 @@ function app() {
             if (state === 'cooling_down' || state === 'unavailable') return 'chip-warn';
             if (state === 'recovery_probe') return 'chip-info';
             return '';
+        },
+
+
+        async openEnvironment(provider) {
+            if (!this.providerUsesOAuth(provider)) return;
+            const generation = ++this.environmentGeneration;
+            this.environmentPath = `/api/providers/${this.selectedClient}/${encodeURIComponent(provider.name)}`;
+            this.environmentVisible = true;
+            this.environmentBusy = true;
+            this.environmentDiagnostics = null;
+            this.environmentCheckDoH = false;
+            this.environmentProfile = {};
+            this.environmentIdentity = '';
+            this.environmentUpstream = {};
+            this.environmentForm = { country: 'US', timezone: 'America/New_York' };
+            this.environmentAccount = '';
+            try {
+                const data = await this.apiCall(this.environmentPath + '/oauth-environment', {}, true);
+                if (generation !== this.environmentGeneration) return;
+                this.environmentProfile = { ...data.environment };
+                this.environmentAccount = data.account_id || this.t('requestEnv.fallbackIdentity');
+                this.environmentIdentity = data.account_identity || '';
+                this.environmentUpstream = data.upstream_region || {};
+                this.environmentForm = { country: data.environment.country || 'US', timezone: data.environment.timezone || 'America/New_York' };
+            } catch (_) {
+                // apiCall displays the failure; keep the dialog available for retry.
+            } finally {
+                if (generation === this.environmentGeneration) this.environmentBusy = false;
+            }
+        },
+        async saveEnvironment() {
+            if (this.environmentBusy || !this.environmentIdentity) return;
+            const generation = this.environmentGeneration;
+            this.environmentBusy = true;
+            try {
+                const data = await this.apiCall(this.environmentPath + '/oauth-environment', {
+                    method: 'PUT', body: JSON.stringify({ country: this.environmentForm.country, timezone: this.environmentForm.timezone, account_identity: this.environmentIdentity })
+                }, true);
+                if (generation !== this.environmentGeneration) return;
+                this.environmentProfile = { ...data.environment };
+                this.environmentDiagnostics = null;
+                this.environmentForm = { country: data.environment.country, timezone: data.environment.timezone };
+            } catch (_) {
+                // apiCall reports the error; preserve user input for correction.
+            } finally {
+                if (generation === this.environmentGeneration) this.environmentBusy = false;
+            }
+        },
+        environmentDNSLabel() {
+            const dns = this.environmentProfile.dns || 'auto';
+            return dns === 'auto' ? this.t('requestEnv.automatic') : dns === 'system' ? this.t('requestEnv.systemDNS') : this.tf('requestEnv.resolverChoice', { resolver: dns === 'google' ? 'Google' : 'Cloudflare' });
+        },
+        environmentSourceLabel() {
+            if (this.environmentProfile.needs_confirmation) return this.t('requestEnv.pendingSource');
+            return this.t('requestEnv.sources.' + (this.environmentProfile.source || 'unknown'));
+        },
+        environmentCheckDetail(check) {
+            if (this.locale !== 'zh-CN') return check.detail;
+            const details = {
+                'Persistent device ID matches this OAuth account.': '持久设备标识与当前 OAuth 账号一致。',
+                'Account ID is unavailable; device ID uses the stable account identity fallback.': '尚无账号 ID，设备标识使用稳定账号身份生成。',
+                'Request region requires user confirmation; it is not inferred from network exits.': '请求地区需要用户确认，不根据网络出口推断。',
+                'Request preferences are stored on the account; they do not prove registration or billing country.': '请求配置已按账号保存，不能证明注册地或账单国家。',
+                'Target proxy policy failed.': '目标代理策略无法解析。',
+                'Account DNS transport could not be created.': '无法建立账号 DNS 连接。',
+                'DNS follows the system or proxy resolver; Google/Cloudflare is not enforced.': '此凭据沿用系统或代理解析器，尚未核验 Cloudflare / Google DoH。',
+                'Account DoH lookup failed; no system DNS fallback was used.': '账号 DoH 查询失败，未回退系统 DNS。',
+                'Target hostnames are delegated to the standard proxy; public DoH is not required.': '目标域名交给标准代理解析，不依赖公共 DoH。',
+                "The proxy's actual DNS backend and target addresses are unverified.": '尚未核验代理实际使用的 DNS 后端及目标地址。',
+                'Optional DoH reference lookup failed; proxy requests do not depend on it.': '可选 DoH 参考查询失败；代理请求不依赖此查询。',
+                'Target resolution follows the system resolver; system/TUN routing is not observed.': '目标域名由系统解析器处理；尚未观测系统或 TUN 路由。',
+                'Target connections use DoH returned addresses with original Host and TLS SNI.': '目标连接使用 DoH 返回的地址，保留原始 Host 与 TLS SNI。',
+                'Target HTTP connection succeeded without account credentials; authentication is unverified.': '目标 HTTP 连接成功，未发送账号凭据；认证尚未核验。',
+                'Target connection did not complete; no fallback route was used.': '目标连接未完成，未切换其他路径。',
+                'Reference service observation only; it does not prove the target exit or account country.': '仅为参考服务的观测，不能证明目标出口或账号国家。',
+                'No reference service observation was available on the selected entry.': '当前入口未获得参考服务观测。',
+                'The target exit is unverified; matching proxy entries do not prove matching egress.': '目标出口尚未核验；相同代理入口不能证明相同出口。',
+                'No token refresh or paid model request was sent by this diagnostic.': '诊断未发送 token 刷新或付费模型请求，未验证上游认证。'
+            };
+            const resolver = /^(cloudflare|google) DoH succeeded/.exec(check.detail || '');
+            if (resolver) return `${resolver[1] === 'cloudflare' ? 'Cloudflare' : 'Google'} DoH 已通过当前入口核验。`;
+            const reference = /^(cloudflare|google) DoH reference lookup succeeded/.exec(check.detail || '');
+            if (reference) return `${reference[1] === 'cloudflare' ? 'Cloudflare' : 'Google'} DoH 参考查询成功，不能证明代理实际 DNS 或目标出口。`;
+            return details[check.detail] || check.detail;
+        },
+        environmentBootstrapDetail() {
+            const value = this.environmentDiagnostics?.bootstrap_dns || '';
+            if (this.locale !== 'zh-CN') return value;
+            if (!value) return '';
+            let detail = value.includes('for proxy requests') ? '代理业务请求不使用 DoH，由代理解析目标域名' : value.includes('DoH is not used') ? '未使用 DoH' : 'DoH 固定引导 IP 连接，未指定显式代理';
+            if (value.includes('system DNS resolves')) detail += '；代理域名第一跳由系统 DNS 解析';
+            return detail;
+        },
+
+        async diagnoseEnvironment() {
+            if (this.environmentBusy) return;
+            const generation = this.environmentGeneration;
+            this.environmentBusy = true;
+            try {
+                const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH }) }, true);
+                if (generation !== this.environmentGeneration) return;
+                this.environmentDiagnostics = report;
+                this.environmentProfile = { ...report.environment };
+            } catch (_) {
+                // apiCall displays the failure.
+            } finally {
+                if (generation === this.environmentGeneration) this.environmentBusy = false;
+            }
         },
 
         // API Calls
@@ -3903,6 +4113,7 @@ function app() {
             const payload = {
                 client_type: this.selectedClient,
                 provider,
+                request_environment: { country: this.providerForm.request_country ?? 'US', timezone: this.providerForm.request_timezone ?? 'America/New_York', source: this.providerForm.request_environment_source || 'default' },
                 proxy_mode: proxyMode
             };
             if (proxyMode === 'custom') {
@@ -4160,6 +4371,9 @@ function app() {
                 auth_type: 'api_key',
                 oauth_provider: this.defaultOAuthProviderValue(),
                 oauth_ref: '',
+                request_country: 'US',
+                request_timezone: 'America/New_York',
+                request_environment_source: 'default',
                 name: '',
                 base_url: '',
                 proxy_mode: 'default',
@@ -4469,6 +4683,9 @@ function app() {
                 auth_type: 'api_key',
                 oauth_provider: this.defaultOAuthProviderValue(),
                 oauth_ref: '',
+                request_country: 'US',
+                request_timezone: 'America/New_York',
+                request_environment_source: 'default',
                 name: '',
                 base_url: '',
                 proxy_mode: 'default',

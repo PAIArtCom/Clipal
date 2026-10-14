@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clipal Management</title>
+
     <script>
         (function () {
             try {
@@ -208,6 +209,7 @@
                                 <button @click="pinProvider(provider.name)" class="icon-btn"
                                     :class="{'pin-active': clientConfig.mode === 'manual' && provider.name === clientConfig.pinned_provider}"
                                     :title="providerPinTitle(provider)" :disabled="!provider.enabled">📌</button>
+                                <button x-show="providerUsesOAuth(provider)" @click="openEnvironment(provider)" class="icon-btn" :title="t('requestEnv.open')" :aria-label="t('requestEnv.open')">🌐</button>
                                 <button @click="editProvider(provider)" class="icon-btn"
                                     :title="providerEditTitle(provider)" :disabled="providerUsesOAuth(provider)">✏️</button>
                                 <button @click="deleteProvider(provider)" class="icon-btn danger"
@@ -1104,6 +1106,11 @@
                         </div>
                     </div>
 
+                    <label class="form-label" for="oauth-request-country" x-show="providerFormUsesOAuth() && !showEditProviderModal" x-text="t('requestEnv.country')"></label>
+                    <div class="form-control-wrap" x-show="providerFormUsesOAuth() && !showEditProviderModal"><input id="oauth-request-country" class="form-input" x-model="providerForm.request_country" @input="providerForm.request_environment_source = 'user'" maxlength="2" pattern="[A-Za-z]{2}" placeholder="US"><p class="form-hint" x-text="t('requestEnv.hint')"></p></div>
+                    <label class="form-label" for="oauth-request-timezone" x-show="providerFormUsesOAuth() && !showEditProviderModal" x-text="t('requestEnv.timezone')"></label>
+                    <div class="form-control-wrap" x-show="providerFormUsesOAuth() && !showEditProviderModal"><input id="oauth-request-timezone" class="form-input" x-model="providerForm.request_timezone" @input="providerForm.request_environment_source = 'user'" placeholder="America/New_York"></div>
+
                     <label class="form-label" x-show="!providerFormUsesOAuth()" x-text="t('modal.provider.name')"></label>
                     <div class="form-control-wrap" x-show="!providerFormUsesOAuth()">
                         <input type="text" x-model="providerForm.name" class="form-input"
@@ -1249,6 +1256,35 @@
     </div>
 
     <script src="/static/app.js"></script>
+    <div class="modal-backdrop" :class="{show: environmentVisible}" x-show="environmentVisible" x-cloak @click.self="!environmentBusy && (environmentVisible = false)" @keydown.escape.window="!environmentBusy && (environmentVisible = false)">
+        <div class="modal" role="dialog" aria-modal="true" :aria-label="t('requestEnv.title')" style="max-width: 680px;">
+            <div class="modal-header"><h2 id="environment-title" x-text="t('requestEnv.title')"></h2><button class="icon-btn" :disabled="environmentBusy" @click="environmentVisible = false" :aria-label="t('common.cancel')">×</button></div>
+            <div class="modal-body">
+                <p class="form-hint" x-text="t('requestEnv.hint')"></p>
+                <p class="form-hint" x-text="environmentAccount"></p>
+                <p class="form-hint" x-show="environmentProfile.needs_confirmation" x-text="t('requestEnv.confirmHint')"></p>
+                <div class="form-group"><span class="form-label" x-text="t('requestEnv.source')"></span><p x-text="environmentSourceLabel()"></p></div>
+                <div class="form-group"><label class="form-label" for="account-country" x-text="t('requestEnv.country')"></label><input id="account-country" class="form-input" x-model="environmentForm.country" maxlength="2" pattern="[A-Za-z]{2}" :disabled="environmentBusy"></div>
+                <div class="form-group"><label class="form-label" for="account-timezone" x-text="t('requestEnv.timezone')"></label><input id="account-timezone" class="form-input" x-model="environmentForm.timezone" placeholder="America/New_York" :disabled="environmentBusy"></div>
+                <template x-for="field in ['language', 'locale']" :key="field"><div class="form-group"><span class="form-label" x-text="t('requestEnv.' + field)"></span><p x-text="environmentProfile[field] || t('requestEnv.waiting')"></p></div></template>
+                <div class="form-group" x-show="Object.keys(environmentUpstream).length"><span class="form-label" x-text="t('requestEnv.upstream')"></span><p x-text="[environmentUpstream.country_code || environmentUpstream.country, environmentUpstream.timezone].filter(Boolean).join(' · ')"></p></div>
+                <div class="form-group"><span class="form-label" x-text="t('requestEnv.dns')"></span><p x-text="environmentDNSLabel()"></p></div>
+                <div class="form-group"><label class="form-label"><input type="checkbox" x-model="environmentCheckDoH" :disabled="environmentBusy"> <span x-text="t('requestEnv.checkDoH')"></span></label><p class="form-hint" x-text="t('requestEnv.checkDoHHint')"></p></div>
+                <div class="form-group"><span class="form-label" x-text="t('requestEnv.device')"></span><code style="overflow-wrap: anywhere;" x-text="environmentProfile.device_id || '…'"></code></div>
+                <template x-if="environmentDiagnostics"><div>
+                    <p class="form-hint" x-text="environmentDiagnostics.checked_at"></p>
+                    <p class="form-hint" x-text="t('requestEnv.reference')"></p><p class="form-hint" x-text="environmentDiagnostics.observation_source"></p>
+                    <p class="form-hint" x-text="[environmentDiagnostics.exit_ip, environmentDiagnostics.exit_country, environmentDiagnostics.exit_timezone].filter(Boolean).join(' · ')"></p>
+                    <p class="form-hint" x-text="environmentDiagnostics.proxy_hint || t('requestEnv.direct')"></p>
+                    <p class="form-hint" x-text="environmentBootstrapDetail()"></p>
+                    <template x-for="check in environmentDiagnostics.checks" :key="check.name"><p><strong x-text="t('requestEnv.checks.' + check.name)"></strong>: <span x-text="t('requestEnv.statuses.' + check.status)"></span><small class="form-hint" style="display: block;" x-text="environmentCheckDetail(check)"></small></p></template>
+                </div></template>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary" :disabled="environmentBusy || !environmentIdentity" @click="saveEnvironment()" x-text="t('requestEnv.save')"></button><button class="btn btn-secondary" :disabled="environmentBusy" @click="diagnoseEnvironment()" x-text="environmentBusy ? t('common.working') : t('requestEnv.diagnose')"></button></div>
+        </div>
+    </div>
+
+
 </body>
 
 </html>
