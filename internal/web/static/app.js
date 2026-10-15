@@ -28,6 +28,8 @@ function app() {
         locale: document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en',
         supportedLocales: ['en', 'zh-CN'],
         activeTab: 'providers',
+        tabNames: ['providers', 'integrations', 'settings', 'data', 'services', 'status'],
+        savedGlobalConfig: null,
         servicePoll: null,
         selectedClient: 'claude',
         oauthProviders: [],
@@ -110,6 +112,7 @@ function app() {
                     providers: 'Providers',
                     integrations: 'CLI Takeover',
                     settings: 'Global Settings',
+                    data: 'Backup & Import',
                     services: 'Services',
                     status: 'System Status'
                 },
@@ -131,6 +134,7 @@ function app() {
                     reset: 'Reset',
                     export: 'Export',
                     cancel: 'Cancel',
+                    confirmTitle: 'Please confirm',
                     show: 'Show',
                     hide: 'Hide',
                     refresh: 'Refresh',
@@ -227,6 +231,7 @@ function app() {
                     addedTitle: 'Added provider {provider}',
                     addedMessage: 'The provider is now available for {client}.',
                     deleteConfirm: 'Are you sure you want to delete provider "{name}"?',
+                    deleteKeysNote: 'Its {count} configured API key(s) will be permanently removed.',
                     deletedTitle: 'Deleted provider {name}',
                     deletedMessage: 'It has been removed from {client}\'s provider list.',
                     clientTypeLabel: 'Client Type',
@@ -326,7 +331,12 @@ function app() {
                     listenAddress: 'Listen Address',
                     allowRemoteProxy: 'Allow Remote Proxy',
                     allowRemoteWebUI: 'Allow Remote Web UI',
-                    remoteAccessHint: 'Remote access is unauthenticated. Protect it with your firewall, VPN, or reverse proxy.',
+                    remoteProxyHint: 'Lets other machines send model requests through this Clipal. Requests are not authenticated; protect the port with a firewall, VPN, or reverse proxy.',
+                    remoteWebUIHint: 'Exposes this management UI, including provider API keys and OAuth tokens, to other machines. There is no built-in authentication.',
+                    remoteWebUIWarning: 'Anyone who can reach this port can read and change your configuration. Only enable it behind a firewall, VPN, or authenticating reverse proxy.',
+                    remoteWebUIConfirmTitle: 'Expose the Web UI remotely?',
+                    remoteWebUIConfirm: 'The management UI has no authentication. Anyone who can reach this port can read your API keys and OAuth tokens.',
+                    remoteWebUIConfirmAction: 'Enable and save',
                     port: 'Port',
                     logLevel: 'Log Level',
                     maxBodySize: 'Max Body Size',
@@ -372,6 +382,14 @@ function app() {
                     maxInlineWaitHint: 'How long Clipal may wait before overflowing to another provider.',
                     enableStickySessions: 'Enable Sticky Sessions',
                     enableBusyBackpressure: 'Enable Busy Backpressure',
+                    dataTitle: 'Backup & Import',
+                    dataSubtitle: 'Export a full backup or import data. These actions run immediately and are separate from Global Settings.',
+                    unsaved: 'Unsaved changes',
+                    restartRequired: 'Restart required',
+                    restartNotice: 'Listen address or port changed. Restart Clipal for it to take effect.',
+                    unsavedTitle: 'Discard unsaved settings?',
+                    unsavedMessage: 'You have unsaved changes in Global Settings. Leaving this page will discard them.',
+                    discardChanges: 'Discard changes',
                     footerHint: 'Saving updates `config.yaml`. Some runtime changes may require restart to take full effect.',
                     saveSettings: 'Save Settings',
                     saveSuccess: 'Configuration saved. Some changes may require restart.',
@@ -585,6 +603,7 @@ function app() {
                     providers: 'Providers',
                     integrations: 'CLI 接管',
                     settings: '全局设置',
+                    data: '备份与导入',
                     services: '服务',
                     status: '系统状态'
                 },
@@ -606,6 +625,7 @@ function app() {
                     reset: '重置',
                     export: '导出',
                     cancel: '取消',
+                    confirmTitle: '请确认',
                     show: '展开',
                     hide: '收起',
                     refresh: '刷新',
@@ -701,6 +721,7 @@ function app() {
                     addedTitle: '已添加 Provider {provider}',
                     addedMessage: '这个 Provider 现在可供 {client} 使用。',
                     deleteConfirm: '确认删除 Provider “{name}” 吗？',
+                    deleteKeysNote: '其已配置的 {count} 个 API Key 将被永久移除。',
                     deletedTitle: '已删除 Provider {name}',
                     deletedMessage: '它已从 {client} 的 Provider 列表中移除。',
                     clientTypeLabel: '客户端类型',
@@ -800,7 +821,12 @@ function app() {
                     listenAddress: '监听地址',
                     allowRemoteProxy: '允许远程代理访问',
                     allowRemoteWebUI: '允许远程 Web UI 访问',
-                    remoteAccessHint: '远程访问没有内置认证，请使用防火墙、VPN 或反向代理进行保护。',
+                    remoteProxyHint: '允许其他机器通过本机 Clipal 发送模型请求。请求不做身份认证，请用防火墙、VPN 或反向代理保护该端口。',
+                    remoteWebUIHint: '管理界面（含 Provider API Key 与 OAuth 令牌）将对其他机器开放，且没有内置认证。',
+                    remoteWebUIWarning: '任何能访问该端口的人都可以读取并修改你的配置。请仅在防火墙、VPN 或带认证的反向代理之后开启。',
+                    remoteWebUIConfirmTitle: '确认对外开放 Web UI？',
+                    remoteWebUIConfirm: '管理界面没有认证。任何能访问该端口的人都能读取你的 API Key 和 OAuth 令牌。',
+                    remoteWebUIConfirmAction: '开启并保存',
                     port: '端口',
                     logLevel: '日志级别',
                     maxBodySize: '最大请求体大小',
@@ -846,6 +872,14 @@ function app() {
                     maxInlineWaitHint: 'Clipal 在溢出到其他 Provider 前可等待的最长时间。',
                     enableStickySessions: '启用粘性会话',
                     enableBusyBackpressure: '启用 Busy Backpressure',
+                    dataTitle: '备份与导入',
+                    dataSubtitle: '导出完整备份或导入数据。这些操作会立即执行，与“全局设置”的保存无关。',
+                    unsaved: '有未保存的修改',
+                    restartRequired: '需重启',
+                    restartNotice: '监听地址或端口已修改，需重启 Clipal 后生效。',
+                    unsavedTitle: '放弃未保存的设置？',
+                    unsavedMessage: '“全局设置”中有未保存的修改，离开此页将丢弃它们。',
+                    discardChanges: '放弃修改',
                     footerHint: '保存会更新 `config.yaml`。部分运行时改动需要重启后才会完全生效。',
                     saveSettings: '保存设置',
                     saveSuccess: '配置已保存。部分改动可能需要重启。',
@@ -1082,6 +1116,10 @@ function app() {
             stdout_path: '',
             stderr_path: ''
         },
+        confirmDialog: { visible: false, title: '', message: '', detail: '', confirmLabel: '', danger: false },
+        confirmResolver: null,
+        globalSaving: false,
+        savedAllowRemoteWebUI: false,
         toasts: [],
         toastCounter: 0,
         toastTimeouts: {},
@@ -1152,7 +1190,81 @@ function app() {
             return Object.values(this.status.clients || {}).some(client => (client.enabled_providers || []).length > 0);
         },
         setupIntegrationReady() { return (this.integrations || []).some(item => item.state === 'configured'); },
-        openSetupTab(tab) { this.activeTab = tab; },
+        openSetupTab(tab) { return this.setTab(tab); },
+
+        // Switches the visible tab; leaving Global Settings with unsaved edits asks first.
+        async setTab(tab) {
+            if (!this.tabNames.includes(tab) || tab === this.activeTab) return true;
+            if (this.activeTab === 'settings' && this.globalDirty) {
+                const ok = await this.askConfirm({
+                    title: this.t('settings.unsavedTitle'),
+                    message: this.t('settings.unsavedMessage'),
+                    confirmLabel: this.t('settings.discardChanges'),
+                    danger: true
+                });
+                if (!ok) {
+                    this.syncHash();
+                    return false;
+                }
+                this.globalConfig = JSON.parse(JSON.stringify(this.savedGlobalConfig));
+            }
+            this.activeTab = tab;
+            return true;
+        },
+
+        moveTab(direction) {
+            const names = this.tabNames;
+            const current = names.indexOf(this.activeTab);
+            let next = current;
+            if (direction === 'first') next = 0;
+            else if (direction === 'last') next = names.length - 1;
+            else next = (current + direction + names.length) % names.length;
+            this.setTab(names[next]).then(() => {
+                this.$nextTick(() => {
+                    const el = document.getElementById('tabbtn-' + this.activeTab);
+                    if (el && typeof el.focus === 'function') el.focus();
+                });
+            });
+        },
+
+        // Hash routing: #/<tab>[/<client>] keeps tab and client across reloads and in history.
+        parseHash() {
+            const raw = String((window.location && window.location.hash) || '').replace(/^#\/?/, '');
+            const [tab, client] = raw.split('/');
+            return { tab: tab || '', client: client || '' };
+        },
+
+        hashForState() {
+            const parts = [this.activeTab];
+            if (this.activeTab === 'providers') parts.push(this.selectedClient);
+            return '#/' + parts.join('/');
+        },
+
+        syncHash(replace = false) {
+            if (!window.location) return;
+            const hash = this.hashForState();
+            if (window.location.hash === hash) return;
+            if (replace && window.history && typeof window.history.replaceState === 'function') {
+                window.history.replaceState(null, '', hash);
+            } else {
+                window.location.hash = hash;
+            }
+        },
+
+        async applyHash() {
+            const { tab, client } = this.parseHash();
+            if (tab && this.tabNames.includes(tab)) {
+                await this.setTab(tab);
+            }
+            if (client && this.activeTab === 'providers' && this.isSupportedClientType(client)) {
+                await this.selectClient(client);
+            }
+        },
+
+        get globalDirty() {
+            if (!this.savedGlobalConfig) return false;
+            return JSON.stringify(this.globalConfig) !== JSON.stringify(this.savedGlobalConfig);
+        },
 
         normalizeLocale(locale) {
             const value = String(locale || '').trim();
@@ -1921,6 +2033,13 @@ function app() {
         async init() {
             this.initLocale();
             this.initTheme();
+            const initialRoute = this.parseHash();
+            if (this.tabNames.includes(initialRoute.tab)) {
+                this.activeTab = initialRoute.tab;
+            }
+            if (this.isSupportedClientType(initialRoute.client)) {
+                this.selectedClient = initialRoute.client;
+            }
             const pendingOAuthSession = this.loadPendingOAuthSession();
             if (pendingOAuthSession && this.isSupportedClientType(pendingOAuthSession.client_type)) {
                 this.selectedClient = pendingOAuthSession.client_type;
@@ -1947,6 +2066,21 @@ function app() {
             if (pendingOAuthSession) {
                 this.resumePendingOAuthSession(pendingOAuthSession, { showError: false }).catch(error => {
                     console.error('Failed to resume pending OAuth session:', error);
+                });
+            }
+
+            this.syncHash(true);
+            if (typeof this.$watch === 'function') {
+                this.$watch('activeTab', () => this.syncHash());
+                this.$watch('selectedClient', () => this.syncHash());
+            }
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('hashchange', () => this.applyHash());
+                window.addEventListener('beforeunload', event => {
+                    if (this.globalDirty) {
+                        event.preventDefault();
+                        event.returnValue = '';
+                    }
                 });
             }
 
@@ -2198,12 +2332,40 @@ function app() {
             }
         },
 
+        // In-app confirmation dialog; resolves true on confirm, false on cancel/Escape/backdrop.
+        askConfirm({ title = '', message = '', detail = '', confirmLabel = '', danger = false } = {}) {
+            if (this.confirmResolver) {
+                this.resolveConfirm(false);
+            }
+            this.confirmDialog = {
+                visible: true,
+                title: title || this.t('common.confirmTitle'),
+                message,
+                detail,
+                confirmLabel: confirmLabel || this.t('common.confirmTitle'),
+                danger: !!danger
+            };
+            const pending = new Promise(resolve => {
+                this.confirmResolver = resolve;
+            });
+            this.$nextTick(() => {
+                const cancel = this.$refs && this.$refs.confirmCancel;
+                if (cancel && typeof cancel.focus === 'function') cancel.focus();
+            });
+            return pending;
+        },
+
+        resolveConfirm(result) {
+            const resolve = this.confirmResolver;
+            this.confirmResolver = null;
+            this.confirmDialog = { ...this.confirmDialog, visible: false };
+            if (resolve) resolve(!!result);
+        },
+
         // API Calls
         async apiCall(url, options = {}, background = false, suppressAlert = false) {
             if (!background) this.isLoading = true;
             try {
-                // Minimum loading time to prevent flickering for fast requests
-                const start = Date.now();
                 const headers = {
                     'X-Clipal-UI': '1',
                     ...options.headers
@@ -2227,12 +2389,6 @@ function app() {
                 }
 
                 const data = await response.json();
-
-                // Artificial delay for smoother UX if request was too fast
-                if (!background) {
-                    const elapsed = Date.now() - start;
-                    if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
-                }
 
                 return data;
             } catch (error) {
@@ -2270,9 +2426,19 @@ function app() {
             if (disabledReason) {
                 return;
             }
-            if (action === 'uninstall' && !confirm(this.t('services.confirmUninstall'))) return;
-            if (action === 'stop' && !confirm(this.t('services.confirmStop'))) return;
-            if (action === 'restart' && !confirm(this.t('services.confirmRestart'))) return;
+            const confirmKeys = {
+                uninstall: 'services.confirmUninstall',
+                stop: 'services.confirmStop',
+                restart: 'services.confirmRestart'
+            };
+            if (confirmKeys[action]) {
+                const ok = await this.askConfirm({
+                    message: this.t(confirmKeys[action]),
+                    confirmLabel: this.t('services.' + action),
+                    danger: action !== 'restart'
+                });
+                if (!ok) return;
+            }
 
             // Best-effort request: the service might stop/restart mid-flight.
             this.serviceBusyAction = action;
@@ -3888,7 +4054,7 @@ function app() {
                 await this.apiCall(`/api/client-config/${this.selectedClient}`, {
                     method: 'PUT',
                     body: JSON.stringify(this.clientConfig)
-                });
+                }, true);
                 if (successToast && (successToast.title || successToast.message)) {
                     this.showAlert('success', successToast.message || '', successToast.title || '');
                 }
@@ -4340,14 +4506,23 @@ function app() {
                 return;
             }
             const displayName = this.providerDisplayName(item) || name;
-            if (!confirm(this.tf('providers.deleteConfirm', { name: displayName }))) {
+            const keyCount = this.providerUsesOAuth(item) ? 0 : Number(item.key_count) || 0;
+            const confirmed = await this.askConfirm({
+                title: this.t('providers.delete'),
+                message: this.tf('providers.deleteConfirm', { name: displayName }),
+                detail: keyCount > 0 ? this.tf('providers.deleteKeysNote', { count: keyCount }) : '',
+                confirmLabel: this.t('providers.delete'),
+                danger: true
+            });
+            if (!confirmed) {
                 return;
             }
 
             try {
                 await this.apiCall(
                     `/api/providers/${this.selectedClient}/${encodeURIComponent(name)}`,
-                    { method: 'DELETE' }
+                    { method: 'DELETE' },
+                    true
                 );
                 this.showAlert(
                     'success',
@@ -4396,12 +4571,25 @@ function app() {
             try {
                 const cfg = await this.apiCall('/api/config/global');
                 this.globalConfig = this.withDefaultGlobalConfig(cfg);
+                this.savedAllowRemoteWebUI = !!this.globalConfig.allow_remote_web_ui;
+                this.savedGlobalConfig = JSON.parse(JSON.stringify(this.globalConfig));
             } catch (error) {
                 console.error('Failed to load global config:', error);
             }
         },
 
         async saveGlobalConfig() {
+            if (this.globalSaving) return;
+            if (this.globalConfig.allow_remote_web_ui && !this.savedAllowRemoteWebUI) {
+                const ok = await this.askConfirm({
+                    title: this.t('settings.remoteWebUIConfirmTitle'),
+                    message: this.t('settings.remoteWebUIConfirm'),
+                    confirmLabel: this.t('settings.remoteWebUIConfirmAction'),
+                    danger: true
+                });
+                if (!ok) return;
+            }
+            this.globalSaving = true;
             try {
                 const payload = {
                     ...this.globalConfig,
@@ -4413,11 +4601,22 @@ function app() {
                 await this.apiCall('/api/config/global/update', {
                     method: 'PUT',
                     body: JSON.stringify(payload)
-                });
+                }, true);
+                const restartNeeded = !!this.savedGlobalConfig && (
+                    this.savedGlobalConfig.listen_addr !== this.globalConfig.listen_addr
+                    || this.savedGlobalConfig.port !== this.globalConfig.port
+                );
+                this.savedAllowRemoteWebUI = !!payload.allow_remote_web_ui;
+                this.savedGlobalConfig = JSON.parse(JSON.stringify(this.globalConfig));
                 this.showAlert('success', this.t('settings.saveSuccess'));
+                if (restartNeeded) {
+                    this.showAlert('info', this.t('settings.restartNotice'));
+                }
                 await this.refreshStatus();
             } catch (error) {
                 console.error('Failed to save global config:', error);
+            } finally {
+                this.globalSaving = false;
             }
         },
 

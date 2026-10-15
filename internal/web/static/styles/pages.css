@@ -646,6 +646,14 @@
 
 /* Global Settings */
 
+.settings-page-header.settings-page-header--sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 12px 0;
+    background: var(--bg-body);
+}
+
 .settings-page-header {
     display: flex;
     align-items: flex-start;

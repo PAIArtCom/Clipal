@@ -10,6 +10,8 @@ http://127.0.0.1:3333/
 
 If you changed the port, replace `3333` with your actual port.
 
+The current section and client are kept in the URL hash (for example `#/providers/openai` or `#/status`), so reloading or bookmarking returns to the same view.
+
 ## What The Web UI Can Do
 
 ### Providers
@@ -38,6 +40,9 @@ If you changed the port, replace `3333` with your actual port.
 - Configure the circuit breaker
 - Configure log directory, retention, and stdout output
 - Configure desktop notifications
+- Unsaved edits are flagged, and leaving the page asks whether to discard them
+- Fields that only take effect after a restart (listen address, port) are labeled
+- Enabling remote Web UI access asks for confirmation before saving, because the management UI has no built-in authentication
 
 ### System Status
 
@@ -77,12 +82,12 @@ Notes:
 
 ### Export Full Backup
 
-- Use the separate **Export Full Backup** panel to download a complete `clipal.data/v1` JSON backup
+- Use the **Export Full Backup** panel on the **Backup & Import** tab to download a complete `clipal.data/v1` JSON backup
 - The backup includes global and client configuration, provider API keys, OAuth access and refresh tokens, and usage data
 
 ### Import Data
 
-- Use the separate **Import Data** panel to preview and apply native backups or supported external credential exports
+- Use the **Import Data** panel on the **Backup & Import** tab to preview and apply native backups or supported external credential exports
 
 ## Common Provider States In The UI
 

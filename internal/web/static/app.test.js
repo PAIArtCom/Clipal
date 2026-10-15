@@ -887,6 +887,7 @@ test('deleteProvider deletes oauth providers through the provider API', async ()
         return {};
     };
     state.showAlert = () => {};
+    state.askConfirm = async () => true;
     state.loadProviders = async () => {};
     state.refreshStatus = async () => {};
 
@@ -2371,4 +2372,130 @@ test('OAuth account region confirmation sends identity and preserves DNS policy'
     assert.equal(state.environmentProfile.dns, 'google');
     assert.equal(state.environmentProfile.source, 'user');
     assert.equal(state.environmentBusy, false);
+});
+
+test('askConfirm resolves with the dialog choice and closes the dialog', async () => {
+    const state = loadApp();
+
+    const accepted = state.askConfirm({ message: 'Delete?', danger: true });
+    assert.equal(state.confirmDialog.visible, true);
+    assert.equal(state.confirmDialog.danger, true);
+    state.resolveConfirm(true);
+    assert.equal(await accepted, true);
+    assert.equal(state.confirmDialog.visible, false);
+
+    const rejected = state.askConfirm({ message: 'Delete?' });
+    state.resolveConfirm(false);
+    assert.equal(await rejected, false);
+});
+
+test('deleteProvider does not call the API when confirmation is declined', async () => {
+    const state = loadApp();
+    const calls = [];
+    state.apiCall = async url => {
+        calls.push(url);
+        return {};
+    };
+    state.askConfirm = async () => false;
+
+    await state.deleteProvider({ name: 'p1', key_count: 2 });
+
+    assert.deepEqual(calls, []);
+});
+
+test('saveGlobalConfig asks before newly exposing the Web UI remotely', async () => {
+    const state = loadApp();
+    const calls = [];
+    state.apiCall = async url => {
+        calls.push(url);
+        return {};
+    };
+    state.showAlert = () => {};
+    state.refreshStatus = async () => {};
+    state.savedAllowRemoteWebUI = false;
+    state.globalConfig.allow_remote_web_ui = true;
+
+    state.askConfirm = async () => false;
+    await state.saveGlobalConfig();
+    assert.deepEqual(calls, []);
+
+    state.askConfirm = async () => true;
+    await state.saveGlobalConfig();
+    assert.deepEqual(calls, ['/api/config/global/update']);
+    assert.equal(state.savedAllowRemoteWebUI, true);
+
+    let asked = false;
+    state.askConfirm = async () => {
+        asked = true;
+        return true;
+    };
+    await state.saveGlobalConfig();
+    assert.equal(asked, false);
+});
+
+test('globalDirty tracks edits against the saved snapshot', async () => {
+    const state = loadApp();
+    state.apiCall = async () => ({ listen_addr: '127.0.0.1', port: 3333 });
+    assert.equal(state.globalDirty, false);
+
+    await state.loadGlobalConfig();
+    assert.equal(state.globalDirty, false);
+
+    state.globalConfig.port = 4444;
+    assert.equal(state.globalDirty, true);
+
+    state.globalConfig.port = 3333;
+    assert.equal(state.globalDirty, false);
+});
+
+test('setTab asks before discarding unsaved settings and restores the snapshot', async () => {
+    const state = loadApp();
+    state.apiCall = async () => ({ listen_addr: '127.0.0.1', port: 3333 });
+    await state.loadGlobalConfig();
+    state.activeTab = 'settings';
+    state.globalConfig.port = 9999;
+
+    state.askConfirm = async () => false;
+    assert.equal(await state.setTab('status'), false);
+    assert.equal(state.activeTab, 'settings');
+    assert.equal(state.globalConfig.port, 9999);
+
+    state.askConfirm = async () => true;
+    assert.equal(await state.setTab('status'), true);
+    assert.equal(state.activeTab, 'status');
+    assert.equal(state.globalConfig.port, 3333);
+    assert.equal(state.globalDirty, false);
+});
+
+test('saveGlobalConfig reports a restart when listen address or port changed', async () => {
+    const state = loadApp();
+    state.apiCall = async url => (url === '/api/config/global'
+        ? { listen_addr: '127.0.0.1', port: 3333 }
+        : {});
+    state.refreshStatus = async () => {};
+    const alerts = [];
+    state.showAlert = (type, message) => alerts.push({ type, message });
+    await state.loadGlobalConfig();
+
+    state.globalConfig.port = 4444;
+    await state.saveGlobalConfig();
+
+    assert.deepEqual(alerts.map(item => item.type), ['success', 'info']);
+    assert.equal(state.globalDirty, false);
+});
+
+test('hash routing parses tab and client and serializes current state', async () => {
+    const state = loadApp({ context: { window: { location: { hash: '#/providers/openai' } } } });
+    assert.deepEqual({ ...state.parseHash() }, { tab: 'providers', client: 'openai' });
+
+    state.activeTab = 'status';
+    assert.equal(state.hashForState(), '#/status');
+    state.activeTab = 'providers';
+    state.selectedClient = 'gemini';
+    assert.equal(state.hashForState(), '#/providers/gemini');
+
+    state.__context.window.location.hash = '#/data';
+    state.askConfirm = async () => true;
+    await state.applyHash();
+    assert.equal(state.activeTab, 'data');
 });

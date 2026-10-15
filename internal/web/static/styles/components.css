@@ -381,6 +381,31 @@
     transform: scale(1);
 }
 
+.modal-backdrop--confirm {
+    z-index: 120;
+}
+
+.modal--confirm {
+    max-width: 440px;
+}
+
+.confirm-message {
+    font-size: var(--text-base, 14px);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.form-warning {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-surface);
+    color: var(--warning);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+}
+
 .modal-header {
     padding: 24px 28px;
     border-bottom: 1px solid var(--border);
