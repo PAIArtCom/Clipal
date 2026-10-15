@@ -203,6 +203,11 @@
                                     :class="'provider-card__status ' + (provider.enabled ? 'provider-card__status--enabled' : 'provider-card__status--disabled')"
                                     x-text="providerStatusText(provider.enabled)">
                                 </span>
+                                <template x-if="providerRuntime(provider)">
+                                    <span class="runtime-pill" :class="'runtime-pill--' + providerRuntime(provider).tone"
+                                        :title="providerRuntime(provider).title"
+                                        x-text="providerRuntime(provider).label"></span>
+                                </template>
                             </div>
                             <div class="provider-card__controls">
                                 <label class="switch" :title="providerToggleTitle(provider)">
@@ -984,25 +989,28 @@
                         </div>
                         <div class="status-card__activity" x-show="client.last_switch || client.last_request">
                             <div class="status-card__activity-title" x-text="t('statusPage.recentActivity')"></div>
-                            <div class="status-card__activity-item" x-show="client.last_switch">
-                                <span x-text="t('statusPage.lastSwitch')"></span>
-                                <span
-                                    x-text="(client.last_switch && client.last_switch.label) ? client.last_switch.label : ''"></span>
-                                <span
-                                    x-text="(client.last_switch && client.last_switch.detail) ? client.last_switch.detail : ''"></span>
-                                <span
-                                    x-text="(client.last_switch && client.last_switch.at) ? client.last_switch.at : ''"></span>
+                            <div class="activity-row" x-show="client.last_switch">
+                                <span class="activity-dot" :class="'activity-dot--' + activityTone('switch', client.last_switch)"></span>
+                                <div class="activity-main">
+                                    <span class="activity-kind" x-text="t('statusPage.activitySwitch')"></span>
+                                    <span class="activity-text" x-text="client.last_switch && client.last_switch.label"></span>
+                                    <span class="activity-detail" x-show="client.last_switch && client.last_switch.detail"
+                                        x-text="client.last_switch && client.last_switch.detail"></span>
+                                </div>
+                                <time class="activity-time" :title="client.last_switch && client.last_switch.at"
+                                    x-text="activityTime(client.last_switch)"></time>
                             </div>
-                            <div class="status-card__activity-item" x-show="client.last_request">
-                                <span x-text="t('statusPage.lastRequest')"></span>
-                                <span
-                                    x-text="(client.last_request && client.last_request.label) ? client.last_request.label : ''"></span>
-                                <span
-                                    x-text="(client.last_request && client.last_request.detail) ? client.last_request.detail : ''"></span>
-                                <span
-                                    x-text="(client.last_request && client.last_request.bytes) ? ('(' + client.last_request.bytes + ' bytes)') : ''"></span>
-                                <span
-                                    x-text="(client.last_request && client.last_request.at) ? client.last_request.at : ''"></span>
+                            <div class="activity-row" x-show="client.last_request">
+                                <span class="activity-dot" :class="'activity-dot--' + activityTone('request', client.last_request)"></span>
+                                <div class="activity-main">
+                                    <span class="activity-kind" x-text="t('statusPage.activityRequest')"></span>
+                                    <span class="activity-text" x-text="client.last_request && client.last_request.label"></span>
+                                    <span class="activity-detail" x-show="client.last_request && client.last_request.detail"
+                                        x-text="client.last_request && client.last_request.detail"></span>
+                                    <span class="activity-meta" x-text="activityRequestMeta(client.last_request)"></span>
+                                </div>
+                                <time class="activity-time" :title="client.last_request && client.last_request.at"
+                                    x-text="activityTime(client.last_request)"></time>
                             </div>
                         </div>
                         <div class="status-card__groups">

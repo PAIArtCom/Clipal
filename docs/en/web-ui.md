@@ -30,6 +30,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Route Claude and Codex OAuth requests through Agent SDK-compatible upstream wrapping by default, with required transport fields handled by Clipal.
 - View OAuth auth status and refresh summary on provider cards
 - Load OAuth plan and rate-limit details for supported providers (currently Codex)
+- See each provider's runtime state on its card: in use, cooling down (with time remaining), unavailable, or probing recovery
 
 ### Global Settings
 
@@ -49,7 +50,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - View version and uptime
 - View config directory
 - View current mode, pinned provider, and preferred provider per client group
-- View last switch event and last request summary
+- View the latest provider switch and latest request per client, with status color and relative time
 - View provider runtime state, configured key count, and available key count
 
 ### Services

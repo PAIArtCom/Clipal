@@ -2504,3 +2504,44 @@ test('index.html attributes contain no escaped quotes', () => {
     const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
     assert.equal(html.includes('\\"'), false);
 });
+
+test('providerRuntime reports current and degraded providers only', () => {
+    const state = loadApp();
+    state.selectedClient = 'claude';
+    state.status = {
+        clients: {
+            claude: {
+                current_provider: 'a',
+                providers: [
+                    { name: 'a', state: 'available', enabled: true },
+                    { name: 'b', state: 'cooling_down', enabled: true, deactivated_in: '2m0s', key_count: 2, available_key_count: 0 },
+                    { name: 'c', state: 'available', enabled: true },
+                    { name: 'd', state: 'disabled', enabled: false },
+                    { name: 'e', state: 'recovery_probe', enabled: true }
+                ]
+            }
+        }
+    };
+
+    assert.equal(state.providerRuntime({ name: 'a' }).state, 'current');
+    const cooling = state.providerRuntime({ name: 'b' });
+    assert.equal(cooling.state, 'cooling_down');
+    assert.match(cooling.label, /2m0s/);
+    assert.equal(state.providerRuntime({ name: 'c' }), null);
+    assert.equal(state.providerRuntime({ name: 'd' }), null);
+    assert.equal(state.providerRuntime({ name: 'e' }).tone, 'info');
+    assert.equal(state.providerRuntime({ name: 'missing' }), null);
+});
+
+test('activity helpers classify request outcomes and summarize metadata', () => {
+    const state = loadApp();
+    assert.equal(state.activityTone('switch', {}), 'warn');
+    assert.equal(state.activityTone('request', { status: 200 }), 'success');
+    assert.equal(state.activityTone('request', { status: 429 }), 'danger');
+    assert.equal(state.activityTone('request', { status: 0 }), 'danger');
+    assert.equal(
+        state.activityRequestMeta({ provider: 'p1', status: 200, protocol: 'anthropic', bytes: 12 }),
+        'p1 · 200 · anthropic · 12 B'
+    );
+    assert.equal(state.activityRequestMeta(null), '');
+});

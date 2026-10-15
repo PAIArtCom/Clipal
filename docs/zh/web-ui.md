@@ -30,6 +30,7 @@ http://127.0.0.1:3333/
 - 对 Claude 和 Codex OAuth 请求默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
 - 在 provider 卡片上查看 OAuth 鉴权状态和最近刷新摘要
 - 为支持的 OAuth provider 加载套餐和限额详情（当前仅 Codex）
+- 在 provider 卡片上直接查看运行态：使用中、冷却中（含剩余时间）、不可用、恢复探测中
 
 ### Global Settings
 
@@ -49,7 +50,7 @@ http://127.0.0.1:3333/
 - 查看版本和运行时长
 - 查看配置目录
 - 查看各客户端当前模式、固定 provider、当前优先 provider
-- 查看最近切换事件和最近请求结果
+- 查看每个客户端最近一次切换和最近一次请求，带状态颜色和相对时间
 - 查看每个 provider 的运行态、已配置 key 数、可用 key 数
 
 ### Services

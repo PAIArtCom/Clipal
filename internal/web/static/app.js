@@ -156,6 +156,10 @@ function app() {
                 },
                 providers: {
                     addTo: 'Add Provider to {client}',
+                    runtimeCurrent: 'In use',
+                    runtimeCoolingDown: 'Cooling down',
+                    runtimeUnavailable: 'Unavailable',
+                    runtimeRecoveryProbe: 'Probing recovery',
                     modeLabel: 'Mode',
                     modeAuto: 'Auto',
                     modeManual: 'Manual',
@@ -518,9 +522,9 @@ function app() {
                     disabled: 'Disabled',
                     circuitBreakerSummary: '{failure} fail / {success} succ ({timeout})',
                     pinned: 'Pinned',
-                    lastSwitch: 'Last switch:',
-                    lastRequest: 'Last request:',
-                    recentActivity: 'Recent activity',
+                    activitySwitch: 'Provider switch',
+                    activityRequest: 'Request',
+                    recentActivity: 'Latest activity',
                     providersCount: 'Providers: {count}',
                     enabledCount: 'Enabled: {count}',
                     groupCurrent: 'Current',
@@ -647,6 +651,10 @@ function app() {
                 },
                 providers: {
                     addTo: '为 {client} 添加 Provider',
+                    runtimeCurrent: '使用中',
+                    runtimeCoolingDown: '冷却中',
+                    runtimeUnavailable: '不可用',
+                    runtimeRecoveryProbe: '恢复探测中',
                     modeLabel: '模式',
                     modeAuto: '自动',
                     modeManual: '手动',
@@ -1008,9 +1016,9 @@ function app() {
                     disabled: '已禁用',
                     circuitBreakerSummary: '{failure} 次失败 / {success} 次成功（{timeout}）',
                     pinned: '已固定',
-                    lastSwitch: '最近切换：',
-                    lastRequest: '最近请求：',
-                    recentActivity: '最近活动',
+                    activitySwitch: '切换 Provider',
+                    activityRequest: '请求',
+                    recentActivity: '最新活动',
                     providersCount: '提供方：{count}',
                     enabledCount: '已启用：{count}',
                     groupCurrent: '当前',
@@ -2089,7 +2097,8 @@ function app() {
                 if (this.activeTab === 'services') {
                     this.loadServiceStatus(true);
                 }
-                if (this.activeTab === 'status') {
+                const visible = typeof document === 'undefined' || !document.hidden;
+                if (visible && (this.activeTab === 'status' || this.activeTab === 'providers')) {
                     this.refreshStatus();
                 }
             }, 3000);
@@ -3893,6 +3902,62 @@ function app() {
                 return this.t('providers.modeHelpManual');
             }
             return this.t('providers.modeHelpAuto');
+        },
+
+        // Runtime badge for a provider card; null when nothing noteworthy (healthy standby or disabled).
+        providerRuntime(provider) {
+            const name = String((provider && provider.name) || '').trim();
+            const client = this.status && this.status.clients ? this.status.clients[this.selectedClient] : null;
+            if (!name || !client) return null;
+
+            const entry = (Array.isArray(client.providers) ? client.providers : [])
+                .find(p => p && String(p.name || '').trim() === name) || null;
+            let state = '';
+            if (String(client.current_provider || '').trim() === name) {
+                state = 'current';
+            } else if (entry && ['cooling_down', 'unavailable', 'recovery_probe'].includes(entry.state)) {
+                state = entry.state;
+            }
+            if (!state) return null;
+
+            const keys = {
+                current: 'providers.runtimeCurrent',
+                cooling_down: 'providers.runtimeCoolingDown',
+                unavailable: 'providers.runtimeUnavailable',
+                recovery_probe: 'providers.runtimeRecoveryProbe'
+            };
+            const tones = { current: 'primary', cooling_down: 'warn', unavailable: 'danger', recovery_probe: 'info' };
+            const remaining = entry ? String(entry.deactivated_in || entry.circuit_open_in || '').trim() : '';
+            const base = this.t(keys[state]);
+            return {
+                state,
+                tone: tones[state],
+                label: remaining ? `${base} · ${remaining}` : base,
+                title: entry ? this.providerStatusTitle(entry) : base
+            };
+        },
+
+        // Latest-activity rows on the Status page.
+        activityTone(kind, item) {
+            if (kind === 'switch') return 'warn';
+            const status = Number(item && item.status);
+            if (status >= 200 && status < 300) return 'success';
+            if (status >= 400 || status === 0) return 'danger';
+            return 'info';
+        },
+
+        activityTime(item) {
+            return this.formatRelativeTime(item && item.at, '');
+        },
+
+        activityRequestMeta(item) {
+            if (!item) return '';
+            const parts = [];
+            if (item.provider) parts.push(item.provider);
+            if (item.status) parts.push(String(item.status));
+            if (item.protocol) parts.push(item.protocol);
+            if (item.bytes) parts.push(`${item.bytes} B`);
+            return parts.join(' · ');
         },
 
         providerStatusLabel(p) {
