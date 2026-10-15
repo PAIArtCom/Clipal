@@ -1126,6 +1126,7 @@ function app() {
         },
         confirmDialog: { visible: false, title: '', message: '', detail: '', confirmLabel: '', danger: false },
         confirmResolver: null,
+        confirmReturnFocus: null,
         globalSaving: false,
         savedAllowRemoteWebUI: false,
         toasts: [],
@@ -2346,6 +2347,8 @@ function app() {
             if (this.confirmResolver) {
                 this.resolveConfirm(false);
             }
+            this.confirmReturnFocus = (typeof document !== 'undefined' && document.activeElement) || null;
+            this.setBackgroundInert(true);
             this.confirmDialog = {
                 visible: true,
                 title: title || this.t('common.confirmTitle'),
@@ -2357,10 +2360,23 @@ function app() {
             const pending = new Promise(resolve => {
                 this.confirmResolver = resolve;
             });
-            this.$nextTick(() => {
-                const cancel = this.$refs && this.$refs.confirmCancel;
-                if (cancel && typeof cancel.focus === 'function') cancel.focus();
-            });
+            // x-show reveals the dialog a frame or two later; focus only works once it is rendered.
+            let attempts = 0;
+            const focusCancel = () => {
+                const cancel = typeof document.querySelector === 'function'
+                    ? document.querySelector('.modal--confirm [data-confirm-cancel]')
+                    : null;
+                if (!cancel || typeof cancel.focus !== 'function') return;
+                const rendered = typeof cancel.getClientRects !== 'function' || cancel.getClientRects().length > 0;
+                if (!rendered && attempts++ < 100) {
+                    // x-show reveals the dialog on the next animation frame, which can be delayed
+                    // (for example in a throttled or occluded tab), so keep polling for ~1.6s.
+                    setTimeout(focusCancel, 16);
+                    return;
+                }
+                cancel.focus();
+            };
+            this.$nextTick(focusCancel);
             return pending;
         },
 
@@ -2368,7 +2384,37 @@ function app() {
             const resolve = this.confirmResolver;
             this.confirmResolver = null;
             this.confirmDialog = { ...this.confirmDialog, visible: false };
+            this.setBackgroundInert(false);
+            const target = this.confirmReturnFocus;
+            this.confirmReturnFocus = null;
+            if (target && typeof target.focus === 'function') {
+                this.$nextTick(() => target.focus());
+            }
             if (resolve) resolve(!!result);
+        },
+
+        // Makes the page behind a modal dialog unreachable by keyboard and assistive tech.
+        setBackgroundInert(inert) {
+            if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+            const container = document.querySelector('.container');
+            if (container) container.inert = !!inert;
+        },
+
+        // Keeps Tab / Shift+Tab inside the confirm dialog.
+        trapConfirmFocus(event) {
+            const dialog = event.currentTarget;
+            const focusable = Array.from(dialog.querySelectorAll('button:not([disabled])'));
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+            if (event.shiftKey && (active === first || !dialog.contains(active))) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+                event.preventDefault();
+                first.focus();
+            }
         },
 
         // API Calls
@@ -3912,11 +3958,13 @@ function app() {
 
             const entry = (Array.isArray(client.providers) ? client.providers : [])
                 .find(p => p && String(p.name || '').trim() === name) || null;
+            const isCurrent = String(client.current_provider || '').trim() === name;
             let state = '';
-            if (String(client.current_provider || '').trim() === name) {
-                state = 'current';
-            } else if (entry && ['cooling_down', 'unavailable', 'recovery_probe'].includes(entry.state)) {
+            if (entry && ['cooling_down', 'unavailable', 'recovery_probe'].includes(entry.state)) {
+                // A degraded health state is more useful than "in use" when troubleshooting.
                 state = entry.state;
+            } else if (isCurrent) {
+                state = 'current';
             }
             if (!state) return null;
 
@@ -3933,7 +3981,11 @@ function app() {
                 state,
                 tone: tones[state],
                 label: remaining ? `${base} · ${remaining}` : base,
-                title: entry ? this.providerStatusTitle(entry) : base
+                current: isCurrent,
+                title: [
+                    isCurrent && state !== 'current' ? this.t('providers.runtimeCurrent') : '',
+                    entry ? this.providerStatusTitle(entry) : base
+                ].filter(Boolean).join('\n')
             };
         },
 
@@ -4656,9 +4708,11 @@ function app() {
             }
             this.globalSaving = true;
             try {
+                // Snapshot at submit time: edits made while the request is in flight stay unsaved.
+                const submitted = JSON.parse(JSON.stringify(this.globalConfig));
                 const payload = {
-                    ...this.globalConfig,
-                    upstream_proxy_mode: this.normalizeGlobalProxyMode(this.globalConfig.upstream_proxy_mode)
+                    ...submitted,
+                    upstream_proxy_mode: this.normalizeGlobalProxyMode(submitted.upstream_proxy_mode)
                 };
                 if (payload.upstream_proxy_mode !== 'custom') {
                     payload.upstream_proxy_url = '';
@@ -4668,11 +4722,11 @@ function app() {
                     body: JSON.stringify(payload)
                 }, true);
                 const restartNeeded = !!this.savedGlobalConfig && (
-                    this.savedGlobalConfig.listen_addr !== this.globalConfig.listen_addr
-                    || this.savedGlobalConfig.port !== this.globalConfig.port
+                    this.savedGlobalConfig.listen_addr !== submitted.listen_addr
+                    || this.savedGlobalConfig.port !== submitted.port
                 );
                 this.savedAllowRemoteWebUI = !!payload.allow_remote_web_ui;
-                this.savedGlobalConfig = JSON.parse(JSON.stringify(this.globalConfig));
+                this.savedGlobalConfig = submitted;
                 this.showAlert('success', this.t('settings.saveSuccess'));
                 if (restartNeeded) {
                     this.showAlert('info', this.t('settings.restartNotice'));

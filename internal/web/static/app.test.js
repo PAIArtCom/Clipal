@@ -2545,3 +2545,66 @@ test('activity helpers classify request outcomes and summarize metadata', () => 
     );
     assert.equal(state.activityRequestMeta(null), '');
 });
+
+test('saveGlobalConfig keeps edits made while the save is in flight as unsaved', async () => {
+    const state = loadApp();
+    let release;
+    state.apiCall = async url => {
+        if (url === '/api/config/global') return { listen_addr: '127.0.0.1', port: 3333 };
+        await new Promise(resolve => { release = resolve; });
+        return {};
+    };
+    state.refreshStatus = async () => {};
+    state.showAlert = () => {};
+    await state.loadGlobalConfig();
+
+    state.globalConfig.port = 4444;
+    const saving = state.saveGlobalConfig();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    state.globalConfig.port = 5555;
+    release();
+    await saving;
+
+    assert.equal(state.savedGlobalConfig.port, 4444);
+    assert.equal(state.globalDirty, true);
+});
+
+test('providerRuntime shows degraded health even for the current provider', () => {
+    const state = loadApp();
+    state.selectedClient = 'claude';
+    state.status = {
+        clients: {
+            claude: {
+                current_provider: 'a',
+                providers: [{ name: 'a', state: 'unavailable', enabled: true, key_count: 1, available_key_count: 0 }]
+            }
+        }
+    };
+
+    const runtime = state.providerRuntime({ name: 'a' });
+    assert.equal(runtime.state, 'unavailable');
+    assert.equal(runtime.tone, 'danger');
+    assert.equal(runtime.current, true);
+    assert.match(runtime.title, /^In use\n/);
+});
+
+test('askConfirm makes the background inert and restores focus on close', async () => {
+    const container = { inert: false };
+    const trigger = { focus() { trigger.focused = true; } };
+    const state = loadApp({
+        context: {
+            document: {
+                activeElement: trigger,
+                querySelector: selector => (selector === '.container' ? container : null)
+            }
+        }
+    });
+
+    const pending = state.askConfirm({ message: 'Sure?' });
+    assert.equal(container.inert, true);
+    state.resolveConfirm(true);
+    await pending;
+
+    assert.equal(container.inert, false);
+    assert.equal(trigger.focused, true);
+});

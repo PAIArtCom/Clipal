@@ -1295,7 +1295,8 @@
         x-show="confirmDialog.visible" @keydown.escape.window="confirmDialog.visible && resolveConfirm(false)"
         @click.self="resolveConfirm(false)">
         <div class="modal modal--confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"
-            aria-describedby="confirm-message">
+            aria-describedby="confirm-message"
+            @keydown.tab="trapConfirmFocus($event)">
             <div class="modal-header">
                 <h2 id="confirm-title" x-text="confirmDialog.title"></h2>
             </div>
@@ -1304,7 +1305,7 @@
                 <p class="form-hint" x-show="confirmDialog.detail" x-text="confirmDialog.detail"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" x-ref="confirmCancel" @click="resolveConfirm(false)"
+                <button type="button" class="btn btn-secondary" data-confirm-cancel @click="resolveConfirm(false)"
                     x-text="t('common.cancel')"></button>
                 <button type="button" class="btn" :class="confirmDialog.danger ? 'btn-danger' : 'btn-primary'"
                     @click="resolveConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
