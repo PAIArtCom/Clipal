@@ -41,7 +41,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Configure log directory, retention, and stdout output
 - Configure desktop notifications
 - Unsaved edits are flagged, and leaving the page asks whether to discard them
-- Fields that only take effect after a restart (listen address, port) are labeled
+- Fields that only take effect after a restart (listen address, port) carry a restart hint
 - Enabling remote Web UI access asks for confirmation before saving, because the management UI has no built-in authentication
 
 ### System Status

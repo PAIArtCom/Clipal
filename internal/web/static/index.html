@@ -74,23 +74,23 @@
             @keydown.home.prevent="moveTab('first')" @keydown.end.prevent="moveTab('last')">
             <button id="tabbtn-providers" role="tab" :tabindex="activeTab === 'providers' ? 0 : -1"
                 :aria-selected="activeTab === 'providers'" aria-controls="tab-providers"
-                @click=\"setTab('providers')\" :class="{'active': activeTab === 'providers'}" class="tab"
+                @click="setTab('providers')" :class="{'active': activeTab === 'providers'}" class="tab"
                 x-text="t('nav.providers')"></button>
             <button id="tabbtn-integrations" role="tab" :tabindex="activeTab === 'integrations' ? 0 : -1"
                 :aria-selected="activeTab === 'integrations'" aria-controls="tab-integrations"
-                @click=\"setTab('integrations')\" :class="{'active': activeTab === 'integrations'}" class="tab"
+                @click="setTab('integrations')" :class="{'active': activeTab === 'integrations'}" class="tab"
                 x-text="t('nav.integrations')"></button>
             <button id="tabbtn-settings" role="tab" :tabindex="activeTab === 'settings' ? 0 : -1"
-                :aria-selected="activeTab === 'settings'" aria-controls="tab-settings" @click=\"setTab('settings')\"
+                :aria-selected="activeTab === 'settings'" aria-controls="tab-settings" @click="setTab('settings')"
                 :class="{'active': activeTab === 'settings'}" class="tab" x-text="t('nav.settings')"></button>
             <button id="tabbtn-data" role="tab" :tabindex="activeTab === 'data' ? 0 : -1"
                 :aria-selected="activeTab === 'data'" aria-controls="tab-data" @click="setTab('data')"
                 :class="{'active': activeTab === 'data'}" class="tab" x-text="t('nav.data')"></button>
             <button id="tabbtn-services" role="tab" :tabindex="activeTab === 'services' ? 0 : -1"
-                :aria-selected="activeTab === 'services'" aria-controls="tab-services" @click=\"setTab('services')\"
+                :aria-selected="activeTab === 'services'" aria-controls="tab-services" @click="setTab('services')"
                 :class="{'active': activeTab === 'services'}" class="tab" x-text="t('nav.services')"></button>
             <button id="tabbtn-status" role="tab" :tabindex="activeTab === 'status' ? 0 : -1"
-                :aria-selected="activeTab === 'status'" aria-controls="tab-status" @click=\"setTab('status')\"
+                :aria-selected="activeTab === 'status'" aria-controls="tab-status" @click="setTab('status')"
                 :class="{'active': activeTab === 'status'}" class="tab" x-text="t('nav.status')"></button>
         </nav>
 
@@ -363,9 +363,9 @@
                         </div>
                         <div class="settings-panel-grid">
                             <div class="form-group">
-                                <label class="form-label"><span x-text="t('settings.listenAddress')"></span>
-                                    <span class="pill pill--xs pill--neutral" x-text="t('settings.restartRequired')"></span></label>
+                                <label class="form-label" x-text="t('settings.listenAddress')"></label>
                                 <input type="text" x-model="globalConfig.listen_addr" class="form-input" required>
+                                <div class="form-hint" x-text="t('settings.restartRequired')"></div>
                             </div>
                             <div class="form-group">
                                 <label class="checkbox-label">
@@ -384,10 +384,10 @@
                                     x-text="t('settings.remoteWebUIWarning')"></div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label"><span x-text="t('settings.port')"></span>
-                                    <span class="pill pill--xs pill--neutral" x-text="t('settings.restartRequired')"></span></label>
+                                <label class="form-label" x-text="t('settings.port')"></label>
                                 <input type="number" x-model.number="globalConfig.port" class="form-input" required
                                     min="1" max="65535">
+                                <div class="form-hint" x-text="t('settings.restartRequired')"></div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" x-text="t('settings.logLevel')"></label>

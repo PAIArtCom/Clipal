@@ -2499,3 +2499,8 @@ test('hash routing parses tab and client and serializes current state', async ()
     await state.applyHash();
     assert.equal(state.activeTab, 'data');
 });
+
+test('index.html attributes contain no escaped quotes', () => {
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    assert.equal(html.includes('\\"'), false);
+});
