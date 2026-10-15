@@ -134,9 +134,14 @@ func (p *requestPayload) codexOAuthRequest(original *http.Request, requestCtx Re
 	}
 
 	body := p.providerBody(original, requestCtx, provider)
-	targetPath, stream, requestBody, err := buildCodexOAuthRequest(path, body)
+	var targetPath string
+	var stream bool
+	var requestBody []byte
+	var err error
 	if root, ok := p.providerRoot(original, requestCtx, provider); ok {
 		targetPath, stream, requestBody, err = buildCodexOAuthRequestFromRoot(path, root, body)
+	} else {
+		targetPath, stream, requestBody, err = buildCodexOAuthRequest(path, body)
 	}
 	if p.codexCache == nil {
 		p.codexCache = make(map[string]codexOAuthPreparedRequest)
@@ -168,9 +173,13 @@ func (p *requestPayload) geminiOAuthRequest(original *http.Request, requestCtx R
 	}
 
 	body := p.providerBody(original, requestCtx, provider)
-	targetPath, modelName, requestBody, err := buildGeminiOAuthRequest(requestCtx.Capability, path, body, projectID)
+	var targetPath, modelName string
+	var requestBody []byte
+	var err error
 	if root, ok := p.providerRoot(original, requestCtx, provider); ok {
 		targetPath, modelName, requestBody, err = buildGeminiOAuthRequestFromRoot(requestCtx.Capability, path, root, projectID)
+	} else {
+		targetPath, modelName, requestBody, err = buildGeminiOAuthRequest(requestCtx.Capability, path, body, projectID)
 	}
 	if p.geminiCache == nil {
 		p.geminiCache = make(map[string]geminiOAuthPreparedRequest)
@@ -202,9 +211,13 @@ func (p *requestPayload) antigravityOAuthRequest(original *http.Request, request
 	}
 
 	body := p.providerBody(original, requestCtx, provider)
-	targetPath, requestBody, err := buildAntigravityOAuthRequest(requestCtx.Capability, path, body, projectID)
+	var targetPath string
+	var requestBody []byte
+	var err error
 	if root, ok := p.providerRoot(original, requestCtx, provider); ok {
 		targetPath, requestBody, err = buildAntigravityOAuthRequestFromRoot(requestCtx.Capability, path, root, projectID)
+	} else {
+		targetPath, requestBody, err = buildAntigravityOAuthRequest(requestCtx.Capability, path, body, projectID)
 	}
 	if p.antigravityCache == nil {
 		p.antigravityCache = make(map[string]antigravityOAuthPreparedRequest)
