@@ -28,9 +28,9 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Start OAuth authorization for supported client/provider combinations
 - Import OAuth credential files from the Add Provider dialog. Supported files are Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles; Clipal imports only accounts matching the selected service.
 - Route Claude and Codex OAuth requests through Agent SDK-compatible upstream wrapping by default, with required transport fields handled by Clipal.
-- View OAuth auth status and refresh summary on provider cards
+- View OAuth auth status and refresh summary in each provider's details
 - Load OAuth plan and rate-limit details for supported providers (currently Codex)
-- See each provider's runtime state on its card: in use, cooling down (with time remaining), unavailable, or probing recovery
+- See each provider's runtime state in its row: in use, standby, disabled, cooling down (with time remaining), unavailable, or probing recovery
 
 ### Global Settings
 
@@ -42,7 +42,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Configure log directory, retention, and stdout output
 - Configure desktop notifications
 - Unsaved edits are flagged, and leaving the page asks whether to discard them
-- Fields that only take effect after a restart (listen address, port) carry a restart hint
+- Fields that only take effect after a restart (listen address, port) carry an amber restart icon; other field explanations sit behind an ⓘ icon next to the label
 - Enabling remote Web UI access asks for confirmation before saving, because the management UI has no built-in authentication
 
 ### System Status
@@ -125,7 +125,7 @@ Changes that often still need a restart to fully take effect:
 
 ## OAuth account request environment
 
-Adding a new OAuth account offers **Request country / region** and **Request timezone (IANA)**, prefilled with **US / `America/New_York`**. These are request preferences, not evidence of the account's registration or billing country. New York's IANA timezone follows daylight saving automatically; no fixed UTC−5 offset is stored. Unchanged defaults use `source: default`; edited choices use `source: user`.
+Adding a new OAuth account offers **Request country / region** and **Request timezone (IANA)** as dropdowns, prefilled with **US / `America/New_York`**. These are request preferences, not evidence of the account's registration or billing country. New York's IANA timezone follows daylight saving automatically; no fixed UTC−5 offset is stored. Unchanged defaults use `source: default`; edited choices use `source: user`. The Add OAuth and account environment dialogs share the same country and timezone choices. Country names follow the UI language; timezone values remain IANA identifiers. Native dropdowns support keyboard navigation and type-ahead selection. Changing country leaves the timezone unchanged, and existing saved timezone aliases remain selectable.
 
 Preferences belong to the OAuth account and are shared by its linked providers. Refresh, reauthorization, restart and proxy changes retain saved choices. Imports preserve existing settings and their provenance; they do not apply new-account defaults. Legacy values without a trustworthy source remain visible with `needs_confirmation: true`. They may have come from an exit estimate, so the account globe dialog lets the user review, change and explicitly save them. Until confirmation, region fields are omitted from outgoing metadata. Reads, import previews and exports do not persist migration. Upstream region attributes remain separate credential metadata and are displayed independently; they never overwrite request preferences.
 
@@ -140,6 +140,41 @@ Account DNS defaults to **auto** and follows the effective policy for each targe
 The **Include public DoH reference for proxy routes** checkbox defaults off and applies only to the current diagnostic request. With a proxy selected, it queries the stored Cloudflare/Google choice, or Cloudflare → Google for `auto`/`system`, through the same entry after reachability checks. Results do not verify the proxy's DNS backend, target IP or egress. Failure is reported separately as **Not verified** and cannot block business requests; there is no strict preflight option. The reference query has a maximum 10-second budget within the diagnostic's 25-second total deadline and sends no account credentials or environment headers.
 
 Management endpoints are `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` and `POST /api/providers/<client>/<name>/oauth-diagnostics`. The POST body may be empty or `{ "check_doh": false }`; `{ "check_doh": true }` opts into the proxy reference query. It is ignored when the target has no explicit proxy, where the normal checks use the account's actual DNS policy. GET and diagnosis do not change preferences. PUT explicitly confirms or edits country and IANA timezone, checks the loaded account identity, preserves DNS/tokens, and uses existing localhost management and CSRF controls.
+
+
+## Provider list
+
+The toolbar holds the Claude / OpenAI / Gemini switch and **Add provider**; a search box (name or base URL) appears once a group has more than eight providers. The list header carries the group's routing: the Auto / Manual switch (its ⓘ explains the mode) and the current routing candidate, marked with a target icon.
+
+Providers are listed one per row in priority order. A row shows the drag handle (its tooltip includes the configured priority), name with its upstream host or OAuth tag, runtime state (in use, standby, disabled, cooling down with time remaining, unavailable, or probing recovery), today's spend when non-zero, and the enable switch. Pin, edit (OAuth accounts open the account environment instead), and delete appear when the row is hovered, focused, or expanded; an active pin stays visible. Click a row to expand its details: the reason for a degraded state, then tiles for credential status and last refresh (OAuth) or key count (API key), token usage with input/output, and spend today and over 7 days; an OAuth plan and limits card with usage gauges; and rows for base URL, proxy, and provider ID, with copy buttons. Tiles show compact figures; hovering, focusing, or tapping a usage or spend tile shows exact amounts and the token breakdown, so keyboard and touch users can read them too.
+
+Reorder by dragging the handle, or focus the handle and press Alt+↑ / Alt+↓. Reordering is paused while a search is active, because the visible order is then only a subset. A failed reorder save restores the previous order.
+
+On narrow screens, the state and enable switch share the line below the name, and pin, edit, and delete appear once the row is expanded. Detail tiles shrink to three per row. The current candidate is a routing preference, not proof of a completed request.
+
+Automatic routing can stay on a provider that is succeeding or skip unavailable ones, so the configured order does not predict every request.
+
+CLI Takeover cards show the target config path (abbreviated to `~` under the home directory; the full path is in the tooltip), a warning icon whose tooltip carries any tool-specific caveat, a restore icon button, and a collapsed change preview whose toggle shows the added and removed line counts. An open preview widens its card to the full row. For an active integration with a backup, the preview compares against the rollback backup; otherwise against the planned takeover result. The full current and target files stay one level deeper. Files too large for a line diff show only the full-file view.
+
+## Saving, drafts, and connection feedback
+
+Mode switches and pin changes keep the saved selection visible until the server accepts the change. Provider saves, deletes, enable switches, mode changes, and pin changes lock conflicting list actions and client selection until the request and refresh complete; a failed save leaves the original selection intact and reports the error so the operation can be retried.
+
+Closing an edited Provider or OAuth account environment form (including Escape and the backdrop) asks before discarding changes. Failed saves preserve input. Global Settings locks its fields and save/reset actions while loading or resetting so a late read cannot overwrite new edits. Reloading or closing the browser also warns about unsaved settings and form edits. Drafts remain in memory only; confirming discard or leaving the page loses them.
+
+Malformed JSON is rejected before import format detection, with the offending filename in the error. Import file reads, previews, and applies lock file and mode selection and prevent duplicate submission. Applying an import and refreshing its results also prevents closing the preview or switching tabs; failures release the controls.
+
+Gateway status refreshes every three seconds while the Providers or System Status tab is visible; service status refreshes while the Services or System Status tab is visible. Failed status requests show a persistent banner on those tabs instead of repeated error toasts. The last good data is retained with its last successful update time, or a notice that status has never loaded. Data older than 15 seconds is marked stale. Requests time out after 10 seconds, overlapping polls are skipped, and the banner offers retry and clears after a successful refresh. Status refresh failure does not by itself prove that upstream model requests have failed.
+
+## Form controls and feedback
+
+Timeouts and routing durations use a numeric field with a unit selector; request-body limits use bytes, KiB, MiB or GiB. Optional routing durations can be cleared to use defaults. Request-body limits must be at least 64 MiB; idle and response-header timeouts must be zero (disabled) or at least five minutes. Smaller values are flagged before submission. Existing compound durations and fine-grained values are preserved until explicitly edited. Opening the form does not normalize saved configuration. Controls for disabled routing and circuit-breaker features are disabled without deleting their values.
+
+Reasoning effort offers common suggestions while allowing model-specific values; empty means no override. Provider names are validated before submission, and visible field labels focus their controls. Client tabs support left/right arrow navigation. Touch devices use larger action targets.
+
+Dialogs move focus inside, keep Tab and Shift+Tab inside, isolate the background, and restore focus to the opening control. Account environment loading and diagnostics can be closed; late results do not change the closed dialog. Failed account preference loads provide an in-dialog retry. Account preference saves show a busy state and a success notification; errors from closed reads and diagnostics are ignored.
+
+A failed provider-list load preserves the last list with a retry banner; it is not presented as an empty group. Mutations remain disabled until the list reloads successfully. Service HTTP errors show an error, and connection interruptions leave the action explicitly unconfirmed while status is checked.
 
 ## Related Docs
 

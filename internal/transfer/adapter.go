@@ -110,6 +110,13 @@ func (r *Registry) Decode(format string, inputs []Input) (*Dataset, *Report, err
 	if err := validateInputs(inputs); err != nil {
 		return nil, nil, err
 	}
+	// All supported formats are JSON. Reject malformed files before detection,
+	// where an entry-level parser error could otherwise look like a format match.
+	for _, input := range inputs {
+		if !json.Valid(input.Data) {
+			return nil, nil, fmt.Errorf("invalid JSON in import file %q", input.Name)
+		}
+	}
 	if format != FormatAuto {
 		for _, decoder := range r.decoders {
 			if decoder.ID() == format {

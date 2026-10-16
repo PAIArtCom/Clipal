@@ -421,3 +421,22 @@ func TestDataImportApplyRejectsModeRemovedAfterNativeMergePreview(t *testing.T) 
 		t.Fatalf("apply status=%d body=%s", apply.Code, apply.Body.String())
 	}
 }
+
+func TestDataImportPreviewIdentifiesMalformedFileJSON(t *testing.T) {
+	api := NewAPI(t.TempDir(), "test", nil)
+	payload, err := json.Marshal(dataImportRequest{Files: []dataImportFileRequest{{Name: "broken.json", Data: "{broken"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := httptest.NewRecorder()
+	api.HandleDataImportPreview(preview, httptest.NewRequest(http.MethodPost, "/api/data/import/preview", bytes.NewReader(payload)))
+	var response struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if preview.Code != http.StatusBadRequest || response.Error != `invalid JSON in import file "broken.json"` {
+		t.Fatalf("status=%d error=%q", preview.Code, response.Error)
+	}
+}

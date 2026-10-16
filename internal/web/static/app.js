@@ -20,6 +20,7 @@ function defaultOAuthAuthorizationState() {
 
 function app() {
     let oauthAuthorizationPopup = null;
+    const countryOptionsByLocale = new Map();
 
     return {
         // State
@@ -42,8 +43,12 @@ function app() {
         oauthAuthorization: defaultOAuthAuthorizationState(),
         integrations: [],
         integrationBusyProduct: '',
+        integrationPreviewOpen: {},
         environmentVisible: false,
         environmentBusy: false,
+        environmentSaving: false,
+        environmentLoadError: '',
+        environmentProvider: null,
         environmentCheckDoH: false,
         environmentPath: '',
         environmentAccount: '',
@@ -54,8 +59,20 @@ function app() {
         environmentDiagnostics: null,
         environmentGeneration: 0,
         serviceBusyAction: '',
+        serviceActionRequestPending: false,
         messages: {
             en: {
+                forms: {"unit": "Unit for {label}", "nonNegative": "Enter a non-negative number.", "wholeBytes": "Choose a size that is at least one whole byte.", "positiveDuration": "Enter a duration greater than zero.", "preserved": "Saved value: {value}. Enter a number to replace it.", "inherit": "Use provider default", "defaultValue": "Use default", "minimumSize": "The minimum request-body limit is 64 MiB.", "minimumTimeout": "Use zero to disable, or choose at least 5 minutes."},
+                units: {"ns": "Nanoseconds", "us": "Microseconds", "µs": "Microseconds", "ms": "Milliseconds", "s": "Seconds", "m": "Minutes", "h": "Hours", "B": "Bytes", "KiB": "KiB", "MiB": "MiB", "GiB": "GiB"},
+                feedback: {
+                    unsavedTitle: 'Discard unsaved changes?',
+                    unsaved: 'This form has unsaved changes. Discard them?',
+                    failed: 'Cannot refresh status. The connection may be interrupted; displayed data may be out of date.',
+                    stale: 'Status is out of date. Refresh to check the current state.',
+                    never: 'No successful status update yet.',
+                    updated: 'Last successful update: {time}',
+                    runtime: 'Gateway status', service: 'Service status', retry: 'Retry'
+                },
                 requestEnv: {
                     "title": "OAuth request environment",
                     "open": "Account environment",
@@ -65,6 +82,8 @@ function app() {
                     "sources": { "default": "Default request configuration", "user": "User configuration", "unknown": "Not configured" },
                     "confirmHint": "Legacy values may have been inferred from an exit. Review or change them, then save to confirm. Unconfirmed regions are not applied to requests.",
                     "save": "Save / confirm account preferences",
+                    "saved": "Account preferences saved.",
+                    "loadFailed": "Could not load account preferences.",
                     "upstream": "Credential region attributes (separate record)",
                     "reference": "Reference service only — target exit unverified",
                     "language": "Request language",
@@ -105,7 +124,6 @@ function app() {
                 },
                 header: {
                     subtitle: 'Local ingress for Claude, OpenAI, and Gemini traffic',
-                    uptime: 'Uptime: {uptime}'
                 },
                 nav: {
                     sectionsLabel: 'Sections',
@@ -128,20 +146,20 @@ function app() {
                     integrationHint: 'Open CLI Takeover'
                 },
                 common: {
+                    close: 'Close',
+                    copy: 'Copy',
+                    copied: 'Copied',
                     none: 'None',
                     load: 'Load',
                     save: 'Save',
                     reset: 'Reset',
-                    export: 'Export',
                     cancel: 'Cancel',
                     confirmTitle: 'Please confirm',
-                    show: 'Show',
-                    hide: 'Hide',
                     refresh: 'Refresh',
                     working: 'Working...',
+                    saving: 'Saving...',
                     enabled: 'Enabled',
                     disabled: 'Disabled',
-                    active: 'Active'
                 },
                 locale: {
                     label: 'Language',
@@ -155,7 +173,23 @@ function app() {
                     dark: 'Dark'
                 },
                 providers: {
-                    addTo: 'Add Provider to {client}',
+                    add: 'Add provider',
+                    loadFailed: 'Could not load providers. The displayed list may be out of date.',
+                    candidate: 'Current candidate',
+                    spend: 'Spend',
+                    today: 'today',
+                    week: '{amount} in 7 days',
+                    tokensInOut: '{input} in · {output} out',
+                    refreshed: 'Refreshed {time}',
+                    keys: 'API keys',
+                    providerId: 'ID',
+                    search: 'Search by name or URL',
+                    noMatch: 'No providers match this search.',
+                    reorderLocked: 'Clear the search to reorder',
+                    details: 'Details',
+                    emptyNext: 'After adding one, connect your tools in',
+                    runtimeStandby: 'Standby',
+                    unknownCandidate: 'Not yet known',
                     runtimeCurrent: 'In use',
                     runtimeCoolingDown: 'Cooling down',
                     runtimeUnavailable: 'Unavailable',
@@ -163,21 +197,12 @@ function app() {
                     modeLabel: 'Mode',
                     modeAuto: 'Auto',
                     modeManual: 'Manual',
-                    pinned: 'Pinned:',
-                    switchToManual: 'Switch to Manual',
-                    backToAuto: 'Back to Auto',
                     enableProviderFirst: 'Enable a provider first',
-                    pinHint: 'Pin a provider by clicking 📌 on a provider card.',
                     empty: 'No providers configured for {client}',
-                    pinBadge: 'Pinned',
                     baseUrl: 'Base URL',
                     proxy: 'Proxy',
-                    service: 'Service',
                     oauthAuth: 'Auth',
-                    refresh: 'Refresh',
-                    apiKeys: 'API Keys',
                     usageTotal: 'Usage',
-                    usageInOut: 'Input / Output',
                     usageReasoning: 'Reasoning',
                     usageThoughts: 'Thoughts',
                     usageIncluded: 'incl. {label} {tokens}',
@@ -188,7 +213,6 @@ function app() {
                     spendToday: 'Spend Today',
                     spendWeek: 'Spend 7d',
                     planAndLimits: 'Plan & Limits',
-                    plan: 'Plan',
                     rateLimit: 'Limit',
                     rateLimitCodeReviewWeekly: 'Code review weekly limit',
                     rateLimitWeekly: 'Weekly limit',
@@ -202,12 +226,8 @@ function app() {
                     oauthStatusReauthNeeded: 'Reauth needed',
                     justNow: 'Just now',
                     never: 'Never',
-                    model: 'Model Override',
-                    reasoningEffort: 'Reasoning Effort',
-                    thinkingBudgetTokens: 'Thinking Budget Tokens',
-                    configuredCount: '{count} configured',
                     pinTitle: 'Pin (Manual)',
-                    dragToReorder: 'Drag to reorder providers',
+                    dragToReorder: 'Drag to reorder; Alt+↑/↓ to move',
                     edit: 'Edit',
                     delete: 'Delete',
                     disable: 'Disable',
@@ -215,8 +235,8 @@ function app() {
                     pinnedProvider: 'Pinned provider',
                     pinnedProviderCannotDisable: 'Pinned provider cannot be disabled in manual mode',
                     enablePinnedProvider: 'Enable pinned provider',
-                    modeHelpManual: 'Manual (Pinned)\nAlways use the pinned provider.\nNo failover; failures return errors.',
-                    modeHelpAuto: 'Auto (Failover)\nTries enabled providers by priority.\nSwitches on failures.',
+                    modeHelpManual: 'Always uses the pinned provider. No failover.',
+                    modeHelpAuto: 'Fails over between enabled providers by priority.',
                     enableBeforeManual: 'Enable a provider before switching to manual mode',
                     enableBeforePinning: 'Enable the provider before pinning it',
                     switchedToAutoTitle: '{client} switched to Auto',
@@ -239,8 +259,6 @@ function app() {
                     deletedTitle: 'Deleted provider {name}',
                     deletedMessage: 'It has been removed from {client}\'s provider list.',
                     clientTypeLabel: 'Client Type',
-                    authType: 'Auth',
-                    oauthAccount: 'OAuth Account',
                     oauthAuthorizingTitle: 'Authorize {provider}',
                     oauthAuthorizingMessage: 'Finish the OAuth flow in the opened window. Clipal will link the authorized account automatically.',
                     oauthOpeningMessage: 'Preparing the authorization window...',
@@ -265,12 +283,10 @@ function app() {
                     oauthAddedMessageReused: '{email} refreshed existing provider {providerName} for {client}.',
                     oauthAddedMessageRelinked: '{email} relinked provider {providerName} for {client}.',
                     oauthEditLocked: 'OAuth accounts are managed by authorization. Reauthorize or delete the account instead.',
-                    oauthToggleLocked: 'Use the provider toggle to enable or disable OAuth accounts.',
                     oauthUnavailable: 'OAuth is not available for this client yet.',
                     oauthImportCompletedTitle: 'Imported OAuth accounts',
                     oauthImportFailedTitle: 'OAuth import failed',
                     oauthImportSummary: 'Imported {imported} account(s), linked {linked} provider(s), skipped {skipped} entry(s), failed {failed} entry(s).',
-                    oauthImportDetailsMore: '+{count} more entries',
                     oauthImportBrowserUnsupported: 'OAuth credential import is not supported in this browser.',
                     proxyDirect: 'Direct',
                     proxyCustom: 'Custom'
@@ -294,7 +310,8 @@ function app() {
                         importFileHintGemini: 'Supported files: CLIProxyAPI single-account Gemini OAuth JSON or sub2api export JSON. Clipal imports only Gemini accounts from the selected files.',
                         importFileHintAntigravity: 'Supported files: CLIProxyAPI single-account Antigravity OAuth JSON or sub2api export JSON. Clipal imports only Antigravity accounts from the selected files.',
                         name: 'Name *',
-                        nameHint: 'Letters, numbers, dot (.), underscore (_), and hyphen (-).',
+                        namePlaceholder: 'e.g. provider-primary',
+                        nameHint: 'Start with a letter or number; use letters, numbers, dot (.), underscore (_) or hyphen (-), up to 64 characters.',
                         baseUrl: 'Base URL *',
                         proxyMode: 'Proxy Mode',
                         proxyModeDefault: 'Use Default',
@@ -307,22 +324,17 @@ function app() {
                         model: 'Model',
                         modelHint: 'model-id',
                         reasoningEffort: 'Reasoning Effort',
-                        reasoningEffortHint: 'Used as OpenAI Responses reasoning.effort.',
+                        reasoningEffortHint: 'Choose a suggestion or enter a model-specific value. Leave empty to use the provider default.',
                         thinkingBudgetTokens: 'Thinking Budget',
-                        thinkingBudgetTokensHint: 'Use 0 to clear Claude thinking.budget_tokens.',
+                        thinkingBudgetTokensHint: 'Set 0 to clear the thinking budget override.',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: 'One API key per line',
-                        savedAs: 'Saved as',
-                        savedAsSingle: '1 line -> api_key',
-                        savedAsMultiple: '2+ lines -> api_keys',
                         keepExistingKey: 'Leave empty to keep the current configured key.',
                         keepExistingKeys: 'Leave empty to keep the current {count} configured keys.',
                         overridesTitle: 'Overrides',
                         overridesHint: 'Leave empty if no override needed',
-                        overridesOptional: 'Optional',
                         priority: 'Priority',
-                        priorityHint: 'Smaller numbers are tried first.',
                         saveProvider: 'Save Provider',
                         authorizeProvider: 'Continue to Authorization'
                     }
@@ -344,15 +356,15 @@ function app() {
                     port: 'Port',
                     logLevel: 'Log Level',
                     maxBodySize: 'Max Body Size',
-                    maxBodySizeHint: 'Bytes buffered for retryable requests; values below 64 MiB are raised to 64 MiB.',
+                    maxBodySizeHint: 'Buffer limit for retryable requests. Minimum: 64 MiB.',
                     reliabilityTitle: 'Reliability',
                     reliabilityCopy: 'Timeouts, temporary deactivation, and circuit breaker behavior.',
                     reactivateAfter: 'Reactivate After',
                     reactivateAfterHint: 'How long a failed provider stays deactivated.',
                     upstreamIdleTimeout: 'Upstream Idle Timeout',
-                    upstreamIdleTimeoutHint: 'Set 0 to disable; positive values below 5m are raised to 5m.',
+                    upstreamIdleTimeoutHint: 'Set 0 to disable; otherwise use at least 5 minutes.',
                     responseHeaderTimeout: 'Response Header Timeout',
-                    responseHeaderTimeoutHint: 'Set 0 to disable; positive values below 5m are raised to 5m.',
+                    responseHeaderTimeoutHint: 'Set 0 to disable; otherwise use at least 5 minutes.',
                     upstreamProxyMode: 'Default Upstream Proxy',
                     upstreamProxyUrl: 'Default Proxy URL',
                     upstreamProxyHint: 'Used by providers whose proxy mode is Default.',
@@ -364,7 +376,7 @@ function app() {
                     failureThreshold: 'Failure Threshold',
                     failureThresholdHint: '0 disables the circuit breaker.',
                     successThreshold: 'Success Threshold',
-                    openTimeout: 'Open Timeout',
+                    openTimeout: 'Circuit Breaker Cooldown',
                     halfOpenMaxInflight: 'Half-Open Max In-Flight',
                     logsAlertsTitle: 'Logs & Alerts',
                     logsAlertsCopy: 'Local logging, retention, and desktop notification behavior.',
@@ -379,11 +391,11 @@ function app() {
                     routingTitle: 'Routing Strategy',
                     routingCopy: 'Expose only the routing controls that change user-visible behavior.',
                     stickySessionTtl: 'Sticky Session TTL',
-                    stickySessionTtlHint: 'Idle lifetime for explicit session bindings.',
+                    stickySessionTtlHint: 'Idle lifetime for explicit session bindings. Leave empty to use the default.',
                     shortRetryAfterMax: 'Short Retry-After Max',
-                    shortRetryAfterMaxHint: 'Upper bound for honoring short upstream retry-after hints.',
+                    shortRetryAfterMaxHint: 'Upper bound for honoring short upstream retry-after hints. Leave empty to use the default.',
                     maxInlineWait: 'Max Inline Wait',
-                    maxInlineWaitHint: 'How long Clipal may wait before overflowing to another provider.',
+                    maxInlineWaitHint: 'How long Clipal may wait before overflowing to another provider. Leave empty to use the default.',
                     enableStickySessions: 'Enable Sticky Sessions',
                     enableBusyBackpressure: 'Enable Busy Backpressure',
                     dataTitle: 'Backup & Import',
@@ -395,10 +407,10 @@ function app() {
                     unsavedMessage: 'You have unsaved changes in Global Settings. Leaving this page will discard them.',
                     discardChanges: 'Discard changes',
                     footerHint: 'Saving updates `config.yaml`. Some runtime changes may require restart to take full effect.',
-                    saveSettings: 'Save Settings',
                     saveSuccess: 'Configuration saved. Some changes may require restart.',
                     exportSaved: 'Backup saved as {filename}.',
                     exportDownloadStarted: 'Download started for {filename}. Check your browser downloads for its location.',
+                    exportFileType: 'Clipal backup (JSON)',
                     exportFailure: 'Failed to export backup',
                     exportFullBackup: 'Export Full Backup',
                     exportBackupCopy: 'Downloads global and client configuration, provider API keys, OAuth access and refresh tokens, and usage data.',
@@ -430,7 +442,6 @@ function app() {
                     importChangeSummary: 'Added {added} · Updated {updated} · Removed {removed}',
                     importPreviewGuard: 'If the selected data or current state changes, preview again before applying.',
                     importApplied: 'Imported {credentials} credentials, {providers} providers, and {usage} usage records',
-                    importSuccess: 'Data imported successfully',
                     importFailure: 'Failed to import data'
                 },
                 integrations: {
@@ -449,7 +460,11 @@ function app() {
                     noBackupYet: 'No backup yet. Apply once before restore becomes available.',
                     restoreOnlyActive: 'Restore is only available while Clipal is active.',
                     dismissResult: 'Dismiss result',
-                    detailsPreview: 'View Configuration Details & Preview',
+                    fullFiles: 'Full files',
+                    previewChanges: 'Preview changes',
+                    changesSummary: 'Changes: +{added} / −{removed} lines',
+                    changesNone: 'No changes to apply',
+                    changesLarge: 'Changes (file too large for a line diff)',
                     backupAvailable: 'Backup Available',
                     noBackupMeta: 'No backup yet',
                     currentFile: 'Current file',
@@ -467,16 +482,10 @@ function app() {
                     resultRestartMessage: 'Restart the client or open a new session to apply changes.',
                     resultApplyErrorTitle: 'Couldn’t update this client',
                     resultRestoreErrorTitle: 'Couldn’t restore this client',
-                    noteClaude: 'Clipal updates ANTHROPIC_BASE_URL in ~/.claude/settings.json, inserts a placeholder ANTHROPIC_API_KEY only when no Claude client auth env is present, may also mark ~/.claude.json onboarding complete, and leaves existing ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN untouched.',
-                    noteCodex: 'Clipal updates model_provider to clipal and writes [model_providers.clipal] with the local URL and wire_api = "responses".',
-                    noteOpencode: 'Clipal adds or updates provider.clipal, points it at the local Clipal OpenAI-compatible URL, and switches the active model to clipal/<current-model>.',
-                    noteGemini: 'Clipal only updates GEMINI_API_BASE in ~/.gemini/.env. Other Gemini environment overrides may still take precedence.',
-                    noteContinue: 'Clipal adds or updates a user-level Continue model entry that points at the local Clipal OpenAI-compatible URL. You may still need to select that model inside Continue.',
-                    noteAider: 'Clipal updates the home-level .aider.conf.yml openai-api-base and a minimal OpenAI-compatible model value. Existing openai-api-key values stay untouched; if missing, Clipal inserts a placeholder clipal key. Repo-local config, .env, or CLI flags can still override it.',
-                    noteGoose: 'Clipal creates or updates a managed Goose custom provider file. You may still need to select the Clipal provider or model inside Goose.',
-                    noteDefault: 'Clipal only edits the user-level config file shown on this card.'
                 },
                 services: {
+                    actionFailed: 'The service action failed. Retry or check the service output.',
+                    actionUnconfirmed: 'Connection interrupted; the service action is unconfirmed. Checking status…',
                     title: 'Clipal Service',
                     subtitle: 'Manage the OS background service (same as clipal service *)',
                     supported: 'Supported',
@@ -517,11 +526,11 @@ function app() {
                 statusPage: {
                     systemInfo: 'System Info',
                     uptime: 'Uptime',
+                    pinned: 'Pinned',
                     configDir: 'Config Dir',
                     circuitBreaker: 'Circuit Breaker',
                     disabled: 'Disabled',
                     circuitBreakerSummary: '{failure} fail / {success} succ ({timeout})',
-                    pinned: 'Pinned',
                     activitySwitch: 'Provider switch',
                     activityRequest: 'Request',
                     recentActivity: 'Latest activity',
@@ -551,8 +560,21 @@ function app() {
                 }
             },
             'zh-CN': {
+                forms: {"unit": "{label}的单位", "nonNegative": "请输入非负数。", "wholeBytes": "请选择至少为一个整数字节的大小。", "positiveDuration": "请输入大于零的时长。", "preserved": "已保存：{value}。输入数值后可替换。", "inherit": "使用上游默认值", "defaultValue": "使用默认值", "minimumSize": "请求体大小至少为 64 MiB。", "minimumTimeout": "设为零可关闭，否则请至少设置 5 分钟。"},
+                units: {"ns": "纳秒", "us": "微秒", "µs": "微秒", "ms": "毫秒", "s": "秒", "m": "分钟", "h": "小时", "B": "字节", "KiB": "KiB", "MiB": "MiB", "GiB": "GiB"},
+                feedback: {
+                    unsavedTitle: '丢弃未保存的修改？',
+                    unsaved: '此表单有未保存的修改，是否丢弃？',
+                    failed: '无法刷新状态，连接可能已中断；当前显示的数据可能已过期。',
+                    stale: '状态已过期，请刷新以核实当前状态。',
+                    never: '尚未成功获取状态。',
+                    updated: '上次成功更新：{time}',
+                    runtime: '网关状态', service: '服务状态', retry: '重试'
+                },
                 requestEnv: {
                     "title": "OAuth 请求环境",
+                    "saved": "账号配置已保存。",
+                    "loadFailed": "无法加载账号配置。",
                     "open": "账号环境",
                     "country": "请求国家 / 地区",
                     "source": "配置来源",
@@ -600,7 +622,6 @@ function app() {
                 },
                 header: {
                     subtitle: '面向 Claude、OpenAI 和 Gemini 流量的本地入口',
-                    uptime: '运行时长：{uptime}'
                 },
                 nav: {
                     sectionsLabel: '功能分区',
@@ -623,20 +644,20 @@ function app() {
                     integrationHint: '打开 CLI 接管'
                 },
                 common: {
+                    close: '关闭',
+                    copy: '复制',
+                    copied: '已复制',
                     none: '无',
                     load: '加载',
                     save: '保存',
                     reset: '重置',
-                    export: '导出',
                     cancel: '取消',
                     confirmTitle: '请确认',
-                    show: '展开',
-                    hide: '收起',
                     refresh: '刷新',
                     working: '处理中...',
+                    saving: '保存中...',
                     enabled: '已启用',
                     disabled: '已禁用',
-                    active: '可用'
                 },
                 locale: {
                     label: '语言',
@@ -650,7 +671,23 @@ function app() {
                     dark: '深色'
                 },
                 providers: {
-                    addTo: '为 {client} 添加 Provider',
+                    add: '添加 Provider',
+                    loadFailed: '无法加载 Provider，当前列表可能已过期。',
+                    candidate: '当前候选',
+                    spend: '花费',
+                    today: '今日',
+                    week: '近 7 天 {amount}',
+                    tokensInOut: '输入 {input} · 输出 {output}',
+                    refreshed: '{time}刷新',
+                    keys: 'API Key',
+                    providerId: 'ID',
+                    search: '按名称或地址搜索',
+                    noMatch: '没有匹配的 Provider。',
+                    reorderLocked: '清空搜索后可调整顺序',
+                    details: '详情',
+                    emptyNext: '添加后，可在此接入你的工具：',
+                    runtimeStandby: '待命',
+                    unknownCandidate: '暂未确定',
                     runtimeCurrent: '使用中',
                     runtimeCoolingDown: '冷却中',
                     runtimeUnavailable: '不可用',
@@ -658,21 +695,12 @@ function app() {
                     modeLabel: '模式',
                     modeAuto: '自动',
                     modeManual: '手动',
-                    pinned: '固定：',
-                    switchToManual: '切到手动',
-                    backToAuto: '返回自动',
                     enableProviderFirst: '请先启用一个 Provider',
-                    pinHint: '点击 Provider 卡片上的 📌 可固定 Provider。',
                     empty: '{client} 还没有配置任何 Provider',
-                    pinBadge: '已固定',
                     baseUrl: 'Base URL',
                     proxy: '代理',
-                    service: '服务',
                     oauthAuth: '授权',
-                    refresh: '刷新',
-                    apiKeys: 'API Keys',
                     usageTotal: '用量',
-                    usageInOut: '输入 / 输出',
                     usageReasoning: '推理',
                     usageThoughts: '思考',
                     usageIncluded: '含{label} {tokens}',
@@ -683,7 +711,6 @@ function app() {
                     spendToday: '今日消费',
                     spendWeek: '近 7 天消费',
                     planAndLimits: '套餐与限额',
-                    plan: '套餐',
                     rateLimit: '限额',
                     rateLimitCodeReviewWeekly: '代码审查周限额',
                     rateLimitWeekly: '周限额',
@@ -697,10 +724,6 @@ function app() {
                     oauthStatusReauthNeeded: '需重新授权',
                     justNow: '刚刚',
                     never: '从未',
-                    model: '模型覆盖',
-                    reasoningEffort: '思考强度',
-                    thinkingBudgetTokens: '思考预算 Tokens',
-                    configuredCount: '已配置 {count} 个',
                     pinTitle: '固定到手动模式',
                     edit: '编辑',
                     delete: '删除',
@@ -709,8 +732,8 @@ function app() {
                     pinnedProvider: '已固定 Provider',
                     pinnedProviderCannotDisable: '手动模式下不能禁用已固定的 Provider',
                     enablePinnedProvider: '先启用已固定的 Provider',
-                    modeHelpManual: '手动（固定）\n始终使用固定的 Provider。\n不进行故障切换，失败会直接报错。',
-                    modeHelpAuto: '自动（故障切换）\n按优先级尝试已启用的 Provider。\n失败时自动切换。',
+                    modeHelpManual: '始终使用固定的 Provider，不做故障切换。',
+                    modeHelpAuto: '按优先级在已启用的 Provider 间故障切换。',
                     enableBeforeManual: '切到手动模式前请先启用一个 Provider',
                     enableBeforePinning: '固定前请先启用该 Provider',
                     switchedToAutoTitle: '{client} 已切到自动模式',
@@ -733,8 +756,6 @@ function app() {
                     deletedTitle: '已删除 Provider {name}',
                     deletedMessage: '它已从 {client} 的 Provider 列表中移除。',
                     clientTypeLabel: '客户端类型',
-                    authType: '认证方式',
-                    oauthAccount: 'OAuth 账号',
                     oauthAuthorizingTitle: '授权 {provider}',
                     oauthAuthorizingMessage: '请在新打开的窗口完成 OAuth 授权。授权完成后，Clipal 会自动关联这个账号。',
                     oauthOpeningMessage: '正在准备授权窗口...',
@@ -759,14 +780,12 @@ function app() {
                     oauthAddedMessageReused: '{email} 已刷新并继续复用现有 Provider {providerName} 供 {client} 使用。',
                     oauthAddedMessageRelinked: '{email} 已重新关联到 Provider {providerName}，现在可供 {client} 使用。',
                     oauthEditLocked: 'OAuth 账号由授权流程管理。请重新授权或删除账号。',
-                    oauthToggleLocked: '可通过 Provider 开关启用或禁用 OAuth 账号。',
                     oauthUnavailable: '这个客户端暂时还不能使用 OAuth。',
                     oauthImportCompletedTitle: '已导入 OAuth 账号',
                     oauthImportFailedTitle: 'OAuth 导入失败',
                     oauthImportSummary: '已导入 {imported} 个账号，关联 {linked} 个 Provider，跳过 {skipped} 条记录，失败 {failed} 条记录。',
-                    oauthImportDetailsMore: '另有 {count} 条记录',
                     oauthImportBrowserUnsupported: '当前浏览器不支持 OAuth 凭据导入。',
-                    dragToReorder: '拖拽调整优先级',
+                    dragToReorder: '拖拽排序；Alt+↑/↓ 移动',
                     proxyDirect: '直连',
                     proxyCustom: '自定义'
                 },
@@ -789,7 +808,8 @@ function app() {
                         importFileHintGemini: '支持：CLIProxyAPI 单账号 Gemini OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Gemini 账号。',
                         importFileHintAntigravity: '支持：CLIProxyAPI 单账号 Antigravity OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Antigravity 账号。',
                         name: '名称 *',
-                        nameHint: '允许字母、数字、点号 (.)、下划线 (_) 和连字符 (-)。',
+                        namePlaceholder: '例如 provider-primary',
+                        nameHint: '以字母或数字开头，可含字母、数字、点号、下划线和连字符，最多 64 个字符。',
                         baseUrl: 'Base URL *',
                         proxyMode: '代理模式',
                         proxyModeDefault: '使用默认值',
@@ -802,21 +822,17 @@ function app() {
                         model: '模型',
                         modelHint: 'model-id',
                         reasoningEffort: '思考强度',
-                        reasoningEffortHint: '写入 OpenAI Responses 的 reasoning.effort。',
+                        reasoningEffortHint: '可选常用值，也可填写模型专属值。留空时使用上游默认值。',
                         thinkingBudgetTokens: '思考预算',
-                        thinkingBudgetTokensHint: '填 0 清空 Claude 的 thinking.budget_tokens。',
+                        thinkingBudgetTokensHint: '设为 0 可取消思考预算覆盖。',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: '每行一个 API Key',
-                        savedAs: '保存方式',
-                        savedAsSingle: '1 行 -> api_key',
-                        savedAsMultiple: '2 行及以上 -> api_keys',
-                        keepExistingKeys: '留空则保留当前已配置的 {count} 个 key。',
+                        keepExistingKey: '留空则保留当前已配置的 API Key。',
+                        keepExistingKeys: '留空则保留当前已配置的 {count} 个 API Key。',
                         overridesTitle: '覆盖',
                         overridesHint: '无需覆盖则留空',
-                        overridesOptional: '可选',
                         priority: '优先级',
-                        priorityHint: '数字越小越先尝试。',
                         saveProvider: '保存 Provider',
                         authorizeProvider: '继续授权'
                     }
@@ -838,15 +854,15 @@ function app() {
                     port: '端口',
                     logLevel: '日志级别',
                     maxBodySize: '最大请求体大小',
-                    maxBodySizeHint: '用于可重试请求的缓冲字节数；低于 64 MiB 的值会自动提升为 64 MiB。',
+                    maxBodySizeHint: '可重试请求的缓冲大小，至少为 64 MiB。',
                     reliabilityTitle: '可靠性',
                     reliabilityCopy: '超时、临时停用和熔断器行为。',
                     reactivateAfter: '恢复激活时间',
                     reactivateAfterHint: '失败的 Provider 会停用多久后再恢复。',
                     upstreamIdleTimeout: '上游空闲超时',
-                    upstreamIdleTimeoutHint: '设为 0 可关闭；其他低于 5m 的正值会自动提升为 5m。',
+                    upstreamIdleTimeoutHint: '设为 0 可关闭，否则请至少设置 5 分钟。',
                     responseHeaderTimeout: '响应头超时',
-                    responseHeaderTimeoutHint: '设为 0 可关闭；其他低于 5m 的正值会自动提升为 5m。',
+                    responseHeaderTimeoutHint: '设为 0 可关闭，否则请至少设置 5 分钟。',
                     upstreamProxyMode: '默认上游代理',
                     upstreamProxyUrl: '默认代理 URL',
                     upstreamProxyHint: '对代理模式为“使用默认值”的 Provider 生效。',
@@ -858,7 +874,7 @@ function app() {
                     failureThreshold: '失败阈值',
                     failureThresholdHint: '设为 0 可关闭熔断器。',
                     successThreshold: '成功阈值',
-                    openTimeout: '打开超时',
+                    openTimeout: '熔断冷却时间',
                     halfOpenMaxInflight: '半开最大并发',
                     logsAlertsTitle: '日志与提醒',
                     logsAlertsCopy: '本地日志、保留策略和桌面通知行为。',
@@ -873,11 +889,11 @@ function app() {
                     routingTitle: '路由策略',
                     routingCopy: '只暴露会影响用户可见行为的路由控制项。',
                     stickySessionTtl: '粘性会话 TTL',
-                    stickySessionTtlHint: '显式会话绑定的空闲生存时间。',
+                    stickySessionTtlHint: '显式会话绑定的空闲生存时间，留空使用默认值。',
                     shortRetryAfterMax: '短 Retry-After 上限',
-                    shortRetryAfterMaxHint: '对上游较短 retry-after 提示的最大遵从值。',
+                    shortRetryAfterMaxHint: '对上游较短 retry-after 提示的最大遵从值，留空使用默认值。',
                     maxInlineWait: '最大内联等待',
-                    maxInlineWaitHint: 'Clipal 在溢出到其他 Provider 前可等待的最长时间。',
+                    maxInlineWaitHint: 'Clipal 在溢出到其他 Provider 前可等待的最长时间，留空使用默认值。',
                     enableStickySessions: '启用粘性会话',
                     enableBusyBackpressure: '启用 Busy Backpressure',
                     dataTitle: '备份与导入',
@@ -889,10 +905,10 @@ function app() {
                     unsavedMessage: '“全局设置”中有未保存的修改，离开此页将丢弃它们。',
                     discardChanges: '放弃修改',
                     footerHint: '保存会更新 `config.yaml`。部分运行时改动需要重启后才会完全生效。',
-                    saveSettings: '保存设置',
                     saveSuccess: '配置已保存。部分改动可能需要重启。',
                     exportSaved: '备份已保存为 {filename}。',
                     exportDownloadStarted: '已开始下载 {filename}，请在浏览器下载列表中查看保存位置。',
+                    exportFileType: 'Clipal 备份（JSON）',
                     exportFailure: '备份导出失败',
                     exportFullBackup: '导出完整备份',
                     exportBackupCopy: '下载全局与客户端配置、Provider API Key、OAuth access 和 refresh token，以及用量历史。',
@@ -924,7 +940,6 @@ function app() {
                     importChangeSummary: '新增 {added} · 更新 {updated} · 移除 {removed}',
                     importPreviewGuard: '若所选数据或当前状态发生变化，请重新预览后再执行。',
                     importApplied: '已导入 {credentials} 个凭据、{providers} 个 Provider 和 {usage} 条用量记录',
-                    importSuccess: '数据导入成功',
                     importFailure: '数据导入失败'
                 },
                 integrations: {
@@ -943,7 +958,11 @@ function app() {
                     noBackupYet: '目前还没有备份。至少先使用一次 Clipal 后才能恢复。',
                     restoreOnlyActive: '只有在当前由 Clipal 接管时才能恢复。',
                     dismissResult: '关闭结果',
-                    detailsPreview: '查看配置详情与预览',
+                    fullFiles: '完整文件',
+                    previewChanges: '预览变更',
+                    changesSummary: '变更：+{added} / −{removed} 行',
+                    changesNone: '没有需要应用的变更',
+                    changesLarge: '变更（文件过大，不显示逐行对比）',
                     backupAvailable: '已有备份',
                     noBackupMeta: '暂无备份',
                     currentFile: '当前文件',
@@ -961,16 +980,10 @@ function app() {
                     resultRestartMessage: '请重启客户端或重新打开一个会话以应用改动。',
                     resultApplyErrorTitle: '更新此客户端失败',
                     resultRestoreErrorTitle: '恢复此客户端失败',
-                    noteClaude: 'Clipal 会更新 ~/.claude/settings.json 中的 ANTHROPIC_BASE_URL，只有缺少 Claude 客户端认证环境变量时才补占位 ANTHROPIC_API_KEY，必要时也会把 ~/.claude.json 的 onboarding 标记补成完成，不会改动已有 ANTHROPIC_API_KEY 和 ANTHROPIC_AUTH_TOKEN。',
-                    noteCodex: 'Clipal 会把 model_provider 更新为 clipal，并写入 [model_providers.clipal]，使用本地 URL 和 wire_api = "responses"。',
-                    noteOpencode: 'Clipal 会新增或更新 provider.clipal，指向本地 Clipal OpenAI 兼容地址，并把当前 model 切到 clipal/<当前模型>。',
-                    noteGemini: 'Clipal 只会更新 ~/.gemini/.env 中的 GEMINI_API_BASE。其他 Gemini 环境覆盖项仍可能优先生效。',
-                    noteContinue: 'Clipal 会新增或更新用户级 Continue 模型项，指向本地 Clipal OpenAI 兼容地址。你可能仍需在 Continue 中手动选择该模型。',
-                    noteAider: 'Clipal 会更新 home 级 .aider.conf.yml 中的 openai-api-base 和一个最小 OpenAI 兼容 model。已有 openai-api-key 会保留，只有缺失时才会自动补占位值 clipal。仓库级配置、.env 或 CLI 参数仍可能覆盖它。',
-                    noteGoose: 'Clipal 会创建或更新受管控的 Goose 自定义 provider 文件。你可能仍需在 Goose 中选择 Clipal provider 或 model。',
-                    noteDefault: 'Clipal 只会修改此卡片展示的用户级配置文件。'
                 },
                 services: {
+                    actionFailed: '服务操作失败，请重试或检查服务输出。',
+                    actionUnconfirmed: '连接已中断，尚未确认服务操作结果，正在检查状态…',
                     title: 'Clipal 服务',
                     subtitle: '管理操作系统后台服务（等同于 clipal service *）',
                     supported: '支持',
@@ -1011,11 +1024,11 @@ function app() {
                 statusPage: {
                     systemInfo: '系统信息',
                     uptime: '运行时长',
+                    pinned: '已固定',
                     configDir: '配置目录',
                     circuitBreaker: '熔断器',
                     disabled: '已禁用',
                     circuitBreakerSummary: '{failure} 次失败 / {success} 次成功（{timeout}）',
-                    pinned: '已固定',
                     activitySwitch: '切换 Provider',
                     activityRequest: '请求',
                     recentActivity: '最新活动',
@@ -1051,6 +1064,9 @@ function app() {
             { value: 'gemini', label: 'Gemini' }
         ],
         providers: [],
+        providerLoadBusy: false,
+        providerLoadError: '',
+        providerLoadGeneration: 0,
         clientConfig: {
             mode: 'auto',
             pinned_provider: '',
@@ -1096,6 +1112,7 @@ function app() {
                 }
             }
         },
+        dataImportBusy: '',
         dataImportFiles: [],
         dataImportMode: '',
         dataImportPlan: null,
@@ -1127,7 +1144,22 @@ function app() {
         confirmDialog: { visible: false, title: '', message: '', detail: '', confirmLabel: '', danger: false },
         confirmResolver: null,
         confirmReturnFocus: null,
+        dialogReturnFocus: null,
+        providerSearch: '',
+        expandedProviders: {},
+        providerReordering: false,
+        clientConfigSaving: false,
+        providerUpdating: false,
+        providerFormSnapshot: null,
+        environmentFormSnapshot: null,
+        providerSaving: false,
+        statusClock: Date.now(),
+        statusHealth: {
+            runtime: { lastSuccess: 0, failed: false, busy: false },
+            service: { lastSuccess: 0, failed: false, busy: false }
+        },
         globalSaving: false,
+        globalLoading: false,
         savedAllowRemoteWebUI: false,
         toasts: [],
         toastCounter: 0,
@@ -1194,6 +1226,83 @@ function app() {
             };
         },
 
+        get selectedRuntime() {
+            return (this.status.clients || {})[this.selectedClient] || {};
+        },
+        // Search only earns its space once the list no longer fits on one screen.
+        get providerSearchAvailable() {
+            return this.providers.length > 8 || !!this.providerSearch;
+        },
+        get visibleProviders() {
+            const query = this.providerSearch.trim().toLowerCase();
+            if (!query) return this.providers;
+            return this.providers.filter(provider => [provider.name, provider.display_name, provider.base_url]
+                .filter(Boolean).join(' ').toLowerCase().includes(query));
+        },
+        get canReorderProviders() {
+            return !this.providerSearch.trim() && this.canMutateProviders;
+        },
+        get providerMutationBusy() {
+            return this.providerSaving || this.providerUpdating || this.providerReordering || this.clientConfigSaving;
+        },
+        get canMutateProviders() {
+            return !this.providerMutationBusy && !this.providerLoadBusy && !this.providerLoadError;
+        },
+        providerPinned(provider) {
+            return this.clientConfig.mode === 'manual' && !!provider && provider.name === this.clientConfig.pinned_provider;
+        },
+        providerNeedsAttention(provider) {
+            const runtime = this.providerRuntime(provider);
+            return !!provider.enabled && !!runtime && runtime.state !== 'current';
+        },
+        providerRowState(provider) {
+            if (!provider.enabled) {
+                const label = this.t('common.disabled');
+                return { tone: 'off', label, title: label };
+            }
+            const runtime = this.providerRuntime(provider);
+            if (runtime) return runtime;
+            const label = this.t('providers.runtimeStandby');
+            return { tone: 'idle', label, title: label };
+        },
+        // Secondary line under the provider name; the OAuth tag is rendered separately.
+        providerRowMeta(provider) {
+            const parts = [];
+            if (!this.providerUsesOAuth(provider) && provider.base_url) {
+                try {
+                    parts.push(new URL(provider.base_url).host);
+                } catch (_) {
+                    parts.push(provider.base_url);
+                }
+            }
+            if (provider.display_name && provider.display_name !== provider.name) parts.push(provider.name);
+            return parts.join(' · ');
+        },
+        // Today's spend for the row; blank when there is nothing to report so rows stay quiet.
+        providerSpendTodayLabel(provider) {
+            if (!this.providerSpendVisible(provider) || !Number(provider.usage.spend_today_micros || 0)) return '';
+            return this.providerSpendToday(provider);
+        },
+        providerExpanded(provider) {
+            return !!this.expandedProviders[provider.name];
+        },
+        toggleProviderDetails(provider) {
+            this.expandedProviders = { ...this.expandedProviders, [provider.name]: !this.expandedProviders[provider.name] };
+        },
+        providerRowClick(provider, event) {
+            // Controls inside the row handle their own clicks.
+            if (event && event.target && event.target.closest && event.target.closest('button, input, label, a')) return;
+            this.toggleProviderDetails(provider);
+        },
+        runtimeCandidatesLabel() {
+            const client = this.selectedRuntime;
+            const candidates = Object.entries(client.current_providers || {});
+            const names = [...new Set(candidates.map(([, name]) => name).filter(Boolean))];
+            if (names.length === 1) return names[0];
+            return candidates.length ? candidates.map(([capability, name]) => `${capability}: ${name}`).join(' · ')
+                : client.current_provider || this.t('providers.unknownCandidate');
+        },
+
         setupServiceReady() { return !!this.serviceStatus.running; },
         setupProviderReady() {
             return Object.values(this.status.clients || {}).some(client => (client.enabled_providers || []).length > 0);
@@ -1204,6 +1313,14 @@ function app() {
         // Switches the visible tab; leaving Global Settings with unsaved edits asks first.
         async setTab(tab) {
             if (!this.tabNames.includes(tab) || tab === this.activeTab) return true;
+            if (this.dataImportBusy === 'apply') {
+                this.syncHash();
+                return false;
+            }
+            if (!await this.requestCloseProvider() || !await this.closeEnvironment()) {
+                this.syncHash();
+                return false;
+            }
             if (this.activeTab === 'settings' && this.globalDirty) {
                 const ok = await this.askConfirm({
                     title: this.t('settings.unsavedTitle'),
@@ -1218,16 +1335,22 @@ function app() {
                 this.globalConfig = JSON.parse(JSON.stringify(this.savedGlobalConfig));
             }
             this.activeTab = tab;
+            // Refresh on arrival so data paused while the tab was hidden is not shown as stale.
+            if (this.statusPolledOn('runtime')) this.refreshStatus();
+            if (this.statusPolledOn('service')) this.loadServiceStatus(true);
             return true;
+        },
+
+        nextChoiceIndex(current, length, direction) {
+            if (direction === 'first') return 0;
+            if (direction === 'last') return length - 1;
+            return (current + direction + length) % length;
         },
 
         moveTab(direction) {
             const names = this.tabNames;
             const current = names.indexOf(this.activeTab);
-            let next = current;
-            if (direction === 'first') next = 0;
-            else if (direction === 'last') next = names.length - 1;
-            else next = (current + direction + names.length) % names.length;
+            const next = this.nextChoiceIndex(current, names.length, direction);
             this.setTab(names[next]).then(() => {
                 this.$nextTick(() => {
                     const el = document.getElementById('tabbtn-' + this.activeTab);
@@ -1273,6 +1396,48 @@ function app() {
         get globalDirty() {
             if (!this.savedGlobalConfig) return false;
             return JSON.stringify(this.globalConfig) !== JSON.stringify(this.savedGlobalConfig);
+        },
+
+        get providerDirty() {
+            return (this.showAddProviderModal || this.showEditProviderModal)
+                && this.providerFormSnapshot !== null
+                && JSON.stringify(this.providerForm) !== this.providerFormSnapshot;
+        },
+        get environmentDirty() {
+            return this.environmentVisible && this.environmentFormSnapshot !== null
+                && JSON.stringify(this.environmentForm) !== this.environmentFormSnapshot;
+        },
+        get hasUnsavedInput() {
+            return this.globalDirty || this.providerDirty || this.environmentDirty;
+        },
+        async confirmDiscard(dirty) {
+            if (!dirty) return true;
+            return this.askConfirm({
+                title: this.t('feedback.unsavedTitle'), message: this.t('feedback.unsaved'),
+                confirmLabel: this.t('settings.discardChanges'), danger: true
+            });
+        },
+        async requestCloseProvider(event) {
+            if (!(this.showAddProviderModal || this.showEditProviderModal)) return true;
+            if (this.confirmDialog.visible || this.providerSaving) return false;
+            // Consume Escape before opening a confirmation so its window listener
+            // cannot dismiss the new dialog with the same keypress.
+            if (event) event.stopImmediatePropagation();
+            if (!await this.confirmDiscard(this.providerDirty)) return false;
+            this.closeModals();
+            return true;
+        },
+        async closeEnvironment() {
+            if (!this.environmentVisible) return true;
+            if (this.environmentSaving || this.confirmDialog.visible) return false;
+            if (await this.confirmDiscard(this.environmentDirty)) {
+                this.environmentVisible = false;
+                this.environmentBusy = false;
+                this.environmentFormSnapshot = null;
+                ++this.environmentGeneration;
+                return true;
+            }
+            return false;
         },
 
         normalizeLocale(locale) {
@@ -1336,7 +1501,7 @@ function app() {
             if (index === -1) {
                 return;
             }
-            const next = (index + direction + this.supportedLocales.length) % this.supportedLocales.length;
+            const next = this.nextChoiceIndex(index, this.supportedLocales.length, direction);
             const locale = this.supportedLocales[next];
             this.setLocale(locale);
             this.focusLocaleButton(locale);
@@ -1946,15 +2111,18 @@ function app() {
         },
 
         async loadOAuthProviders(background = false) {
+            const client = this.selectedClient;
             try {
                 const items = await this.apiCall(
-                    `/api/oauth/providers?client_type=${encodeURIComponent(this.selectedClient)}`,
+                    `/api/oauth/providers?client_type=${encodeURIComponent(client)}`,
                     {},
                     background,
                     true
                 );
+                if (client !== this.selectedClient) return;
                 this.oauthProviders = Array.isArray(items) ? items : [];
             } catch (error) {
+                if (client !== this.selectedClient) return;
                 console.error('Failed to load oauth providers:', error);
                 this.oauthProviders = [];
             }
@@ -2082,26 +2250,24 @@ function app() {
             if (typeof this.$watch === 'function') {
                 this.$watch('activeTab', () => this.syncHash());
                 this.$watch('selectedClient', () => this.syncHash());
+                this.$watch('visibleDialog', (current, previous) => this.handleDialogChange(current, previous));
             }
             if (typeof window.addEventListener === 'function') {
                 window.addEventListener('hashchange', () => this.applyHash());
                 window.addEventListener('beforeunload', event => {
-                    if (this.globalDirty) {
+                    if (this.hasUnsavedInput) {
                         event.preventDefault();
                         event.returnValue = '';
                     }
                 });
             }
 
-            // Simple poller: 3s refresh while on Services/Status tabs.
+            // Poll only for the visible tab that shows the data; statusClock keeps staleness reactive.
             this.servicePoll = setInterval(() => {
-                if (this.activeTab === 'services') {
-                    this.loadServiceStatus(true);
-                }
-                const visible = typeof document === 'undefined' || !document.hidden;
-                if (visible && (this.activeTab === 'status' || this.activeTab === 'providers')) {
-                    this.refreshStatus();
-                }
+                this.statusClock = Date.now();
+                if (typeof document !== 'undefined' && document.hidden) return;
+                if (this.statusPolledOn('service')) this.loadServiceStatus(true);
+                if (this.statusPolledOn('runtime')) this.refreshStatus();
             }, 3000);
         },
 
@@ -2134,20 +2300,6 @@ function app() {
             } else {
                 document.documentElement.classList.remove('dark');
             }
-        },
-
-        get isDarkTheme() {
-            return this.theme === 'dark' ||
-                (this.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        },
-
-        get brandIconSrc() {
-            return this.isDarkTheme ? '/static/clipal-icon-dark.svg' : '/static/clipal-icon.svg';
-        },
-
-        get themeIcon() {
-            if (this.theme === 'system') return '💻';
-            return this.theme === 'dark' ? '🌙' : '☀️';
         },
 
         get themeLabel() {
@@ -2227,17 +2379,38 @@ function app() {
         },
 
         providerStatusChipClass(state, p) {
-            if (state === 'current') return 'chip-primary';
-            if (state === 'disabled') return 'chip-danger';
-            if (state === 'cooling_down' || state === 'unavailable') return 'chip-warn';
-            if (state === 'recovery_probe') return 'chip-info';
-            return '';
+            if (state === 'current') return 'pill--primary';
+            if (state === 'disabled') return 'pill--muted';
+            if (state === 'cooling_down') return 'pill--warning';
+            if (state === 'unavailable') return 'pill--danger';
+            if (state === 'recovery_probe') return 'pill--primary';
+            return 'pill--neutral';
         },
 
-
+        environmentCountryOptions(selected) {
+            if (!countryOptionsByLocale.has(this.locale)) {
+                const names = typeof Intl.DisplayNames === 'function'
+                    ? new Intl.DisplayNames([this.locale], { type: 'region' }) : null;
+                const options = Object.entries(requestEnvironmentChoices.countries).map(([value, fallback]) => ({
+                    value, label: `${names ? names.of(value) : fallback} (${value})`
+                }));
+                options.sort((a, b) => a.label.localeCompare(b.label, this.locale));
+                countryOptionsByLocale.set(this.locale, options);
+            }
+            const options = countryOptionsByLocale.get(this.locale);
+            return selected && !options.some(option => option.value === selected)
+                ? [{ value: selected, label: selected }, ...options] : options;
+        },
+        environmentTimezoneOptions(selected) {
+            const options = requestEnvironmentChoices.timezones;
+            // Keep saved aliases (for example US/Eastern) exactly as stored.
+            return selected && !options.includes(selected) ? [selected, ...options] : options;
+        },
         async openEnvironment(provider) {
-            if (!this.providerUsesOAuth(provider)) return;
+            if (this.providerMutationBusy || !this.providerUsesOAuth(provider)) return;
             const generation = ++this.environmentGeneration;
+            this.environmentProvider = provider;
+            this.environmentLoadError = '';
             this.environmentPath = `/api/providers/${this.selectedClient}/${encodeURIComponent(provider.name)}`;
             this.environmentVisible = true;
             this.environmentBusy = true;
@@ -2247,17 +2420,21 @@ function app() {
             this.environmentIdentity = '';
             this.environmentUpstream = {};
             this.environmentForm = { country: 'US', timezone: 'America/New_York' };
+            this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
             this.environmentAccount = '';
             try {
-                const data = await this.apiCall(this.environmentPath + '/oauth-environment', {}, true);
+                const data = await this.apiCall(this.environmentPath + '/oauth-environment', {}, true, true);
                 if (generation !== this.environmentGeneration) return;
                 this.environmentProfile = { ...data.environment };
                 this.environmentAccount = data.account_id || this.t('requestEnv.fallbackIdentity');
                 this.environmentIdentity = data.account_identity || '';
                 this.environmentUpstream = data.upstream_region || {};
                 this.environmentForm = { country: data.environment.country || 'US', timezone: data.environment.timezone || 'America/New_York' };
-            } catch (_) {
-                // apiCall displays the failure; keep the dialog available for retry.
+                this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
+            } catch (error) {
+                if (generation === this.environmentGeneration && this.environmentVisible) {
+                    this.environmentLoadError = error.message || this.t('requestEnv.loadFailed');
+                }
             } finally {
                 if (generation === this.environmentGeneration) this.environmentBusy = false;
             }
@@ -2266,6 +2443,7 @@ function app() {
             if (this.environmentBusy || !this.environmentIdentity) return;
             const generation = this.environmentGeneration;
             this.environmentBusy = true;
+            this.environmentSaving = true;
             try {
                 const data = await this.apiCall(this.environmentPath + '/oauth-environment', {
                     method: 'PUT', body: JSON.stringify({ country: this.environmentForm.country, timezone: this.environmentForm.timezone, account_identity: this.environmentIdentity })
@@ -2274,10 +2452,15 @@ function app() {
                 this.environmentProfile = { ...data.environment };
                 this.environmentDiagnostics = null;
                 this.environmentForm = { country: data.environment.country, timezone: data.environment.timezone };
+                this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
+                this.showAlert('success', this.t('requestEnv.saved'));
             } catch (_) {
                 // apiCall reports the error; preserve user input for correction.
             } finally {
-                if (generation === this.environmentGeneration) this.environmentBusy = false;
+                if (generation === this.environmentGeneration) {
+                    this.environmentBusy = false;
+                    this.environmentSaving = false;
+                }
             }
         },
         environmentDNSLabel() {
@@ -2331,12 +2514,12 @@ function app() {
             const generation = this.environmentGeneration;
             this.environmentBusy = true;
             try {
-                const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH }) }, true);
+                const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH }) }, true, true);
                 if (generation !== this.environmentGeneration) return;
                 this.environmentDiagnostics = report;
                 this.environmentProfile = { ...report.environment };
-            } catch (_) {
-                // apiCall displays the failure.
+            } catch (error) {
+                if (generation === this.environmentGeneration && this.environmentVisible) this.showAlert('error', error.message);
             } finally {
                 if (generation === this.environmentGeneration) this.environmentBusy = false;
             }
@@ -2384,7 +2567,7 @@ function app() {
             const resolve = this.confirmResolver;
             this.confirmResolver = null;
             this.confirmDialog = { ...this.confirmDialog, visible: false };
-            this.setBackgroundInert(false);
+            this.setBackgroundInert(!!this.visibleDialog);
             const target = this.confirmReturnFocus;
             this.confirmReturnFocus = null;
             if (target && typeof target.focus === 'function') {
@@ -2393,17 +2576,54 @@ function app() {
             if (resolve) resolve(!!result);
         },
 
-        // Makes the page behind a modal dialog unreachable by keyboard and assistive tech.
+        // Isolate page controls behind a dialog; the separate toast region stays live.
         setBackgroundInert(inert) {
             if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
-            const container = document.querySelector('.container');
-            if (container) container.inert = !!inert;
+            for (const selector of ['.toolbar', '.container']) {
+                const element = document.querySelector(selector);
+                if (element) element.inert = !!inert;
+            }
         },
 
-        // Keeps Tab / Shift+Tab inside the confirm dialog.
-        trapConfirmFocus(event) {
+        get visibleDialog() {
+            if (this.confirmDialog.visible) return 'confirm';
+            if (this.showAddProviderModal || this.showEditProviderModal) return 'provider';
+            if (this.environmentVisible) return 'environment';
+            return this.showDataImportPreviewModal ? 'import' : '';
+        },
+        handleDialogChange(current, previous) {
+            this.setBackgroundInert(!!current);
+            if (!previous && current && current !== 'confirm') this.dialogReturnFocus = document.activeElement;
+            if (!current) {
+                const target = this.dialogReturnFocus;
+                this.dialogReturnFocus = null;
+                if (target && target.isConnected !== false) this.$nextTick(() => target.focus());
+                return;
+            }
+            // Confirm dialogs handle their own initial and return focus.
+            if (current === 'confirm' || previous === 'confirm') return;
+            let attempts = 0;
+            const focusFirst = () => {
+                if (this.visibleDialog !== current) return;
+                const dialog = document.querySelector(`[data-dialog="${current}"]`);
+                const controls = dialog ? this.dialogFocusables(dialog) : [];
+                const target = controls.find(element => element.matches('input, select, textarea')) || controls[0];
+                if (!target) {
+                    if (attempts++ < 100) setTimeout(focusFirst, 16);
+                    return;
+                }
+                target.focus();
+            };
+            this.$nextTick(focusFirst);
+        },
+        dialogFocusables(dialog) {
+            return Array.from(dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+                .filter(element => !element.closest?.('[inert]') && (typeof element.getClientRects !== 'function' || element.getClientRects().length > 0));
+        },
+        // Every modal uses the same keyboard boundary, including nested confirmations.
+        trapDialogFocus(event) {
             const dialog = event.currentTarget;
-            const focusable = Array.from(dialog.querySelectorAll('button:not([disabled])'));
+            const focusable = this.dialogFocusables(dialog);
             if (focusable.length === 0) return;
             const first = focusable[0];
             const last = focusable[focusable.length - 1];
@@ -2439,8 +2659,8 @@ function app() {
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Request failed');
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error?.error || this.t('toast.requestFailed'));
                 }
 
                 const data = await response.json();
@@ -2457,26 +2677,56 @@ function app() {
         },
 
         // Status
-        async refreshStatus() {
+        statusPolledOn(key) {
+            return key === 'service' ? this.activeTab === 'services' || this.activeTab === 'status'
+                : this.activeTab === 'providers' || this.activeTab === 'status';
+        },
+        statusNeedsAttention(key) {
+            const health = this.statusHealth[key];
+            return health.failed || (!!health.lastSuccess && this.statusClock - health.lastSuccess >= 15000);
+        },
+        statusUpdatedLabel(key) {
+            const timestamp = this.statusHealth[key].lastSuccess;
+            return timestamp ? this.tf('feedback.updated', {
+                time: new Date(timestamp).toLocaleTimeString(this.locale)
+            }) : this.t('feedback.never');
+        },
+        async fetchTrackedStatus(key, url) {
+            const health = this.statusHealth[key];
+            if (health.busy) return null;
+            health.busy = true;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
             try {
-                this.status = await this.apiCall('/api/status', {}, true); // Background update
-            } catch (error) {
-                console.error('Failed to refresh status:', error);
+                const data = await this.apiCall(url, { signal: controller.signal }, true, true);
+                health.lastSuccess = Date.now();
+                this.statusClock = health.lastSuccess;
+                health.failed = false;
+                return data;
+            } catch (_) {
+                health.failed = true;
+                return null;
+            } finally {
+                clearTimeout(timeout);
+                health.busy = false;
             }
+        },
+        async refreshStatus() {
+            const data = await this.fetchTrackedStatus('runtime', '/api/status');
+            if (data) this.status = data;
         },
 
         // Services
         async loadServiceStatus(background = false) {
-            try {
-                const status = await this.apiCall('/api/service/status', {}, !!background);
+            const status = await this.fetchTrackedStatus('service', '/api/service/status');
+            if (status) {
                 this.serviceStatus = this.withDefaultServiceStatus(status);
-                this.serviceBusyAction = '';
-            } catch (error) {
-                console.error('Failed to load service status:', error);
+                if (!this.serviceActionRequestPending) this.serviceBusyAction = '';
             }
         },
 
         async serviceAction(action) {
+            if (this.serviceBusyAction) return;
             const disabledReason = this.serviceActionDisabledReason(action);
             if (disabledReason) {
                 return;
@@ -2497,8 +2747,10 @@ function app() {
 
             // Best-effort request: the service might stop/restart mid-flight.
             this.serviceBusyAction = action;
+            this.serviceActionRequestPending = true;
+            let response;
             try {
-                await fetch(`/api/service/${action}`, {
+                response = await fetch(`/api/service/${action}`, {
                     method: 'POST',
                     headers: { 'X-Clipal-UI': '1', 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.serviceForm),
@@ -2506,9 +2758,20 @@ function app() {
                 });
             } catch (e) {
                 // Ignore network errors (common when the service restarts).
+            } finally {
+                this.serviceActionRequestPending = false;
             }
 
-            this.showAlert('info', this.tf('services.requestedAction', { action: this.serviceActionLabel(action) }));
+            if (response && !response.ok) {
+                const error = await response.json().catch(() => ({}));
+                this.serviceBusyAction = '';
+                this.showAlert('error', error.error || this.t('services.actionFailed'));
+                return;
+            }
+
+            this.showAlert('info', response
+                ? this.tf('services.requestedAction', { action: this.serviceActionLabel(action) })
+                : this.t('services.actionUnconfirmed'));
             // Staggered refresh to cover fast/slow restart paths.
             setTimeout(() => this.loadServiceStatus(true), 1500);
             setTimeout(() => this.loadServiceStatus(true), 3500);
@@ -2518,6 +2781,10 @@ function app() {
                     this.serviceBusyAction = '';
                 }
             }, 9000);
+        },
+
+        async copyValue(text) {
+            if (await this.copyToClipboard(text)) this.showAlert('success', '', this.t('common.copied'));
         },
 
         async copyToClipboard(text) {
@@ -2530,7 +2797,7 @@ function app() {
                     return true;
                 }
             } catch (e) {
-                // fall through to legacy approach
+                // Use the document copy command when clipboard access is unavailable.
             }
 
             try {
@@ -2564,11 +2831,11 @@ function app() {
         },
 
         serviceRuntimeClass() {
-            if (!this.serviceStatus.supported) return 'pill-danger';
-            if (!this.serviceStatus.installed) return 'pill-warning';
-            if (this.serviceStatus.running) return 'pill-success';
-            if (this.serviceStatus.loaded) return 'pill-warning';
-            return 'pill-danger';
+            if (!this.serviceStatus.supported) return 'pill--danger';
+            if (!this.serviceStatus.installed) return 'pill--warning';
+            if (this.serviceStatus.running) return 'pill--success';
+            if (this.serviceStatus.loaded) return 'pill--warning';
+            return 'pill--danger';
         },
 
         serviceActionIsBusy(action) {
@@ -2620,15 +2887,24 @@ function app() {
             }
         },
 
-        integrationStateClass(state) {
+        integrationStateTone(state) {
             switch (String(state || '').trim()) {
                 case 'configured':
-                    return 'pill-success';
+                    return 'success';
                 case 'error':
-                    return 'pill-danger';
+                    return 'danger';
                 default:
-                    return 'pill-warning';
+                    return 'idle';
             }
+        },
+
+        toggleIntegrationPreview(product) {
+            this.integrationPreviewOpen = { ...this.integrationPreviewOpen, [product]: !this.integrationPreviewOpen[product] };
+        },
+
+        // Show paths under the user's home as ~/...; the full path stays in the title attribute.
+        displayHomePath(path) {
+            return String(path || '').replace(/^(\/Users\/[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=[\/\\])/, '~');
         },
 
         integrationProductName(product) {
@@ -2651,7 +2927,6 @@ function app() {
                     return product;
             }
         },
-
 
         integrationApplyLabel() {
             return this.t('integrations.apply');
@@ -2684,29 +2959,6 @@ function app() {
                 ? this.t('integrations.restoreOnlyActive')
                 : '';
         },
-
-
-        integrationProductNote(product) {
-            switch (String(product || '').trim()) {
-                case 'claude':
-                    return this.t('integrations.noteClaude');
-                case 'codex':
-                    return this.t('integrations.noteCodex');
-                case 'opencode':
-                    return this.t('integrations.noteOpencode');
-                case 'gemini':
-                    return this.t('integrations.noteGemini');
-                case 'continue':
-                    return this.t('integrations.noteContinue');
-                case 'aider':
-                    return this.t('integrations.noteAider');
-                case 'goose':
-                    return this.t('integrations.noteGoose');
-                default:
-                    return this.t('integrations.noteDefault');
-            }
-        },
-
 
         integrationPreviewValue(content, emptyLabel) {
             const value = String(content || '');
@@ -2789,9 +3041,44 @@ function app() {
             this.integrationResults = next;
         },
 
+        integrationChangesSummary(integration) {
+            const changes = integration && integration.changes;
+            if (!changes || changes.limited) return this.t('integrations.changesLarge');
+            if (!changes.rows.length) return this.t('integrations.changesNone');
+            return this.tf('integrations.changesSummary', changes);
+        },
+
+        integrationChanges(before, after) {
+            if (before === after) return { rows: [], added: 0, removed: 0, limited: false };
+            const a = before ? String(before).split('\n') : [];
+            const b = after ? String(after).split('\n') : [];
+            if (String(before).length + String(after).length > 100000 || a.length * b.length > 160000 || a.length + b.length > 2000) {
+                return { rows: [], added: 0, removed: 0, limited: true };
+            }
+            const matrix = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
+            for (let i = a.length - 1; i >= 0; i--) {
+                for (let j = b.length - 1; j >= 0; j--) {
+                    matrix[i][j] = a[i] === b[j] ? matrix[i + 1][j + 1] + 1
+                        : Math.max(matrix[i + 1][j], matrix[i][j + 1]);
+                }
+            }
+            const rows = [];
+            let i = 0, j = 0, added = 0, removed = 0;
+            while (i < a.length || j < b.length) {
+                if (i < a.length && j < b.length && a[i] === b[j]) { i++; j++; continue; }
+                if (j < b.length && (i === a.length || matrix[i][j + 1] > matrix[i + 1][j])) {
+                    rows.push({ kind: 'added', text: '+ ' + b[j], line: ++j }); added++;
+                } else {
+                    rows.push({ kind: 'removed', text: '− ' + a[i], line: ++i }); removed++;
+                }
+            }
+            return { rows, added, removed, limited: false };
+        },
+
         normalizeIntegration(item) {
             return {
                 ...item,
+                changes: this.integrationChanges(String(item.current_content || ''), this.integrationSecondaryPreviewContent(item)),
                 name: this.integrationProductName(item.product) || item.name,
                 current_content: String((item && item.current_content) || ''),
                 planned_content: String((item && item.planned_content) || ''),
@@ -2799,7 +3086,6 @@ function app() {
                 backup_target_existed: !!(item && item.backup_target_existed)
             };
         },
-
 
         async loadIntegrations(background = false) {
             try {
@@ -2875,20 +3161,10 @@ function app() {
                 : this.t('providers.modeAuto');
         },
 
-        modeToggleLabel() {
-            return String(this.clientConfig.mode || '').trim() === 'auto'
-                ? this.t('providers.switchToManual')
-                : this.t('providers.backToAuto');
-        },
-
         modeToggleTitle() {
             return String(this.clientConfig.mode || '').trim() === 'auto' && !this.hasEnabledProviders
                 ? this.t('providers.enableProviderFirst')
                 : '';
-        },
-
-        configuredKeyCountLabel(count) {
-            return this.tf('providers.configuredCount', { count: Number(count || 0) });
         },
 
         formatTokenCount(value) {
@@ -3050,64 +3326,12 @@ function app() {
             return this.t('providers.justNow');
         },
 
-        providerUsageTotal(provider) {
-            const usage = provider && provider.usage;
-            if (!usage || !usage.has_usage) {
-                return this.t('common.none');
-            }
-            const base = this.formatCompactTokenCount(usage.total_tokens || 0);
-            const suffix = this.providerUsageBreakdownSuffix(provider, 'total');
-            return suffix ? `${base} ${suffix}` : base;
-        },
-
         providerUsageTotalMain(provider) {
             const usage = provider && provider.usage;
             if (!usage || !usage.has_usage) {
                 return this.t('common.none');
             }
             return this.formatCompactTokenCount(usage.total_tokens || 0);
-        },
-
-        providerUsageTotalBreakdown(provider) {
-            return this.providerUsageBreakdownSuffix(provider, 'total');
-        },
-
-        providerUsageTotalTitle(provider) {
-            const usage = provider && provider.usage;
-            if (!usage || !usage.has_usage) {
-                return this.t('common.none');
-            }
-            return this.providerUsageTotalTooltip(provider);
-        },
-
-        providerUsageInOut(provider) {
-            const usage = provider && provider.usage;
-            if (!usage || !usage.has_usage) {
-                return this.t('common.none');
-            }
-            const base = `${this.formatCompactTokenCount(usage.input_tokens || 0)} / ${this.formatCompactTokenCount(usage.output_tokens || 0)}`;
-            const suffix = this.providerUsageBreakdownSuffix(provider, 'output');
-            return suffix ? `${base} ${suffix}` : base;
-        },
-
-        providerUsageInOutMain(provider) {
-            const usage = provider && provider.usage;
-            if (!usage || !usage.has_usage) {
-                return this.t('common.none');
-            }
-            return `${this.formatCompactTokenCount(usage.input_tokens || 0)} / ${this.formatCompactTokenCount(usage.output_tokens || 0)}`;
-        },
-
-        providerUsageInOutBreakdown(provider) {
-            return this.providerUsageBreakdownSuffix(provider, 'output');
-        },
-
-        providerUsageInOutTitle(provider) {
-            const usage = provider && provider.usage;
-            if (!usage || !usage.has_usage) {
-                return this.t('common.none');
-            }
-            return this.providerUsageInOutTooltip(provider);
         },
 
         providerUsageBreakdowns(provider, parent) {
@@ -3154,27 +3378,16 @@ function app() {
             }
         },
 
-        providerUsageBreakdownSummary(entry, compact = false) {
+        providerUsageBreakdownSummary(entry) {
             if (!entry) {
                 return '';
             }
             const label = this.providerUsageBreakdownLabel(entry.kind);
-            const tokens = compact
-                ? this.formatCompactTokenCount(entry.tokens || 0)
-                : this.formatTokenCount(entry.tokens || 0);
+            const tokens = this.formatTokenCount(entry.tokens || 0);
             return this.tf('providers.usageIncluded', { label, tokens });
         },
 
-        providerUsageBreakdownSuffix(provider, parent) {
-            const entries = this.providerUsageBreakdowns(provider, parent);
-            if (!entries.length) {
-                return '';
-            }
-            const summary = this.providerUsageBreakdownSummary(entries[0], true);
-            return summary ? `· ${summary}` : '';
-        },
-
-        providerUsageTotalTooltip(provider) {
+        providerUsageTotalTitle(provider) {
             const usage = provider && provider.usage;
             if (!usage || !usage.has_usage) {
                 return this.t('common.none');
@@ -3187,12 +3400,12 @@ function app() {
                 return this.tf('providers.usageTotalFormulaSimple', { total, input, output });
             }
             const extra = entries
-                .map((entry) => this.providerUsageBreakdownSummary(entry, false))
+                .map((entry) => this.providerUsageBreakdownSummary(entry))
                 .join(this.t('providers.usageBreakdownJoiner'));
             return this.tf('providers.usageTotalFormula', { total, input, output, extra });
         },
 
-        providerUsageInOutTooltip(provider) {
+        providerUsageInOutTitle(provider) {
             const usage = provider && provider.usage;
             if (!usage || !usage.has_usage) {
                 return this.t('common.none');
@@ -3205,7 +3418,7 @@ function app() {
                 return formula;
             }
             const suffix = entries
-                .map((entry) => this.providerUsageBreakdownSummary(entry, false))
+                .map((entry) => this.providerUsageBreakdownSummary(entry))
                 .join(this.t('providers.usageBreakdownJoiner'));
             return `${formula} · ${suffix}`;
         },
@@ -3240,34 +3453,6 @@ function app() {
                 return this.t('common.none');
             }
             return this.formatUSDMicros(provider.usage.spend_week_micros || 0, true);
-        },
-
-        suppressProviderDragTooltip(event) {
-            const card = event && event.currentTarget && event.currentTarget.closest
-                ? event.currentTarget.closest('.provider-card')
-                : null;
-            if (!card) {
-                return;
-            }
-            const title = String(card.getAttribute('title') || '');
-            if (title) {
-                card.dataset.dragTooltipTitle = title;
-                card.removeAttribute('title');
-            }
-        },
-
-        restoreProviderDragTooltip(event) {
-            const card = event && event.currentTarget && event.currentTarget.closest
-                ? event.currentTarget.closest('.provider-card')
-                : null;
-            if (!card) {
-                return;
-            }
-            const title = String(card.dataset.dragTooltipTitle || '');
-            if (title) {
-                card.setAttribute('title', title);
-                delete card.dataset.dragTooltipTitle;
-            }
         },
 
         providerOAuthPlanRaw(provider) {
@@ -3312,10 +3497,6 @@ function app() {
             return provider && provider.oauth_rate_limits && typeof provider.oauth_rate_limits === 'object'
                 ? provider.oauth_rate_limits
                 : null;
-        },
-
-        providerOAuthHasSummary(provider) {
-            return !!this.providerOAuthPlanLabel(provider) || this.providerOAuthRateLimitSections(provider).length > 0;
         },
 
         providerOAuthRateLimitSections(provider) {
@@ -3483,14 +3664,6 @@ function app() {
             return `${month}/${day}, ${hours}:${minutes}`;
         },
 
-        providerPinBadgeTitle() {
-            return this.t('providers.pinnedProvider');
-        },
-
-        providerStatusText(enabled) {
-            return enabled ? this.t('common.active') : this.t('common.disabled');
-        },
-
         providerToggleTitle(provider) {
             const isPinned = String(this.clientConfig.mode || '').trim() === 'manual'
                 && provider
@@ -3519,9 +3692,6 @@ function app() {
 
         providerEditKeyHint() {
             const count = Number(this.editingProviderKeyCount || 0);
-            if (this.locale === 'zh-CN') {
-                return this.tf('modal.provider.keepExistingKeys', { count });
-            }
             if (count === 1) {
                 return this.t('modal.provider.keepExistingKey');
             }
@@ -3612,30 +3782,6 @@ function app() {
             return String((provider && provider.name) || '').trim();
         },
 
-        providerCardTitle(provider) {
-            const displayName = this.providerDisplayName(provider);
-            if (!this.providerUsesOAuth(provider)) {
-                return displayName;
-            }
-            return this.truncateLabel(displayName, 15);
-        },
-
-        truncateLabel(value, maxChars = 15) {
-            const text = String(value || '').trim();
-            const limit = Number(maxChars);
-            if (!text || !Number.isFinite(limit) || limit < 1) {
-                return text;
-            }
-            const chars = Array.from(text);
-            if (chars.length <= limit) {
-                return text;
-            }
-            if (limit <= 3) {
-                return chars.slice(0, limit).join('');
-            }
-            return chars.slice(0, limit - 3).join('') + '...';
-        },
-
         normalizeOAuthAuthStatus(status) {
             switch (String(status || '').trim().toLowerCase()) {
                 case 'ready':
@@ -3681,15 +3827,15 @@ function app() {
             }
         },
 
-        providerOAuthAuthStatusClass(provider) {
+        providerOAuthAuthStatusTone(provider) {
             switch (this.providerOAuthAuthStatus(provider)) {
                 case 'ready':
-                    return 'pill--success';
+                    return 'success';
                 case 'refresh_due':
-                    return 'pill--warning';
+                    return 'warn';
                 case 'reauth_needed':
                 default:
-                    return 'pill--danger';
+                    return 'danger';
             }
         },
 
@@ -3730,13 +3876,6 @@ function app() {
             }
         },
 
-        providerAuthSummary(provider) {
-            if (this.providerUsesOAuth(provider)) {
-                return `${this.t('modal.provider.credentialSourceOAuth')} / ${this.oauthProviderLabel(provider && provider.oauth_provider)}`;
-            }
-            return this.t('modal.provider.credentialSourceApiKey');
-        },
-
         providerModalSaveLabel() {
             if (!this.showEditProviderModal && this.providerFormUsesOAuth()) {
                 return this.t('modal.provider.authorizeProvider');
@@ -3765,23 +3904,6 @@ function app() {
                 return mode;
             }
             return '';
-        },
-
-        providerHasVisibleDetails(provider) {
-            if (this.providerUsesOAuth(provider)) {
-                return this.providerSupportsOAuthMetadata(provider)
-                    || this.providerOAuthHasSummary(provider)
-                    || !!(provider && provider.base_url)
-                    || this.normalizeProviderProxyMode(provider && provider.proxy_mode) !== 'default'
-                    || !!(provider && provider.usage && (provider.usage.has_usage || provider.usage.has_cost));
-            }
-            if (provider && provider.base_url) {
-                return true;
-            }
-            if (this.normalizeProviderProxyMode(provider && provider.proxy_mode) !== 'default') {
-                return true;
-            }
-            return !!(provider && provider.usage && (provider.usage.has_usage || provider.usage.has_cost));
         },
 
         async loadProviderOAuthMetadata(provider) {
@@ -3915,6 +4037,26 @@ function app() {
             return this.t('integrations.fileDoesNotExistYet');
         },
 
+        // Go durations such as "26h3m4.51s" read as "1d 2h 3m"; seconds only show in the first minute.
+        statusUptimeLabel() {
+            const raw = String((this.status && this.status.uptime) || '').trim();
+            const units = { h: 3600, m: 60, s: 1, ms: 0.001, 'µs': 0.000001, us: 0.000001, ns: 0.000000001 };
+            let seconds = 0;
+            let matched = false;
+            for (const [, value, unit] of raw.matchAll(/([\d.]+)(h|ms|µs|us|ns|m|s)/g)) {
+                seconds += Number(value) * units[unit];
+                matched = true;
+            }
+            if (!matched) return raw || this.t('common.none');
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (d) return `${d}d ${h}h ${m}m`;
+            if (h) return `${h}h ${m}m`;
+            if (m) return `${m}m`;
+            return `${Math.floor(seconds)}s`;
+        },
+
         statusSystemInfoLabel() {
             return this.t('statusPage.systemInfo');
         },
@@ -3943,7 +4085,7 @@ function app() {
             return (this.providers || []).some(p => !!p.enabled);
         },
 
-        modeHelpText() {
+        modeHelpSummary() {
             if ((this.clientConfig.mode || '') === 'manual') {
                 return this.t('providers.modeHelpManual');
             }
@@ -4058,48 +4200,58 @@ function app() {
 
             this.sortableInstance = Sortable.create(el, {
                 animation: 250,
-                // Make the entire card draggable
-                handle: '.provider-card',
-                // Filter out buttons and inputs so they remain clickable
-                filter: '.btn, button, input, .pill, .provider-card__actions',
-                preventOnFilter: false,
+                handle: '.provider-drag-handle',
+                draggable: '.provider-row',
+                onMove: () => this.canReorderProviders,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
                 dragClass: 'sortable-drag',
                 forceFallback: false,
                 onEnd: async (evt) => {
-                    if (evt.oldIndex === evt.newIndex) return;
-
-                    const previousProviders = (this.providers || []).map(provider => ({ ...provider }));
-                    const previousOrder = previousProviders.map(provider => provider.name);
-
-                    // Sortable has already mutated the DOM, but Alpine still thinks the
-                    // previous keyed order is intact. Restore the old DOM order first so
-                    // Alpine can apply the reordered state without scrambling cards.
-                    this.syncSortableDomOrder(previousOrder);
-                    this.applyLocalProviderReorder(evt.oldIndex, evt.newIndex);
-                    await this.afterProviderRender();
-                    const names = (this.providers || []).map(provider => provider.name);
-
-                    try {
-                        await this.apiCall(`/api/providers/${this.selectedClient}/_reorder`, {
-                            method: 'PUT',
-                            body: JSON.stringify({ providers: names })
-                        }, true);
-                    } catch (error) {
-                        console.error('Failed to reorder providers:', error);
-                        this.providers = previousProviders;
-                        await this.afterProviderRender();
-                    }
+                    // Restore the DOM before Alpine applies the new keyed order.
+                    this.syncSortableDomOrder(this.providers.map(p => p.name));
+                    await this.reorderProviders(evt.oldDraggableIndex ?? evt.oldIndex, evt.newDraggableIndex ?? evt.newIndex);
                 }
             });
         },
 
-        syncSortableDomOrder(order) {
-            if (!this.sortableInstance || typeof this.sortableInstance.sort !== 'function') {
-                return;
+        async moveProvider(provider, delta) {
+            const index = this.providers.findIndex(p => p.name === provider.name);
+            await this.reorderProviders(index, index + delta);
+        },
+        async reorderProviders(from, to) {
+            if (!this.canReorderProviders || !Number.isInteger(from) || !Number.isInteger(to)
+                || from < 0 || to < 0 || from >= this.providers.length || to >= this.providers.length || from === to) return;
+            this.providerReordering = true;
+            const previousProviders = this.providers.map(provider => ({ ...provider }));
+            const client = this.selectedClient;
+            this.applyLocalProviderReorder(from, to);
+            await this.afterProviderRender();
+            try {
+                await this.apiCall(`/api/providers/${client}/_reorder`, {
+                    method: 'PUT', body: JSON.stringify({ providers: this.providers.map(p => p.name) })
+                }, true);
+            } catch (error) {
+                this.providers = previousProviders;
+                await this.afterProviderRender();
+            } finally {
+                this.providerReordering = false;
             }
-            this.sortableInstance.sort(Array.isArray(order) ? order : [], false);
+        },
+
+        syncSortableDomOrder(order) {
+            const list = document.getElementById('providers-list');
+            if (!list || !Array.isArray(order)) return;
+            // Sortable.sort() indexes all children against its filtered toArray(),
+            // so Alpine's non-draggable <template> shifts its node lookup by one.
+            // Move the existing keyed rows directly, keeping Alpine's nodes intact.
+            const rows = new Map(Array.from(list.children)
+                .filter(row => row.matches('.provider-row'))
+                .map(row => [row.getAttribute('data-id'), row]));
+            for (const name of order) {
+                const row = rows.get(name);
+                if (row) list.appendChild(row);
+            }
         },
 
         afterProviderRender() {
@@ -4132,11 +4284,16 @@ function app() {
         },
 
         async loadProviders(background = false) {
+            const client = this.selectedClient;
+            const generation = ++this.providerLoadGeneration;
+            this.providerLoadBusy = true;
+            this.providerLoadError = '';
             try {
                 const [providers, clientCfg] = await Promise.all([
-                    this.apiCall(`/api/providers/${this.selectedClient}`, {}, background),
-                    this.apiCall(`/api/client-config/${this.selectedClient}`, {}, true)
+                    this.apiCall(`/api/providers/${client}`, {}, background),
+                    this.apiCall(`/api/client-config/${client}`, {}, true)
                 ]);
+                if (generation !== this.providerLoadGeneration || client !== this.selectedClient) return;
                 this.providers = providers || [];
                 this.clientConfig = {
                     ...this.clientConfig,
@@ -4147,15 +4304,33 @@ function app() {
                     }
                 };
             } catch (error) {
+                if (generation !== this.providerLoadGeneration || client !== this.selectedClient) return;
                 console.error('Failed to load providers:', error);
-                this.providers = [];
+                this.providerLoadError = error.message || this.t('providers.loadFailed');
+            } finally {
+                if (generation === this.providerLoadGeneration) this.providerLoadBusy = false;
             }
         },
 
+        async moveClient(direction) {
+            const index = this.clientOptions.findIndex(client => client.value === this.selectedClient);
+            const next = this.nextChoiceIndex(index, this.clientOptions.length, direction);
+            await this.selectClient(this.clientOptions[next].value);
+            this.$nextTick(() => document.querySelector(`[data-client="${this.selectedClient}"]`)?.focus());
+        },
+
         async selectClient(clientType) {
-            if (this.selectedClient === clientType) {
+            if (this.providerMutationBusy || this.selectedClient === clientType) {
+                this.syncHash();
                 return;
             }
+            if (!await this.requestCloseProvider() || !await this.closeEnvironment()) {
+                this.syncHash();
+                return;
+            }
+            this.providerSearch = '';
+            this.expandedProviders = {};
+            this.providers = [];
             this.selectedClient = clientType;
             await Promise.all([
                 this.loadProviders(),
@@ -4166,22 +4341,38 @@ function app() {
             });
         },
 
-        async saveClientConfig(successToast = null) {
+        async saveClientConfig(successToast = null, nextConfig = this.clientConfig) {
+            if (!this.canMutateProviders) return;
+            this.clientConfigSaving = true;
+            const client = this.selectedClient;
+            const previousConfig = this.clientConfig;
             try {
-                await this.apiCall(`/api/client-config/${this.selectedClient}`, {
+                await this.apiCall(`/api/client-config/${client}`, {
                     method: 'PUT',
-                    body: JSON.stringify(this.clientConfig)
+                    body: JSON.stringify(nextConfig)
                 }, true);
+                // A deletion or another load may have completed while this response
+                // was in flight. Read the current server state instead of restoring
+                // a stale pin and announcing a mode that is no longer active.
+                if (this.clientConfig !== previousConfig) {
+                    await this.loadProviders(true);
+                    await this.refreshStatus();
+                    return;
+                }
+                this.clientConfig = nextConfig;
                 if (successToast && (successToast.title || successToast.message)) {
                     this.showAlert('success', successToast.message || '', successToast.title || '');
                 }
                 await this.refreshStatus();
             } catch (error) {
                 console.error('Failed to save client config:', error);
+            } finally {
+                this.clientConfigSaving = false;
             }
         },
 
         async setClientMode(mode) {
+            if (!this.canMutateProviders) return;
             const m = String(mode || '').toLowerCase();
             if (m !== 'auto' && m !== 'manual') return;
 
@@ -4190,43 +4381,36 @@ function app() {
                 return;
             }
 
-            this.clientConfig.mode = m;
+            const nextConfig = { ...this.clientConfig, mode: m };
             if (m === 'auto') {
-                this.clientConfig.pinned_provider = '';
+                nextConfig.pinned_provider = '';
             } else {
                 // Default pin: prefer current provider, else highest priority enabled provider.
-                const pinned = String(this.clientConfig.pinned_provider || '').trim();
+                const pinned = String(nextConfig.pinned_provider || '').trim();
                 const pinnedProvider = pinned ? (this.providers || []).find(p => p && p.name === pinned) : null;
                 const pinnedOk = pinnedProvider && !!pinnedProvider.enabled;
 
                 if (!pinnedOk) {
-                    // Best-effort refresh so "current provider" is as accurate as possible.
-                    try {
-                        await this.refreshStatus();
-                    } catch (e) {
-                        // Ignore refresh failures; we fall back to local provider list.
-                    }
-
                     const st = (this.status && this.status.clients) ? this.status.clients[this.selectedClient] : null;
                     const cur = st ? String(st.current_provider || '').trim() : '';
                     const curProvider = cur ? (this.providers || []).find(p => p && p.name === cur) : null;
 
                     if (curProvider && curProvider.name && !!curProvider.enabled) {
-                        this.clientConfig.pinned_provider = curProvider.name;
+                        nextConfig.pinned_provider = curProvider.name;
                     } else {
                         const enabled = (this.providers || []).filter(p => p && p.name && !!p.enabled);
                         enabled.sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0));
-                        this.clientConfig.pinned_provider = (enabled[0] && enabled[0].name) ? enabled[0].name : '';
+                        nextConfig.pinned_provider = (enabled[0] && enabled[0].name) ? enabled[0].name : '';
                     }
                 }
             }
             const client = this.providerToastClientLabel();
-            const pinned = String(this.clientConfig.pinned_provider || '').trim();
+            const pinned = String(nextConfig.pinned_provider || '').trim();
             if (m === 'auto') {
                 await this.saveClientConfig({
                     title: this.tf('providers.switchedToAutoTitle', { client }),
                     message: this.t('providers.switchedToAutoMessage')
-                });
+                }, nextConfig);
                 return;
             }
             await this.saveClientConfig({
@@ -4234,10 +4418,11 @@ function app() {
                 message: pinned
                     ? this.tf('providers.switchedToManualMessagePinned', { provider: pinned })
                     : this.t('providers.switchedToManualMessage')
-            });
+            }, nextConfig);
         },
 
         async pinProvider(name) {
+            if (!this.canMutateProviders) return;
             const v = String(name || '').trim();
             if (!v) return;
 
@@ -4247,19 +4432,23 @@ function app() {
                 return;
             }
 
-            this.clientConfig.mode = 'manual';
-            this.clientConfig.pinned_provider = v;
+            const nextConfig = { ...this.clientConfig, mode: 'manual', pinned_provider: v };
             const client = this.providerToastClientLabel();
             await this.saveClientConfig({
                 title: this.tf('providers.pinnedTitle', { client, provider: v }),
                 message: this.t('providers.pinnedMessage')
-            });
+            }, nextConfig);
         },
 
         async toggleProvider(provider, event) {
+            if (!this.canMutateProviders) {
+                event.target.checked = provider.enabled;
+                return;
+            }
             const oldEnabled = provider.enabled;
             const newEnabled = !!event.target.checked;
             provider.enabled = newEnabled;
+            this.providerUpdating = true;
 
             try {
                 await this.apiCall(
@@ -4289,15 +4478,19 @@ function app() {
                 provider.enabled = oldEnabled;
                 event.target.checked = oldEnabled;
                 console.error('Failed to toggle provider:', error);
+            } finally {
+                this.providerUpdating = false;
             }
         },
 
         async saveProvider() {
+            if (!this.canMutateProviders) return;
             try {
                 if (!this.showEditProviderModal && this.providerFormUsesOAuth()) {
                     await this.startOAuthProviderAuthorization();
                     return;
                 }
+                this.providerSaving = true;
 
                 const payload = {
                     proxy_mode: this.normalizeProviderProxyMode(this.providerForm.proxy_mode),
@@ -4384,6 +4577,8 @@ function app() {
                 await this.refreshStatus();
             } catch (error) {
                 console.error('Failed to save provider:', error);
+            } finally {
+                this.providerSaving = false;
             }
         },
 
@@ -4591,6 +4786,7 @@ function app() {
         },
 
         editProvider(provider) {
+            if (!this.canMutateProviders) return;
             if (this.providerUsesOAuth(provider)) {
                 this.showAlert('error', this.t('providers.oauthEditLocked'));
                 return;
@@ -4613,10 +4809,12 @@ function app() {
             };
             this.editingProviderName = provider.name;
             this.editingProviderKeyCount = Number(provider.key_count || 0);
+            this.providerFormSnapshot = JSON.stringify(this.providerForm);
             this.showEditProviderModal = true;
         },
 
         async deleteProvider(provider) {
+            if (!this.canMutateProviders) return;
             const item = provider || {};
             const name = String(item.name || '').trim();
             if (!name) {
@@ -4631,10 +4829,11 @@ function app() {
                 confirmLabel: this.t('providers.delete'),
                 danger: true
             });
-            if (!confirmed) {
+            if (!confirmed || !this.canMutateProviders) {
                 return;
             }
 
+            this.providerUpdating = true;
             try {
                 await this.apiCall(
                     `/api/providers/${this.selectedClient}/${encodeURIComponent(name)}`,
@@ -4650,10 +4849,13 @@ function app() {
                 await this.refreshStatus();
             } catch (error) {
                 console.error('Failed to delete provider:', error);
+            } finally {
+                this.providerUpdating = false;
             }
         },
 
         openAddProviderModal() {
+            if (!this.canMutateProviders) return;
             const maxPriority = this.providers.reduce((max, p) => {
                 const pr = typeof p.priority === 'number' ? p.priority : 0;
                 return pr > max ? pr : max;
@@ -4680,11 +4882,14 @@ function app() {
             };
             this.editingProviderName = '';
             this.editingProviderKeyCount = 0;
+            this.providerFormSnapshot = JSON.stringify(this.providerForm);
             this.showAddProviderModal = true;
         },
 
         // Global Config
         async loadGlobalConfig() {
+            if (this.globalLoading) return;
+            this.globalLoading = true;
             try {
                 const cfg = await this.apiCall('/api/config/global');
                 this.globalConfig = this.withDefaultGlobalConfig(cfg);
@@ -4692,11 +4897,13 @@ function app() {
                 this.savedGlobalConfig = JSON.parse(JSON.stringify(this.globalConfig));
             } catch (error) {
                 console.error('Failed to load global config:', error);
+            } finally {
+                this.globalLoading = false;
             }
         },
 
         async saveGlobalConfig() {
-            if (this.globalSaving) return;
+            if (this.globalSaving || this.globalLoading) return;
             if (this.globalConfig.allow_remote_web_ui && !this.savedAllowRemoteWebUI) {
                 const ok = await this.askConfirm({
                     title: this.t('settings.remoteWebUIConfirmTitle'),
@@ -4746,7 +4953,7 @@ function app() {
                     ? await window.showSaveFilePicker({
                         suggestedName: filename,
                         types: [{
-                            description: 'Clipal backup (JSON)',
+                            description: this.t('settings.exportFileType'),
                             accept: { 'application/json': ['.json'] }
                         }]
                     })
@@ -4789,6 +4996,8 @@ function app() {
         },
 
         async selectDataImportFiles(event) {
+            if (this.dataImportBusy) return;
+            this.dataImportBusy = 'reading';
             const files = Array.from((event && event.target && event.target.files) || []);
             try {
                 this.dataImportFiles = await Promise.all(files.map(async file => ({
@@ -4802,10 +5011,13 @@ function app() {
                 this.dataImportFiles = [];
                 this.dataImportPlan = null;
                 this.showAlert('error', this.t('settings.importFailure'));
+            } finally {
+                this.dataImportBusy = '';
             }
         },
 
         triggerDataImportPicker() {
+            if (this.dataImportBusy) return;
             const input = this.$refs && this.$refs.dataImportInput;
             if (!input || typeof input.click !== 'function') {
                 this.showAlert('error', this.t('settings.importFilePickerUnavailable'));
@@ -4838,6 +5050,7 @@ function app() {
         },
 
         closeDataImportPreview() {
+            if (this.dataImportBusy) return;
             this.showDataImportPreviewModal = false;
             this.dataImportPlan = null;
         },
@@ -4855,7 +5068,8 @@ function app() {
         },
 
         async previewDataImport() {
-            if (!this.dataImportFiles.length) return;
+            if (this.dataImportBusy || !this.dataImportFiles.length) return;
+            this.dataImportBusy = 'preview';
             try {
                 this.dataImportPlan = await this.apiCall('/api/data/import/preview', {
                     method: 'POST',
@@ -4868,11 +5082,14 @@ function app() {
                 this.showDataImportPreviewModal = false;
                 const message = String((error && error.message) || '').trim() || this.t('settings.importFailure');
                 this.showAlert('error', message);
+            } finally {
+                this.dataImportBusy = '';
             }
         },
 
         async applyDataImport() {
-            if (!this.dataImportPlan) return;
+            if (this.dataImportBusy || !this.dataImportPlan) return;
+            this.dataImportBusy = 'apply';
             try {
                 const result = await this.apiCall('/api/data/import/apply', {
                     method: 'POST',
@@ -4895,6 +5112,8 @@ function app() {
                     this.showDataImportPreviewModal = false;
                 }
                 this.showAlert('error', message);
+            } finally {
+                this.dataImportBusy = '';
             }
         },
 
@@ -4994,6 +5213,7 @@ function app() {
         },
 
         closeModals() {
+            this.providerFormSnapshot = null;
             this.cancelOAuthAuthorization(false);
             this.showAddProviderModal = false;
             this.showEditProviderModal = false;

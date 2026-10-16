@@ -1203,3 +1203,24 @@ func TestApplyRejectsPlanWhenCredentialSetChangedAfterPreview(t *testing.T) {
 		t.Fatalf("apply error=%v, want base-state conflict", err)
 	}
 }
+
+func TestRegistryRejectsMalformedJSONBeforeFormatDetection(t *testing.T) {
+	registry := NewRegistry()
+	for _, format := range []string{FormatAuto, FormatClipal, FormatCLIProxyAPI, FormatSub2API, FormatCodexAuth} {
+		for _, data := range []string{"", "{broken", `{} {}`, `{"accounts":[`} {
+			t.Run(format+"/"+data, func(t *testing.T) {
+				_, _, err := registry.Decode(format, []Input{{Name: "broken.json", Data: []byte(data)}})
+				if err == nil || err.Error() != `invalid JSON in import file "broken.json"` {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			})
+		}
+	}
+	_, _, err := registry.Decode(FormatAuto, []Input{
+		{Name: "credential.json", Data: []byte(`{"type":"codex","access_token":"test-token"}`)},
+		{Name: "truncated.json", Data: []byte(`{"accounts":[`)},
+	})
+	if err == nil || err.Error() != `invalid JSON in import file "truncated.json"` {
+		t.Fatalf("mixed input did not identify the malformed file: %v", err)
+	}
+}

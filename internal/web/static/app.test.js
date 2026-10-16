@@ -23,7 +23,8 @@ function createPopupWindow() {
 }
 
 function loadApp(options = {}) {
-    const source = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+    const source = ['environment-options.js', 'form-controls.js', 'app.js']
+        .map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
     const storage = new Map(Object.entries(options.localStorageData || {}));
     const location = {
         href: 'http://localhost/',
@@ -80,6 +81,7 @@ function loadApp(options = {}) {
         clearInterval() {},
         queueMicrotask,
         URL,
+        AbortController,
         fetch: async () => ({ ok: true, json: async () => ({}) }),
         confirm: () => true
     };
@@ -148,41 +150,39 @@ test('applyLocalProviderReorder reorders providers and renumbers priority immedi
     );
 });
 
-test('syncSortableDomOrder delegates to Sortable instance with provider names', () => {
-    const state = loadApp();
-    const calls = [];
-    state.sortableInstance = {
-        sort(order, useAnimation) {
-            calls.push({ order, useAnimation });
+function createProviderList(names) {
+    const template = { matches: () => false };
+    const list = {
+        children: [template, ...names.map(name => ({
+            matches: selector => selector === '.provider-row',
+            getAttribute: attribute => attribute === 'data-id' ? name : null
+        }))],
+        appendChild(row) {
+            this.children.splice(this.children.indexOf(row), 1);
+            this.children.push(row);
         }
     };
+    return list;
+}
 
+test('syncSortableDomOrder restores keyed rows without counting the Alpine template', () => {
+    const list = createProviderList(['p1', 'p2', 'p3']);
+    const template = list.children[0];
+    const originalRows = list.children.slice(1);
+    const state = loadApp({ context: { document: { getElementById: () => list } } });
     state.syncSortableDomOrder(['p3', 'p1', 'p2']);
-
-    assert.deepEqual(calls, [
-        { order: ['p3', 'p1', 'p2'], useAnimation: false }
-    ]);
+    assert.equal(list.children[0], template);
+    assert.deepEqual(list.children.slice(1), [originalRows[2], originalRows[0], originalRows[1]]);
+    state.syncSortableDomOrder(['p2', 'p3', 'p1']);
+    assert.deepEqual(list.children.slice(1), [originalRows[1], originalRows[2], originalRows[0]]);
 });
 
-test('afterProviderRender aligns Sortable DOM order to current providers on nextTick', async () => {
-    const state = loadApp();
-    const calls = [];
-    state.providers = [
-        { name: 'p2', priority: 1, enabled: true },
-        { name: 'p1', priority: 2, enabled: true }
-    ];
-    state.sortableInstance = {
-        sort(order, useAnimation) {
-            calls.push({ order, useAnimation });
-        }
-    };
-    state.$nextTick = callback => callback();
-
+test('afterProviderRender aligns keyed rows to current providers on nextTick', async () => {
+    const list = createProviderList(['p1', 'p2']);
+    const state = loadApp({ context: { document: { getElementById: () => list } } });
+    state.providers = [{ name: 'p2', priority: 1 }, { name: 'p1', priority: 2 }];
     await state.afterProviderRender();
-
-    assert.deepEqual(calls, [
-        { order: ['p2', 'p1'], useAnimation: false }
-    ]);
+    assert.deepEqual(list.children.slice(1).map(row => row.getAttribute('data-id')), ['p2', 'p1']);
 });
 
 test('apiCall omits JSON content type for FormData uploads', async () => {
@@ -491,18 +491,6 @@ test('setProviderAuthType falls back to api_key when oauth is unavailable', () =
     assert.equal(state.providerForm.auth_type, 'api_key');
 });
 
-test('providerCardTitle truncates oauth display name on card', () => {
-    const state = loadApp();
-
-    const title = state.providerCardTitle({
-        auth_type: 'oauth',
-        display_name: 'gamebabies@gmail.com',
-        name: 'codex-gamebabies-gmail-com'
-    });
-
-    assert.equal(title, 'gamebabies@g...');
-});
-
 test('formatCompactTokenCount keeps at most three digits across all units', () => {
     const state = loadApp();
 
@@ -535,13 +523,8 @@ test('providerUsage labels attach reasoning/thoughts to their parent metrics', (
         }
     };
 
-    assert.equal(state.providerUsageTotal(provider), '724M · incl. Thoughts 9.88K');
     assert.equal(state.providerUsageTotalMain(provider), '724M');
-    assert.equal(state.providerUsageTotalBreakdown(provider), '· incl. Thoughts 9.88K');
     assert.equal(state.providerUsageTotalTitle(provider), '724,117,614 = 720,473,100 + 3,644,514 + incl. Thoughts 9,876');
-    assert.equal(state.providerUsageInOut(provider), '720M / 3.64M · incl. Reasoning 120K');
-    assert.equal(state.providerUsageInOutMain(provider), '720M / 3.64M');
-    assert.equal(state.providerUsageInOutBreakdown(provider), '· incl. Reasoning 120K');
     assert.equal(state.providerUsageInOutTitle(provider), '720,473,100 / 3,644,514 · incl. Reasoning 120,045');
 });
 
@@ -564,9 +547,7 @@ test('providerUsage breakdowns prefer structured entries and preserve parent sem
         JSON.parse(JSON.stringify(state.providerUsageBreakdowns(provider, 'total'))),
         [{ kind: 'thoughts', parent: 'total', tokens: 17 }]
     );
-    assert.equal(state.providerUsageTotal(provider), '25 · incl. Thoughts 17');
     assert.equal(state.providerUsageTotalTitle(provider), '25 = 7 + 1 + incl. Thoughts 17');
-    assert.equal(state.providerUsageInOut(provider), '7 / 1');
     assert.equal(state.providerUsageInOutTitle(provider), '7 / 1');
 });
 
@@ -581,9 +562,7 @@ test('providerUsage titles fall back to plain formulas without breakdowns', () =
         }
     };
 
-    assert.equal(state.providerUsageTotal(provider), '92');
     assert.equal(state.providerUsageTotalTitle(provider), '92 = 23 + 69');
-    assert.equal(state.providerUsageInOut(provider), '23 / 69');
     assert.equal(state.providerUsageInOutTitle(provider), '23 / 69');
 });
 
@@ -626,52 +605,6 @@ test('formatUSDMicros does not round spend values into the next display tier', (
     assert.equal(state.formatUSDMicros(9999500), '$9.99');
     assert.equal(state.formatUSDMicros(999999000), '$999');
     assert.equal(state.formatUSDMicros(999999000000), '$999K');
-});
-
-test('providerHasVisibleDetails keeps oauth plan summary visible without token usage', () => {
-    const state = loadApp();
-
-    const visible = state.providerHasVisibleDetails({
-        auth_type: 'oauth',
-        base_url: '',
-        proxy_mode: 'default',
-        usage: null,
-        oauth_plan_type: 'free'
-    });
-
-    assert.equal(visible, true);
-});
-
-test('providerHasVisibleDetails keeps spend-only providers visible', () => {
-    const state = loadApp();
-
-    const visible = state.providerHasVisibleDetails({
-        auth_type: 'api_key',
-        base_url: '',
-        proxy_mode: 'default',
-        usage: {
-            has_cost: true,
-            spend_today_micros: 1
-        }
-    });
-
-    assert.equal(visible, true);
-});
-
-test('providerHasVisibleDetails shows oauth metadata loader before metadata fetch', () => {
-    const state = loadApp();
-
-    const visible = state.providerHasVisibleDetails({
-        name: 'codex-sean-example-com',
-        auth_type: 'oauth',
-        oauth_provider: 'codex',
-        oauth_ref: 'codex-sean-example-com',
-        base_url: '',
-        proxy_mode: 'default',
-        usage: null
-    });
-
-    assert.equal(visible, true);
 });
 
 test('providerOAuthRateLimitSections builds weekly and code review rows', () => {
@@ -2066,12 +1999,12 @@ test('data import picker uses the OAuth file-picker pattern and reports selected
 
     const markup = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
     assert.match(markup, /class="btn btn-secondary btn-sm" @click="triggerDataImportPicker\(\)"/);
-    assert.match(markup, /x-ref="dataImportInput" type="file" style="display: none;"/);
+    assert.match(markup, /x-ref="dataImportInput" type="file" hidden/);
 });
 
 test('full backup export and import use separate settings panels', () => {
     const markup = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-    const panelStart = '<section class="settings-panel" style="grid-column: 1 / -1;">';
+    const panelStart = '<section class="settings-panel settings-panel--wide">';
     const exportPanelStart = markup.indexOf(panelStart);
     const exportPanelEnd = markup.indexOf('</section>', exportPanelStart);
     const importPanelStart = markup.indexOf(panelStart, exportPanelEnd);
@@ -2590,21 +2523,954 @@ test('providerRuntime shows degraded health even for the current provider', () =
 
 test('askConfirm makes the background inert and restores focus on close', async () => {
     const container = { inert: false };
+    const toolbar = { inert: false };
     const trigger = { focus() { trigger.focused = true; } };
     const state = loadApp({
         context: {
             document: {
                 activeElement: trigger,
-                querySelector: selector => (selector === '.container' ? container : null)
+                querySelector: selector => ({ '.container': container, '.toolbar': toolbar }[selector] || null)
             }
         }
     });
 
     const pending = state.askConfirm({ message: 'Sure?' });
     assert.equal(container.inert, true);
+    assert.equal(toolbar.inert, true);
     state.resolveConfirm(true);
     await pending;
 
     assert.equal(container.inert, false);
+    assert.equal(toolbar.inert, false);
     assert.equal(trigger.focused, true);
+});
+
+test('Escape opens provider discard confirmation without cancelling it on the same event', async () => {
+    const state = loadApp();
+    state.openAddProviderModal();
+    state.providerForm.name = 'draft';
+    const event = { stopped: false, stopImmediatePropagation() { this.stopped = true; } };
+    const pending = state.requestCloseProvider(event);
+    // Simulate the next window listener in DOM registration order.
+    if (!event.stopped && state.confirmDialog.visible) state.resolveConfirm(false);
+    assert.equal(event.stopped, true);
+    assert.equal(state.confirmDialog.visible, true);
+
+    const secondEscape = { stopped: false, stopImmediatePropagation() { this.stopped = true; } };
+    await state.requestCloseProvider(secondEscape);
+    assert.equal(secondEscape.stopped, false);
+    state.resolveConfirm(false);
+    assert.equal(await pending, false);
+    assert.equal(state.showAddProviderModal, true);
+    assert.equal(state.providerForm.name, 'draft');
+});
+
+
+test('mode and pin changes preserve the saved selection on failure and commit only on success', async () => {
+    for (const [initialMode, action] of [['auto', s => s.setClientMode('manual')], ['manual', s => s.setClientMode('auto')], ['manual', s => s.pinProvider('backup')]]) {
+        const state = loadApp();
+        state.providers = [{ name: 'primary', enabled: true, priority: 1 }, { name: 'backup', enabled: true, priority: 2 }];
+        state.clientConfig = { mode: initialMode, pinned_provider: initialMode === 'auto' ? '' : 'primary' };
+        const before = JSON.stringify(state.clientConfig);
+        state.showAlert = () => {};
+        state.refreshStatus = async () => {};
+        let finish;
+        let payload;
+        state.apiCall = async (_, options) => {
+            payload = JSON.parse(options.body);
+            await new Promise((resolve, reject) => { finish = reject; });
+        };
+        const pending = action(state);
+        assert.equal(state.clientConfigSaving, true);
+        assert.equal(JSON.stringify(state.clientConfig), before);
+        const client = state.selectedClient;
+        await state.selectClient('gemini');
+        await state.pinProvider('backup');
+        assert.equal(state.selectedClient, client);
+        finish(new Error('save failed'));
+        await pending;
+        assert.equal(JSON.stringify(state.clientConfig), before);
+        assert.equal(state.clientConfigSaving, false);
+        state.apiCall = async () => ({});
+        await action(state);
+        assert.equal(JSON.stringify(state.clientConfig), JSON.stringify(payload));
+    }
+});
+
+test('provider discard confirmation preserves edits on cancel and clears them only on acceptance', async () => {
+    const state = loadApp();
+    state.openAddProviderModal();
+    assert.equal(state.providerDirty, false);
+    state.providerForm.name = 'draft';
+    state.providerForm.api_keys_text = 'unsaved-key';
+    assert.equal(state.hasUnsavedInput, true);
+    state.askConfirm = async () => false;
+    await state.requestCloseProvider();
+    assert.equal(state.showAddProviderModal, true);
+    assert.equal(state.providerForm.api_keys_text, 'unsaved-key');
+    state.askConfirm = async () => true;
+    await state.requestCloseProvider();
+    assert.equal(state.showAddProviderModal, false);
+    assert.equal(state.providerForm.api_keys_text, '');
+    assert.equal(state.providerDirty, false);
+    state.openAddProviderModal();
+    state.askConfirm = () => { throw new Error('clean form must not prompt'); };
+    await state.requestCloseProvider();
+    assert.equal(state.showAddProviderModal, false);
+});
+
+test('provider save failure preserves input and successful save closes without discard prompt', async () => {
+    const state = loadApp();
+    state.openAddProviderModal();
+    state.providerForm.name = 'draft';
+    state.providerForm.api_keys_text = 'unsaved-key';
+    state.apiCall = async () => { throw new Error('save failed'); };
+    await state.saveProvider();
+    assert.equal(state.providerDirty, true);
+    assert.equal(state.providerSaving, false);
+    assert.equal(state.providerForm.api_keys_text, 'unsaved-key');
+    state.apiCall = async () => ({});
+    state.showAlert = () => {};
+    state.loadProviders = async () => {};
+    state.refreshStatus = async () => {};
+    state.askConfirm = () => { throw new Error('saved form must not prompt'); };
+    await state.saveProvider();
+    assert.equal(state.showAddProviderModal, false);
+    assert.equal(state.hasUnsavedInput, false);
+});
+
+test('environment draft survives cancellation and failed save, then becomes clean after successful save', async () => {
+    const state = loadApp();
+    const data = { environment: { country: 'US', timezone: 'America/New_York' }, account_identity: 'test' };
+    state.apiCall = async () => data;
+    await state.openEnvironment({ name: 'test', auth_type: 'oauth' });
+    assert.equal(state.environmentDirty, false);
+    state.environmentForm.country = 'JP';
+    state.askConfirm = async () => false;
+    await state.closeEnvironment();
+    assert.equal(state.environmentVisible, true);
+    state.apiCall = async () => { throw new Error('save failed'); };
+    await state.saveEnvironment();
+    assert.equal(state.environmentDirty, true);
+    assert.equal(state.environmentForm.country, 'JP');
+    state.apiCall = async () => ({ ...data, environment: { country: 'JP', timezone: 'Asia/Tokyo' } });
+    await state.saveEnvironment();
+    assert.equal(state.environmentDirty, false);
+    state.askConfirm = () => { throw new Error('saved form must not prompt'); };
+    await state.closeEnvironment();
+    assert.equal(state.environmentVisible, false);
+});
+
+test('status polling retains last good data, suppresses toasts, marks stale and recovers', async () => {
+    const state = loadApp();
+    let fail = false;
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    state.__context.fetch = async () => {
+        if (fail) throw new Error('offline');
+        return { ok: true, json: async () => ({ version: 'test', clients: {} }) };
+    };
+    await state.refreshStatus();
+    assert.equal(state.status.version, 'test');
+    assert.equal(state.statusNeedsAttention('runtime'), false);
+    state.statusClock = state.statusHealth.runtime.lastSuccess + 15000;
+    assert.equal(state.statusNeedsAttention('runtime'), true);
+    fail = true;
+    await state.refreshStatus();
+    await state.refreshStatus();
+    assert.equal(state.status.version, 'test');
+    assert.equal(state.statusHealth.runtime.failed, true);
+    assert.equal(alerts.length, 0);
+    fail = false;
+    await state.refreshStatus();
+    assert.equal(state.statusNeedsAttention('runtime'), false);
+});
+
+test('initial status failure reports no successful update and retry does not overlap requests', async () => {
+    const state = loadApp();
+    let rejectRequest;
+    let calls = 0;
+    state.apiCall = async () => {
+        calls++;
+        return new Promise((_, reject) => { rejectRequest = reject; });
+    };
+    const pending = state.refreshStatus();
+    await state.refreshStatus();
+    assert.equal(calls, 1);
+    rejectRequest(new Error('offline'));
+    await pending;
+    assert.equal(state.statusNeedsAttention('runtime'), true);
+    assert.equal(state.statusUpdatedLabel('runtime'), state.t('feedback.never'));
+    assert.equal(state.statusHealth.runtime.busy, false);
+});
+
+test('status timeout releases the polling lock and services keep their last good state', async () => {
+    let timeout;
+    const state = loadApp({ context: { setTimeout: callback => { timeout = callback; return 1; }, clearTimeout() {} } });
+    state.serviceStatus.running = true;
+    state.__context.fetch = async (_, options) => new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => reject(new Error('timed out')));
+    });
+    const pending = state.loadServiceStatus(true);
+    timeout();
+    await pending;
+    assert.equal(state.serviceStatus.running, true);
+    assert.equal(state.statusHealth.service.failed, true);
+    assert.equal(state.statusHealth.service.busy, false);
+    assert.equal(state.toasts.length, 0);
+});
+
+test('reload protection includes provider and environment drafts', async () => {
+    const listeners = {};
+    const state = loadApp({ context: { window: { addEventListener: (name, handler) => { listeners[name] = handler; } } } });
+    state.apiCall = async url => url.startsWith('/api/providers/') ? [] : {};
+    state.loadOAuthProviders = async () => {};
+    state.loadIntegrations = async () => {};
+    await state.init();
+    const event = () => ({ prevented: false, preventDefault() { this.prevented = true; } });
+    const clean = event();
+    listeners.beforeunload(clean);
+    assert.equal(clean.prevented, false);
+    state.openAddProviderModal();
+    state.providerForm.name = 'draft';
+    const provider = event();
+    listeners.beforeunload(provider);
+    assert.equal(provider.prevented, true);
+    state.closeModals();
+    state.environmentVisible = true;
+    state.environmentFormSnapshot = JSON.stringify(state.environmentForm);
+    state.environmentForm.country = 'JP';
+    const environment = event();
+    listeners.beforeunload(environment);
+    assert.equal(environment.prevented, true);
+});
+
+
+test('navigation cannot retarget an unsaved provider draft without confirmation', async () => {
+    const state = loadApp();
+    state.openAddProviderModal();
+    state.providerForm.name = 'draft';
+    state.askConfirm = async () => false;
+    assert.equal(await state.setTab('status'), false);
+    assert.equal(state.activeTab, 'providers');
+    const client = state.selectedClient;
+    await state.selectClient('gemini');
+    assert.equal(state.selectedClient, client);
+    assert.equal(state.providerForm.name, 'draft');
+    state.askConfirm = async () => true;
+    assert.equal(await state.setTab('status'), true);
+    assert.equal(state.showAddProviderModal, false);
+});
+
+test('provider search narrows the list without changing priority and locks reordering', () => {
+    const state = loadApp();
+    state.providers = [
+        { name: 'primary', display_name: 'Work', enabled: true, priority: 1, base_url: 'https://example.test' },
+        { name: 'backup', enabled: true, priority: 2, auth_type: 'oauth' },
+        { name: 'off', enabled: false, priority: 3 }
+    ];
+    const original = JSON.stringify(state.providers);
+    assert.equal(state.providerSearchAvailable, false);
+    state.providerSearch = 'WORK';
+    assert.equal(state.providerSearchAvailable, true);
+    assert.deepEqual(state.visibleProviders.map(p => p.name), ['primary']);
+    state.providerSearch = 'example.test';
+    assert.deepEqual(state.visibleProviders.map(p => p.name), ['primary']);
+    assert.equal(state.canReorderProviders, false);
+    state.providerSearch = '';
+    assert.equal(state.visibleProviders.length, 3);
+    assert.equal(state.canReorderProviders, true);
+    assert.equal(JSON.stringify(state.providers), original);
+    state.providers = Array.from({ length: 9 }, (_, i) => ({ name: 'p' + i, priority: i + 1 }));
+    assert.equal(state.providerSearchAvailable, true);
+});
+test('keyboard moves persist the full order and roll back failed saves', async () => {
+    const list = createProviderList(['a', 'b', 'c']);
+    const domOrder = () => list.children.slice(1).map(row => row.getAttribute('data-id'));
+    const state = loadApp({ context: { document: { getElementById: () => list } } });
+    state.providers = [{ name: 'a', priority: 1 }, { name: 'b', priority: 2 }, { name: 'c', priority: 3 }];
+    let payload;
+    state.apiCall = async (_, options) => { payload = JSON.parse(options.body); };
+    await state.moveProvider(state.providers[1], -1);
+    assert.deepEqual(payload.providers, ['b', 'a', 'c']);
+    assert.deepEqual(domOrder(), ['b', 'a', 'c']);
+    assert.equal(state.providers[0].priority, 1);
+    const saved = JSON.stringify(state.providers);
+    state.apiCall = async () => { throw new Error('failed'); };
+    await state.moveProvider(state.providers[0], 1);
+    assert.equal(JSON.stringify(state.providers), saved);
+    assert.deepEqual(domOrder(), ['b', 'a', 'c']);
+    assert.equal(state.providerReordering, false);
+    state.providerSearch = 'a';
+    state.apiCall = async () => { throw new Error('must not save filtered order'); };
+    await state.moveProvider(state.providers[0], 1);
+    assert.equal(JSON.stringify(state.providers), saved);
+    state.providerSearch = '';
+    await state.moveProvider(state.providers[0], -1);
+    assert.equal(JSON.stringify(state.providers), saved);
+});
+
+test('reordering locks client switches and mode changes until the save completes', async () => {
+    const state = loadApp();
+    state.providers = [{ name: 'a', priority: 1, enabled: true }, { name: 'b', priority: 2, enabled: true }];
+    let resolve;
+    let requests = 0;
+    state.apiCall = async () => { requests++; await new Promise(done => { resolve = done; }); };
+    const pending = state.moveProvider(state.providers[0], 1);
+    await new Promise(done => setImmediate(done));
+    const client = state.selectedClient;
+    await state.selectClient('gemini');
+    await state.setClientMode('manual');
+    assert.equal(state.selectedClient, client);
+    assert.equal(requests, 1);
+    resolve();
+    await pending;
+    assert.equal(state.providerReordering, false);
+});
+
+test('serving label shows capability candidates and falls back when unknown', () => {
+    const state = loadApp();
+    assert.equal(state.runtimeCandidatesLabel(), 'Not yet known');
+    state.status.clients[state.selectedClient] = { current_provider: 'a', current_providers: { text: 'a', image: 'b' } };
+    assert.equal(state.runtimeCandidatesLabel(), 'text: a · image: b');
+    state.status.clients[state.selectedClient] = { current_provider: 'a', current_providers: { text: 'a', image: 'a' } };
+    assert.equal(state.runtimeCandidatesLabel(), 'a');
+});
+
+test('provider rows show disabled, standby, in-use and degraded states', () => {
+    const state = loadApp();
+    state.status.clients[state.selectedClient] = {
+        current_provider: 'live',
+        providers: [{ name: 'cool', state: 'cooling_down', deactivated_in: '3m' }]
+    };
+    assert.equal(state.providerRowState({ name: 'off', enabled: false }).tone, 'off');
+    assert.equal(state.providerRowState({ name: 'idle', enabled: true }).label, 'Standby');
+    assert.equal(state.providerRowState({ name: 'live', enabled: true }).tone, 'primary');
+    const cool = state.providerRowState({ name: 'cool', enabled: true });
+    assert.equal(cool.tone, 'warn');
+    assert.match(cool.label, /3m/);
+    assert.equal(state.providerNeedsAttention({ name: 'cool', enabled: true }), true);
+    assert.equal(state.providerNeedsAttention({ name: 'live', enabled: true }), false);
+});
+
+test('provider row meta names the upstream host or OAuth and expands on demand', () => {
+    const state = loadApp();
+    assert.equal(state.providerRowMeta({ name: 'a', base_url: 'https://api.example.test/v1' }), 'api.example.test');
+    assert.equal(state.providerRowMeta({ name: 'codex-a', display_name: 'a@example.test', auth_type: 'oauth' }), 'codex-a');
+    assert.equal(state.providerSpendTodayLabel({ usage: { has_cost: true, spend_today_micros: 0 } }), '');
+    assert.notEqual(state.providerSpendTodayLabel({ usage: { has_cost: true, spend_today_micros: 1200000 } }), '');
+    const row = { name: 'a' };
+    assert.equal(state.providerExpanded(row), false);
+    state.providerRowClick(row, { target: { closest: () => null } });
+    assert.equal(state.providerExpanded(row), true);
+    state.providerRowClick(row, { target: { closest: () => ({}) } });
+    assert.equal(state.providerExpanded(row), true);
+    state.toggleProviderDetails(row);
+    assert.equal(state.providerExpanded(row), false);
+});
+
+test('status polling is scoped to the tab that shows the data', () => {
+    const state = loadApp();
+    state.activeTab = 'providers';
+    assert.equal(state.statusPolledOn('runtime'), true);
+    assert.equal(state.statusPolledOn('service'), false);
+    state.activeTab = 'services';
+    assert.equal(state.statusPolledOn('runtime'), false);
+    assert.equal(state.statusPolledOn('service'), true);
+    state.activeTab = 'status';
+    assert.equal(state.statusPolledOn('runtime'), true);
+    assert.equal(state.statusPolledOn('service'), true);
+    state.activeTab = 'settings';
+    assert.equal(state.statusPolledOn('runtime'), false);
+});
+
+test('system status refreshes service readiness on arrival and retains failure feedback', async () => {
+    const state = loadApp();
+    state.activeTab = 'settings';
+    state.serviceStatus.running = true;
+    state.statusHealth.service.lastSuccess = Date.now() - 60000;
+    const calls = [];
+    state.apiCall = async url => {
+        calls.push(url);
+        if (url === '/api/service/status') throw new Error('offline');
+        return {};
+    };
+    await state.setTab('status');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(calls.sort(), ['/api/service/status', '/api/status']);
+    assert.equal(state.setupServiceReady(), true);
+    assert.equal(state.statusNeedsAttention('service'), true);
+    assert.equal(state.statusPolledOn('service'), true);
+    state.apiCall = async () => ({ running: false });
+    await state.loadServiceStatus(true);
+    assert.equal(state.setupServiceReady(), false);
+    assert.equal(state.statusNeedsAttention('service'), false);
+});
+
+test('OAuth rows without plan metadata still expose credential details', () => {
+    const state = loadApp();
+    const provider = { name: 'claude-account', auth_type: 'oauth', oauth_provider: 'claude', oauth_auth_status: 'reauth_needed' };
+    state.providerRowClick(provider, { target: { closest: () => null } });
+    assert.equal(state.providerExpanded(provider), true);
+    assert.equal(state.providerOAuthAuthStatusLabel(provider), 'Reauth needed');
+    assert.equal(state.providerOAuthRefreshSummary(provider), 'Never');
+});
+
+test('integration change summary reports counts, no-op and oversized files', () => {
+    const state = loadApp();
+    assert.equal(state.integrationChangesSummary({ changes: state.integrationChanges('a', 'b') }), 'Changes: +1 / −1 lines');
+    assert.equal(state.integrationChangesSummary({ changes: state.integrationChanges('a', 'a') }), 'No changes to apply');
+    assert.match(state.integrationChangesSummary({ changes: { limited: true, rows: [] } }), /too large/);
+});
+test('integration diff handles insertions, removals, repeated lines and large files', () => {
+    const state = loadApp();
+    let diff = state.integrationChanges('keep\nold\nkeep', 'keep\nnew\nkeep');
+    assert.equal(diff.added, 1);
+    assert.equal(diff.removed, 1);
+    assert.equal(diff.rows[0].text, '− old');
+    assert.equal(diff.rows[1].text, '+ new');
+    assert.equal(state.integrationChanges('same', 'same').rows.length, 0);
+    assert.equal(state.integrationChanges('', '<script>bad()</script>').rows[0].text, '+ <script>bad()</script>');
+    assert.equal(state.integrationChanges('removed', '').removed, 1);
+    assert.equal(state.integrationChanges('x\n'.repeat(1000), 'y\n'.repeat(1000)).limited, true);
+    assert.equal(state.integrationChanges('x'.repeat(100001), '').limited, true);
+});
+
+test('integration preview uses planned content for apply and original backup for rollback', () => {
+    const state = loadApp();
+    const item = { product: 'codex', current_content: 'current', planned_content: 'planned', backup_content: 'original', backup_available: true };
+    let normalized = state.normalizeIntegration({ ...item, state: 'not_configured' });
+    assert.equal(normalized.changes.rows[1].text, '+ planned');
+    normalized = state.normalizeIntegration({ ...item, state: 'configured' });
+    assert.equal(normalized.changes.rows[1].text, '+ original');
+});
+
+
+test('drag handle and keyboard moves use the same reorder path; search blocks dragging', async () => {
+    let options;
+    const state = loadApp({ context: {
+        document: { getElementById: () => createProviderList(['a', 'b']) },
+        Sortable: { create: (_, supplied) => { options = supplied; return { sort() {}, destroy() {} }; } }
+    } });
+    state.providers = [{ name: 'a' }, { name: 'b' }];
+    state.initSortable();
+    assert.equal(options.handle, '.provider-drag-handle');
+    assert.equal(options.onMove(), true);
+    state.providerSearch = 'a';
+    assert.equal(options.onMove(), false);
+    state.providerSearch = '';
+    let moved;
+    state.reorderProviders = async (from, to) => { moved = [from, to]; };
+    await options.onEnd({ oldDraggableIndex: 0, newDraggableIndex: 1, oldIndex: 2, newIndex: 3 });
+    assert.deepEqual(moved, [0, 1]);
+});
+
+test('takeover cards abbreviate home paths, tone states and toggle previews per product', () => {
+    const state = loadApp();
+    assert.equal(state.displayHomePath('/Users/sean/.claude/settings.json'), '~/.claude/settings.json');
+    assert.equal(state.displayHomePath('/home/dev/.codex/config.toml'), '~/.codex/config.toml');
+    assert.equal(state.displayHomePath('C:\\Users\\bob\\.codex\\config.toml'), '~\\.codex\\config.toml');
+    assert.equal(state.displayHomePath('/etc/clipal.yaml'), '/etc/clipal.yaml');
+    assert.equal(state.integrationStateTone('configured'), 'success');
+    assert.equal(state.integrationStateTone('error'), 'danger');
+    assert.equal(state.integrationStateTone('not_configured'), 'idle');
+    state.toggleIntegrationPreview('claude');
+    assert.equal(state.integrationPreviewOpen.claude, true);
+    assert.equal(!!state.integrationPreviewOpen.codex, false);
+    state.toggleIntegrationPreview('claude');
+    assert.equal(state.integrationPreviewOpen.claude, false);
+});
+
+test('mode summary and OAuth auth tone follow the current state', () => {
+    const state = loadApp();
+    state.clientConfig = { mode: 'auto' };
+    assert.match(state.modeHelpSummary(), /priority/);
+    state.clientConfig = { mode: 'manual' };
+    assert.match(state.modeHelpSummary(), /pinned/);
+    const oauth = status => ({ auth_type: 'oauth', oauth_auth_status: status });
+    assert.equal(state.providerOAuthAuthStatusTone(oauth('ready')), 'success');
+    assert.equal(state.providerOAuthAuthStatusTone(oauth('refresh_due')), 'warn');
+    assert.equal(state.providerOAuthAuthStatusTone(oauth('reauth_needed')), 'danger');
+});
+
+test('environment dropdowns localize countries and preserve stored country and timezone aliases', () => {
+    const state = loadApp();
+    const english = state.environmentCountryOptions('US');
+    assert.equal(english.length, 249);
+    assert.match(english.find(option => option.value === 'US').label, /United States/);
+    state.locale = 'zh-CN';
+    assert.match(state.environmentCountryOptions('JP').find(option => option.value === 'JP').label, /日本/);
+    assert.equal(state.environmentCountryOptions('XK').filter(option => option.value === 'XK').length, 1);
+    const zones = state.environmentTimezoneOptions('US/Eastern');
+    for (const zone of ['US/Eastern', 'UTC', 'America/New_York', 'Asia/Shanghai', 'Asia/Tokyo', 'Europe/London']) {
+        assert.ok(zones.includes(zone), zone);
+    }
+    assert.equal(zones.filter(zone => zone === 'US/Eastern').length, 1);
+    state.environmentForm = { country: 'US', timezone: 'US/Eastern' };
+    state.environmentForm.country = 'JP';
+    state.environmentCountryOptions(state.environmentForm.country);
+    state.environmentTimezoneOptions(state.environmentForm.timezone);
+    assert.equal(state.environmentForm.timezone, 'US/Eastern');
+});
+
+test('country dropdown keeps English fallback names without Intl.DisplayNames', () => {
+    const state = loadApp({ context: { Intl: {} } });
+    assert.match(state.environmentCountryOptions('JP').find(option => option.value === 'JP').label, /Japan/);
+});
+
+test('mode saves lock provider mutations until completion', async () => {
+    const state = loadApp();
+    const provider = { name: 'primary', enabled: true, priority: 1 };
+    state.providers = [provider];
+    state.refreshStatus = async () => {};
+    state.showAlert = () => {};
+    let finish;
+    let requests = 0;
+    state.apiCall = async () => {
+        requests++;
+        await new Promise(resolve => { finish = resolve; });
+    };
+    const pending = state.pinProvider(provider.name);
+    assert.equal(state.canMutateProviders, false);
+    await state.deleteProvider(provider);
+    state.editProvider(provider);
+    state.openAddProviderModal();
+    await state.saveProvider();
+    assert.equal(state.showEditProviderModal, false);
+    assert.equal(state.showAddProviderModal, false);
+    assert.equal(requests, 1);
+    finish();
+    await pending;
+    assert.equal(state.canMutateProviders, true);
+});
+
+test('late mode response reloads config after an in-flight deletion instead of restoring a deleted pin', async () => {
+    const state = loadApp();
+    state.providers = [{ name: 'primary', enabled: true, priority: 1 }];
+    state.refreshStatus = async () => {};
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    let finish;
+    let configReads = 0;
+    state.apiCall = async (url, options = {}) => {
+        if (options.method === 'PUT') {
+            await new Promise(resolve => { finish = resolve; });
+            return {};
+        }
+        if (url.startsWith('/api/providers/')) return [];
+        configReads++;
+        return { mode: 'auto', pinned_provider: '' };
+    };
+    const pending = state.pinProvider('primary');
+    await state.loadProviders(true);
+    finish();
+    await pending;
+    assert.equal(state.clientConfig.mode, 'auto');
+    assert.equal(state.clientConfig.pinned_provider, '');
+    assert.equal(configReads, 2);
+    assert.equal(alerts.length, 0);
+});
+
+test('unit editor displays saved durations and byte counts without rewriting configuration', () => {
+    const state = loadApp();
+    let raw = '1h30m';
+    let writes = 0;
+    const field = state.__context.unitField({ get: () => raw, set: value => { raw = value; writes++; } });
+    field.sync();
+    assert.equal(field.value, '90');
+    assert.equal(field.unit, 'm');
+    assert.equal(raw, '1h30m');
+    assert.equal(writes, 0);
+    field.commit('45');
+    field.sync();
+    assert.equal(raw, '45m');
+    field.unit = 's';
+    field.commit('2.5');
+    assert.equal(raw, '2.5s');
+    raw = '0';
+    field.sync();
+    assert.equal(field.value, '0');
+    assert.equal(raw, '0');
+
+    raw = 67108864;
+    const size = state.__context.unitField({ kind: 'bytes', get: () => raw, set: value => { raw = value; } });
+    size.sync();
+    assert.equal(size.value, '64');
+    assert.equal(size.unit, 'MiB');
+    size.commit('128');
+    assert.equal(raw, 134217728);
+    size.unit = 'B';
+    size.commit('1.5');
+    assert.equal(size.error, 'forms.wholeBytes');
+    size.commit('1025');
+    assert.equal(size.error, '');
+    assert.equal(raw, 1025);
+});
+
+test('unit editor preserves optional blanks, fine durations, and uncommon valid saved formats', () => {
+    const state = loadApp();
+    let raw = '';
+    let enabled = true;
+    const field = state.__context.unitField({ optional: true, positive: true, disabled: () => !enabled, get: () => raw, set: value => { raw = value; } });
+    field.sync();
+    assert.equal(field.value, '');
+    field.commit('0');
+    assert.equal(field.error, 'forms.positiveDuration');
+    field.commit('');
+    assert.equal(raw, '');
+    assert.equal(field.error, '');
+    raw = '2ns';
+    field.sync();
+    assert.equal(field.unit, 'ns');
+    assert.ok(field.choices.includes('ns'));
+    raw = '+1h30m';
+    field.sync();
+    assert.equal(field.custom, '+1h30m');
+    assert.equal(raw, '+1h30m');
+    enabled = false;
+    field.sync();
+    assert.equal(field.disabled, true);
+});
+
+test('provider loading errors preserve the last list and recover without pretending the group is empty', async () => {
+    const state = loadApp({ context: { console: { ...console, error() {} } } });
+    state.providers = [{ name: 'saved' }];
+    state.apiCall = async () => { throw new Error('offline'); };
+    await state.loadProviders(true);
+    assert.equal(state.providers[0].name, 'saved');
+    assert.equal(state.providerLoadError, 'offline');
+    assert.equal(state.canMutateProviders, false);
+    state.apiCall = async url => url.startsWith('/api/providers/') ? [{ name: 'fresh' }] : { mode: 'auto' };
+    await state.loadProviders(true);
+    assert.equal(state.providers[0].name, 'fresh');
+    assert.equal(state.providerLoadError, '');
+    assert.equal(state.canMutateProviders, true);
+});
+
+test('an older client response cannot overwrite the selected client list', async () => {
+    const state = loadApp();
+    let finish;
+    state.apiCall = async url => {
+        if (url === '/api/providers/claude') return new Promise(resolve => { finish = resolve; });
+        if (url.startsWith('/api/providers/')) return [{ name: 'openai-only' }];
+        return { mode: 'auto' };
+    };
+    const older = state.loadProviders(true);
+    state.selectedClient = 'openai';
+    await state.loadProviders(true);
+    finish([{ name: 'claude-only' }]);
+    await older;
+    assert.equal(state.providers[0].name, 'openai-only');
+    assert.equal(state.providerLoadBusy, false);
+});
+
+test('service HTTP failures show errors and do not announce a requested action', async () => {
+    const scheduled = [];
+    const state = loadApp({ context: {
+        fetch: async () => ({ ok: false, json: async () => ({ error: 'permission denied' }) }),
+        setTimeout: (...args) => scheduled.push(args)
+    } });
+    state.serviceActionDisabledReason = () => '';
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    await state.serviceAction('start');
+    assert.deepEqual(alerts, [['error', 'permission denied']]);
+    assert.equal(state.serviceBusyAction, '');
+    assert.equal(scheduled.length, 0);
+});
+
+test('interrupted service actions remain unconfirmed and recheck status without accepting duplicates', async () => {
+    const scheduled = [];
+    let calls = 0;
+    let finish;
+    const state = loadApp({ context: {
+        fetch: async () => { calls++; await new Promise(resolve => { finish = resolve; }); throw new Error('network'); },
+        setTimeout: (...args) => scheduled.push(args)
+    } });
+    state.serviceActionDisabledReason = () => '';
+    state.fetchTrackedStatus = async () => ({ running: true });
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    const pending = state.serviceAction('start');
+    await state.loadServiceStatus(true);
+    assert.equal(state.serviceBusyAction, 'start');
+    await state.serviceAction('start');
+    assert.equal(calls, 1);
+    finish();
+    await pending;
+    assert.equal(alerts[0][1], state.t('services.actionUnconfirmed'));
+    assert.equal(scheduled.length, 4);
+});
+
+test('account environment loading can be closed and a late response cannot reopen or change it', async () => {
+    const state = loadApp();
+    let finish;
+    state.apiCall = async () => new Promise(resolve => { finish = resolve; });
+    const pending = state.openEnvironment({ name: 'account', auth_type: 'oauth' });
+    assert.equal(state.environmentBusy, true);
+    assert.equal(await state.closeEnvironment(), true);
+    finish({ environment: { country: 'JP', timezone: 'Asia/Tokyo' }, account_identity: 'account' });
+    await pending;
+    assert.equal(state.environmentVisible, false);
+    assert.equal(state.environmentBusy, false);
+    assert.equal(state.environmentIdentity, '');
+});
+
+test('all dialog focus boundaries include inputs and selects and exclude hidden controls', () => {
+    const state = loadApp();
+    const first = { focus() { first.focused = true; }, getClientRects: () => [1] };
+    const last = { focus() { last.focused = true; }, getClientRects: () => [1] };
+    const hidden = { getClientRects: () => [] };
+    const dialog = { querySelectorAll: () => [hidden, first, last], contains: () => true };
+    let prevented = false;
+    state.__context.document.activeElement = last;
+    state.trapDialogFocus({ currentTarget: dialog, shiftKey: false, preventDefault() { prevented = true; } });
+    assert.equal(first.focused, true);
+    assert.equal(prevented, true);
+    state.__context.document.activeElement = first;
+    state.trapDialogFocus({ currentTarget: dialog, shiftKey: true, preventDefault() {} });
+    assert.equal(last.focused, true);
+});
+
+test('unit editors reject values the backend would silently raise while allowing disabled timeouts', () => {
+    const state = loadApp();
+    let raw = '5m';
+    const duration = state.__context.unitField({ minimum: 300, get: () => raw, set: value => { raw = value; } });
+    duration.sync();
+    duration.unit = 's';
+    duration.commit('30');
+    assert.equal(duration.error, 'forms.minimumTimeout');
+    duration.commit('0');
+    assert.equal(duration.error, '');
+    duration.commit('300');
+    assert.equal(duration.error, '');
+    raw = 67108864;
+    const size = state.__context.unitField({ kind: 'bytes', minimum: 67108864, get: () => raw, set: value => { raw = value; } });
+    size.sync();
+    size.commit('1');
+    assert.equal(size.error, 'forms.minimumSize');
+    size.commit('64');
+    assert.equal(size.error, '');
+});
+
+test('client keyboard selection wraps and supports first and last while preserving save locks', async () => {
+    const state = loadApp({ context: { document: { querySelector: () => null } } });
+    const visited = [];
+    state.loadProviders = async () => visited.push(state.selectedClient);
+    state.loadOAuthProviders = async () => {};
+    await state.moveClient(-1);
+    assert.equal(state.selectedClient, 'gemini');
+    await state.moveClient('first');
+    assert.equal(state.selectedClient, 'claude');
+    await state.moveClient('last');
+    assert.equal(state.selectedClient, 'gemini');
+    state.clientConfigSaving = true;
+    await state.moveClient(1);
+    assert.equal(state.selectedClient, 'gemini');
+    assert.deepEqual(visited, ['gemini', 'claude', 'gemini']);
+});
+
+test('account preference saves report success and prevent closure only while writing', async () => {
+    const state = loadApp();
+    state.environmentVisible = true;
+    state.environmentIdentity = 'account';
+    state.environmentPath = '/api/providers/claude/account';
+    let finish;
+    state.apiCall = async () => new Promise(resolve => { finish = resolve; });
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    const pending = state.saveEnvironment();
+    assert.equal(state.environmentSaving, true);
+    assert.equal(await state.closeEnvironment(), false);
+    finish({ environment: { country: 'JP', timezone: 'Asia/Tokyo' } });
+    await pending;
+    assert.equal(state.environmentSaving, false);
+    assert.deepEqual(alerts, [['success', state.t('requestEnv.saved')]]);
+    assert.equal(await state.closeEnvironment(), true);
+});
+
+test('account load failures offer retry state and late errors after close stay silent', async () => {
+    const state = loadApp();
+    const alerts = [];
+    state.showAlert = (...args) => alerts.push(args);
+    state.apiCall = async () => { throw new Error('offline'); };
+    await state.openEnvironment({ name: 'account', auth_type: 'oauth' });
+    assert.equal(state.environmentLoadError, 'offline');
+    assert.equal(state.environmentBusy, false);
+    assert.equal(state.environmentProvider.name, 'account');
+    state.apiCall = async () => ({ environment: { country: 'US', timezone: 'America/New_York' }, account_identity: 'account' });
+    await state.openEnvironment(state.environmentProvider);
+    assert.equal(state.environmentLoadError, '');
+    assert.equal(state.environmentIdentity, 'account');
+    await state.closeEnvironment();
+    let reject;
+    state.apiCall = async () => new Promise((_, fail) => { reject = fail; });
+    const pending = state.openEnvironment(state.environmentProvider);
+    await state.closeEnvironment();
+    reject(new Error('late error'));
+    await pending;
+    assert.equal(state.environmentLoadError, '');
+    assert.equal(alerts.length, 0);
+});
+
+test('translations have identical keys and interpolation parameters in both languages', () => {
+    const state = loadApp();
+    const flatten = (object, prefix = '', result = {}) => {
+        for (const [key, value] of Object.entries(object)) {
+            const name = prefix ? `${prefix}.${key}` : key;
+            if (typeof value === 'object') flatten(value, name, result);
+            else result[name] = value;
+        }
+        return result;
+    };
+    const english = flatten(state.messages.en);
+    const chinese = flatten(state.messages['zh-CN']);
+    assert.deepEqual(Object.keys(english).sort(), Object.keys(chinese).sort());
+    const parameters = value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
+    for (const key of Object.keys(english)) {
+        assert.deepEqual(parameters(english[key]), parameters(chinese[key]), key);
+    }
+    state.locale = 'zh-CN';
+    state.editingProviderKeyCount = 1;
+    assert.match(state.providerEditKeyHint(), /API Key/);
+});
+
+test('provider save keeps list actions and client selection locked through the final refresh', async () => {
+    const state = loadApp();
+    state.openAddProviderModal();
+    state.providerForm.name = 'new-provider';
+    state.apiCall = async () => ({});
+    state.showAlert = () => {};
+    state.loadProviders = async () => {};
+    let finishRefresh;
+    state.refreshStatus = () => new Promise(resolve => { finishRefresh = resolve; });
+    const pending = state.saveProvider();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(state.showAddProviderModal, false);
+    assert.equal(state.canMutateProviders, false);
+    state.openAddProviderModal();
+    assert.equal(state.showAddProviderModal, false);
+    await state.selectClient('gemini');
+    assert.equal(state.selectedClient, 'claude');
+    finishRefresh();
+    await pending;
+    assert.equal(state.canMutateProviders, true);
+});
+
+test('provider toggles serialize conflicting operations and release the lock after failure', async () => {
+    const state = loadApp({ context: { console: { ...console, error() {} } } });
+    const provider = { name: 'primary', enabled: true };
+    let finish;
+    let calls = 0;
+    state.apiCall = () => { calls++; return new Promise((resolve, reject) => { finish = reject; }); };
+    const pending = state.toggleProvider(provider, { target: { checked: false } });
+    assert.equal(state.canMutateProviders, false);
+    const duplicate = { target: { checked: true } };
+    await state.toggleProvider(provider, duplicate);
+    await state.pinProvider(provider.name);
+    await state.selectClient('gemini');
+    assert.equal(calls, 1);
+    assert.equal(duplicate.target.checked, false);
+    assert.equal(state.selectedClient, 'claude');
+    finish(new Error('offline'));
+    await pending;
+    assert.equal(provider.enabled, true);
+    assert.equal(state.canMutateProviders, true);
+});
+
+test('provider deletion prevents conflicting writes until the refreshed list is ready', async () => {
+    const state = loadApp();
+    state.askConfirm = async () => true;
+    state.showAlert = () => {};
+    state.apiCall = async () => ({});
+    let finish;
+    state.loadProviders = () => new Promise(resolve => { finish = resolve; });
+    state.refreshStatus = async () => {};
+    const pending = state.deleteProvider({ name: 'primary' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(state.canMutateProviders, false);
+    await state.selectClient('gemini');
+    assert.equal(state.selectedClient, 'claude');
+    finish();
+    await pending;
+    assert.equal(state.canMutateProviders, true);
+});
+
+test('data import locks file reads, preview and apply against duplicate or conflicting input', async () => {
+    const state = loadApp();
+    state.dataImportFiles = [{ name: 'backup.json', data: '{}' }];
+    let finish;
+    let calls = 0;
+    state.apiCall = () => { calls++; return new Promise(resolve => { finish = resolve; }); };
+    const preview = state.previewDataImport();
+    await state.previewDataImport();
+    await state.selectDataImportFiles({ target: { files: [] } });
+    assert.equal(state.dataImportBusy, 'preview');
+    assert.equal(state.dataImportFiles.length, 1);
+    assert.equal(calls, 1);
+    finish({ id: 'reviewed', mode: 'merge' });
+    await preview;
+    assert.equal(state.dataImportBusy, '');
+    state.showAlert = () => {};
+    state.loadGlobalConfig = state.loadProviders = state.refreshStatus = async () => {};
+    const apply = state.applyDataImport();
+    state.closeDataImportPreview();
+    await state.applyDataImport();
+    assert.equal(await state.setTab('settings'), false);
+    assert.equal(state.activeTab, 'providers');
+    assert.equal(state.dataImportPlan.id, 'reviewed');
+    assert.equal(state.showDataImportPreviewModal, true);
+    assert.equal(calls, 2);
+    finish({});
+    await apply;
+    assert.equal(state.dataImportBusy, '');
+    assert.equal(state.dataImportPlan, null);
+});
+
+test('API errors with missing or malformed server messages use the selected language', async () => {
+    for (const json of [async () => ({}), async () => null, async () => { throw new SyntaxError('not JSON'); }]) {
+        const state = loadApp({ context: { fetch: async () => ({ ok: false, json }) } });
+        state.locale = 'zh-CN';
+        state.showAlert = () => {};
+        await assert.rejects(state.apiCall('/api/test'), { message: '请求失败' });
+    }
+});
+
+test('global settings reads serialize reset and block saves until the authoritative snapshot arrives', async () => {
+    const state = loadApp();
+    let finish;
+    const calls = [];
+    state.apiCall = url => { calls.push(url); return new Promise(resolve => { finish = resolve; }); };
+    const pending = state.loadGlobalConfig();
+    assert.equal(state.globalLoading, true);
+    await state.loadGlobalConfig();
+    await state.saveGlobalConfig();
+    assert.deepEqual(calls, ['/api/config/global']);
+    finish({ listen_addr: '127.0.0.1', port: 3333, log_retention_days: 14 });
+    await pending;
+    assert.equal(state.globalLoading, false);
+    assert.equal(state.globalDirty, false);
+    state.globalConfig.log_retention_days = 21;
+    assert.equal(state.globalDirty, true);
+});
+
+test('failed settings reads release controls and preserve the draft', async () => {
+    const state = loadApp({ context: { console: { ...console, error() {} } } });
+    state.globalConfig.log_retention_days = 21;
+    state.apiCall = async () => { throw new Error('offline'); };
+    await state.loadGlobalConfig();
+    assert.equal(state.globalLoading, false);
+    assert.equal(state.globalConfig.log_retention_days, 21);
+});
+
+test('literal translation references resolve in both UI languages', () => {
+    const state = loadApp();
+    const source = ['app.js', 'index.html', 'form-controls.js']
+        .map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
+    const keys = new Set([...source.matchAll(/\btf?\(\s*['"]([^'"]+)['"]\s*[,)]/g)].map(match => match[1]));
+    for (const locale of state.supportedLocales) {
+        for (const key of keys) {
+            assert.equal(typeof state.lookupMessage(locale, key), 'string', `${locale}: ${key}`);
+        }
+    }
 });
