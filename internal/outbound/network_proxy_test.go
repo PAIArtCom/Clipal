@@ -140,17 +140,20 @@ func TestGnomeManualProxySelection(t *testing.T) {
 		name     string
 		settings map[string]string
 		want     string
+		scheme   string
 	}{
-		{"HTTPS specific", map[string]string{"https.host": "'https-proxy'", "https.port": "8081"}, "http://https-proxy:8081"},
-		{"HTTPS falls back to HTTP", map[string]string{"http.host": "'http-proxy'", "http.port": "8080"}, "http://http-proxy:8080"},
-		{"shared HTTP overrides HTTPS", map[string]string{"use-same-proxy": "true", "http.host": "'shared'", "http.port": "8080", "https.host": "'unused'", "https.port": "8081"}, "http://shared:8080"},
-		{"port zero disables proxy", map[string]string{"https.host": "'disabled'", "https.port": "0", "socks.host": "'socks-proxy'", "socks.port": "1080"}, "socks5h://socks-proxy:1080"},
-		{"authentication", map[string]string{"http.host": "'proxy'", "http.port": "8080", "http.use-authentication": "true", "http.authentication-user": "'owner'", "http.authentication-password": "'secret'"}, "http://owner:secret@proxy:8080"},
-		{"exception", map[string]string{"http.host": "'proxy'", "http.port": "8080", "ignore-hosts": "['*.example']"}, ""},
-		{"no proxy", nil, ""},
+		{"HTTPS specific", map[string]string{"https.host": "'https-proxy'", "https.port": "8081"}, "http://https-proxy:8081", "https"},
+		{"HTTPS falls back to HTTP", map[string]string{"http.host": "'http-proxy'", "http.port": "8080"}, "http://http-proxy:8080", "https"},
+		{"shared HTTP overrides HTTPS", map[string]string{"use-same-proxy": "true", "http.host": "'shared'", "http.port": "8080", "https.host": "'unused'", "https.port": "8081"}, "http://shared:8080", "https"},
+		{"port zero disables proxy", map[string]string{"https.host": "'disabled'", "https.port": "0", "socks.host": "'socks-proxy'", "socks.port": "1080"}, "socks5h://socks-proxy:1080", "https"},
+		{"authentication", map[string]string{"http.host": "'proxy'", "http.port": "8080", "http.use-authentication": "true", "http.authentication-user": "'owner'", "http.authentication-password": "'secret'"}, "http://owner:secret@proxy:8080", "https"},
+		{"exception", map[string]string{"http.host": "'proxy'", "http.port": "8080", "ignore-hosts": "['*.example']"}, "", "https"},
+		{"no proxy", nil, "", "https"},
+		{"HTTP ignores HTTPS proxy", map[string]string{"https.host": "'unused'", "https.port": "8081", "http.host": "'http-proxy'", "http.port": "8080"}, "http://http-proxy:8080", "http"},
+		{"HTTP falls back to SOCKS", map[string]string{"socks.host": "'socks-proxy'", "socks.port": "1080"}, "socks5h://socks-proxy:1080", "http"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "https://public.example", nil)
+			req, _ := http.NewRequest(http.MethodGet, tt.scheme+"://public.example", nil)
 			read := func(schema, key string) (string, error) {
 				prefix := strings.TrimPrefix(schema, "org.gnome.system.proxy")
 				prefix = strings.TrimPrefix(prefix, ".")

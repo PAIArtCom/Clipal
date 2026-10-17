@@ -13,14 +13,14 @@ import (
 func systemProxy(req *http.Request) (*url.URL, error) {
 	// Linux has no universal desktop proxy API. Read GNOME's published settings
 	// when available; headless and other desktops continue using environment policy.
-	binary, err := exec.LookPath("gsettings")
-	if err != nil {
+	if _, err := exec.LookPath("gsettings"); err != nil {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(req.Context(), time.Second)
 	defer cancel()
 	read := func(schema, key string) (string, error) {
-		data, err := exec.CommandContext(ctx, binary, "get", schema, key).Output()
+		// Keep the executable fixed; schema and key are separate arguments, never shell text.
+		data, err := exec.CommandContext(ctx, "gsettings", "get", schema, key).Output()
 		return strings.TrimSpace(string(data)), err
 	}
 	mode, err := read("org.gnome.system.proxy", "mode")

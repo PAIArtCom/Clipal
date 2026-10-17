@@ -15,11 +15,11 @@ func gnomeSystemProxy(req *http.Request, read func(string, string) (string, erro
 	if err != nil {
 		return nil, err
 	}
-	schemes := []string{req.URL.Scheme}
-	if shared == "true" {
-		schemes = []string{"http"}
-	} else if req.URL.Scheme == "https" {
-		schemes = append(schemes, "http")
+	// GNOME defines fixed http/https/socks schemas. Never derive a command
+	// argument from the request's raw URL scheme.
+	schemes := []string{"http"}
+	if shared != "true" && req.URL.Scheme == "https" {
+		schemes = []string{"https", "http"}
 	}
 	schemes = append(schemes, "socks")
 	for _, scheme := range schemes {
