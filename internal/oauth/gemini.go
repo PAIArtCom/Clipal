@@ -128,7 +128,6 @@ func NewGeminiClient() *GeminiClient {
 		CallbackPath:     defaultGeminiCallbackPath,
 		HTTPClient:       &http.Client{Timeout: 30 * time.Second},
 		Now:              time.Now,
-		Sleep:            time.Sleep,
 	}
 	applyGeminiClientEnvOverrides(client)
 	return client
@@ -508,65 +507,9 @@ func (c *GeminiClient) callCloudCode(ctx context.Context, accessToken string, ac
 }
 
 func (c *GeminiClient) pollCloudCodeOperation(ctx context.Context, accessToken string, name string) (map[string]any, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, fmt.Errorf("operation name is required")
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if _, ok := ctx.Deadline(); !ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, defaultGeminiOperationPollTimeout)
-		defer cancel()
-	}
-
-	for attempt := 0; attempt < defaultGeminiOperationPollMaxAttempts; attempt++ {
-		if attempt > 0 {
-			c.sleep(defaultGeminiOperationPollDelay)
-		}
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		endpoint := strings.TrimRight(c.cloudCodeURL(), "/") + "/" + strings.Trim(c.cloudCodeVersion(), "/") + "/" + strings.TrimLeft(name, "/")
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel))
-
-		resp, err := c.httpClient().Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		respBody, readErr := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if readErr != nil {
-			return nil, readErr
-		}
-		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-			if attempt+1 < defaultGeminiOperationPollMaxAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
-				continue
-			}
-			return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-		}
-
-		var data map[string]any
-		if err := json.Unmarshal(respBody, &data); err != nil {
-			return nil, err
-		}
-		if done, _ := data["done"].(bool); done {
-			return data, nil
-		}
-	}
-
-	return nil, fmt.Errorf("operation %q did not complete after %d polls", name, defaultGeminiOperationPollMaxAttempts)
+	return pollCloudCodeOperation(ctx, accessToken, name, cloudCodeOperationConfig{
+		Client: c.httpClient(), BaseURL: c.cloudCodeURL(), Version: c.cloudCodeVersion(), UserAgent: geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel), Now: c.now, Sleep: c.Sleep,
+	})
 }
 
 func geminiMetadataFromToken(client *GeminiClient, token *geminiTokenResponse, projectID string, tierID string, autoProject bool) map[string]string {
@@ -756,6 +699,19 @@ func geminiLoadCodeAssistProjectSetupError(payload map[string]any, requestedProj
 		}
 		return nil
 	}
+	messages := codeAssistIneligibilityReasons(payload)
+	if len(messages) > 0 {
+		return fmt.Errorf("gemini account is not eligible for Code Assist: %s", strings.Join(messages, "; "))
+	}
+	if strings.TrimSpace(requestedProject) == "" {
+		return fmt.Errorf("gemini oauth requires GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID for this account")
+	}
+	return fmt.Errorf("gemini account is not eligible for Code Assist")
+}
+
+// Both Google OAuth clients receive the same Code Assist eligibility response.
+func codeAssistIneligibilityReasons(payload map[string]any) []string {
+	ineligible, _ := payload["ineligibleTiers"].([]any)
 	messages := make([]string, 0, len(ineligible))
 	for _, rawTier := range ineligible {
 		tier, ok := rawTier.(map[string]any)
@@ -770,13 +726,7 @@ func geminiLoadCodeAssistProjectSetupError(payload map[string]any, requestedProj
 			messages = append(messages, reasonCode)
 		}
 	}
-	if len(messages) > 0 {
-		return fmt.Errorf("gemini account is not eligible for Code Assist: %s", strings.Join(messages, "; "))
-	}
-	if strings.TrimSpace(requestedProject) == "" {
-		return fmt.Errorf("gemini oauth requires GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID for this account")
-	}
-	return fmt.Errorf("gemini account is not eligible for Code Assist")
+	return messages
 }
 
 func validateGeminiProjectID(projectID string) error {

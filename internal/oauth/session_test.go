@@ -758,6 +758,184 @@ func TestRefreshIfNeededCoalescesConcurrentCallers(t *testing.T) {
 	}
 }
 
+func TestRefreshIfNeededRepairsAntigravityProjectBeforeTokenExpiry(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		provider     config.OAuthProvider
+		project      string
+		refreshError error
+		wantCalls    int32
+	}{
+		{"missing project", config.OAuthProviderAntigravity, "", nil, 1},
+		{"failed repair", config.OAuthProviderAntigravity, "", fmt.Errorf("account is not eligible"), 1},
+		{"complete account", config.OAuthProviderAntigravity, "project-123", nil, 0},
+		{"other provider", config.OAuthProviderCodex, "", nil, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			now := time.Now()
+			original := &Credential{Ref: "stable-ref", Provider: tc.provider, Email: "account@example.com",
+				AccessToken: "access-before", RefreshToken: "refresh-before", ExpiresAt: now.Add(time.Hour), LastRefresh: now,
+				Metadata: map[string]string{"project_id": tc.project}}
+			store := NewStore(dir)
+			if err := store.Save(original); err != nil {
+				t.Fatal(err)
+			}
+			repaired := original.Clone()
+			repaired.AccountID = "project-123"
+			repaired.Metadata["project_id"] = "project-123"
+			client := &stubProviderClient{provider: tc.provider, refreshCred: repaired, refreshErr: tc.refreshError}
+			svc := NewService(dir, WithProviderClient(client), WithNowFunc(func() time.Time { return now }))
+			_, err := svc.RefreshIfNeeded(context.Background(), tc.provider, original.Ref)
+			if (err != nil) != (tc.refreshError != nil) {
+				t.Fatalf("error=%v", err)
+			}
+			if client.refreshCalled != tc.wantCalls {
+				t.Fatalf("refresh calls=%d, want %d", client.refreshCalled, tc.wantCalls)
+			}
+			saved, err := store.Load(tc.provider, original.Ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantProject := tc.project
+			if tc.wantCalls == 1 && tc.refreshError == nil {
+				wantProject = "project-123"
+			}
+			if saved.Metadata["project_id"] != wantProject || saved.Ref != original.Ref || saved.AccessToken != original.AccessToken {
+				t.Fatal("repair did not preserve identity/tokens or persisted an invalid project")
+			}
+			if tc.refreshError == nil {
+				if _, err := svc.RefreshIfNeeded(context.Background(), tc.provider, original.Ref); err != nil {
+					t.Fatal(err)
+				}
+				if client.refreshCalled != tc.wantCalls {
+					t.Fatal("complete credential was refreshed again")
+				}
+			}
+		})
+	}
+}
+
+func TestAntigravityProjectRepairUsesFreshAccessToken(t *testing.T) {
+	for _, tc := range []struct {
+		name                                               string
+		expired, noRefresh, denied, revoked, wrongIdentity bool
+	}{
+		{name: "fresh token"}, {name: "fresh without refresh token", noRefresh: true},
+		{name: "failed repair preserves token", denied: true}, {name: "expired refreshes first", expired: true}, {name: "revoked fresh token refreshes once", revoked: true}, {name: "rotated token survives project restriction", expired: true, denied: true}, {name: "mismatched identity cannot replace tokens", expired: true, wrongIdentity: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Now()
+			tokenCalls, userCalls, loadCalls := 0, 0, 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/token":
+					tokenCalls++
+					if tc.expired && tc.denied {
+						_, _ = io.WriteString(w, `{"access_token":"access-new","refresh_token":"refresh-new","expires_in":3600}`)
+					} else {
+						_, _ = io.WriteString(w, `{"access_token":"access-new","expires_in":3600}`)
+					}
+				case "/userinfo":
+					userCalls++
+					if tc.wrongIdentity {
+						_, _ = io.WriteString(w, `{"email":"other@example.com"}`)
+					} else {
+						_, _ = io.WriteString(w, `{"email":"account@example.com"}`)
+					}
+				case "/v1internal:loadCodeAssist":
+					loadCalls++
+					if tc.revoked && r.Header.Get("Authorization") == "Bearer access-before" {
+						w.WriteHeader(http.StatusUnauthorized)
+						_, _ = io.WriteString(w, `{"error":{"message":"expired access"}}`)
+						return
+					}
+					want := "Bearer access-before"
+					if tc.expired || tc.revoked {
+						want = "Bearer access-new"
+					}
+					if r.Header.Get("Authorization") != want {
+						t.Error("project repair used the wrong access token")
+					}
+					if tc.denied {
+						_, _ = io.WriteString(w, `{"ineligibleTiers":[{"tierId":"free-tier","reasonCode":"UNSUPPORTED_LOCATION"}]}`)
+					} else {
+						_, _ = io.WriteString(w, `{"cloudaicompanionProject":"project-123","currentTier":{"id":"free-tier"}}`)
+					}
+				default:
+					t.Errorf("unexpected onboarding or network retry: %s", r.URL.Path)
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			}))
+			defer server.Close()
+			ag := &AntigravityClient{TokenURL: server.URL + "/token", UserInfoURL: server.URL + "/userinfo", CloudCodeURL: server.URL, DailyCloudCodeURL: server.URL, HTTPClient: server.Client(), Now: func() time.Time { return now }, Sleep: func(time.Duration) {}}
+			svc := NewService(t.TempDir(), WithProviderClient(ag), WithNowFunc(func() time.Time { return now }))
+			original := &Credential{Ref: "stable", Provider: config.OAuthProviderAntigravity, Email: "account@example.com", AccessToken: "access-before", RefreshToken: "refresh-before", ExpiresAt: now.Add(time.Hour), LastRefresh: now, Metadata: map[string]string{"custom": "retained", "paid_tier_id": "stale-paid"}}
+			if tc.noRefresh {
+				original.RefreshToken = ""
+			}
+			if tc.expired {
+				original.ExpiresAt = now.Add(-time.Minute)
+			}
+			if err := svc.Store().Save(original); err != nil {
+				t.Fatal(err)
+			}
+			_, err := svc.RefreshIfNeeded(context.Background(), original.Provider, original.Ref)
+			if (err != nil) != (tc.denied || tc.wrongIdentity) {
+				t.Fatalf("repair error=%v", err)
+			}
+			saved, loadErr := svc.Store().Load(original.Provider, original.Ref)
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			wantTokenCalls := 0
+			if tc.expired || tc.revoked {
+				wantTokenCalls = 1
+			}
+			wantLoadCalls := 1
+			if tc.revoked {
+				wantLoadCalls = 2
+			}
+			if tc.wrongIdentity {
+				wantLoadCalls = 0
+			}
+			if tokenCalls != wantTokenCalls || userCalls != wantTokenCalls || loadCalls != wantLoadCalls {
+				t.Fatalf("token=%d userinfo=%d load=%d", tokenCalls, userCalls, loadCalls)
+			}
+			if ((!tc.expired && !tc.revoked) || tc.wrongIdentity) && (saved.AccessToken != original.AccessToken || !saved.ExpiresAt.Equal(original.ExpiresAt) || !saved.LastRefresh.Equal(original.LastRefresh)) {
+				t.Fatal("project-only repair rotated or extended the access token")
+			}
+			if tc.denied || tc.wrongIdentity {
+				if saved.Metadata["project_id"] != "" {
+					t.Fatal("failed repair persisted a project")
+				}
+			} else if saved.Metadata["project_id"] != "project-123" || saved.Metadata["paid_tier_id"] != "" {
+				t.Fatal("repair did not install current project/tier metadata")
+			}
+			wantRefresh := original.RefreshToken
+			if tc.expired && tc.denied {
+				wantRefresh = "refresh-new"
+			}
+			if (tc.expired || tc.revoked) && !tc.wrongIdentity && (saved.AccessToken != "access-new" || !saved.LastRefresh.Equal(now) || !saved.ExpiresAt.Equal(now.Add(time.Hour))) {
+				t.Fatal("verified token refresh was lost after project setup")
+			}
+			if wantTokenCalls == 1 && !tc.wrongIdentity {
+				var serialized map[string]any
+				if err := json.Unmarshal([]byte(saved.Metadata["token_json"]), &serialized); err != nil {
+					t.Fatal(err)
+				}
+				if serialized["access_token"] != saved.AccessToken || serialized["refresh_token"] != saved.RefreshToken {
+					t.Fatal("serialized token metadata diverged from the credential")
+				}
+			}
+			if saved.Ref != original.Ref || saved.RefreshToken != wantRefresh || saved.Metadata["custom"] != "retained" {
+				t.Fatal("repair changed identity or unrelated metadata")
+			}
+		})
+	}
+}
+
 func TestRefreshIfNeededCoalescesConcurrentCallersAcrossHTTPClients(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 4, 18, 18, 0, 0, 0, time.UTC)
@@ -817,6 +995,40 @@ func TestRefreshIfNeededCoalescesConcurrentCallersAcrossHTTPClients(t *testing.T
 
 	if got := atomic.LoadInt32(&refreshCalls); got != 1 {
 		t.Fatalf("refresh calls = %d, want 1", got)
+	}
+}
+
+func TestRefreshWaiterCanCancelWithoutStoppingLeader(t *testing.T) {
+	now := time.Now()
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	client := &stubProviderClient{provider: config.OAuthProviderCodex, refreshStarted: started, refreshWait: release}
+	svc := NewService(t.TempDir(), WithProviderClient(client), WithNowFunc(func() time.Time { return now }))
+	cred := &Credential{Provider: config.OAuthProviderCodex, Ref: "stable", Email: "account@example.com", AccessToken: "access", RefreshToken: "refresh", ExpiresAt: now.Add(-time.Hour)}
+	if err := svc.Store().Save(cred); err != nil {
+		t.Fatal(err)
+	}
+	leader := make(chan error, 1)
+	go func() { _, err := svc.RefreshIfNeeded(context.Background(), cred.Provider, cred.Ref); leader <- err }()
+	<-started
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	waiter := make(chan error, 1)
+	go func() { _, err := svc.RefreshIfNeeded(ctx, cred.Provider, cred.Ref); waiter <- err }()
+	select {
+	case err := <-waiter:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("waiter error=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Error("cancelled caller waited for shared refresh")
+	}
+	close(release)
+	if err := <-leader; err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&client.refreshCalled) != 1 {
+		t.Fatal("cancelled waiter started another refresh")
 	}
 }
 

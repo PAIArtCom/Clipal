@@ -18,6 +18,43 @@ func TestAntigravityOAuthFallbackVersionMatchesCurrentRelease(t *testing.T) {
 	}
 }
 
+func TestAntigravitySetupFailureIsActionableBeforeGeneration(t *testing.T) {
+	for _, mode := range []config.ClientMode{config.ClientModeAuto, config.ClientModeManual} {
+		for _, tc := range []struct {
+			kind    string
+			status  int
+			message string
+		}{
+			{"project_required", http.StatusConflict, "requires a user-provided Google Cloud project"},
+			{"tier_unavailable", http.StatusForbidden, "UNSUPPORTED_LOCATION"},
+		} {
+			t.Run(string(mode)+"/"+tc.kind, func(t *testing.T) {
+				client := &stubGeminiOAuthClient{provider: config.OAuthProviderAntigravity, refreshErr: &oauthpkg.AntigravitySetupError{Kind: tc.kind, TierID: "standard-tier", ReasonCodes: []string{"UNSUPPORTED_LOCATION"}}}
+				svc := oauthpkg.NewService(t.TempDir(), oauthpkg.WithProviderClient(client))
+				cred := &oauthpkg.Credential{Ref: "stable", Provider: config.OAuthProviderAntigravity, Email: "account@example.com", AccessToken: "private-access", RefreshToken: "private-refresh", ExpiresAt: time.Now().Add(time.Hour)}
+				if err := svc.Store().Save(cred); err != nil {
+					t.Fatal(err)
+				}
+				cp := newClientProxy(ClientGemini, mode, "target", []config.Provider{{Name: "target", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderAntigravity, OAuthRef: cred.Ref, Priority: 1}}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+				cp.oauth = svc
+				cp.httpClient.Transport = roundTripperFunc(func(*http.Request) (*http.Response, error) {
+					t.Error("generation was sent despite failed account setup")
+					return newResponse(200, nil, `{}`), nil
+				})
+				req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-3-flash:generateContent", strings.NewReader(`{"contents":[{"parts":[{"text":"hello"}]}]}`))
+				w := httptest.NewRecorder()
+				cp.forwardWithFailover(w, req, "/v1beta/models/gemini-3-flash:generateContent")
+				if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.message) {
+					t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+				}
+				if strings.Contains(w.Body.String(), "private-") {
+					t.Fatal("account secret was disclosed")
+				}
+			})
+		}
+	}
+}
+
 func TestCreateProxyRequest_AntigravityOAuthRebuildsUpstreamContextAndWrapsGenerate(t *testing.T) {
 	dir := t.TempDir()
 	svc := oauthpkg.NewService(dir)

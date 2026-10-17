@@ -9,12 +9,18 @@
     position: sticky;
     top: 0;
     z-index: 60;
-    background: var(--material-bar);
+    /*
+     * A thin opaque title band with a hairline under it, then the tab area in
+     * translucent window colour. No rule under the tabs: they belong to the content.
+     */
+    background: linear-gradient(180deg,
+        var(--chrome-band) 0 var(--toolbar-height),
+        var(--separator) var(--toolbar-height) calc(var(--toolbar-height) + 1px),
+        var(--material-bar) calc(var(--toolbar-height) + 1px));
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
-    box-shadow: 0 0.5px 0 var(--separator);
-    /* Padding, not a child margin, so the gap counts toward the sticky height. */
-    padding-bottom: 12px;
+    /* Padding, not a child margin, so the insets count toward the sticky height (--toolbar-offset). */
+    padding-bottom: var(--tabbar-inset-bottom);
 }
 
 /* Window chrome row: brand on the left, app-level controls on the right. */
@@ -22,17 +28,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
     max-width: var(--content-width);
     height: var(--toolbar-height);
-    margin: 0 auto;
-    padding: 0 24px;
+    margin: 0 auto var(--tabbar-inset-top);
+    padding: 0 var(--page-gutter);
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: var(--space-sm);
     flex: none;
     min-width: 0;
 }
@@ -73,7 +79,7 @@
 }
 
 .brand__version {
-    padding: 1px 6px;
+    padding: var(--space-2xs) var(--space-sm);
     border-radius: var(--radius-xs);
     background: var(--fill);
     color: var(--text-secondary);
@@ -92,12 +98,13 @@
  */
 .tabbar {
     display: flex;
-    gap: 0;
-    max-width: calc(var(--content-width) - 48px);
+    /* Same edges as the page content: content width minus both gutters. */
+    width: calc(100% - 2 * var(--page-gutter));
+    max-width: calc(var(--content-width) - 2 * var(--page-gutter));
     height: var(--tabbar-height);
     margin: 0 auto;
-    padding: 3px;
-    border-radius: 12px;
+    padding: var(--space-2xs);
+    border-radius: 11px;
     background: var(--fill);
     box-shadow: var(--shadow-control-inset);
 }
@@ -108,9 +115,9 @@
     flex: 1 1 0;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: var(--space-sm);
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 var(--space-md);
     border: 0;
     border-radius: 9px;
     background: transparent;
@@ -183,7 +190,7 @@
 .toolbar__actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     flex: none;
 }
 
@@ -197,8 +204,9 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 24px;
-    margin: 4px 0 18px;
+    gap: var(--space-xl);
+    /* Closer to its own content than to the tab bar above it. */
+    margin-bottom: var(--gap-item);
 }
 
 .page-intro__title {
@@ -211,13 +219,13 @@
 .page-intro__title-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-sm);
 }
 
 .page-intro__meta {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-sm);
     flex-wrap: wrap;
     flex: none;
 }
@@ -230,8 +238,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 48px 24px;
+    gap: var(--gap-inner);
+    padding: var(--gap-section) var(--inset-group);
     border-radius: var(--radius-lg);
     background: var(--bg-content);
     box-shadow: var(--shadow-group);
@@ -252,16 +260,16 @@
 
 .empty-state__actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-sm);
     flex-wrap: wrap;
     justify-content: center;
-    margin-top: 6px;
+    margin-top: var(--space-sm);
 }
 
 .empty-state__detail {
     width: 100%;
     max-width: 640px;
-    margin-top: 8px;
+    margin-top: var(--space-sm);
     text-align: left;
 }
 
@@ -286,9 +294,9 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding: 12px 16px;
+    gap: var(--space-md);
+    margin-bottom: var(--gap-module);
+    padding: var(--inset-tile);
     border-radius: var(--radius-md);
     background: var(--warning-soft);
     box-shadow: inset 0 0 0 0.5px rgba(255, 159, 10, 0.35);
@@ -300,7 +308,7 @@
 }
 
 .connection-banner p {
-    margin: 2px 0;
+    margin: var(--space-2xs) 0;
     color: var(--text-primary);
 }
 
@@ -311,19 +319,19 @@
 /* Notification banners, top-right like macOS. */
 .toast-stack {
     position: fixed;
-    top: calc(var(--toolbar-offset) + 12px);
-    right: 16px;
+    top: calc(var(--toolbar-offset) + var(--space-md));
+    right: var(--page-gutter);
     z-index: 180;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 10px;
+    gap: var(--space-sm);
     pointer-events: none;
 }
 
 .toast {
-    width: min(360px, calc(100vw - 32px));
-    padding: 12px 14px;
+    width: min(360px, calc(100vw - 2 * var(--page-gutter)));
+    padding: var(--space-md) var(--space-lg);
     border-radius: var(--radius-lg);
     background: var(--material-popover);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
@@ -335,7 +343,7 @@
 .toast__header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .toast__badge {
@@ -356,7 +364,7 @@
 }
 
 .toast__message {
-    margin-top: 4px;
+    margin-top: var(--space-xs);
     font-size: var(--text-sm);
     line-height: var(--leading-normal);
     color: var(--text-secondary);
@@ -401,7 +409,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px 16px;
+    padding: var(--space-xl) var(--space-lg);
     background: var(--scrim);
     opacity: 0;
     pointer-events: none;
@@ -426,7 +434,7 @@
     flex-direction: column;
     width: 100%;
     max-width: 560px;
-    max-height: calc(100vh - 48px);
+    max-height: calc(100vh - 2 * var(--space-xl));
     border-radius: var(--radius-xl);
     background: var(--bg-content);
     box-shadow: var(--shadow-sheet);
@@ -456,8 +464,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 18px 20px 8px;
+    gap: var(--space-md);
+    padding: var(--inset-group) var(--inset-group) var(--gap-item);
 }
 
 .modal-header h2 {
@@ -466,15 +474,16 @@
 
 .modal-body {
     min-height: 0;
-    padding: 12px 20px 20px;
+    padding: 0 var(--inset-group) var(--inset-group);
     overflow-y: auto;
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 20px 18px;
+    gap: var(--space-md);
+    padding: var(--space-lg) var(--inset-group);
+    /* The hairline marks the edge of a scrolling body; whitespace alone would read as more content. */
     box-shadow: 0 -0.5px 0 var(--separator);
 }
 
@@ -497,8 +506,8 @@
     grid-auto-rows: max-content;
     align-content: start;
     grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
-    column-gap: 16px;
-    row-gap: 14px;
+    column-gap: var(--space-lg);
+    row-gap: var(--gap-item);
     align-items: start;
 }
 
@@ -506,7 +515,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 4px;
+    gap: var(--space-xs);
     min-height: var(--control-md);
     text-align: right;
     font-size: var(--text-sm);
@@ -527,7 +536,7 @@
 .form-inline {
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .form-input--narrow {
@@ -541,8 +550,8 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
+    gap: var(--space-md);
+    margin-top: var(--gap-inner);
 }
 
 .form-hint--inline,
@@ -550,18 +559,17 @@
     margin-top: 0;
 }
 
+/* Extra top space, not a rule, sets the overrides apart from the main fields. */
 .provider-overrides-group {
-    margin-top: 4px;
-    padding-top: 14px;
-    box-shadow: 0 -0.5px 0 var(--separator);
+    margin-top: var(--space-sm);
 }
 
 .provider-overrides-header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: var(--space-md);
+    margin-bottom: var(--gap-inner);
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
     color: var(--text-primary);
@@ -570,8 +578,8 @@
 .provider-overrides-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 16px;
-    padding: 12px;
+    gap: var(--space-md) var(--space-lg);
+    padding: var(--space-lg);
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -581,7 +589,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
+    gap: var(--gap-inner);
     min-width: 0;
 }
 
@@ -600,8 +608,8 @@
 .provider-oauth-flow {
     display: flex;
     align-items: flex-start;
-    gap: 14px;
-    padding: 16px;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -639,14 +647,14 @@
 
 .provider-oauth-flow__content {
     display: grid;
-    gap: 6px;
+    gap: var(--space-sm);
     min-width: 0;
 }
 
 .provider-oauth-flow__manual {
     display: grid;
-    gap: 12px;
-    margin-top: 8px;
+    gap: var(--space-md);
+    margin-top: var(--space-sm);
 }
 
 .provider-oauth-flow__input,
@@ -656,7 +664,7 @@
 }
 
 .provider-oauth-flow__manual-error {
-    margin-top: 6px;
+    margin-top: var(--space-xs);
     font-size: var(--text-xs);
     color: var(--danger-text);
 }
@@ -703,16 +711,7 @@
 /* ---------- Responsive ---------- */
 
 @media (max-width: 760px) {
-    .toolbar__inner {
-        padding: 0 16px;
-    }
-
     /* Compact tabs: unselected sections collapse to their glyph. */
-    .tabbar {
-        max-width: none;
-        margin: 0 16px;
-    }
-
     .tab:not(.active) {
         flex: 0 0 44px;
         padding: 0;
@@ -735,7 +734,7 @@
     .page-intro {
         flex-direction: column;
         align-items: flex-start;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .page-intro__title {
@@ -743,8 +742,8 @@
     }
 
     .toast-stack {
-        left: 16px;
-        right: 16px;
+        left: var(--page-gutter);
+        right: var(--page-gutter);
         align-items: stretch;
     }
 
@@ -773,13 +772,14 @@
 
     .form-horizontal-grid {
         grid-template-columns: minmax(0, 1fr);
-        row-gap: 6px;
+        row-gap: var(--gap-inner);
     }
 
+    /* Label to control is one inner gap; label to the previous field is the item gap. */
     .form-horizontal-grid > .form-label {
         justify-content: flex-start;
         min-height: 0;
-        margin-top: 8px;
+        margin-top: calc(var(--gap-item) - var(--gap-inner));
         text-align: left;
     }
 
@@ -801,7 +801,7 @@
 .unit-field {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-sm);
     min-width: 0;
 }
 .unit-field > .form-input { flex: 1 1 80px; min-width: 0; width: 0; }
@@ -814,17 +814,10 @@
     .toast__close { min-width: 44px; min-height: 44px; opacity: 1; }
     .form-input, .form-select { min-height: 44px; }
     .switch { min-width: 44px; height: 44px; }
-    .switch .slider { width: 38px; height: 22px; left: 3px; top: 11px; right: auto; bottom: auto; }
-    .switch--sm .slider { width: 30px; height: 18px; left: 7px; top: 13px; }
+    /* The track keeps its size, centred in the 44px hit area. */
+    .switch .slider { width: 38px; height: 22px; margin: auto; }
+    .switch--sm .slider { width: 30px; height: 18px; }
     .checkbox-label, .form-label:has(> input[type="checkbox"]) { min-height: 44px; }
-}
-
-/* Touch screens: 44px-tall tabs for comfortable tapping. */
-@media (pointer: coarse) {
-    :root {
-        --tabbar-height: 44px;
-        --toolbar-offset: calc(var(--toolbar-height) + var(--tabbar-height) + 12px);
-    }
 }
 
 .connection-banner > div {

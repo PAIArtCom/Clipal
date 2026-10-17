@@ -210,9 +210,12 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 默认值不会覆盖目标模型支持的客户端显式字段。如果请求中已经带了 `tools`、Claude `thinking` / `context_management` / `output_config`，或 Codex `reasoning` / `tool_choice` / `parallel_tool_calls`，Clipal 会保留这些值；不支持相关能力的 Claude 模型仍可能移除不兼容的 thinking/output 控制。
 - OAuth provider 不允许设置 `base_url`、`api_key`、`api_keys`
 - 推荐在 Web UI 里，在对应客户端页面通过 `Add Provider -> OAuth -> Codex`、`Claude` 或 `Antigravity` 直接发起授权
+- Antigravity 授权需要 Code Assist 返回、开户完成后分配或用户明确提供的非空项目 ID。所选档位若有 `userDefinedCloudaicompanionProject: true`，就需要用户拥有权限的项目，Clipal 不会对该档位尝试托管项目开户。现有项目选择依次使用 `CLIPAL_OAUTH_ANTIGRAVITY_PROJECT_ID`、`GOOGLE_CLOUD_PROJECT`／`GOOGLE_CLOUD_PROJECT_ID` 或已保存的项目元数据。其他档位的限制不会否定已分配的项目或可用的所选档位。请求地区偏好不能证明 Google 账号资格。
+- Antigravity 开户会在同一服务地址轮询命名 operation，保留自身客户端身份、检查 operation 错误，并拒绝项目为空的完成结果。未命名的待完成响应会有限重试。已有凭证缺少项目元数据时，有效 access token 直接用于补全元数据，不额外换 token 或延长 token 寿命；没有 refresh token 的有效凭证也可补全。过期或被拒绝的 access token 才需刷新。补全成功保留 Provider 关联与账号偏好，仅补项目失败时不覆盖原凭证。已有账号若已成功刷新 token，且 userinfo 确认身份一致，即使随后遇到已知项目／资格限制，也会保存刷新结果，保留轮换后的 refresh token；仍返回初始化错误，不虚构项目，也不会将缺少可用项目的新授权保存为成功账号。
+- 已知的 Antigravity 初始化限制会在模型生成前返回：需要用户项目为 HTTP 409，所选档位不可用或需要账号验证为 HTTP 403。自动路由仍可选择其他可用 Provider；只有本次没有 Provider 能继续、且失败均为已知初始化限制时，才返回相应错误。公开错误只包含初始化事实和原因码，不包含凭据、原始上游响应或验证链接。
 - Add Provider 对话框也可以导入已有 OAuth 授权文件：Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。导入时会按当前选择的 OAuth 服务过滤账号。
 - 授权成功后，后端会根据账号身份生成稳定的内部 `name`，UI 里显示邮箱作为可读标签
-- OAuth 请求配置保存在凭据 `request_environment` 中。添加账号默认 US / `America/New_York`，来源为 `default` 或 `user`；导入保留原值，旧地区需要确认。代理使用 provider、全局和环境配置及 `NO_PROXY`，不探测控制器。账号 DNS 的 `auto` 有标准代理时由代理解析，无显式代理时使用 Cloudflare → Google DoH。保存的 `cloudflare`／`google` 值选择无代理时的 DNS 及可选诊断服务，不启用严格代理预检。代理 DoH 参考检查仅是单次诊断选项，不作为账号配置保存。见 [Web UI](web-ui.md#oauth-账号请求环境)。
+- OAuth 请求配置保存在凭据 `request_environment` 中。添加账号默认 US / `America/New_York`，来源为 `default` 或 `user`；导入保留原值，旧地区需要确认。代理使用 provider、全局、环境和系统配置及 `NO_PROXY`，不探测控制器。账号 DNS 的 `auto` 有标准代理时由代理解析；无代理入口时优先尝试 Cloudflare → Google DoH 及目标 IP，解析或连接建立失败后回退系统域名通路。Clipal 调整自身连接路径，不修改用户网络配置。保存的 `cloudflare`／`google` 值选择无代理时的 DNS 及可选诊断服务，不启用严格代理预检。代理 DoH 参考检查仅是单次诊断选项，不作为账号配置保存。见 [Web UI](web-ui.md#oauth-账号请求环境)。
 - OAuth 凭据不写入 YAML，而是保存在 `~/.clipal/oauth/<provider>/<email>--<oauth_ref>.json`
 - 只要存在 `refresh_token`，Clipal 会在 access token 临近过期时自动刷新；如果上游先返回 `401`，也会强制 refresh 后再重试一次
 - 已创建的 OAuth provider 可以像普通 provider 一样排序、置顶、启停，但凭据修改需要重新授权，不走通用编辑表单
@@ -222,7 +225,8 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 只有一个 key 时用 `api_key`
 - 需要同 provider 多 key 轮转时用 `api_keys`
 - 需要统一默认代理时，优先配置全局 `upstream_proxy_mode` / `upstream_proxy_url`，并让 provider 使用 `proxy_mode: default`
-- 需要让某个 provider 绕过全局默认代理和环境代理时，用 `proxy_mode: direct`
+- 需要让某个 provider 绕过全局默认代理、环境代理和系统代理时，用 `proxy_mode: direct`
+- `environment` 按目标协议依次使用 HTTP_PROXY／HTTPS_PROXY（含小写形式）、ALL_PROXY 和系统设置；NO_PROXY 同时适用于环境与系统代理。macOS 原生构建通过 CFNetwork 支持 SOCKS、例外规则和 PAC；Windows 使用 WinHTTP；Linux 在可用时读取 GNOME 手动代理，否则沿用环境变量。macOS 非 CGO 构建通过 scutil 支持静态代理。GNOME PAC 明确报不支持，不绕过代理。显式 direct／custom 优先。每次请求只读取设置，不修改网络或探测代理软件。
 - 不同上游对同一模型族使用不同模型 ID 时，可为该 provider 配置 `model`
 - 只有在你希望 Clipal 按 provider 覆盖客户端默认思考参数时，才配置 `reasoning_effort` 或 `thinking_budget_tokens`
 - Google AI Studio / Gemini API key provider 使用 `https://generativelanguage.googleapis.com`。Clipal 会透传 Gemini 的 `generateContent`、流式生成、token 计数、embeddings、Imagen/Veo `predict*`、文件、cached contents、tuned models、`interactions`、batches、operations、file search stores、generated files、corpora、auth tokens、agents 和 webhooks，不改写请求体。Gemini Live API WebSocket 代理暂不支持。

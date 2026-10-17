@@ -24,6 +24,23 @@ type dialTransport interface {
 	WithDialContext(DialContext) http.RoundTripper
 }
 type endpoint struct{ url, bootstrap string }
+type requestDeadlineKey struct{}
+
+// net/http detaches dial contexts from the request deadline so connections can
+// be reused. Account DNS and bootstrap attempts still need that shared budget.
+func preserveRequestDeadline(req *http.Request) *http.Request {
+	if deadline, ok := req.Context().Deadline(); ok {
+		return req.WithContext(context.WithValue(req.Context(), requestDeadlineKey{}, deadline))
+	}
+	return req
+}
+
+func restoreRequestDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+	if deadline, ok := ctx.Value(requestDeadlineKey{}).(time.Time); ok {
+		return context.WithDeadline(ctx, deadline)
+	}
+	return ctx, func() {}
+}
 
 var endpoints = map[string]endpoint{
 	"cloudflare": {"https://cloudflare-dns.com/dns-query", "1.1.1.1"},
@@ -34,12 +51,14 @@ type answer struct {
 	ips     []net.IP
 	until   time.Time
 	service string
+	err     error
 }
 type resolver struct {
 	client   *http.Client
 	endpoint string
 	mu       sync.Mutex
 	cache    map[string]answer
+	pending  map[string]*lookupCall
 	fallback *resolver
 	service  string
 }
@@ -58,61 +77,106 @@ func newRouteResolver(dns string, route *url.URL, dial DialContext, roots *x509.
 	t := base.Clone()
 	t.Proxy = nil
 	t.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
+	//nolint:staticcheck // A custom default transport must not bypass bootstrap routing.
+	t.DialTLS = nil
+	t.DialTLSContext = nil
 	t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, err
+		return dialRoute(ctx, addr, route, dial, roots)
+	}
+	if !domain {
+		// Only the public DoH service hostname uses system bootstrap DNS.
+		// Target names remain in encrypted queries, including on TUN networks.
+		t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			ctx, cancel := restoreRequestDeadline(ctx)
+			defer cancel()
+			return dialDoHBootstrap(ctx, addr, e.bootstrap, dial, t.TLSClientConfig)
 		}
-		// All standard proxy routes retain the service domain for DNS/routing.
-		// Other routes bootstrap by fixed IP; TLS verification is unchanged.
-		bootstrap := e.bootstrap
-		if domain {
-			bootstrap = host
-		}
-		return dialRoute(ctx, net.JoinHostPort(bootstrap, port), route, dial, roots)
 	}
 	return &resolver{client: &http.Client{Transport: t, Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, endpoint: e.url, cache: map[string]answer{}, service: dns}
 }
 
-func (r *resolver) lookupService(ctx context.Context, host string) ([]net.IP, error) {
+// Verify the service's original TLS name on both bootstrap paths. Reserving
+// time for the fixed IP prevents a stalled system lookup or TLS handshake
+// from consuming the entire resolver budget.
+func dialDoHBootstrap(ctx context.Context, address, fixedIP string, dial DialContext, config *tls.Config) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	var lastErr error
+	for index, bootstrap := range []string{host, fixedIP} {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		attemptCtx := ctx
+		cancel := func() {}
+		if index == 0 {
+			budget := 3 * time.Second
+			if deadline, ok := ctx.Deadline(); ok {
+				budget = time.Until(deadline) * 3 / 4
+			}
+			attemptCtx, cancel = context.WithTimeout(ctx, budget)
+		}
+		conn, err := dial(attemptCtx, "tcp", net.JoinHostPort(bootstrap, port))
+		if err == nil {
+			conn, err = handshakeTLS(attemptCtx, conn, host, config)
+			if err == nil {
+				cancel()
+				return conn, nil
+			}
+		}
+		cancel()
+		if conn != nil {
+			_ = conn.Close()
+		}
+		lastErr = err
+	}
+	return nil, fmt.Errorf("DoH service hostname and fixed IP bootstrap failed: %w", lastErr)
+}
+
+func (r *resolver) lookupService(ctx context.Context, host string) (answer, error) {
 	if ip := net.ParseIP(host); ip != nil {
-		return []net.IP{ip}, nil
+		return answer{ips: []net.IP{ip}, until: time.Now().Add(5 * time.Minute), service: r.service}, nil
 	}
 	var ips []net.IP
-	ttl := uint32(300)
+	var until time.Time
 	for _, typ := range []dnsmessage.Type{dnsmessage.TypeA, dnsmessage.TypeAAAA} {
 		name, err := dnsmessage.NewName(host + ".")
 		if err != nil {
-			return nil, fmt.Errorf("invalid DNS name")
+			return answer{}, fmt.Errorf("invalid DNS name")
 		}
 		msg := dnsmessage.Message{Header: dnsmessage.Header{RecursionDesired: true}, Questions: []dnsmessage.Question{{Name: name, Type: typ, Class: dnsmessage.ClassINET}}}
 		wire, err := msg.Pack()
 		if err != nil {
-			return nil, err
+			return answer{}, err
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint, bytes.NewReader(wire))
 		if err != nil {
-			return nil, err
+			return answer{}, err
 		}
 		req.Header.Set("Content-Type", "application/dns-message")
 		req.Header.Set("Accept", "application/dns-message")
 		req.Header["User-Agent"] = nil
-		resp, err := r.client.Do(req)
+		resp, err := r.client.Do(preserveRequestDeadline(req))
 		if err != nil {
-			return nil, fmt.Errorf("account DoH connection failed")
+			return answer{}, fmt.Errorf("account DoH connection failed: %w", err)
 		}
 		data, readErr := io.ReadAll(io.LimitReader(resp.Body, 65537))
 		_ = resp.Body.Close()
 		if readErr != nil || len(data) > 65536 || resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("account DoH returned an invalid response")
+			return answer{}, fmt.Errorf("account DoH returned an invalid response")
 		}
 		var result dnsmessage.Message
 		if err := result.Unpack(data); err != nil || !result.Response || result.RCode != dnsmessage.RCodeSuccess || len(result.Questions) != 1 || result.Questions[0] != msg.Questions[0] {
-			return nil, fmt.Errorf("account DoH lookup failed")
+			return answer{}, fmt.Errorf("account DoH lookup failed")
 		}
+		received := time.Now()
 		for _, a := range result.Answers {
-			if a.Header.TTL < ttl {
-				ttl = a.Header.TTL
+			// Each DNS response ages from its own receipt. Waiting for AAAA
+			// must not renew an earlier A/CNAME answer's lifetime.
+			expiry := received.Add(time.Duration(min(a.Header.TTL, uint32(300))) * time.Second)
+			if until.IsZero() || expiry.Before(until) {
+				until = expiry
 			}
 			switch value := a.Body.(type) {
 			case *dnsmessage.AResource:
@@ -123,15 +187,9 @@ func (r *resolver) lookupService(ctx context.Context, host string) ([]net.IP, er
 		}
 	}
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("account DoH returned no addresses")
+		return answer{}, fmt.Errorf("account DoH returned no addresses")
 	}
-	r.mu.Lock()
-	if len(r.cache) >= 256 {
-		r.cache = map[string]answer{}
-	}
-	r.cache[host] = answer{ips: ips, until: time.Now().Add(time.Duration(ttl) * time.Second), service: r.service}
-	r.mu.Unlock()
-	return ips, nil
+	return answer{ips: ips, until: until, service: r.service}, nil
 }
 
 type transport struct {
@@ -217,10 +275,15 @@ func (t *transport) route(req *http.Request) (*routeTransport, error) {
 		r = newRouteResolver(t.dns, proxy, t.dial, t.proxyRoots, domain)
 	}
 	dial := DialContext(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		ctx, cancel := restoreRequestDeadline(ctx)
+		defer cancel()
 		// Standard proxies own target resolution. Public DoH is only queried by
 		// an explicit diagnostic Lookup; it never gates a proxy connection.
 		if proxy != nil || r == nil {
 			return dialRoute(ctx, addr, proxy, t.dial, t.proxyRoots)
+		}
+		if t.dns == "auto" {
+			return connectAutomatically(ctx, addr, t.dial, r, nil)
 		}
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -242,6 +305,19 @@ func (t *transport) route(req *http.Request) (*routeTransport, error) {
 		//nolint:staticcheck // Clear the deprecated hook too, so it cannot bypass account DNS.
 		clone.DialTLS = nil
 		clone.DialContext = dial
+		if t.dns == "auto" && proxy == nil {
+			clone.DialTLSContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+				ctx, cancel := restoreRequestDeadline(ctx)
+				defer cancel()
+				host, _, err := net.SplitHostPort(address)
+				if err != nil {
+					return nil, err
+				}
+				return connectAutomatically(ctx, address, t.dial, r, func(ctx context.Context, conn net.Conn) (net.Conn, error) {
+					return handshakeTLS(ctx, conn, host, clone.TLSClientConfig)
+				})
+			}
+		}
 		rt = clone
 	} else {
 		custom, ok := t.base.(dialTransport)
@@ -259,7 +335,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return route.rt.RoundTrip(req)
+	return route.rt.RoundTrip(preserveRequestDeadline(req))
 }
 func (t *transport) CloseIdleConnections() {
 	t.mu.Lock()
@@ -295,17 +371,8 @@ func Lookup(ctx context.Context, client *http.Client, target string) ([]net.IP, 
 	return route.resolver.lookup(ctx, req.URL.Hostname())
 }
 
-func (r *resolver) lookup(ctx context.Context, host string) ([]net.IP, error) {
-	host = strings.TrimSuffix(strings.ToLower(host), ".")
-	if ip := net.ParseIP(host); ip != nil {
-		return []net.IP{ip}, nil
-	}
-	r.mu.Lock()
-	cached := r.cache[host]
-	r.mu.Unlock()
-	if time.Now().Before(cached.until) {
-		return cached.ips, nil
-	}
+// queryUncached retains Cloudflare -> Google priority inside one shared lookup.
+func (r *resolver) queryUncached(ctx context.Context, host string) (answer, error) {
 	primaryTimeout := 5 * time.Second
 	if deadline, ok := ctx.Deadline(); ok && r.fallback != nil {
 		if remaining := time.Until(deadline) / 2; remaining < primaryTimeout {
@@ -319,22 +386,18 @@ func (r *resolver) lookup(ctx context.Context, host string) ([]net.IP, error) {
 		return ips, err
 	}
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return answer{}, ctx.Err()
 	}
 	queryCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	primaryErr := err
 	ips, err = r.fallback.lookupService(queryCtx, host)
 	if err != nil {
-		return nil, fmt.Errorf("cloudflare and google account DoH both failed")
+		return answer{}, fmt.Errorf("cloudflare and google account DoH both failed: cloudflare: %v; google: %w", primaryErr, err)
 	}
-	r.fallback.mu.Lock()
-	fallback := r.fallback.cache[host]
-	r.fallback.mu.Unlock()
-	r.mu.Lock()
-	r.cache[host] = fallback
-	r.mu.Unlock()
 	return ips, nil
 }
+
 func (r *resolver) closeIdleConnections() {
 	r.client.CloseIdleConnections()
 	if r.fallback != nil {

@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -318,4 +319,101 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestAntigravityCredentialFromTokenRequiresUsableProject(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("GOOGLE_CLOUD_PROJECT_ID", "")
+	for _, tc := range []struct {
+		name, load, onboard, requested, wantProject, wantError string
+		operations                                             []string
+		pending                                                []string
+		camel                                                  bool
+	}{
+		{name: "assigned", load: `{"cloudaicompanionProject":"project-123"}`, wantProject: "project-123"},
+		{name: "onboarded", load: `{}`, onboard: `{"done":true,"response":{"cloudaicompanionProject":{"id":"project-123"}}}`, wantProject: "project-123"},
+		{name: "unnamed pending camel compatibility", load: `{}`, onboard: `{"done":false}`, pending: []string{`{"done":true,"response":{"cloudaicompanionProject":"project-123"}}`}, camel: true, wantProject: "project-123"},
+		{name: "empty completion", load: `{}`, onboard: `{"done":true,"response":{}}`, wantError: "project_id"},
+		{name: "ineligible location", load: `{"ineligibleTiers":[{"tierId":"free-tier","reasonCode":"UNSUPPORTED_LOCATION","reasonMessage":"Not available in your location."}]}`, wantError: "UNSUPPORTED_LOCATION"},
+		{name: "other tier ineligible", load: `{"cloudaicompanionProject":"project-123","ineligibleTiers":[{"reasonCode":"UNSUPPORTED_LOCATION"}]}`, wantProject: "project-123"},
+		{name: "standard tier needs supplied project", load: `{"allowedTiers":[{"id":"standard-tier","isDefault":true,"userDefinedCloudaicompanionProject":true}],"ineligibleTiers":[{"tierId":"free-tier","reasonCode":"UNSUPPORTED_LOCATION"}]}`, wantError: "requires a user-provided Google Cloud project"},
+		{name: "supplied standard project", load: `{"allowedTiers":[{"id":"standard-tier","isDefault":true,"userDefinedCloudaicompanionProject":true}]}`, requested: "configured-project", wantProject: "configured-project"},
+		{name: "another tier restriction does not block onboarding", load: `{"allowedTiers":[{"id":"free-tier","isDefault":true}],"ineligibleTiers":[{"tierId":"g1-pro-tier","reasonCode":"SUBSCRIPTION_REQUIRED"}]}`, onboard: `{"done":true,"response":{"cloudaicompanionProject":"project-123"}}`, wantProject: "project-123"},
+		{name: "poll named operation", load: `{}`, onboard: `{"name":"operations/test-123","done":false}`, operations: []string{`{"name":"operations/test-123","done":false}`, `{"name":"operations/test-123","done":true,"response":{"cloudaicompanionProject":"project-123"}}`}, wantProject: "project-123"},
+		{name: "failed operation", load: `{}`, onboard: `{"name":"operations/test-123","done":false}`, operations: []string{`{"done":true,"error":{"code":7,"message":"permission denied"},"response":{"cloudaicompanionProject":"must-not-save"}}`}, wantError: "permission denied"},
+		{name: "failed initial operation", load: `{}`, onboard: `{"done":true,"error":{"code":7,"message":"permission denied"}}`, wantError: "permission denied"},
+		{name: "account validation", load: `{"ineligibleTiers":[{"tierId":"free-tier","reasonCode":"VALIDATION_REQUIRED"}]}`, wantError: "validation"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			onboardCalls, operationCalls, compatibilityCalls := 0, 0, 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/userinfo":
+					_, _ = io.WriteString(w, `{"email":"account@example.com"}`)
+				case "/v1internal:loadCodeAssist":
+					_, _ = io.WriteString(w, tc.load)
+				case "/v1internal:onboardUser":
+					var payload map[string]any
+					if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+						t.Error(err)
+					}
+					if tc.camel && payload["tierId"] == nil {
+						compatibilityCalls++
+						w.WriteHeader(http.StatusBadRequest)
+						_, _ = io.WriteString(w, `{"error":"use tierId"}`)
+						return
+					}
+					onboardCalls++
+					if tc.onboard == "" {
+						t.Error("unexpected onboarding for supplied project or deterministic setup requirement")
+					}
+					if onboardCalls > 1 && onboardCalls-2 < len(tc.pending) {
+						_, _ = io.WriteString(w, tc.pending[onboardCalls-2])
+					} else {
+						_, _ = io.WriteString(w, tc.onboard)
+					}
+				case "/v1internal/operations/test-123":
+					if r.Method != http.MethodGet || r.Header.Get("User-Agent") != antigravityUserAgent() {
+						t.Errorf("operation method/identity: %s %s", r.Method, r.Header.Get("User-Agent"))
+					}
+					if operationCalls >= len(tc.operations) {
+						t.Error("unexpected operation retry")
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					_, _ = io.WriteString(w, tc.operations[operationCalls])
+					operationCalls++
+				default:
+					t.Errorf("unexpected path %q", r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+			client := &AntigravityClient{UserInfoURL: server.URL + "/userinfo", CloudCodeURL: server.URL, DailyCloudCodeURL: server.URL, ProjectID: tc.requested, HTTPClient: server.Client(), Sleep: func(time.Duration) {}}
+			cred, err := client.credentialFromToken(context.Background(), &geminiTokenResponse{AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 3600}, nil)
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) || cred != nil {
+					t.Fatalf("credential present=%v error=%v, want %q", cred != nil, err, tc.wantError)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if cred.AccountID != tc.wantProject || cred.Metadata["project_id"] != tc.wantProject {
+					t.Fatalf("project not populated: account=%q metadata=%q", cred.AccountID, cred.Metadata["project_id"])
+				}
+			}
+			wantOnboard := 0
+			if tc.onboard != "" {
+				wantOnboard = 1 + len(tc.pending)
+			}
+			if tc.camel && compatibilityCalls != 1 {
+				t.Errorf("compatibility retries=%d, want 1", compatibilityCalls)
+			}
+			if onboardCalls != wantOnboard || operationCalls != len(tc.operations) {
+				t.Fatalf("onboard=%d operations=%d", onboardCalls, operationCalls)
+			}
+		})
+	}
 }

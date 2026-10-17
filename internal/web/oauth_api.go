@@ -1080,22 +1080,6 @@ func (a *API) oauthHTTPClientForTarget(target oauthTargetClient, oauthProvider c
 	if err != nil {
 		return nil
 	}
-	globalMode := cfg.Global.NormalizedUpstreamProxyMode()
-	if target.ProxyConfigured && target.ProxyMode == config.ProviderProxyModeDirect && oauthProvider == config.OAuthProviderClaude {
-		return nil
-	}
-	if !target.ProxyConfigured && globalMode == config.GlobalUpstreamProxyModeDirect && oauthProvider == config.OAuthProviderClaude {
-		return nil
-	}
-	if !target.ProxyConfigured {
-		switch globalMode {
-		case config.GlobalUpstreamProxyModeDirect, config.GlobalUpstreamProxyModeCustom:
-		default:
-			if !proxypkg.OAuthProviderUsesEnvironmentProxy(oauthProvider) {
-				return nil
-			}
-		}
-	}
 	provider := config.Provider{
 		Name:          "oauth-session",
 		OAuthProvider: oauthProvider,

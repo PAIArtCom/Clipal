@@ -6,89 +6,47 @@
 
 /* ========== Providers ========== */
 
+/* One toolbar row: client picker, routing mode and candidate | search, add. */
 .providers-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: var(--space-md) var(--space-xl);
+    margin-bottom: var(--gap-item);
 }
 
-.providers-bar > .segmented-group .segment-btn {
-    min-height: 28px;
-    padding: 0 18px;
-}
-
-.providers-bar__end {
+.providers-bar__start {
     display: flex;
     align-items: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-xl);
+    min-width: 0;
 }
 
-.provider-empty {
+.providers-bar__routing {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 56px 24px;
-    border-radius: var(--radius-lg);
-    background: var(--bg-content);
-    box-shadow: var(--shadow-group);
-    text-align: center;
+    gap: var(--space-sm);
+    min-width: 0;
 }
 
-.provider-empty__title {
-    font-size: var(--text-md);
-    font-weight: var(--font-semibold);
-    color: var(--text-primary);
-}
-
-.provider-empty__hint {
+.providers-bar__candidate {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 0;
+    margin-left: var(--space-sm);
     font-size: var(--text-sm);
     color: var(--text-secondary);
 }
 
-/* Panel: routing header + rows, one content group. */
-.provider-panel {
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    background: var(--bg-content);
-    box-shadow: var(--shadow-group);
-}
-
-.provider-panel__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px 24px;
-    padding: 10px 14px;
-    background: var(--bg-subtle);
-    box-shadow: 0 0.5px 0 var(--separator);
-}
-
-.provider-panel__routing {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-}
-
-.provider-panel__candidate {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    font-size: var(--text-sm);
-}
-
-.provider-panel__candidate .ic {
+.providers-bar__candidate .ic {
     color: var(--accent);
 }
 
-.provider-panel__candidate strong {
-    max-width: 320px;
+.providers-bar__candidate strong {
+    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -96,53 +54,117 @@
     color: var(--text-primary);
 }
 
+.providers-bar__end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+/*
+ * Second level: a macOS tab view. The client tabs sit centred on the top edge
+ * of a recessed panel; everything inside the panel belongs to the selected
+ * client (routing, search, add, the list and the inspector).
+ */
+.client-tabview {
+    --client-tabs-height: 32px;   /* 28px tabs + track inset */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.client-tabview__tabs {
+    position: relative;
+    z-index: 1;
+    /* Half the tabs overlap the panel edge. */
+    margin-bottom: calc(-1 * var(--client-tabs-height) / 2);
+    background: var(--bg-window);
+    box-shadow: var(--shadow-control-inset), 0 0 0 0.5px var(--separator);
+}
+
+.client-tabview__tabs::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--fill);
+}
+
+.client-tabview__tabs .segment-btn {
+    min-height: 28px;
+    min-width: 96px;
+    padding: 0 var(--space-lg);
+}
+
+.client-tabview__body {
+    align-self: stretch;
+    min-width: 0;
+    padding: calc(var(--client-tabs-height) / 2 + var(--space-xl)) var(--inset-group) var(--inset-group);
+    border-radius: var(--radius-xl);
+    background: var(--fill-hover);
+    box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+
+/*
+ * List and inspector side by side: the list stays short and scannable, the
+ * selected provider's details get the room. Narrow screens show one at a time.
+ */
+.provider-split {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    gap: var(--gap-module);
+    align-items: start;
+}
+
+.provider-panel {
+    padding: var(--space-xs);
+    border-radius: var(--radius-lg);
+    background: var(--bg-content);
+    box-shadow: var(--shadow-group);
+}
+
 .provider-panel__note {
-    padding: 20px 16px;
+    padding: var(--inset-tile);
     font-size: var(--text-sm);
     color: var(--text-secondary);
 }
 
-/* Rows separated by inset hairlines, as in a macOS grouped list. */
+/* Rows are separated by space, not rules; the selection is a rounded plate. */
+.provider-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+}
+
 .provider-row {
-    position: relative;
-    background: var(--bg-content);
-}
-
-.provider-row + .provider-row::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 44px;
-    right: 0;
-    height: 0.5px;
-    background: var(--separator);
-}
-
-.provider-row__main {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) 160px 64px auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px;
-    min-height: 56px;
-    padding: 8px 12px 8px 10px;
+    gap: var(--space-sm);
+    min-height: 52px;
+    padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xs);
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: background-color var(--dur-fast) var(--ease);
 }
 
-.provider-row__main:hover,
-.provider-row.is-expanded .provider-row__main {
+.provider-row:hover {
     background: var(--fill-hover);
+}
+
+.provider-row.is-selected {
+    background: var(--accent-soft);
 }
 
 .provider-drag-handle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
+    width: 20px;
     height: 28px;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--text-quaternary);
     cursor: grab;
@@ -150,7 +172,7 @@
     transition: color var(--dur-fast) var(--ease);
 }
 
-.provider-row__main:hover .provider-drag-handle:not(:disabled) {
+.provider-row:hover .provider-drag-handle:not(:disabled) {
     color: var(--text-secondary);
 }
 
@@ -159,11 +181,19 @@
     opacity: 0.4;
 }
 
+/* The name block is the row's keyboard target; the row itself takes mouse clicks. */
 .provider-row__name {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-2xs);
     min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
 .provider-row__title {
@@ -178,21 +208,20 @@
 .provider-row__meta {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-sm);
     min-width: 0;
     font-size: var(--text-xs);
     color: var(--text-secondary);
     white-space: nowrap;
 }
 
-.provider-row__meta > span:last-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
+.provider-row.is-disabled .provider-row__name {
+    opacity: 0.5;
 }
 
 .provider-row__tag {
     flex: none;
-    padding: 0 5px;
+    padding: 0 var(--space-xs);
     border-radius: 4px;
     background: var(--fill);
     color: var(--text-secondary);
@@ -202,20 +231,20 @@
     line-height: 1.7;
 }
 
-.provider-row.is-disabled .provider-row__name {
-    opacity: 0.5;
-}
-
+/* Runtime state: dot + label, toned. Used in rows and in the inspector header. */
 .provider-row__state {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-xs);
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--text-sm);
     color: var(--text-secondary);
+}
+
+.provider-row__state > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .provider-row__state.is-primary { color: var(--accent); font-weight: var(--font-medium); }
@@ -224,47 +253,6 @@
 .provider-row__state.is-info { color: var(--accent); }
 .provider-row__state.is-idle,
 .provider-row__state.is-off { color: var(--text-tertiary); }
-
-.provider-row__spend {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    color: var(--text-secondary);
-}
-
-.provider-row__actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.provider-row__actions .switch {
-    margin-right: 8px;
-}
-
-/* Secondary actions stay quiet until the row is hovered, focused or expanded. */
-.provider-row__actions .row-icon:not(.is-active):not(.provider-row__chevron) {
-    opacity: 0;
-}
-
-.provider-row__main:hover .row-icon,
-.provider-row__main:focus-within .row-icon,
-.provider-row.is-expanded .row-icon {
-    opacity: 1 !important;
-}
-
-.provider-row__main:hover .row-icon:disabled,
-.provider-row__main:focus-within .row-icon:disabled,
-.provider-row.is-expanded .row-icon:disabled {
-    opacity: 0.35 !important;
-}
-
-@media (hover: none) {
-    .provider-row__actions .row-icon:not(.is-active):not(.provider-row__chevron) {
-        opacity: 1;
-    }
-}
 
 .provider-row__pin.is-active {
     color: var(--warning-text);
@@ -275,140 +263,219 @@
     fill: currentColor;
 }
 
-.provider-row__chevron .ic {
-    transition: transform var(--dur) var(--ease-spring);
-}
+/* ---------- Inspector ---------- */
 
-.provider-row.is-expanded .provider-row__chevron .ic {
-    transform: rotate(180deg);
-}
-
-.provider-row__details {
+.provider-inspector {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 4px 16px 16px 46px;
-    background: var(--fill-hover);
-}
-
-.provider-row__reason {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 0;
-    padding: 10px 12px;
-    border-radius: var(--radius-md);
-    background: var(--danger-soft);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
-
-.provider-row__reason .ic {
-    margin-top: 1px;
-    color: var(--danger);
-}
-
-/* Small widgets: label with glyph, one prominent value, one quiet line. */
-.detail-tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 10px;
-}
-
-.detail-tile,
-.detail-card,
-.detail-list {
-    border-radius: var(--radius-md);
+    gap: var(--gap-module);
+    min-width: 0;
+    padding: var(--inset-group);
+    border-radius: var(--radius-lg);
     background: var(--bg-content);
     box-shadow: var(--shadow-group);
 }
 
-.detail-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    padding: 12px 14px;
+/* Only narrow screens push the inspector over the list and need a way back. */
+.provider-inspector__back {
+    display: none;
+    align-self: flex-start;
+    margin: calc(-1 * var(--space-sm)) 0 calc(-1 * var(--space-sm)) calc(-1 * var(--space-sm));
+    padding: 0 var(--space-sm);
 }
 
-.detail-tile__label {
+.provider-inspector__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-lg);
+}
+
+.provider-inspector__identity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+
+.provider-inspector__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+}
+
+.provider-inspector__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-sm);
+    min-width: 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.provider-inspector__host {
+    overflow-wrap: anywhere;
+}
+
+.provider-inspector__actions {
+    display: flex;
+    align-items: center;
+    flex: none;
+    gap: var(--space-2xs);
+}
+
+.provider-inspector__reason {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--inset-tile);
+    border-radius: var(--radius-md);
+    background: var(--danger-soft);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.provider-inspector__reason .ic {
+    /* Centre the glyph on the first text line. */
+    margin-top: calc((1lh - 16px) / 2);
+    color: var(--danger);
+}
+
+/* Cooling down and recovery are temporary: amber, not red. */
+.provider-inspector__reason.is-warn,
+.provider-inspector__reason.is-info {
+    background: var(--warning-soft);
+}
+
+.provider-inspector__reason.is-warn .ic,
+.provider-inspector__reason.is-info .ic {
+    color: var(--warning);
+}
+
+.provider-inspector__reason-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    min-width: 0;
+}
+
+.provider-inspector__reason-text strong {
+    font-weight: var(--font-semibold);
+}
+
+/* The upstream's own error text: secondary, wrapped, never widening the panel. */
+.provider-inspector__reason-message {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+/* Key figures: three fixed columns separated by space, no boxes. */
+.inspector-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--gap-item);
+}
+
+.inspector-metric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+
+.inspector-metric.tooltip {
+    align-items: stretch;
+    border-radius: var(--radius-xs);
+    cursor: default;
+}
+
+.inspector-metric__label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-xs);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--text-secondary);
 }
 
-.detail-tile__label .ic {
+.inspector-metric__label .ic {
     width: 14px;
     height: 14px;
     color: var(--text-tertiary);
 }
 
-.detail-tile__value {
-    font-size: var(--text-lg);
+.inspector-metric__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-xl);
     font-weight: var(--font-semibold);
     font-variant-numeric: tabular-nums;
     letter-spacing: var(--tracking-tight);
     color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.detail-tile__value small {
-    margin-left: 4px;
+.inspector-metric__value small {
+    margin-left: var(--space-xs);
     font-size: var(--text-xs);
     font-weight: var(--font-regular);
     color: var(--text-secondary);
 }
 
-.detail-tile__value.status-text {
-    font-size: var(--text-md);
+.inspector-metric__value.status-text {
+    font-size: var(--text-lg);
 }
 
-.detail-tile__sub {
-    font-size: var(--text-xs);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
+.inspector-metric__sub {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
 }
 
-.detail-card {
+/* Titled section inside the inspector: heading, then its content one inner step below. */
+.inspector-section {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 12px 14px 14px;
+    gap: var(--space-md);
 }
 
-.detail-card__header {
+.inspector-section__header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-sm);
     min-height: var(--control-sm);
 }
 
-.detail-card__action {
+.inspector-section__title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+}
+
+.inspector-section__action {
     margin-left: auto;
 }
 
-/* Inset list of connection facts, one per row, with trailing actions. */
+/* Connection facts: one per row, hairlines between rows, trailing copy action. */
 .detail-list {
     margin: 0;
-    padding: 0 6px 0 14px;
 }
 
 .detail-list__row {
     display: grid;
     grid-template-columns: 120px minmax(0, 1fr) 28px;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-md);
     min-height: 40px;
 }
 
@@ -419,7 +486,7 @@
 .detail-list__row dt {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-xs);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--text-secondary);
@@ -447,8 +514,8 @@
 
 .limit-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px 28px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-md) var(--space-2xl);
 }
 
 .provider-row__metadata-error {
@@ -460,14 +527,14 @@
 .provider-limit {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-sm);
 }
 
 .provider-limit__header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .provider-limit__label {
@@ -511,7 +578,7 @@
     opacity: 0.35;
 }
 
-.sortable-chosen .provider-row__main {
+.sortable-chosen {
     background: var(--bg-content);
 }
 
@@ -525,15 +592,15 @@
 .integration-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
-    gap: 14px;
+    gap: var(--gap-module);
 }
 
 .integration-card {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--gap-item);
     min-width: 0;
-    padding: 18px 18px 14px;
+    padding: var(--inset-group);
     border-radius: var(--radius-lg);
     background: var(--bg-content);
     box-shadow: var(--shadow-group);
@@ -548,13 +615,13 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
 }
 
 .integration-card__identity {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--space-xs);
     min-width: 0;
 }
 
@@ -566,7 +633,7 @@
 .integration-card__path {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-xs);
     min-width: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -597,17 +664,16 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--space-sm);
     margin-top: auto;
-    padding-top: 12px;
-    box-shadow: 0 -0.5px 0 var(--separator);
 }
 
 .integration-card__toggle {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 4px 6px 4px 2px;
+    gap: var(--space-sm);
+    /* Flush left so the chevron sits on the card's content edge. */
+    padding: var(--space-xs) var(--space-sm) var(--space-xs) 0;
     border: 0;
     border-radius: 6px;
     background: none;
@@ -633,7 +699,7 @@
 
 .diff-counts {
     display: inline-flex;
-    gap: 6px;
+    gap: var(--space-sm);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
 }
@@ -649,31 +715,32 @@
 .integration-card__actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     margin-left: auto;
 }
 
 .integration-card__preview {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .integration-diff {
     max-height: 300px;
     overflow: auto;
-    padding: 6px 0;
+    padding: var(--space-sm) 0;
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+    line-height: var(--leading-relaxed);
 }
 
 .diff-line {
     display: flex;
-    gap: 10px;
-    padding: 1px 12px;
+    gap: var(--space-md);
+    padding: 0 var(--space-md);
 }
 
 .diff-line code {
@@ -700,13 +767,13 @@
 .integration-preview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-    gap: 12px;
-    margin-top: 10px;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
 }
 
 .integration-preview-panel {
     min-width: 0;
-    padding: 12px 14px;
+    padding: var(--inset-tile);
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -715,7 +782,7 @@
 .integration-preview-code {
     max-height: 320px;
     min-height: 80px;
-    margin-top: 8px;
+    margin-top: var(--space-sm);
     overflow: auto;
     font-size: var(--text-xs);
     line-height: 1.6;
@@ -726,8 +793,8 @@
 
 .integration-result {
     display: grid;
-    gap: 6px;
-    padding: 12px 14px;
+    gap: var(--space-xs);
+    padding: var(--inset-tile);
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -740,7 +807,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .integration-result__badge--success { background: var(--bg-content); color: var(--success-text); }
@@ -781,26 +848,15 @@
 
 /* ========== Global Settings and Backup & Import ========== */
 
-.settings-page-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 16px;
-    margin: 4px 0 18px;
-}
-
-.settings-page-header .section-title {
-    font-size: var(--text-2xl);
-    letter-spacing: var(--tracking-display);
-}
-
-/* Save bar sticks under the toolbar while the form scrolls. */
-.settings-page-header--sticky {
+/* Page header that doubles as the save bar: sticks under the toolbar while the form scrolls. */
+.settings-savebar {
     position: sticky;
     top: var(--toolbar-offset);
     z-index: 20;
-    margin: 0 -24px 18px;
-    padding: 12px 24px;
+    align-items: center;
+    /* Bleed to the gutters; the padding keeps the title on the content edge. */
+    margin: calc(-1 * var(--page-top)) calc(-1 * var(--page-gutter)) calc(var(--gap-item) - var(--space-md));
+    padding: var(--page-top) var(--page-gutter) var(--space-md);
     background: var(--material-bar);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
@@ -811,7 +867,7 @@
     align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .settings-compact-grid {
@@ -821,12 +877,13 @@
     margin: 0;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
-    gap: 14px;
-    align-items: start;
+    gap: var(--gap-module);
+    /* Panels in a row share one height, so a short panel leaves no hole beside a tall one. */
+    align-items: stretch;
 }
 
 .settings-panel {
-    padding: 18px 20px 20px;
+    padding: var(--inset-group);
     border-radius: var(--radius-lg);
     background: var(--bg-content);
     box-shadow: var(--shadow-group);
@@ -837,7 +894,7 @@
 }
 
 .settings-panel-header {
-    margin-bottom: 16px;
+    margin-bottom: var(--gap-item);
 }
 
 .settings-panel-header h3 {
@@ -848,7 +905,7 @@
 .settings-panel-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--gap-item);
 }
 
 .settings-panel-grid .form-group {
@@ -860,28 +917,21 @@
     font-size: var(--text-sm);
 }
 
+/* A checkbox field sits on the control line of its row, not the label line. */
+.settings-panel-grid > .form-group:has(> .label-row > .checkbox-label) {
+    align-self: end;
+}
+
+/* On/off flags after a panel's fields: plain checkboxes, grouped by distance. */
 .settings-flag-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-    gap: 8px;
-    margin-top: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--gap-item);
+    margin-top: var(--gap-item);
 }
 
-.settings-flag-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 40px;
-    padding: 9px 12px;
-    border-radius: var(--radius-md);
-    background: var(--bg-subtle);
-    box-shadow: inset 0 0 0 0.5px var(--separator);
-}
-
-.settings-flag-card.checkbox-label {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
+.settings-flag-grid .checkbox-label {
+    min-height: var(--control-md);
 }
 
 .settings-form-actions {
@@ -889,14 +939,14 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 16px;
-    margin-top: 16px;
+    gap: var(--space-lg);
+    margin-top: var(--gap-item);
 }
 
 /* ========== Services ========== */
 
 .service-panel {
-    gap: 14px;
+    gap: var(--gap-item);
 }
 
 .service-panel__actions {
@@ -904,14 +954,14 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .service-panel__group {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .service-panel__group--end {
@@ -919,7 +969,7 @@
 }
 
 .service-panel__group--end .checkbox-label {
-    margin-right: 4px;
+    margin-right: var(--space-sm);
 }
 
 .service-panel > .form-hint {
@@ -933,20 +983,20 @@
 /* ========== System Status ========== */
 
 .status-card {
-    gap: 16px;
+    gap: var(--gap-item);
 }
 
 .status-card__header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
 }
 
 .status-card__heading {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-xs);
     min-width: 0;
 }
 
@@ -958,14 +1008,14 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .status-card__meta {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-sm);
     font-size: var(--text-xs);
     color: var(--text-secondary);
 }
@@ -975,30 +1025,39 @@
     align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-sm);
 }
 
 .status-card__groups {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .status-card__group {
     display: grid;
     grid-template-columns: 84px minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--space-md);
     align-items: start;
 }
 
+/* Centred on the first row of 20px chips. */
 .status-card__group-label {
-    padding-top: 3px;
+    display: flex;
+    align-items: center;
+    min-height: 20px;
     font-size: var(--text-xs);
     color: var(--text-secondary);
 }
 
 .status-card__group-chips {
     min-width: 0;
+}
+
+/* Rendered but empty (no providers, no pinned line): drop it so it adds no gap. */
+.status-card__groups:not(:has(.status-card__group)),
+.status-card__meta:not(:has(> :not(template))) {
+    display: none;
 }
 
 .pill--muted {
@@ -1008,14 +1067,14 @@
 }
 
 .status-card__activity {
-    padding: 4px 12px;
+    padding: 0 var(--space-md);
     border-radius: var(--radius-md);
     background: var(--bg-subtle);
     box-shadow: inset 0 0 0 0.5px var(--separator);
 }
 
 .status-card__activity-title {
-    padding: 8px 0 4px;
+    padding: var(--space-sm) 0 var(--space-xs);
     font-size: var(--text-xs);
     color: var(--text-secondary);
 }
@@ -1023,8 +1082,10 @@
 .activity-row {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 8px 0;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    font-size: var(--text-sm);
+    line-height: 1.5;
     box-shadow: 0 -0.5px 0 var(--separator);
 }
 
@@ -1032,7 +1093,8 @@
     flex: none;
     width: 7px;
     height: 7px;
-    margin-top: 6px;
+    /* Centre the dot on the first text line. */
+    margin-top: calc((1lh - 7px) / 2);
     border-radius: 50%;
     background: var(--text-tertiary);
 }
@@ -1046,10 +1108,8 @@
     display: flex;
     flex: 1;
     flex-wrap: wrap;
-    gap: 2px 8px;
+    gap: var(--space-2xs) var(--space-sm);
     min-width: 0;
-    font-size: var(--text-sm);
-    line-height: 1.5;
 }
 
 .activity-kind {
@@ -1075,7 +1135,7 @@
 
 .activity-time {
     flex: none;
-    padding-top: 2px;
+    align-self: baseline;
     white-space: nowrap;
     font-size: var(--text-xs);
     color: var(--text-tertiary);
@@ -1096,66 +1156,32 @@
         width: 100%;
     }
 
-    /* Name gets the full first line; status and controls share the second. */
-    .provider-row__main {
-        grid-template-columns: 24px minmax(0, 1fr) auto;
-        row-gap: 6px;
+    /* One pane at a time: the list, or the selected provider pushed over it. */
+    .provider-split {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .provider-drag-handle {
-        grid-row: 1 / span 2;
-        align-self: start;
-    }
-
-    .provider-row__name {
-        grid-column: 2 / span 2;
-    }
-
-    .provider-row__spend {
+    .provider-split:not(.is-detail-open) .provider-inspector,
+    .provider-split.is-detail-open .provider-panel {
         display: none;
     }
 
-    /* Touch screens have no hover: secondary actions appear once the row is expanded. */
-    .provider-row:not(.is-expanded) .row-icon:not(.is-active):not(.provider-row__chevron) {
-        display: none;
+    .provider-inspector__back {
+        display: inline-flex;
     }
 
-    .provider-row__state {
-        grid-column: 2;
-        grid-row: 2;
+    .inspector-metric__value {
+        font-size: var(--text-lg);
     }
 
-    .provider-row__actions {
-        grid-column: 3;
-        grid-row: 2;
-    }
-
-    .provider-row__details {
-        padding: 6px 16px 18px;
-    }
-
-    /* Up to three compact tiles per row so a third tile never sits alone. */
-    .detail-tiles {
-        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-        gap: 8px;
-    }
-
-    .detail-tile {
-        padding: 10px;
-    }
-
-    .detail-tile__value {
-        font-size: var(--text-md);
-    }
-
-    .detail-tile__value small {
+    .inspector-metric__value small {
         display: none;
     }
 
     .detail-list__row {
         grid-template-columns: minmax(0, 1fr) 28px;
         row-gap: 0;
-        padding: 8px 0;
+        padding: var(--space-sm) 0;
     }
 
     .detail-list__row dt {
@@ -1164,59 +1190,43 @@
 
     .status-card__group {
         grid-template-columns: 1fr;
-        gap: 6px;
+        gap: var(--space-xs);
     }
 }
 
 @media (max-width: 640px) {
-    .settings-page-header {
-        flex-direction: column;
-        align-items: stretch;
+    /* The save bar keeps title and actions on one line; the page-intro column stack would double its height. */
+    .settings-savebar {
+        flex-direction: row;
+        align-items: center;
     }
 
-    .settings-page-header--sticky {
-        margin: 0 -16px 16px;
-        padding: 10px 16px;
-    }
-
-    .settings-toolbar-actions {
-        justify-content: flex-start;
-    }
-
-    .settings-panel {
-        padding: 16px;
-    }
-
-    .settings-panel-grid {
+    .settings-panel-grid,
+    .settings-flag-grid {
         grid-template-columns: 1fr;
     }
 
     .service-panel__group--end {
         margin-left: 0;
     }
-
-    .settings-page-header .section-title {
-        font-size: var(--text-xl);
-    }
 }
 
-@media (max-width: 760px) and (pointer: coarse) {
-    .provider-row__main { grid-template-columns: 44px minmax(0, 1fr) auto; }
+@media (pointer: coarse) {
+    .provider-row { grid-template-columns: 44px minmax(0, 1fr) auto; padding-left: 0; }
     .provider-drag-handle { width: 44px; height: 44px; }
-    .provider-row.is-expanded .provider-row__actions { grid-column: 2 / span 2; grid-row: 3; justify-content: flex-end; }
-    .provider-row.is-expanded .provider-row__state { grid-column: 2 / span 2; }
 }
 
 /* Status: setup tiles navigate; pinned provider and counters use glyphs. */
 .kv-item--link {
     position: relative;
-    padding-right: 32px;
+    /* Room for the 14px chevron plus an inner gap. */
+    padding-right: calc(var(--space-lg) + 14px + var(--gap-inner));
 }
 
 .kv-item__go {
     position: absolute;
     top: 50%;
-    right: 12px;
+    right: var(--space-lg);
     width: 14px;
     height: 14px;
     color: var(--text-tertiary);
@@ -1232,7 +1242,7 @@
 .status-card__pinned {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-xs);
     min-width: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -1254,21 +1264,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
     margin-bottom: 0;
-}
-
-/* Tiles with exact figures reveal them on hover, focus or tap. */
-.detail-tile.tooltip {
-    display: flex;
-    align-items: stretch;
-    cursor: default;
-}
-
-.detail-tile.tooltip:focus-visible {
-    box-shadow: var(--shadow-group), 0 0 0 3px var(--accent-ring);
-}
-
-.detail-tile .tooltip-content {
-    top: calc(100% + 6px);
 }

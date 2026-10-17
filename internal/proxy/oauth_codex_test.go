@@ -279,7 +279,7 @@ func TestCreateCodexOAuthRequest_RefreshUsesProviderCustomProxy(t *testing.T) {
 	}
 }
 
-func TestOAuthHTTPClientForProvider_ClaudeDirectPreservesProviderClient(t *testing.T) {
+func TestOAuthHTTPClientForProvider_DirectAlwaysSuppliesRoutingPolicy(t *testing.T) {
 	providerDirect := config.Provider{
 		Name:          "claude-oauth",
 		AuthType:      config.ProviderAuthTypeOAuth,
@@ -289,8 +289,10 @@ func TestOAuthHTTPClientForProvider_ClaudeDirectPreservesProviderClient(t *testi
 		Priority:      1,
 	}
 	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{providerDirect}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
-	if got := cp.oauthHTTPClientForProvider(providerDirect, 0); got != nil {
-		t.Fatalf("provider direct oauthHTTPClientForProvider = %T, want nil", got)
+	if got := cp.oauthHTTPClientForProvider(providerDirect, 0); got == nil {
+		t.Fatal("missing provider direct client")
+	} else if transport, ok := got.Transport.(*http.Transport); !ok || transport.Proxy != nil {
+		t.Fatal("provider direct must override inherited environment and system proxies")
 	}
 
 	providerDefault := config.Provider{
@@ -301,8 +303,10 @@ func TestOAuthHTTPClientForProvider_ClaudeDirectPreservesProviderClient(t *testi
 		Priority:      1,
 	}
 	cp = newClientProxyWithGlobalProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{providerDefault}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{}, config.GlobalUpstreamProxyModeDirect, "")
-	if got := cp.oauthHTTPClientForProvider(providerDefault, 0); got != nil {
-		t.Fatalf("global direct oauthHTTPClientForProvider = %T, want nil", got)
+	if got := cp.oauthHTTPClientForProvider(providerDefault, 0); got == nil {
+		t.Fatal("missing global direct client")
+	} else if transport, ok := got.Transport.(*http.Transport); !ok || transport.Proxy != nil {
+		t.Fatal("global direct must override inherited environment and system proxies")
 	}
 
 	codexDirect := config.Provider{

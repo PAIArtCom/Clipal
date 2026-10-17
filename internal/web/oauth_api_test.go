@@ -404,7 +404,7 @@ func TestHandleGetOAuthSession_PollThenLinkPreservesOAuthStartProxySettings(t *t
 	}
 }
 
-func TestOAuthHTTPClientForTarget_DefaultEnvironmentPreservesProviderClient(t *testing.T) {
+func TestOAuthHTTPClientForTarget_DefaultInheritsNetworkPolicy(t *testing.T) {
 	t.Setenv("HTTP_PROXY", "")
 	t.Setenv("HTTPS_PROXY", "")
 	t.Setenv("ALL_PROXY", "")
@@ -419,12 +419,14 @@ func TestOAuthHTTPClientForTarget_DefaultEnvironmentPreservesProviderClient(t *t
 		ClientType: "claude",
 		Provider:   config.OAuthProviderClaude,
 	}, config.OAuthProviderClaude)
-	if client != nil {
-		t.Fatalf("oauthHTTPClientForTarget default = %T, want nil", client)
+	if client == nil {
+		t.Fatal("missing OAuth HTTP client")
+	} else if transport, ok := client.Transport.(*http.Transport); !ok || transport.Proxy == nil {
+		t.Fatal("environment client must inherit dynamic system proxy policy")
 	}
 }
 
-func TestOAuthHTTPClientForTarget_ClaudeDirectPreservesProviderClient(t *testing.T) {
+func TestOAuthHTTPClientForTarget_ClaudeDirectOverridesInheritedProxies(t *testing.T) {
 	api := newTestOAuthAPI(t)
 	cfg, err := config.Load(api.configDir)
 	if err != nil {
@@ -437,8 +439,10 @@ func TestOAuthHTTPClientForTarget_ClaudeDirectPreservesProviderClient(t *testing
 		ClientType: "claude",
 		Provider:   config.OAuthProviderClaude,
 	}, config.OAuthProviderClaude)
-	if client != nil {
-		t.Fatalf("global direct oauthHTTPClientForTarget = %T, want nil", client)
+	if client == nil {
+		t.Fatal("missing OAuth HTTP client")
+	} else if transport, ok := client.Transport.(*http.Transport); !ok || transport.Proxy != nil {
+		t.Fatal("global direct must override environment and system proxies")
 	}
 
 	client = api.oauthHTTPClientForTarget(oauthTargetClient{
@@ -447,8 +451,10 @@ func TestOAuthHTTPClientForTarget_ClaudeDirectPreservesProviderClient(t *testing
 		ProxyConfigured: true,
 		ProxyMode:       config.ProviderProxyModeDirect,
 	}, config.OAuthProviderClaude)
-	if client != nil {
-		t.Fatalf("provider direct oauthHTTPClientForTarget = %T, want nil", client)
+	if client == nil {
+		t.Fatal("missing OAuth HTTP client")
+	} else if transport, ok := client.Transport.(*http.Transport); !ok || transport.Proxy != nil {
+		t.Fatal("provider direct must override environment and system proxies")
 	}
 }
 

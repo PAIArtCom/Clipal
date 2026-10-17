@@ -79,6 +79,12 @@ func (cp *ClientProxy) forwardManual(w http.ResponseWriter, req *http.Request, p
 		cancelAttempt(nil)
 		if !prepared {
 			logger.Error("[%s] failed to create request for %s: %v", cp.clientType, provider.Name, err)
+			if setup := accountSetupFailure(err); setup != nil {
+				status, message := setup.HTTPStatus(), setup.Error()
+				cp.recordTerminalRequest(time.Now(), req, provider.Name, status, "request_rejected", message)
+				writeProxyError(w, message, status)
+				return
+			}
 			cp.recordTerminalRequest(time.Now(), req, provider.Name, http.StatusBadGateway, "request_rejected", "Failed to create upstream request.")
 			writeProxyError(w, "Failed to create upstream request", http.StatusBadGateway)
 			return

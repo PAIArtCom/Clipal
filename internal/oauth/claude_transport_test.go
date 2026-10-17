@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/PAIArtCom/Clipal/internal/outbound"
 )
 
 type claudeRoundTripperFunc func(*http.Request) (*http.Response, error)
@@ -199,10 +201,39 @@ func TestNativeClaudeAccountClientRetainsTargetProxyPolicy(t *testing.T) {
 	mu.Lock()
 	got = append([]string(nil), addresses...)
 	mu.Unlock()
-	if len(got) != 2 || got[0] != "1.1.1.1:443" || got[1] != "8.8.8.8:443" {
+	if strings.Join(got, ",") != "cloudflare-dns.com:443,1.1.1.1:443,dns.google:443,8.8.8.8:443,no-proxy.example:443" {
 		t.Fatalf("no-proxy route did not retain automatic DNS: %v", got)
 	}
 	if fallback.Proxy == nil {
 		t.Fatal("account wrapper mutated the original transport")
+	}
+}
+
+func TestNativeAnthropicClientObservesInheritedNetworkPolicyChanges(t *testing.T) {
+	for _, key := range []string{"HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy", "REQUEST_METHOD"} {
+		t.Setenv(key, "")
+	}
+	client := newAnthropicHTTPClient(time.Second)
+	client, err := EnvironmentHTTPClient(client, &RequestEnvironment{DNS: "auto"}, "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdleConnections()
+	req, _ := http.NewRequest(http.MethodGet, "https://platform.claude.com/v1/oauth/token", nil)
+	transport, ok := client.Transport.(*environmentTransport)
+	if !ok {
+		t.Fatalf("expected environment transport, got %T", client.Transport)
+	}
+	inherited := &http.Client{Transport: transport.base}
+	for _, proxy := range []string{"http://first.example:8080", "http://second.example:8081"} {
+		t.Setenv("HTTPS_PROXY", proxy)
+		got, err := outbound.ProxyFor(inherited, req.URL.String())
+		if err != nil || got == nil || got.String() != proxy {
+			t.Fatalf("native inherited proxy=%v error=%v, want %s", got, err, proxy)
+		}
+	}
+	t.Setenv("NO_PROXY", "platform.claude.com")
+	if got, err := outbound.ProxyFor(inherited, req.URL.String()); err != nil || got != nil {
+		t.Fatalf("native NO_PROXY=%v error=%v", got, err)
 	}
 }

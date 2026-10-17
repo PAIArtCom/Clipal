@@ -37,7 +37,13 @@ func EnvironmentHTTPClient(client *http.Client, e *RequestEnvironment, provider 
 	}
 	copyBase := *client
 	var alternative http.RoundTripper
-	if base, ok := client.Transport.(*http.Transport); ok {
+	if client.Transport == nil {
+		if base, ok := http.DefaultTransport.(*http.Transport); ok {
+			clone := base.Clone()
+			clone.Proxy = outbound.NetworkProxy
+			copyBase.Transport = clone
+		}
+	} else if base, ok := client.Transport.(*http.Transport); ok {
 		copyBase.Transport = base.Clone()
 	} else if base, ok := client.Transport.(*anthropicFallbackRoundTripper); ok {
 		if fallback, ok := base.fallback.(*http.Transport); ok {

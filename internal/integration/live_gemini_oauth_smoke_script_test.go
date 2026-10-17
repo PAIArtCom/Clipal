@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -17,7 +18,10 @@ func TestLiveGeminiOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 	script := string(body)
 	for _, want := range []string{
 		`--email EMAIL`,
-		`default: gemini-3-flash-preview`,
+		`default: discover from /models`,
+		`--base-url URL`,
+		`--provider NAME`,
+		`scripts/gemini_live.py`,
 		`CLIPAL_LIVE_OAUTH_EMAIL`,
 		`CLIPAL_LIVE_VERBOSE`,
 		`list_credentials "$creds_json" "$OAUTH_EMAIL" "$OAUTH_REF" "$OAUTH_FILE"`,
@@ -29,11 +33,11 @@ func TestLiveGeminiOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 		`log_level: $clipal_log_level`,
 		`--log-level "$clipal_log_level"`,
 		`artifacts:`,
-		`set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail and request headers/body`,
+		`set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail`,
 		`auth_type: "oauth"`,
 		`oauth_provider: "gemini"`,
-		`"http://127.0.0.1:$clipal_port/clipal/v1beta/models/$MODEL:generateContent"`,
-		`"http://127.0.0.1:$clipal_port/clipal/v1beta/models/$MODEL:streamGenerateContent"`,
+		`run_live_checks "http://127.0.0.1:$clipal_port"`,
+		`--skip-stream --token REFRESHOK`,
 		`clipal-live-invalid-token`,
 		`credential access_token was not replaced after refresh retry`,
 		`ok refreshed temp credential updated`,
@@ -53,5 +57,18 @@ func TestLiveGeminiOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t 
 		if strings.Contains(script, unwanted) {
 			t.Fatalf("live gemini oauth smoke script should not contain %q", unwanted)
 		}
+	}
+}
+
+func TestGeminiLiveDiscoveryBehavior(t *testing.T) {
+	t.Parallel()
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 required for live harness regression tests")
+	}
+	cmd := exec.Command(python, "-m", "unittest", "discover", "-s", "scripts", "-p", "gemini_live_test.py", "-v")
+	cmd.Dir = "../.."
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("live discovery regression: %v\n%s", err, output)
 	}
 }

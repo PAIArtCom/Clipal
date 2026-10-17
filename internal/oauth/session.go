@@ -407,10 +407,15 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	if err != nil {
 		return nil, err
 	}
-	if !force && (!cred.NeedsRefresh(s.now(), s.refreshSkew) || strings.TrimSpace(cred.RefreshToken) == "") {
+	// Older Antigravity logins could save a fresh token without the project
+	// required for generation. Reuse refresh/identity locking to repair those
+	// accounts; failed project resolution must not replace the saved credential.
+	missingProject := cred.Provider == config.OAuthProviderAntigravity && strings.TrimSpace(cred.Metadata["project_id"]) == ""
+	repairOnly := !force && missingProject && !cred.NeedsRefresh(s.now(), s.refreshSkew)
+	if !force && !missingProject && (!cred.NeedsRefresh(s.now(), s.refreshSkew) || strings.TrimSpace(cred.RefreshToken) == "") {
 		return cred, nil
 	}
-	if strings.TrimSpace(cred.RefreshToken) == "" {
+	if !repairOnly && strings.TrimSpace(cred.RefreshToken) == "" {
 		return nil, fmt.Errorf("oauth credential %q has no refresh token", strings.TrimSpace(ref))
 	}
 
@@ -418,7 +423,11 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	s.mu.Lock()
 	if call, ok := s.refreshes[key]; ok {
 		s.mu.Unlock()
-		<-call.done
+		select {
+		case <-call.done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 		if call.cred == nil {
 			return nil, call.err
 		}
@@ -428,7 +437,7 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	s.refreshes[key] = call
 	s.mu.Unlock()
 
-	refreshed, err := s.refreshCredential(ctx, store, cred, httpClient)
+	refreshed, err := s.refreshCredential(ctx, store, cred, httpClient, repairOnly)
 
 	s.mu.Lock()
 	delete(s.refreshes, key)
@@ -443,7 +452,7 @@ func (s *Service) refresh(ctx context.Context, provider config.OAuthProvider, re
 	return refreshed.Clone(), err
 }
 
-func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Credential, httpClient *http.Client) (*Credential, error) {
+func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Credential, httpClient *http.Client, repairOnly bool) (*Credential, error) {
 	client, ok := s.providerClient(cred.Provider)
 	if !ok {
 		return nil, fmt.Errorf("unsupported oauth provider %q", cred.Provider)
@@ -454,8 +463,25 @@ func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Cre
 		return nil, err
 	}
 	defer closeEnvironmentClient(client)
-	refreshed, err := client.Refresh(ctx, cred)
+	var refreshed *Credential
+	if repair, ok := client.(interface {
+		RepairProject(context.Context, *Credential) (*Credential, error)
+	}); repairOnly && ok {
+		refreshed, err = repair.RepairProject(ctx, cred)
+	} else {
+		refreshed, err = client.Refresh(ctx, cred)
+	}
 	if err != nil {
+		var setup *AntigravitySetupError
+		if refreshed != nil && cred.Provider == config.OAuthProviderAntigravity && errors.As(err, &setup) {
+			if !SameAccountIdentity(cred, refreshed) || strings.TrimSpace(refreshed.AccessToken) == "" {
+				return nil, fmt.Errorf("refreshed OAuth identity does not match the stored account")
+			}
+			if saveErr := store.Save(refreshed); saveErr != nil {
+				return nil, fmt.Errorf("persist refreshed OAuth token: %w", saveErr)
+			}
+			s.invalidateGeminiUsageCache(refreshed.Ref)
+		}
 		return nil, err
 	}
 	if err := store.Save(refreshed); err != nil {

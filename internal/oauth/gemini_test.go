@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -868,31 +869,43 @@ func TestGeminiExchangeCodeStopsWhenAccountValidationRequired(t *testing.T) {
 }
 
 func TestGeminiPollCloudCodeOperation_BoundsPendingOperations(t *testing.T) {
-	var pollCalls int
-	cloudCodeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Path; got != "/v1internal/operations/123" {
-			t.Fatalf("path = %q, want /v1internal/operations/123", got)
-		}
-		pollCalls++
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"name":"operations/123","done":false}`)
-	}))
-	defer cloudCodeServer.Close()
-
-	client := &GeminiClient{
-		CloudCodeURL: cloudCodeServer.URL,
-		HTTPClient:   cloudCodeServer.Client(),
-		Sleep:        func(time.Duration) {},
-	}
-
-	_, err := client.pollCloudCodeOperation(context.Background(), "access-1", "operations/123")
-	if err == nil {
-		t.Fatalf("expected polling to fail for non-terminating operation")
-	}
-	if !strings.Contains(err.Error(), "did not complete") {
-		t.Fatalf("error = %q, want poll bound failure", err.Error())
-	}
-	if pollCalls != defaultGeminiOperationPollMaxAttempts {
-		t.Fatalf("poll calls = %d, want %d", pollCalls, defaultGeminiOperationPollMaxAttempts)
+	for _, tc := range []struct {
+		name, operation, response, wantError string
+		deadline                             bool
+		wantCalls                            int
+	}{
+		{"pending bound", "operations/123", `{"name":"operations/123","done":false}`, "did not complete", false, defaultGeminiOperationPollMaxAttempts},
+		{"terminal error", "operations/123", `{"done":true,"error":{"code":7,"message":"permission denied"}}`, "permission denied", false, 1},
+		{"cancel during wait", "operations/123", `{"done":false}`, "context deadline exceeded", true, 1},
+		{"different origin", "https://other.example/operations/123", `{}`, "invalid operation name", false, 0},
+		{"path traversal", "../operations/123", `{}`, "invalid operation name", false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var pollCalls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1internal/operations/123" {
+					t.Errorf("operation path=%s", r.URL.Path)
+				}
+				pollCalls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, tc.response)
+			}))
+			defer server.Close()
+			client := &GeminiClient{CloudCodeURL: server.URL, HTTPClient: server.Client(), Sleep: func(time.Duration) {}}
+			ctx := context.Background()
+			if tc.deadline {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+				client.Sleep = nil
+			}
+			_, err := client.pollCloudCodeOperation(ctx, "access-1", tc.operation)
+			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error=%v want=%s", err, tc.wantError)
+			}
+			if int(pollCalls.Load()) != tc.wantCalls {
+				t.Fatalf("polls=%d want=%d", pollCalls.Load(), tc.wantCalls)
+			}
+		})
 	}
 }

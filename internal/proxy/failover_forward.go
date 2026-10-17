@@ -12,6 +12,7 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/PAIArtCom/Clipal/internal/logger"
 	"github.com/PAIArtCom/Clipal/internal/notify"
+	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
 func nextProviderName(cp *ClientProxy, fromIndex int) (idx int, name string) {
@@ -68,6 +69,14 @@ func describeRequestBuildFailure(provider string, err error) string {
 		return "Request could not be prepared locally: " + msg
 	}
 	return fmt.Sprintf("%s request could not be prepared locally: %s", provider, msg)
+}
+
+func accountSetupFailure(err error) *oauthpkg.AntigravitySetupError {
+	var setup *oauthpkg.AntigravitySetupError
+	if errors.As(err, &setup) {
+		return setup
+	}
+	return nil
 }
 
 func isKeyScopedFailure(reason string) bool {
@@ -167,6 +176,8 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 	lastFailedProvider := ""
 	attemptSummaries := make([]string, 0, active)
 	hadUpstreamAttempt := false
+	setupFailuresOnly := true
+	var lastSetupFailure *oauthpkg.AntigravitySetupError
 
 	for offset := 0; offset < len(cp.providers) && attempted < active; offset++ {
 		if err := req.Context().Err(); err != nil {
@@ -230,6 +241,11 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 			resp, prepared, err := cp.doProviderRequestWithPayload(reqWithAttemptCtx, provider, index, apiKey, path, payload)
 			if err != nil {
 				if !prepared {
+					if setup := accountSetupFailure(err); setup != nil {
+						lastSetupFailure = setup
+					} else {
+						setupFailuresOnly = false
+					}
 					summary := describeRequestBuildFailure(provider.Name, err)
 					attemptSummaries = append(attemptSummaries, summary)
 					lastFailedProvider = provider.Name
@@ -490,6 +506,12 @@ func (cp *ClientProxy) forwardWithFailover(w http.ResponseWriter, req *http.Requ
 	}
 
 	lastProvider := strings.TrimSpace(lastFailedProvider)
+	if !hadUpstreamAttempt && setupFailuresOnly && lastSetupFailure != nil {
+		status, message := lastSetupFailure.HTTPStatus(), lastSetupFailure.Error()
+		cp.recordTerminalRequest(time.Now(), req, lastProvider, status, "request_rejected", strings.Join(attemptSummaries, "; "))
+		writeProxyError(w, message, status)
+		return
+	}
 	terminalResult := "all_providers_failed"
 	terminalStatus := http.StatusServiceUnavailable
 	if !hadUpstreamAttempt {

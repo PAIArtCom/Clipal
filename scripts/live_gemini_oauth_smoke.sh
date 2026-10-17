@@ -10,7 +10,6 @@ require_cmd() {
   fi
 }
 
-require_cmd go
 require_cmd curl
 
 if command -v python3 >/dev/null 2>&1; then
@@ -32,12 +31,20 @@ Options:
   --email EMAIL             Select OAuth credential by email
   --oauth-ref REF           Specific OAuth ref to test
   --oauth-file FILE         Specific credential file to copy into the temporary config
-  --model MODEL             Model name for the smoke requests (default: gemini-3-flash-preview)
+  --model MODEL             Require a listed text model (default: discover from /models)
+  --base-url URL            Test an already running service; do not copy credentials or force refresh
+  --provider NAME           Temporarily pin this Gemini provider with --base-url
   --skip-stream             Skip the streaming :streamGenerateContent smoke
   --skip-refresh-retry      Skip the forced 401 -> refresh -> retry smoke
   --keep-temp               Keep the temporary config dir and logs after success
   --list                    List discoverable Gemini OAuth credentials and exit
   -h, --help                Show this help
+
+Models are discovered before generation; explicitly retired candidates are skipped.
+Success requires the expected text and a terminal STOP in ordinary and SSE responses.
+With --base-url, the running service is used and routing is restored after testing.
+Loopback service URLs bypass proxies; remote URLs retain environment/system proxy support.
+Without it, a temporary service and credential copy exercise refresh retry as well.
 
 Environment fallbacks:
   CLIPAL_LIVE_CONFIG_DIR
@@ -56,7 +63,9 @@ CONFIG_DIR="${CLIPAL_LIVE_CONFIG_DIR:-$HOME/.clipal}"
 OAUTH_EMAIL="${CLIPAL_LIVE_OAUTH_EMAIL:-}"
 OAUTH_REF="${CLIPAL_LIVE_OAUTH_REF:-}"
 OAUTH_FILE="${CLIPAL_LIVE_OAUTH_FILE:-}"
-MODEL="${CLIPAL_LIVE_MODEL:-gemini-3-flash-preview}"
+MODEL="${CLIPAL_LIVE_MODEL:-}"
+BASE_URL=""
+PROVIDER=""
 SKIP_STREAM="${CLIPAL_LIVE_SKIP_STREAM:-0}"
 SKIP_REFRESH_RETRY="${CLIPAL_LIVE_SKIP_REFRESH_RETRY:-0}"
 KEEP_TEMP="${CLIPAL_LIVE_KEEP_TEMP:-0}"
@@ -84,6 +93,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --oauth-file)
       OAUTH_FILE="${2:-}"
+      shift 2
+      ;;
+    --base-url)
+      BASE_URL="${2:-}"
+      shift 2
+      ;;
+    --provider)
+      PROVIDER="${2:-}"
       shift 2
       ;;
     --model)
@@ -166,95 +183,14 @@ print_failure_artifacts() {
 
 print_failure_details() {
   if [[ "$VERBOSE" != "1" ]]; then
-    echo "set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail and request headers/body" >&2
+    echo "set CLIPAL_LIVE_VERBOSE=1 to print clipal.log tail" >&2
     return
   fi
   if [[ -f "$tmpdir/clipal.log" ]]; then
     echo "---- last 200 lines of clipal.log ----" >&2
     tail -n 200 "$tmpdir/clipal.log" >&2 || true
   fi
-  if [[ -n "$last_request_headers" && -f "$last_request_headers" ]]; then
-    echo "---- request headers: $last_request_headers ----" >&2
-    cat "$last_request_headers" >&2 || true
-  fi
-  if [[ -n "$last_request_body" && -f "$last_request_body" ]]; then
-    echo "---- request body: $last_request_body ----" >&2
-    cat "$last_request_body" >&2 || true
-  fi
-}
 
-read_retry_after() {
-  local headers_file="$1"
-  "$PY" - "$headers_file" <<'PY'
-import pathlib
-import sys
-
-headers = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace").splitlines()
-for line in headers:
-    if ":" not in line:
-        continue
-    name, value = line.split(":", 1)
-    if name.strip().lower() != "retry-after":
-        continue
-    value = value.strip()
-    try:
-        seconds = max(int(float(value)), 1)
-    except Exception:
-        seconds = 2
-    print(seconds)
-    raise SystemExit(0)
-print(2)
-PY
-}
-
-post_with_rate_limit_retry() {
-  local url="$1"
-  local payload="$2"
-  local body_file="$3"
-  local headers_file="$4"
-  local stream_mode="${5:-0}"
-  local max_attempts="${6:-5}"
-  local http_code=""
-  local retry_after=""
-  local curl_args=(
-    -sS
-    --max-time 120
-    -D "$headers_file"
-    -o "$body_file"
-    -X POST
-    -H 'Content-Type: application/json'
-    -H 'Authorization: Bearer clipal-placeholder-token'
-    --data "$payload"
-  )
-  if [[ "$stream_mode" == "1" ]]; then
-    curl_args+=(--no-buffer)
-  fi
-  last_request_headers="$headers_file"
-  last_request_body="$body_file"
-  register_artifacts "$headers_file" "$body_file"
-
-  for attempt in $(seq 1 "$max_attempts"); do
-    rm -f "$body_file" "$headers_file"
-    if ! http_code="$(curl "${curl_args[@]}" "$url" -w '%{http_code}')"; then
-      echo "curl request failed: $url" >&2
-      return 1
-    fi
-    if [[ "$http_code" == "200" ]]; then
-      return 0
-    fi
-    if [[ "$http_code" != "429" && "$http_code" != "503" ]]; then
-      break
-    fi
-    if [[ "$attempt" == "$max_attempts" ]]; then
-      break
-    fi
-    retry_after="$(read_retry_after "$headers_file")"
-    echo "request rate limited (HTTP $http_code), retrying in ${retry_after}s [attempt $attempt/$max_attempts]" >&2
-    sleep "$retry_after"
-  done
-
-  echo "request failed: POST $url -> HTTP ${http_code:-<unknown>}" >&2
-  return 1
 }
 
 discover_credentials_json() {
@@ -324,6 +260,30 @@ for item in items:
     print(f"{ref}\t{email}\trefresh_token={refresh}\t{display}")
 PY
 }
+
+# Both installed-service and isolated credential tests share discovery and validation.
+run_live_checks() {
+  local base_url="$1"
+  shift
+  local args=(--base-url "$base_url")
+  if [[ -n "$MODEL" ]]; then args+=(--model "$MODEL"); fi
+  if [[ "$SKIP_STREAM" == "1" ]]; then args+=(--skip-stream); fi
+  "$PY" "$repo_root/scripts/gemini_live.py" "${args[@]}" "$@"
+}
+
+if [[ -n "$BASE_URL" ]]; then
+  if [[ -n "$PROVIDER" ]]; then
+    run_live_checks "$BASE_URL" --provider "$PROVIDER"
+  else
+    run_live_checks "$BASE_URL"
+  fi
+  exit 0
+fi
+if [[ -n "$PROVIDER" ]]; then
+  echo "--provider requires --base-url" >&2
+  exit 2
+fi
+require_cmd go
 
 creds_json="$(discover_credentials_json)"
 if [[ "$LIST_ONLY" == "1" ]]; then
@@ -453,8 +413,6 @@ mkdir -p "$cfgdir/oauth/gemini"
 clipal_port="$(get_free_port)"
 clipal_pid=""
 declare -a failure_artifacts=()
-last_request_headers=""
-last_request_body=""
 cleanup() {
   local exit_status=$?
   set +e
@@ -518,168 +476,17 @@ if [[ -n "$oauth_email" ]]; then
   echo "using oauth email: $oauth_email"
 fi
 
-run_generate_check() {
-  local prompt="$1"
-  local expect_token="$2"
-  local body_file="$3"
-  local headers_file="$4"
-  local payload
-  payload="$("$PY" - "$prompt" <<'PY'
+echo "test: discover models, live generateContent and streamGenerateContent"
+register_artifacts "$tmpdir/live.json"
+run_live_checks "http://127.0.0.1:$clipal_port" >"$tmpdir/live.json"
+cat "$tmpdir/live.json"
+MODEL="$("$PY" - "$tmpdir/live.json" <<'PYMODEL'
 import json
 import sys
-print(json.dumps({
-    "contents": [
-        {
-            "role": "user",
-            "parts": [{"text": sys.argv[1]}],
-        }
-    ]
-}, ensure_ascii=False))
-PY
+with open(sys.argv[1]) as response:
+    print(json.load(response)["selected_model"])
+PYMODEL
 )"
-  post_with_rate_limit_retry \
-    "http://127.0.0.1:$clipal_port/clipal/v1beta/models/$MODEL:generateContent" \
-    "$payload" \
-    "$body_file" \
-    "$headers_file" \
-    0
-
-  "$PY" - "$body_file" "$expect_token" <<'PY'
-import json
-import re
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-texts = []
-for candidate in data.get("candidates", []) or []:
-    if not isinstance(candidate, dict):
-        continue
-    content = candidate.get("content")
-    if not isinstance(content, dict):
-        continue
-    for part in content.get("parts", []) or []:
-        if not isinstance(part, dict):
-            continue
-        text = part.get("text")
-        if isinstance(text, str) and text.strip():
-            texts.append(text.strip())
-
-joined = "\n".join(texts)
-if not joined:
-    raise SystemExit(f"generateContent returned no candidate text: {data}")
-
-expect = re.sub(r"[^A-Z0-9]+", "", sys.argv[2].upper())
-normalized = re.sub(r"[^A-Z0-9]+", "", joined.upper())
-if expect and expect not in normalized:
-    raise SystemExit(f"expected token {expect!r} in response text, got: {joined[:400]!r}")
-
-response_id = str(data.get("responseId", "")).strip()
-preview = joined[:120].replace("\n", " ")
-print(f"ok responseId={response_id or '<none>'} text={preview}")
-PY
-}
-
-run_stream_check() {
-  local prompt="$1"
-  local expect_token="$2"
-  local body_file="$3"
-  local headers_file="$4"
-  local payload
-  payload="$("$PY" - "$prompt" <<'PY'
-import json
-import sys
-print(json.dumps({
-    "contents": [
-        {
-            "role": "user",
-            "parts": [{"text": sys.argv[1]}],
-        }
-    ]
-}, ensure_ascii=False))
-PY
-)"
-  post_with_rate_limit_retry \
-    "http://127.0.0.1:$clipal_port/clipal/v1beta/models/$MODEL:streamGenerateContent" \
-    "$payload" \
-    "$body_file" \
-    "$headers_file" \
-    1
-
-  "$PY" - "$body_file" "$headers_file" "$expect_token" <<'PY'
-import json
-import pathlib
-import re
-import sys
-
-body = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-headers = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8", errors="replace").lower()
-expect = re.sub(r"[^A-Z0-9]+", "", sys.argv[3].upper())
-
-if "data:" not in body:
-    raise SystemExit("stream response did not contain any SSE data frames")
-if "text/event-stream" not in headers:
-    raise SystemExit("stream response missing text/event-stream content-type")
-
-texts = []
-response_ids = []
-for raw in body.splitlines():
-    if not raw.startswith("data:"):
-        continue
-    payload = raw[5:].strip()
-    if not payload or payload == "[DONE]":
-        continue
-    try:
-        data = json.loads(payload)
-    except Exception:
-        continue
-
-    response_id = data.get("responseId")
-    if isinstance(response_id, str) and response_id.strip():
-        response_ids.append(response_id.strip())
-
-    for candidate in data.get("candidates", []) or []:
-        if not isinstance(candidate, dict):
-            continue
-        content = candidate.get("content")
-        if not isinstance(content, dict):
-            continue
-        for part in content.get("parts", []) or []:
-            if not isinstance(part, dict):
-                continue
-            text = part.get("text")
-            if isinstance(text, str) and text.strip():
-                texts.append(text.strip())
-
-joined = "\n".join(texts)
-if not joined:
-    raise SystemExit(f"stream response returned no candidate text: {body[:400]!r}")
-
-normalized = re.sub(r"[^A-Z0-9]+", "", joined.upper())
-if expect and expect not in normalized:
-    raise SystemExit(f"expected token {expect!r} in stream response, got: {body[:400]!r}")
-
-response_id = response_ids[-1] if response_ids else "<none>"
-print(f"ok stream responseId={response_id}")
-PY
-}
-
-echo "test: live generateContent"
-run_generate_check \
-  "Reply with exactly LIVEOK and nothing else." \
-  "LIVEOK" \
-  "$tmpdir/generate.json" \
-  "$tmpdir/generate.headers"
-
-if [[ "$SKIP_STREAM" != "1" ]]; then
-  echo "test: live streamGenerateContent"
-  run_stream_check \
-    "Reply with exactly STREAMOK and nothing else." \
-    "STREAMOK" \
-    "$tmpdir/stream.sse" \
-    "$tmpdir/stream.headers"
-fi
 
 if [[ "$SKIP_REFRESH_RETRY" != "1" ]]; then
   if [[ "$oauth_has_refresh" != "1" ]]; then
@@ -699,11 +506,11 @@ data["expires_at"] = (datetime.now(timezone.utc) + timedelta(hours=24)).replace(
 path.write_text(json.dumps(data, indent=2) + "\n")
 PY
 
-    run_generate_check \
-      "Reply with exactly REFRESHOK and nothing else." \
-      "REFRESHOK" \
-      "$tmpdir/refresh.json" \
-      "$tmpdir/refresh.headers"
+    register_artifacts "$tmpdir/refresh.json"
+    "$PY" "$repo_root/scripts/gemini_live.py" \
+      --base-url "http://127.0.0.1:$clipal_port" --model "$MODEL" \
+      --skip-stream --token REFRESHOK >"$tmpdir/refresh.json"
+    cat "$tmpdir/refresh.json"
 
     "$PY" - "$credential_path" <<'PY'
 import json

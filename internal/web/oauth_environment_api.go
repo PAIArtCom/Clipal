@@ -208,7 +208,10 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 		check("dns", "ok", "Target hostnames are delegated to the standard proxy; public DoH is not required.")
 		check("target_dns", "pending", "The proxy's actual DNS backend and target addresses are unverified.")
 	} else {
-		report.BootstrapDNS = "fixed DoH bootstrap IP (no explicit proxy)"
+		report.BootstrapDNS = "DoH service hostname bootstrap with fixed-IP fallback (no explicit proxy)"
+		if cred.Environment.DNS == "auto" {
+			report.BootstrapDNS = "Automatic DoH route; system hostname fallback on connection failure (no explicit proxy)"
+		}
 	}
 	if resolvedProxy == nil && cred.Environment.DNS == "system" {
 		report.BootstrapDNS = "DoH is not used"
@@ -228,6 +231,9 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 		if cred.Environment.DNS == "system" {
 			check("dns", "pending", "DNS follows the system or proxy resolver; Google/Cloudflare is not enforced.")
 			check("target_dns", "pending", "Target resolution follows the system resolver; system/TUN routing is not observed.")
+		} else if cred.Environment.DNS == "auto" {
+			check("dns", "pending", "Automatic DNS tries DoH first, then the system hostname route if connection establishment fails.")
+			check("target_dns", "pending", "System/TUN routing and target addresses are unverified; no network settings are changed.")
 		} else if _, err := outbound.Lookup(ctx, client, target); err != nil {
 			check("dns", "mismatch", "Account DoH lookup failed; no system DNS fallback was used.")
 		} else {
@@ -243,7 +249,7 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 		_ = resp.Body.Close()
 		check("connection", "ok", "Target HTTP connection succeeded without account credentials; authentication is unverified.")
 	} else {
-		check("connection", "pending", "Target connection did not complete; no fallback route was used.")
+		check("connection", "pending", "Target connection did not complete on the configured routing policy.")
 	}
 	if exit, err := outbound.ProbeExit(ctx, client, target, diagnosticExitURLs...); err == nil {
 		report.ExitIP, report.ExitCountry, report.ExitTimezone = exit.IP, exit.Country, exit.Timezone

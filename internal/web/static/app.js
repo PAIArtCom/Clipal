@@ -90,7 +90,7 @@ function app() {
                     "locale": "Locale",
                     "timezone": "Request timezone (IANA)",
                     "dns": "DNS resolution",
-                    "automatic": "Automatic: proxy resolution; Cloudflare → Google DoH without an explicit proxy",
+                    "automatic": "Automatic: use proxy resolution when configured; otherwise try DoH, then the system hostname route on connection failure",
                     "resolverChoice": "No explicit proxy: {resolver} DoH; otherwise proxy resolution",
                     "checkDoH": "Include public DoH reference for proxy routes",
                     "checkDoHHint": "Optional when using a proxy. Failure does not block requests and results cannot verify the proxy's DNS or target exit.",
@@ -147,6 +147,7 @@ function app() {
                 },
                 common: {
                     close: 'Close',
+                    back: 'Back',
                     copy: 'Copy',
                     copied: 'Copied',
                     none: 'None',
@@ -341,6 +342,7 @@ function app() {
                 },
                 settings: {
                     title: 'Global Settings',
+                    loadFailed: 'Could not load global settings. Retry to load the saved configuration.',
                     subtitle: 'Runtime defaults, recovery policy, routing strategy, and local observability.',
                     runtimeTitle: 'Runtime',
                     runtimeCopy: 'Basic listener and request buffering defaults.',
@@ -369,7 +371,7 @@ function app() {
                     upstreamProxyUrl: 'Default Proxy URL',
                     upstreamProxyHint: 'Used by providers whose proxy mode is Default.',
                     upstreamProxyUrlHelp: 'Supports http://, https://, socks5://, and socks5h:// proxy URLs.',
-                    proxyModeEnvironment: 'Use Environment',
+                    proxyModeEnvironment: 'Environment / System',
                     proxyModeDirect: 'Direct',
                     proxyModeCustom: 'Custom Proxy',
                     upstreamProxyUrlHint: 'http://127.0.0.1:7890',
@@ -588,7 +590,7 @@ function app() {
                     "locale": "地区格式",
                     "timezone": "请求时区（IANA）",
                     "dns": "DNS 解析",
-                    "automatic": "自动：有代理时由代理解析；无显式代理时 Cloudflare → Google DoH",
+                    "automatic": "自动：有代理时由代理解析；否则优先 DoH，解析或连接失败后回退系统域名通路",
                     "resolverChoice": "无显式代理时使用 {resolver} DoH；有代理时由代理解析",
                     "checkDoH": "代理下附加公共 DoH 参考诊断",
                     "checkDoHHint": "使用代理时可选。失败不阻断请求，结果不能核验代理实际 DNS 或目标出口。",
@@ -645,6 +647,7 @@ function app() {
                 },
                 common: {
                     close: '关闭',
+                    back: '返回',
                     copy: '复制',
                     copied: '已复制',
                     none: '无',
@@ -839,6 +842,7 @@ function app() {
                 },
                 settings: {
                     title: '全局设置',
+                    loadFailed: '无法加载全局设置，请重试以读取已保存的配置。',
                     subtitle: '运行时默认项、恢复策略、路由策略以及本地可观测性。',
                     runtimeTitle: '运行时',
                     runtimeCopy: '基础监听配置与请求缓冲默认项。',
@@ -867,7 +871,7 @@ function app() {
                     upstreamProxyUrl: '默认代理 URL',
                     upstreamProxyHint: '对代理模式为“使用默认值”的 Provider 生效。',
                     upstreamProxyUrlHelp: '支持 http://、https://、socks5:// 和 socks5h:// 代理 URL。',
-                    proxyModeEnvironment: '使用环境变量',
+                    proxyModeEnvironment: '环境变量／系统代理',
                     proxyModeDirect: '直连',
                     proxyModeCustom: '自定义代理',
                     upstreamProxyUrlHint: 'http://127.0.0.1:7890',
@@ -1146,7 +1150,8 @@ function app() {
         confirmReturnFocus: null,
         dialogReturnFocus: null,
         providerSearch: '',
-        expandedProviders: {},
+        selectedProviderName: '',
+        providerDetailOpen: false,   // narrow screens: the inspector replaces the list
         providerReordering: false,
         clientConfigSaving: false,
         providerUpdating: false,
@@ -1160,6 +1165,7 @@ function app() {
         },
         globalSaving: false,
         globalLoading: false,
+        globalLoadError: '',
         savedAllowRemoteWebUI: false,
         toasts: [],
         toastCounter: 0,
@@ -1239,6 +1245,15 @@ function app() {
             return this.providers.filter(provider => [provider.name, provider.display_name, provider.base_url]
                 .filter(Boolean).join(' ').toLowerCase().includes(query));
         },
+        // The inspector shows the chosen provider, or the first visible one when none is chosen.
+        get selectedProvider() {
+            const list = this.visibleProviders;
+            return list.find(provider => provider.name === this.selectedProviderName) || list[0] || null;
+        },
+        get providerDetailVisible() {
+            // Keep the list's no-match feedback visible when filtering removes the inspector.
+            return this.providerDetailOpen && !!this.selectedProvider;
+        },
         get canReorderProviders() {
             return !this.providerSearch.trim() && this.canMutateProviders;
         },
@@ -1278,21 +1293,25 @@ function app() {
             if (provider.display_name && provider.display_name !== provider.name) parts.push(provider.name);
             return parts.join(' · ');
         },
-        // Today's spend for the row; blank when there is nothing to report so rows stay quiet.
-        providerSpendTodayLabel(provider) {
-            if (!this.providerSpendVisible(provider) || !Number(provider.usage.spend_today_micros || 0)) return '';
-            return this.providerSpendToday(provider);
+        providerSelected(provider) {
+            return !!this.selectedProvider && this.selectedProvider.name === provider.name;
         },
-        providerExpanded(provider) {
-            return !!this.expandedProviders[provider.name];
+        selectProvider(provider) {
+            this.selectedProviderName = provider.name;
+            this.providerDetailOpen = true;
+            // Narrow screens push the inspector over the list: start it at the top, focus its Back button.
+            if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+                window.scrollTo({ top: 0 });
+                this.$nextTick(() => document.querySelector('.provider-inspector__back')?.focus());
+            }
         },
-        toggleProviderDetails(provider) {
-            this.expandedProviders = { ...this.expandedProviders, [provider.name]: !this.expandedProviders[provider.name] };
+        closeProviderDetail() {
+            this.providerDetailOpen = false;
         },
         providerRowClick(provider, event) {
-            // Controls inside the row handle their own clicks.
-            if (event && event.target && event.target.closest && event.target.closest('button, input, label, a')) return;
-            this.toggleProviderDetails(provider);
+            // Controls inside the row (drag handle, switch) handle their own clicks.
+            if (event && event.target && event.target.closest && event.target.closest('.provider-drag-handle, input, label, a')) return;
+            this.selectProvider(provider);
         },
         runtimeCandidatesLabel() {
             const client = this.selectedRuntime;
@@ -2486,9 +2505,11 @@ function app() {
                 "The proxy's actual DNS backend and target addresses are unverified.": '尚未核验代理实际使用的 DNS 后端及目标地址。',
                 'Optional DoH reference lookup failed; proxy requests do not depend on it.': '可选 DoH 参考查询失败；代理请求不依赖此查询。',
                 'Target resolution follows the system resolver; system/TUN routing is not observed.': '目标域名由系统解析器处理；尚未观测系统或 TUN 路由。',
+                'Automatic DNS tries DoH first, then the system hostname route if connection establishment fails.': '自动 DNS 优先使用 DoH，解析或连接建立失败后回退系统域名通路。',
+                'System/TUN routing and target addresses are unverified; no network settings are changed.': '尚未核验系统／TUN 路由及目标地址；不会修改网络设置。',
+                'Target connection did not complete on the configured routing policy.': '目标连接未能按当前路由策略完成。',
                 'Target connections use DoH returned addresses with original Host and TLS SNI.': '目标连接使用 DoH 返回的地址，保留原始 Host 与 TLS SNI。',
                 'Target HTTP connection succeeded without account credentials; authentication is unverified.': '目标 HTTP 连接成功，未发送账号凭据；认证尚未核验。',
-                'Target connection did not complete; no fallback route was used.': '目标连接未完成，未切换其他路径。',
                 'Reference service observation only; it does not prove the target exit or account country.': '仅为参考服务的观测，不能证明目标出口或账号国家。',
                 'No reference service observation was available on the selected entry.': '当前入口未获得参考服务观测。',
                 'The target exit is unverified; matching proxy entries do not prove matching egress.': '目标出口尚未核验；相同代理入口不能证明相同出口。',
@@ -2504,7 +2525,7 @@ function app() {
             const value = this.environmentDiagnostics?.bootstrap_dns || '';
             if (this.locale !== 'zh-CN') return value;
             if (!value) return '';
-            let detail = value.includes('for proxy requests') ? '代理业务请求不使用 DoH，由代理解析目标域名' : value.includes('DoH is not used') ? '未使用 DoH' : 'DoH 固定引导 IP 连接，未指定显式代理';
+            let detail = value.includes('for proxy requests') ? '代理业务请求不使用 DoH，由代理解析目标域名' : value.includes('DoH is not used') ? '未使用 DoH' : value.includes('Automatic DoH route') ? '自动优先使用 DoH，连接建立失败后回退系统域名通路' : 'DoH 服务域名引导（固定 IP 后备），未指定显式代理';
             if (value.includes('system DNS resolves')) detail += '；代理域名第一跳由系统 DNS 解析';
             return detail;
         },
@@ -4119,16 +4140,29 @@ function app() {
             const tones = { current: 'primary', cooling_down: 'warn', unavailable: 'danger', recovery_probe: 'info' };
             const remaining = entry ? String(entry.deactivated_in || entry.circuit_open_in || '').trim() : '';
             const base = this.t(keys[state]);
+            const reason = state === 'current' ? null : this.providerRuntimeReason(entry);
             return {
                 state,
                 tone: tones[state],
                 label: remaining ? `${base} · ${remaining}` : base,
                 current: isCurrent,
+                reason,
                 title: [
                     isCurrent && state !== 'current' ? this.t('providers.runtimeCurrent') : '',
-                    entry ? this.providerStatusTitle(entry) : base
+                    reason ? reason.summary : base,
+                    reason ? reason.message : ''
                 ].filter(Boolean).join('\n')
             };
+        },
+        // Why a provider is degraded: the backend's own description and the upstream error message,
+        // shown as returned. The provider's name is not part of it; the notice sits under that name.
+        providerRuntimeReason(entry) {
+            if (!entry) return null;
+            const summary = String(entry.detail || '').trim();
+            const raw = String(entry.skip_reason || '').trim() === 'deactivated' ? String(entry.deactivated_message || '').trim() : '';
+            const message = raw.length > 300 ? `${raw.slice(0, 300)}...` : raw;
+            if (!summary && !message) return null;
+            return { summary, message };
         },
 
         // Latest-activity rows on the Status page.
@@ -4329,7 +4363,8 @@ function app() {
                 return;
             }
             this.providerSearch = '';
-            this.expandedProviders = {};
+            this.selectedProviderName = '';
+            this.providerDetailOpen = false;
             this.providers = [];
             this.selectedClient = clientType;
             await Promise.all([
@@ -4845,6 +4880,12 @@ function app() {
                     this.tf('providers.deletedMessage', { client: this.providerToastClientLabel() }),
                     this.tf('providers.deletedTitle', { name: displayName })
                 );
+                // The inspector was showing this provider: return to the list rather than
+                // silently showing whichever provider is now first.
+                if (this.selectedProviderName === name) {
+                    this.selectedProviderName = '';
+                    this.providerDetailOpen = false;
+                }
                 await this.loadProviders();
                 await this.refreshStatus();
             } catch (error) {
@@ -4888,14 +4929,16 @@ function app() {
 
         // Global Config
         async loadGlobalConfig() {
-            if (this.globalLoading) return;
+            if (this.globalLoading || this.globalSaving) return;
             this.globalLoading = true;
             try {
                 const cfg = await this.apiCall('/api/config/global');
                 this.globalConfig = this.withDefaultGlobalConfig(cfg);
                 this.savedAllowRemoteWebUI = !!this.globalConfig.allow_remote_web_ui;
                 this.savedGlobalConfig = JSON.parse(JSON.stringify(this.globalConfig));
+                this.globalLoadError = '';
             } catch (error) {
+                this.globalLoadError = error.message || this.t('settings.loadFailed');
                 console.error('Failed to load global config:', error);
             } finally {
                 this.globalLoading = false;

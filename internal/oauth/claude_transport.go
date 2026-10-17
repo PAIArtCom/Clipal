@@ -42,6 +42,7 @@ func newAnthropicHTTPClient(timeout time.Duration) *http.Client {
 	if transport, ok := http.DefaultTransport.(*http.Transport); ok && transport != nil {
 		clone := transport.Clone()
 		clone.ForceAttemptHTTP2 = true
+		clone.Proxy = outbound.NetworkProxy
 		fallback = clone
 	}
 

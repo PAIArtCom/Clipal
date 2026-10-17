@@ -19,8 +19,8 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/logger"
 	"github.com/PAIArtCom/Clipal/internal/notify"
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/outbound"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
-	"golang.org/x/net/http/httpproxy"
 )
 
 var (
@@ -277,7 +277,7 @@ func newClientProxyWithGlobalProxy(clientType ClientType, mode config.ClientMode
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
-	sharedClient := newUpstreamHTTPClient(dialer, responseHeaderTimeout, http.ProxyFromEnvironment)
+	sharedClient := newUpstreamHTTPClient(dialer, responseHeaderTimeout, outbound.NetworkProxy)
 	pinnedIndex := -1
 	pinnedProvider = strings.TrimSpace(pinnedProvider)
 	if mode == config.ClientModeManual && pinnedProvider != "" {
@@ -396,51 +396,9 @@ func NewOAuthHTTPClientForProvider(provider config.Provider, global config.Globa
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
-	sharedClient := newUpstreamHTTPClient(dialer, durations.ResponseHeaderTimeout, http.ProxyFromEnvironment)
+	sharedClient := newUpstreamHTTPClient(dialer, durations.ResponseHeaderTimeout, outbound.NetworkProxy)
 	policy := effectiveProviderProxyPolicy(provider, global.NormalizedUpstreamProxyMode(), global.EffectiveUpstreamProxyIdentity())
 	return newProviderHTTPClient(policy, provider.Name, sharedClient, dialer, durations.ResponseHeaderTimeout)
-}
-
-func OAuthProviderUsesEnvironmentProxy(provider config.OAuthProvider) bool {
-	proxyFunc := httpproxy.FromEnvironment().ProxyFunc()
-	for _, rawURL := range oauthProviderEnvironmentProxyProbeURLs(provider) {
-		req, err := http.NewRequest(http.MethodGet, rawURL, nil)
-		if err != nil {
-			continue
-		}
-		proxyURL, err := proxyFunc(req.URL)
-		if err == nil && proxyURL != nil {
-			return true
-		}
-	}
-	return false
-}
-
-func oauthProviderEnvironmentProxyProbeURLs(provider config.OAuthProvider) []string {
-	switch config.OAuthProvider(strings.ToLower(strings.TrimSpace(string(provider)))) {
-	case config.OAuthProviderCodex:
-		return []string{
-			"https://auth.openai.com/oauth/token",
-			"https://chatgpt.com/backend-api/wham/usage",
-		}
-	case config.OAuthProviderClaude:
-		return []string{"https://platform.claude.com/v1/oauth/token"}
-	case config.OAuthProviderGemini:
-		return []string{
-			"https://oauth2.googleapis.com/token",
-			"https://www.googleapis.com/oauth2/v1/userinfo",
-			"https://cloudcode-pa.googleapis.com",
-		}
-	case config.OAuthProviderAntigravity:
-		return []string{
-			"https://oauth2.googleapis.com/token",
-			"https://www.googleapis.com/oauth2/v1/userinfo",
-			"https://cloudcode-pa.googleapis.com",
-			"https://daily-cloudcode-pa.googleapis.com",
-		}
-	default:
-		return nil
-	}
 }
 
 func effectiveProviderProxyPolicy(provider config.Provider, globalMode config.GlobalUpstreamProxyMode, globalURL string) upstreamProxyPolicyKey {

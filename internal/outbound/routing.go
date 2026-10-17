@@ -22,6 +22,9 @@ func RouteInfo(client *http.Client, target string) RoutingInfo {
 	if client != nil {
 		if t, ok := client.Transport.(*transport); ok && t.dns != "" && t.dns != "system" {
 			info.ConnectMode = "resolved_ip"
+			if t.dns == "auto" {
+				info.ConnectMode = "auto"
+			}
 		}
 	}
 	return info

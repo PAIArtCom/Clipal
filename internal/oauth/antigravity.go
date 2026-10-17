@@ -3,6 +3,7 @@ package oauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -113,7 +114,6 @@ func NewAntigravityClient() *AntigravityClient {
 		CallbackPath:      defaultAntigravityCallbackPath,
 		HTTPClient:        &http.Client{Timeout: 30 * time.Second},
 		Now:               time.Now,
-		Sleep:             time.Sleep,
 	}
 	applyAntigravityClientEnvOverrides(client)
 	return client
@@ -219,6 +219,37 @@ func (c *AntigravityClient) Refresh(ctx context.Context, cred *Credential) (*Cre
 	return c.credentialFromToken(ctx, token, cred)
 }
 
+// RepairProject completes account metadata using the existing valid access token.
+// Token values and lifetime are retained unless Google rejects the access token;
+// a 401 permits one refresh. Credential references and account preferences remain.
+func (c *AntigravityClient) RepairProject(ctx context.Context, cred *Credential) (*Credential, error) {
+	if cred == nil || strings.TrimSpace(cred.AccessToken) == "" {
+		return nil, fmt.Errorf("antigravity project repair requires an access token")
+	}
+	project, tiers, auto, err := c.resolveProjectID(ctx, cred.AccessToken, cred)
+	if err != nil {
+		var status *cloudCodeHTTPError
+		if errors.As(err, &status) && status.Status == http.StatusUnauthorized && strings.TrimSpace(cred.RefreshToken) != "" {
+			return c.Refresh(ctx, cred)
+		}
+		return nil, err
+	}
+	repaired := cred.Clone()
+	repaired.AccountID = project
+	if repaired.Metadata == nil {
+		repaired.Metadata = map[string]string{}
+	}
+	for key := range repaired.Metadata {
+		if volatileCredentialMetadataKey(config.OAuthProviderAntigravity, key) {
+			delete(repaired.Metadata, key)
+		}
+	}
+	for key, value := range c.projectMetadata(project, tiers, auto) {
+		repaired.Metadata[key] = value
+	}
+	return repaired, nil
+}
+
 func (c *AntigravityClient) exchange(ctx context.Context, form url.Values) (*geminiTokenResponse, error) {
 	gemini := &GeminiClient{TokenURL: c.tokenURL(), HTTPClient: c.httpClient()}
 	return gemini.exchange(ctx, form)
@@ -230,14 +261,29 @@ func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *gemi
 	if err != nil && strings.TrimSpace(previousValue(previous, func(v *Credential) string { return v.Email })) == "" {
 		return nil, err
 	}
-	projectID, tiers, autoProject, err := c.resolveProjectID(ctx, token.AccessToken, previous)
-	if err != nil {
-		return nil, err
+	if err == nil && previous != nil && strings.TrimSpace(previous.Email) != "" && !strings.EqualFold(strings.TrimSpace(email), strings.TrimSpace(previous.Email)) {
+		return nil, fmt.Errorf("antigravity refreshed identity does not match the stored account")
+	}
+	projectID, tiers, autoProject, setupErr := c.resolveProjectID(ctx, token.AccessToken, previous)
+	if setupErr != nil {
+		var setup *AntigravitySetupError
+		identityVerified := err == nil && previous != nil && strings.TrimSpace(email) != "" && strings.EqualFold(strings.TrimSpace(email), strings.TrimSpace(previous.Email))
+		if !identityVerified || !errors.As(setupErr, &setup) {
+			return nil, setupErr
+		}
+		// Existing, verified accounts retain a successful token rotation even when
+		// project setup is blocked. New authorizations remain all-or-nothing.
 	}
 	email = strings.TrimSpace(firstNonEmpty(email, previousValue(previous, func(v *Credential) string { return v.Email })))
 	projectID = strings.TrimSpace(firstNonEmpty(projectID, c.requestedProjectID(previous), previousValue(previous, func(v *Credential) string { return v.AccountID })))
 
-	metadata := c.metadataFromToken(token, projectID, tiers, autoProject)
+	// Google commonly omits refresh_token during refresh. Keep the root token
+	// and its serialized compatibility metadata consistent without mutating the response.
+	effectiveToken := *token
+	if previous != nil && strings.TrimSpace(effectiveToken.RefreshToken) == "" {
+		effectiveToken.RefreshToken = previous.RefreshToken
+	}
+	metadata := c.metadataFromToken(&effectiveToken, projectID, tiers, autoProject)
 	cred := &Credential{
 		Ref:          antigravityCredentialRef(email, projectID),
 		Provider:     config.OAuthProviderAntigravity,
@@ -279,7 +325,7 @@ func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *gemi
 	if cred.Metadata != nil {
 		cred.Metadata["project_id"] = strings.TrimSpace(firstNonEmpty(cred.AccountID, cred.Metadata["project_id"]))
 	}
-	return cred, nil
+	return cred, setupErr
 }
 
 func (c *AntigravityClient) fetchUserEmail(ctx context.Context, accessToken string) (string, error) {
@@ -306,8 +352,8 @@ func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken st
 	if projectID != "" {
 		return projectID, tiers, requestedProject == "", nil
 	}
-	if requestedProject != "" {
-		return requestedProject, tiers, false, nil
+	if err := antigravityProjectRequirement(loadResp, tiers.onboardTierID()); err != nil {
+		return "", tiers, false, err
 	}
 	projectID, err = c.onboardUser(ctx, accessToken, tiers.onboardTierID())
 	if err != nil {
@@ -325,23 +371,50 @@ func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken st
 func (c *AntigravityClient) onboardUser(ctx context.Context, accessToken string, tierID string) (string, error) {
 	tierID = strings.TrimSpace(firstNonEmpty(tierID, defaultAntigravityFreeTierID))
 	metadata := antigravityClientMetadata()
-	resp, err := c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", map[string]any{
-		"tier_id":  tierID,
-		"metadata": metadata,
-	})
-	if err != nil && strings.Contains(err.Error(), "status 400") {
-		resp, err = c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", map[string]any{
-			"tierId":   tierID,
-			"metadata": metadata,
-		})
+	payload := map[string]any{"tier_id": tierID, "metadata": metadata}
+	resp, err := c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", payload)
+	var status *cloudCodeHTTPError
+	if errors.As(err, &status) && status.Status == http.StatusBadRequest {
+		payload = map[string]any{"tierId": tierID, "metadata": metadata}
+		resp, err = c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", payload)
 	}
 	if err != nil {
 		return "", err
 	}
-	if done, _ := resp["done"].(bool); !done {
-		return "", fmt.Errorf("project onboarding did not complete")
+	for attempt := 0; attempt < defaultGeminiOnboardAttempts; attempt++ {
+		if err := cloudCodeOperationError(resp); err != nil {
+			return "", err
+		}
+		if done, _ := resp["done"].(bool); done {
+			projectID := extractGeminiProjectIDFromOnboard(resp)
+			if projectID == "" {
+				return "", fmt.Errorf("project onboarding completed without project_id metadata")
+			}
+			return projectID, nil
+		}
+		if name := extractGeminiOperationName(resp); name != "" {
+			completed, err := pollCloudCodeOperation(ctx, accessToken, name, cloudCodeOperationConfig{Client: c.httpClient(), BaseURL: c.dailyCloudCodeURL(), Version: c.cloudCodeVersion(), UserAgent: antigravityUserAgent(), Now: c.now, Sleep: c.Sleep})
+			if err != nil {
+				return "", err
+			}
+			projectID := extractGeminiProjectIDFromOnboard(completed)
+			if projectID == "" {
+				return "", fmt.Errorf("project onboarding completed without project_id metadata")
+			}
+			return projectID, nil
+		}
+		if attempt+1 == defaultGeminiOnboardAttempts {
+			break
+		}
+		if err := waitCloudCode(ctx, defaultGeminiOnboardDelay, c.Sleep); err != nil {
+			return "", err
+		}
+		resp, err = c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", payload)
+		if err != nil {
+			return "", err
+		}
 	}
-	return extractGeminiProjectIDFromOnboard(resp), nil
+	return "", fmt.Errorf("project onboarding did not complete")
 }
 
 func extractAntigravityTierID(payload map[string]any) string {
@@ -477,7 +550,9 @@ func (c *AntigravityClient) callCloudCode(ctx context.Context, accessToken strin
 		if err != nil {
 			lastErr = err
 			if attempt+1 < defaultAntigravityCloudCodeRetry {
-				c.sleep(defaultAntigravityCloudCodeRetryWait)
+				if err := waitCloudCode(ctx, defaultAntigravityCloudCodeRetryWait, c.Sleep); err != nil {
+					return nil, err
+				}
 				continue
 			}
 			return nil, err
@@ -487,9 +562,11 @@ func (c *AntigravityClient) callCloudCode(ctx context.Context, accessToken strin
 			return nil, readErr
 		}
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-			lastErr = fmt.Errorf("request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+			lastErr = &cloudCodeHTTPError{Status: resp.StatusCode, Body: strings.TrimSpace(string(respBody))}
 			if attempt+1 < defaultAntigravityCloudCodeRetry && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
+				if err := waitCloudCode(ctx, geminiCloudCodeRetryDelay(resp.Header, c.now()), c.Sleep); err != nil {
+					return nil, err
+				}
 				continue
 			}
 			return nil, lastErr
@@ -527,14 +604,18 @@ func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projec
 		tokenJSON["id_token"] = strings.TrimSpace(token.IDToken)
 	}
 	encodedToken, _ := json.Marshal(tokenJSON)
-	metadata := map[string]string{
-		"auto_project": strconv.FormatBool(autoProject),
-		"project_id":   strings.TrimSpace(projectID),
-		"scopes":       strings.Join(c.scopes(), " "),
-		"tier_id":      strings.TrimSpace(firstNonEmpty(tiers.TierID, defaultAntigravityFreeTierID)),
-		"token_json":   string(encodedToken),
-		"token_type":   strings.TrimSpace(token.TokenType),
+	metadata := c.projectMetadata(projectID, tiers, autoProject)
+	metadata["scopes"] = strings.Join(c.scopes(), " ")
+	metadata["token_json"] = string(encodedToken)
+	metadata["token_type"] = strings.TrimSpace(token.TokenType)
+	if scope := strings.TrimSpace(token.Scope); scope != "" {
+		metadata["granted_scope"] = scope
 	}
+	return metadata
+}
+
+func (c *AntigravityClient) projectMetadata(projectID string, tiers antigravityTierMetadata, autoProject bool) map[string]string {
+	metadata := map[string]string{"auto_project": strconv.FormatBool(autoProject), "project_id": strings.TrimSpace(projectID), "tier_id": strings.TrimSpace(firstNonEmpty(tiers.TierID, defaultAntigravityFreeTierID))}
 	for key, value := range map[string]string{
 		"current_tier_id":                      tiers.CurrentTierID,
 		"current_tier_name":                    tiers.CurrentTierName,
@@ -549,9 +630,7 @@ func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projec
 			metadata[key] = value
 		}
 	}
-	if scope := strings.TrimSpace(token.Scope); scope != "" {
-		metadata["granted_scope"] = scope
-	}
+
 	if requestedProject := strings.TrimSpace(c.requestedProjectID(nil)); requestedProject != "" {
 		metadata["requested_project_id"] = requestedProject
 	}

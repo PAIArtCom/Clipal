@@ -823,6 +823,8 @@ test('deleteProvider deletes oauth providers through the provider API', async ()
     state.askConfirm = async () => true;
     state.loadProviders = async () => {};
     state.refreshStatus = async () => {};
+    state.selectedProviderName = 'codex-sean-example-com';
+    state.providerDetailOpen = true;
 
     await state.deleteProvider({
         name: 'codex-sean-example-com',
@@ -838,6 +840,9 @@ test('deleteProvider deletes oauth providers through the provider API', async ()
             method: 'DELETE'
         }
     ]);
+    // The inspector no longer points at the deleted provider.
+    assert.equal(state.selectedProviderName, '');
+    assert.equal(state.providerDetailOpen, false);
 });
 
 test('oauthSessionSuccessMessage reflects provider action', () => {
@@ -2240,6 +2245,10 @@ test('OAuth diagnostic explanations follow the management locale', () => {
     assert.match(state.environmentBootstrapDetail(), /由代理解析/);
     state.environmentDiagnostics = { bootstrap_dns: 'DoH is not used' };
     assert.equal(state.environmentBootstrapDetail(), '未使用 DoH');
+    state.environmentDiagnostics = { bootstrap_dns: 'DoH service hostname bootstrap with fixed-IP fallback (no explicit proxy)' };
+    assert.match(state.environmentBootstrapDetail(), /服务域名引导（固定 IP 后备）/);
+    state.environmentDiagnostics = { bootstrap_dns: 'Automatic DoH route; system hostname fallback on connection failure (no explicit proxy)' };
+    assert.match(state.environmentBootstrapDetail(), /优先使用 DoH.*回退系统域名通路/);
     assert.doesNotMatch(state.environmentCheckDetail(check), /目标连接使用解析结果/);
     assert.match(state.environmentCheckDetail({ detail: 'Target hostnames are delegated to the standard proxy; public DoH is not required.' }), /不依赖公共 DoH/);
     assert.match(state.environmentCheckDetail({ detail: 'Optional DoH reference lookup failed; proxy requests do not depend on it.' }), /不依赖此查询/);
@@ -2853,20 +2862,76 @@ test('provider rows show disabled, standby, in-use and degraded states', () => {
     assert.equal(state.providerNeedsAttention({ name: 'live', enabled: true }), false);
 });
 
-test('provider row meta names the upstream host or OAuth and expands on demand', () => {
+test('degraded-state notices show the backend message as returned and never the provider name', () => {
+    const state = loadApp();
+    state.status.clients[state.selectedClient] = {
+        current_provider: 'live',
+        providers: [
+            { name: 'cool', state: 'cooling_down', label: 'cool (cooling down)', detail: 'Rate limited. Retry in 12m.',
+                skip_reason: 'deactivated', deactivated_reason: 'rate_limit', deactivated_in: '12m', deactivated_message: '429 Too Many Requests' },
+            { name: 'trip', state: 'cooling_down', label: 'trip (cooling down)', detail: 'Circuit breaker is open. Retry in 30s.',
+                skip_reason: 'circuit_open', circuit_state: 'open', circuit_open_in: '30s', deactivated_message: 'stale' },
+            { name: 'bare', state: 'unavailable', label: 'bare (unavailable)' }
+        ]
+    };
+    const cool = state.providerRowState({ name: 'cool', enabled: true });
+    assert.equal(cool.label, 'Cooling down · 12m');
+    assert.equal(cool.reason.summary, 'Rate limited. Retry in 12m.');
+    assert.equal(cool.reason.message, '429 Too Many Requests');
+    assert.doesNotMatch(cool.title, /cool/);
+    // The upstream message belongs to a deactivation only.
+    const trip = state.providerRowState({ name: 'trip', enabled: true });
+    assert.equal(trip.reason.summary, 'Circuit breaker is open. Retry in 30s.');
+    assert.equal(trip.reason.message, '');
+    assert.equal(state.providerRowState({ name: 'bare', enabled: true }).reason, null);
+    assert.equal(state.providerRowState({ name: 'live', enabled: true }).reason, null);
+    state.locale = 'zh-CN';
+    assert.equal(state.providerRowState({ name: 'cool', enabled: true }).reason.summary, 'Rate limited. Retry in 12m.');
+});
+
+test('provider row meta names the upstream host or OAuth and selects into the inspector', () => {
     const state = loadApp();
     assert.equal(state.providerRowMeta({ name: 'a', base_url: 'https://api.example.test/v1' }), 'api.example.test');
     assert.equal(state.providerRowMeta({ name: 'codex-a', display_name: 'a@example.test', auth_type: 'oauth' }), 'codex-a');
-    assert.equal(state.providerSpendTodayLabel({ usage: { has_cost: true, spend_today_micros: 0 } }), '');
-    assert.notEqual(state.providerSpendTodayLabel({ usage: { has_cost: true, spend_today_micros: 1200000 } }), '');
-    const row = { name: 'a' };
-    assert.equal(state.providerExpanded(row), false);
-    state.providerRowClick(row, { target: { closest: () => null } });
-    assert.equal(state.providerExpanded(row), true);
-    state.providerRowClick(row, { target: { closest: () => ({}) } });
-    assert.equal(state.providerExpanded(row), true);
-    state.toggleProviderDetails(row);
-    assert.equal(state.providerExpanded(row), false);
+    const first = { name: 'a' };
+    const second = { name: 'b' };
+    state.providers = [first, second];
+    // Without a choice the inspector shows the first provider; the narrow-screen detail stays closed.
+    assert.equal(state.selectedProvider.name, 'a');
+    assert.equal(state.providerDetailOpen, false);
+    state.providerRowClick(second, { target: { closest: () => null } });
+    assert.equal(state.providerSelected(second), true);
+    assert.equal(state.providerSelected(first), false);
+    assert.equal(state.providerDetailOpen, true);
+    // Clicks on the drag handle or switch do not change the selection.
+    state.providerRowClick(first, { target: { closest: () => ({}) } });
+    assert.equal(state.selectedProvider.name, 'b');
+    state.closeProviderDetail();
+    assert.equal(state.providerDetailOpen, false);
+    // A filtered-out or deleted selection falls back to the first visible provider.
+    state.providers = [first];
+    assert.equal(state.selectedProvider.name, 'a');
+    state.providers = [];
+    assert.equal(state.selectedProvider, null);
+});
+
+test('narrow provider layout shows the list and empty-state feedback when search has no matches', () => {
+    const state = loadApp();
+    state.providers = Array.from({ length: 9 }, (_, index) => ({ name: `provider-${index}` }));
+    assert.equal(state.providerDetailVisible, false);
+    state.selectProvider(state.providers[4]);
+    assert.equal(state.providerDetailVisible, true);
+    state.providerSearch = 'no-match';
+    assert.equal(state.selectedProvider, null);
+    assert.equal(state.providerDetailVisible, false);
+    // Clearing the query restores the chosen provider and its Back navigation.
+    state.providerSearch = '';
+    assert.equal(state.selectedProvider.name, 'provider-4');
+    assert.equal(state.providerDetailVisible, true);
+    state.closeProviderDetail();
+    assert.equal(state.providerDetailVisible, false);
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    assert.match(html, /class="provider-split" :class="\{'is-detail-open': providerDetailVisible\}"/);
 });
 
 test('status polling is scoped to the tab that shows the data', () => {
@@ -2910,8 +2975,9 @@ test('system status refreshes service readiness on arrival and retains failure f
 test('OAuth rows without plan metadata still expose credential details', () => {
     const state = loadApp();
     const provider = { name: 'claude-account', auth_type: 'oauth', oauth_provider: 'claude', oauth_auth_status: 'reauth_needed' };
+    state.providers = [provider];
     state.providerRowClick(provider, { target: { closest: () => null } });
-    assert.equal(state.providerExpanded(provider), true);
+    assert.equal(state.providerSelected(provider), true);
     assert.equal(state.providerOAuthAuthStatusLabel(provider), 'Reauth needed');
     assert.equal(state.providerOAuthRefreshSummary(provider), 'Never');
 });
@@ -3270,6 +3336,23 @@ test('client keyboard selection wraps and supports first and last while preservi
     assert.deepEqual(visited, ['gemini', 'claude', 'gemini']);
 });
 
+test('switching client groups resets the provider selection and respects save locks', async () => {
+    const state = loadApp({ context: { document: { querySelector: () => null } } });
+    const visited = [];
+    state.loadProviders = async () => visited.push(state.selectedClient);
+    state.loadOAuthProviders = async () => {};
+    state.selectedProviderName = 'a';
+    state.providerDetailOpen = true;
+    await state.selectClient('gemini');
+    assert.equal(state.selectedClient, 'gemini');
+    assert.equal(state.selectedProviderName, '');
+    assert.equal(state.providerDetailOpen, false);
+    state.clientConfigSaving = true;
+    await state.selectClient('claude');
+    assert.equal(state.selectedClient, 'gemini');
+    assert.deepEqual(visited, ['gemini']);
+});
+
 test('account preference saves report success and prevent closure only while writing', async () => {
     const state = loadApp();
     state.environmentVisible = true;
@@ -3461,6 +3544,53 @@ test('failed settings reads release controls and preserve the draft', async () =
     await state.loadGlobalConfig();
     assert.equal(state.globalLoading, false);
     assert.equal(state.globalConfig.log_retention_days, 21);
+});
+
+test('initial settings load failure exposes retry and recovers editing and saving without a page reload', async () => {
+    const state = loadApp({ context: { console: { ...console, error() {} } } });
+    state.apiCall = async () => { throw new Error('offline'); };
+    await state.loadGlobalConfig();
+    assert.equal(state.globalLoadError, 'offline');
+    assert.equal(state.savedGlobalConfig, null);
+    assert.equal(state.globalLoading, false);
+
+    let finish;
+    state.apiCall = () => new Promise(resolve => { finish = resolve; });
+    const retry = state.loadGlobalConfig();
+    assert.equal(state.globalLoading, true);
+    finish({ listen_addr: '127.0.0.1', port: 3333 });
+    await retry;
+    assert.equal(state.globalLoadError, '');
+    assert.equal(state.globalDirty, false);
+    state.globalConfig.port = 4444;
+    assert.equal(state.globalDirty, true);
+    const writes = [];
+    state.apiCall = async (url, options) => { writes.push({ url, options }); };
+    state.refreshStatus = async () => {};
+    state.showAlert = () => {};
+    await state.saveGlobalConfig();
+    assert.equal(writes[0].url, '/api/config/global/update');
+    assert.equal(JSON.parse(writes[0].options.body).port, 4444);
+    assert.equal(state.globalDirty, false);
+
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    assert.match(html, /role="alert" x-show="globalLoadError"/);
+    assert.match(html, /@click="loadGlobalConfig\(\)"\s+:disabled="globalLoading \|\| globalSaving" x-text="t\('feedback.retry'\)"/);
+    assert.match(html, /<fieldset class="settings-compact-grid" :disabled="globalLoading \|\| !savedGlobalConfig">/);
+});
+
+test('failed settings reset retains the saved baseline and draft while exposing retry', async () => {
+    const state = loadApp({ context: { console: { ...console, error() {} } } });
+    state.apiCall = async () => ({ port: 3333 });
+    await state.loadGlobalConfig();
+    state.globalConfig.port = 4444;
+    state.apiCall = async () => { throw new Error('offline'); };
+    await state.loadGlobalConfig();
+    assert.equal(state.globalLoadError, 'offline');
+    assert.equal(state.savedGlobalConfig.port, 3333);
+    assert.equal(state.globalConfig.port, 4444);
+    assert.equal(state.globalDirty, true);
+    assert.equal(state.globalLoading, false);
 });
 
 test('literal translation references resolve in both UI languages', () => {

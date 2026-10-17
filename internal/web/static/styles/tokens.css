@@ -33,7 +33,6 @@
 
     /* Surfaces */
     --bg-window: #f5f5f7;
-    --bg-window-top: #fafafb;
     --bg-content: #ffffff;           /* cards, groups, sheets */
     --bg-raised: #ffffff;            /* raised controls (buttons, thumbs) */
     --bg-raised-bottom: #f6f6f8;
@@ -42,7 +41,8 @@
     --fill: rgba(120, 120, 128, 0.12);       /* control tracks, quiet fills */
     --fill-strong: rgba(120, 120, 128, 0.2);
     --fill-hover: rgba(120, 120, 128, 0.08);
-    --material-bar: rgba(250, 250, 252, 0.78);
+    --chrome-band: #ebebee;          /* title band behind the brand row */
+    --material-bar: rgba(245, 245, 247, 0.82);  /* window background, translucent: tab area, save bar */
     --material-popover: rgba(255, 255, 255, 0.86);
     --scrim: rgba(28, 28, 32, 0.28);
 
@@ -113,11 +113,65 @@
     --transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease),
         color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), opacity var(--dur) var(--ease);
 
+    /*
+     * Spacing scale: one 4px base, eight tiers. Every margin, padding, gap and
+     * offset uses a tier or a rhythm token below; there are no other values.
+     * 2xs is reserved for insets inside control tracks.
+     */
+    --space-2xs: 2px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 48px;
+
+    /*
+     * Rhythm: distance alone shows grouping. Each level is clearly larger than
+     * the one inside it: inner < item < module < section.
+     */
+    --gap-inner: var(--space-sm);      /* inside one element: label to control, title to meta */
+    --gap-item: var(--space-lg);       /* siblings in one group: fields, tiles, rows of a list block */
+    --gap-module: var(--space-xl);     /* between content groups (cards, panels) */
+    --gap-section: var(--space-3xl);   /* between page regions; page bottom */
+
+    /* Insets: padding scales with the container's size and importance. */
+    --inset-group: var(--space-xl);    /* content groups: cards, panels, sheets */
+    --inset-tile: var(--space-md) var(--space-lg);  /* tiles and wells inside a group */
+
     /* Layout */
     --content-width: 1040px;
-    --toolbar-height: 52px;     /* chrome row: brand and app controls */
-    --tabbar-height: 36px;      /* section tab bar under the chrome row */
-    --toolbar-offset: calc(var(--toolbar-height) + var(--tabbar-height) + 12px);  /* total sticky height */
+    --page-gutter: var(--space-xl);
+    --toolbar-height: 40px;            /* title band: brand and app controls */
+    --tabbar-height: 36px;             /* section tab bar under the band */
+    --tabbar-inset-top: var(--space-xl);     /* band to tab bar */
+    --tabbar-inset-bottom: var(--space-md);  /* tab bar to the edge of the sticky area */
+    --page-top: var(--space-md);       /* sticky edge to page title; tab bar to title = inset-bottom + page-top */
+    /* Total sticky height: band, inset, tab bar, inset. */
+    --toolbar-offset: calc(var(--toolbar-height) + var(--tabbar-inset-top) + var(--tabbar-height) + var(--tabbar-inset-bottom));
+}
+
+/* Narrow screens: every level shrinks in proportion, so the hierarchy holds. */
+@media (max-width: 760px) {
+    :root {
+        --gap-item: var(--space-md);
+        --gap-module: var(--space-lg);
+        --gap-section: var(--space-2xl);
+        --inset-group: var(--space-lg);
+        --inset-tile: var(--space-md);
+        --page-gutter: var(--space-lg);
+        --tabbar-inset-top: var(--space-lg);
+        --page-top: var(--space-sm);
+    }
+}
+
+/* Touch screens: 44px targets, so the band grows to hold 44px controls. */
+@media (pointer: coarse) {
+    :root {
+        --toolbar-height: 52px;
+        --tabbar-height: 44px;
+    }
 }
 
 .dark {
@@ -142,7 +196,6 @@
     --danger-soft: rgba(255, 69, 58, 0.14);
 
     --bg-window: #161618;
-    --bg-window-top: #1c1c1f;
     --bg-content: #232326;
     --bg-raised: #48484c;
     --bg-raised-bottom: #3f3f43;
@@ -151,7 +204,8 @@
     --fill: rgba(120, 120, 128, 0.24);
     --fill-strong: rgba(120, 120, 128, 0.34);
     --fill-hover: rgba(120, 120, 128, 0.16);
-    --material-bar: rgba(30, 30, 33, 0.72);
+    --chrome-band: #2a2a2e;
+    --material-bar: rgba(22, 22, 24, 0.8);
     --material-popover: rgba(44, 44, 48, 0.86);
     --scrim: rgba(0, 0, 0, 0.45);
 

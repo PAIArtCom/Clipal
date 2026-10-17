@@ -12,6 +12,7 @@ import (
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/outbound"
 )
 
 const (
@@ -799,16 +800,14 @@ func (cp *ClientProxy) oauthHTTPClientForProvider(provider config.Provider, prov
 	if cp == nil || providerIndex < 0 {
 		return nil
 	}
-	if providerIndex < len(cp.providerProxyPolicies) && cp.providerProxyPolicies[providerIndex].mode == upstreamProxyPolicyDirect && provider.NormalizedOAuthProvider() == config.OAuthProviderClaude {
+	client := cp.upstreamHTTPClient(providerIndex)
+	// Injected opaque business transports own their network behavior and cannot
+	// also be used for provider token/usage endpoints. Standard inherited clients
+	// always carry the per-request OS policy, even if no proxy exists right now.
+	if providerIndex < len(cp.providerProxyPolicies) && cp.providerProxyPolicies[providerIndex].mode == upstreamProxyPolicyEnvironment && !outbound.SupportsDNS(client) {
 		return nil
 	}
-	if providerIndex < len(cp.providerProxyPolicies) && cp.providerProxyPolicies[providerIndex].mode == upstreamProxyPolicyEnvironment {
-		if OAuthProviderUsesEnvironmentProxy(provider.NormalizedOAuthProvider()) {
-			return cp.upstreamHTTPClient(providerIndex)
-		}
-		return nil
-	}
-	return cp.upstreamHTTPClient(providerIndex)
+	return client
 }
 
 func (cp *ClientProxy) doPreparedProviderRequest(proxyReq *http.Request, providerIndex int) (*http.Response, error) {

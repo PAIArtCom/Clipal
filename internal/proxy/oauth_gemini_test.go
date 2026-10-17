@@ -16,12 +16,16 @@ import (
 )
 
 type stubGeminiOAuthClient struct {
+	provider      config.OAuthProvider
 	refreshCred   *oauthpkg.Credential
 	refreshErr    error
 	refreshCalled int32
 }
 
 func (c *stubGeminiOAuthClient) Provider() config.OAuthProvider {
+	if c.provider != "" {
+		return c.provider
+	}
 	return config.OAuthProviderGemini
 }
 
