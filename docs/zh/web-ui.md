@@ -62,7 +62,7 @@ http://127.0.0.1:3333/
 ### CLI Takeover
 
 - 在 UI 中查看当前支持的一键接管项
-- 一键接管 `Claude Code`、`Codex CLI`、`OpenCode`、`Antigravity CLI`、`Continue`、`Aider` 和 `Goose`，以及[接管清单](../cli-takeover-candidates.md)中的十一家新增客户端的配置
+- 一键接管[接管清单](../cli-takeover.md)中十八家客户端的用户级配置
 - 首次接管前自动创建备份，便于后续回滚
 - 一键回滚到接管前捕获的原始文件状态
 - 展示 Clipal 实际管理的目标配置文件路径
@@ -84,7 +84,7 @@ OpenCode 遵循 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、XDG 配置目录，�
 
 OpenCode 的限制和模型按已知用户配置层合并后判断：XDG 全局目录中的 `config.json`、`opencode.json`、`opencode.jsonc`，自定义配置文件，自定义目录中的 `opencode.json`、`opencode.jsonc`，最后是 `OPENCODE_CONFIG_CONTENT`。对象递归合并，限制列表由高优先级层替换。只写入选定文件所需的接管字段，其他层保持只读；参与规划的文件变化时会中止写入。后续已知层覆盖选定文件的路由时，会提示冲突。未明确选择模型时保留别名的实际请求 ID；明确填写网关模型 ID 时会更新该请求 ID，同时保留名称、限制和其他元数据。项目、远程和受管配置仍需在客户端运行环境中验证。
 
-隔离 smoke 脚本覆盖全部十八家接入；新增十一家的实际版本、真实请求与两轮回滚结果见[验证清单](../cli-takeover-candidates.md#installed-client-validation)。验证已安装且有可用账号的客户端时：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
+隔离 smoke 脚本覆盖全部十八家接入；已记录的客户端版本、真实请求与两轮回滚结果见[验证清单](../cli-takeover.md#installed-client-validation)。验证已安装且有可用账号的客户端时：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
 
 ```sh
 go build -o /tmp/clipal-takeover ./cmd/clipal
@@ -96,7 +96,7 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 - `Aider` 的一键接管会更新 `openai-api-base`，使用已有的 OpenAI 兼容模型或明确选择的模型；已有 `openai-api-key` 会保留，只有缺失时才自动补占位值 `clipal`
 - `Goose` 的一键接管会管理配置目录中 `custom_providers/clipal.json`，保留已有 headers、认证、流式和模型元数据
 
-新增客户端的默认位置、环境变量、启动参数及阻断条件见[完整接管清单](../cli-takeover-candidates.md)。配置控件由卡片的 `target_capabilities` 决定。Kimi 额外支持明确填写正数 `context_window`；TRAE 必须选择实际使用的 YAML 文件。Crush 仅支持不存在 shell 覆盖的旧式 JSON 配置；Copilot 使用受管理的 shell BYOK 区块。配置检查不代表真实请求已验证成功。
+客户端的默认位置、环境变量、启动参数及阻断条件见[完整接管清单](../cli-takeover.md)。配置控件由卡片的 `target_capabilities` 决定。Kimi 额外支持明确填写正数 `context_window`；TRAE 必须选择实际使用的 YAML 文件。Crush 仅支持不存在 shell 覆盖的旧式 JSON 配置；Copilot 使用受管理的 shell BYOK 区块。配置检查不代表真实请求已验证成功。
 
 ### 导出完整备份
 

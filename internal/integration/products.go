@@ -60,8 +60,8 @@ func xdgDirectory(relative, variable string) func(Manager, string) (string, erro
 	}
 }
 
-// The order of the original seven products remains stable. New planners join
-// the same transaction and backup lifecycle; descriptors contain no writes.
+// Registry order determines the client card order. All planners share the
+// transaction and backup lifecycle; descriptors contain no writes.
 func productDefinitions() []productDefinition {
 	return []productDefinition{
 		{ID: ProductClaudeCode, Name: "Claude Code", Plan: Manager.planClaude, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true}, DefaultDir: homeDirectory(".claude", "CLAUDE_CONFIG_DIR")},

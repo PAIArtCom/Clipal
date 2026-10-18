@@ -28,45 +28,12 @@ if [[ ${#partially_staged_files[@]} -gt 0 ]]; then
   exit 1
 fi
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "pre-commit: go is required" >&2
-  exit 1
-fi
-
-golangci_lint="${GOLANGCI_LINT:-}"
-if [[ -z "$golangci_lint" ]]; then
-  if command -v golangci-lint >/dev/null 2>&1; then
-    golangci_lint="$(command -v golangci-lint)"
-  else
-    gopath="$(go env GOPATH)"
-    candidates=(
-      "$gopath/bin/golangci-lint"
-      "$HOME/bin/golangci-lint"
-      "/opt/homebrew/bin/golangci-lint"
-      "/usr/local/bin/golangci-lint"
-    )
-    for candidate in "${candidates[@]}"; do
-      if [[ -x "$candidate" ]]; then
-        golangci_lint="$candidate"
-        break
-      fi
-    done
-  fi
-fi
-
-if [[ -z "$golangci_lint" || ! -x "$golangci_lint" ]]; then
-  echo "pre-commit: golangci-lint is required" >&2
-  echo "pre-commit: install it from https://golangci-lint.run/welcome/install/" >&2
-  echo "pre-commit: or set GOLANGCI_LINT=/path/to/golangci-lint" >&2
-  exit 1
-fi
-
 echo "pre-commit: gofmt staged Go files"
 gofmt -w -- "${staged_go_files[@]}"
 git add -- "${staged_go_files[@]}"
 
 echo "pre-commit: golangci-lint --fix"
-"$golangci_lint" run --fix ./...
+make lint-fix
 
 fixed_go_files=()
 while IFS= read -r -d '' file; do
@@ -79,6 +46,6 @@ if [[ ${#fixed_go_files[@]} -gt 0 ]]; then
 fi
 
 echo "pre-commit: final lint check"
-"$golangci_lint" run ./...
+make lint
 
 echo "pre-commit: lint fix complete"

@@ -34,7 +34,7 @@ Scan the QR codes below to join the Clipal WeChat group or contact the author.
 ## ✨ Why Clipal?
 
 ### 🚀 **One-Click CLI Takeover**
-No more hunting for hidden config files. With a single click in the Web UI, Clipal can automatically take over the configurations for **18 clients**, including Claude Code, Codex CLI, OpenCode, Antigravity CLI, Pi, Qwen Code, Kimi Code, Copilot CLI, Grok Build and DeepSeek Harness. See the [complete takeover catalog and limits](docs/cli-takeover-candidates.md).
+No more hunting for hidden config files. With a single click in the Web UI, Clipal can automatically take over the configurations for **18 clients**, including Claude Code, Codex CLI, OpenCode, Antigravity CLI, Pi, Qwen Code, Kimi Code, Copilot CLI, Grok Build and DeepSeek Harness. See the [complete takeover catalog and limits](docs/cli-takeover.md).
 - It configures the local base URL for you.
 - It backs up your original settings.
 - It provides a safe rollback whenever you want.
@@ -69,7 +69,7 @@ It natively supports the request flavors of:
 - **Google Gemini**
 
 **Popular Supported Tools:**
-- **AI Coding Assistants:** [18 CLI integrations](docs/cli-takeover-candidates.md), with explicit configuration and rollback boundaries
+- **AI Coding Assistants:** [18 CLI integrations](docs/cli-takeover.md), with explicit configuration and rollback boundaries
 - **Desktop Chat Clients:** Cherry Studio, Kelivo, Chatbox, ChatWise (via OpenAI compatibility)
 
 ---

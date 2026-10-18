@@ -221,4 +221,4 @@ Base URL: http://127.0.0.1:3333/clipal
 
 ## 其他 CLI 接管客户端
 
-Pi、Qwen Code、Kimi Code CLI、Copilot CLI、Kilo CLI、CodeBuddy Code、Crush、iFlow CLI、TRAE Agent、Grok Build 和 DeepSeek Harness 共用预览、接管与回滚流程。[配置清单](../cli-takeover-candidates.md)列出已核验的路径、模型要求、覆盖规则和支持边界。在 CLI Takeover 选择对应卡片，保存配置位置与模型，检查预览后应用；真实请求仍需单独验证。
+Pi、Qwen Code、Kimi Code CLI、Copilot CLI、Kilo CLI、CodeBuddy Code、Crush、iFlow CLI、TRAE Agent、Grok Build 和 DeepSeek Harness 共用预览、接管与回滚流程。[配置清单](../cli-takeover.md)列出已核验的路径、模型要求、覆盖规则和支持边界。在 CLI Takeover 选择对应卡片，保存配置位置与模型，检查预览后应用；真实请求仍需单独验证。

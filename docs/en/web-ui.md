@@ -62,7 +62,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 ### CLI Takeover
 
 - Inspect supported CLI integrations from the UI
-- Apply one-click user-level takeover for `Claude Code`, `Codex CLI`, `OpenCode`, `Antigravity CLI`, `Continue`, `Aider`, and `Goose`, plus the eleven clients in the [takeover catalog](../cli-takeover-candidates.md)
+- Apply one-click user-level takeover for the eighteen clients in the [takeover catalog](../cli-takeover.md)
 - Create a backup before the first takeover so rollback can restore the original file
 - Roll back to the last captured pre-takeover state
 - See the exact target config file path that Clipal manages
@@ -84,7 +84,7 @@ OpenCode follows `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, and XDG configuration
 
 OpenCode restrictions and model selection use the merged known user layers: `config.json`, `opencode.json`, and `opencode.jsonc` in the XDG global directory; the custom config file; `opencode.json` and `opencode.jsonc` in the custom directory; then `OPENCODE_CONFIG_CONTENT`. Objects merge recursively and higher-priority restriction lists replace earlier lists. Only required takeover fields are written to the selected file; other layers stay read-only, and changes to planning inputs abort the write. A later known layer overriding the selected file's routing produces a conflict. Existing alias wire IDs are preserved unless a gateway model ID is explicitly selected, in which case that wire ID is updated while names, limits, and other metadata remain intact. Project, remote, and managed settings still need verification in the client's launch environment.
 
-The isolated smoke script covers all eighteen integrations. The eleven additional clients and their executed versions are recorded in the [validation catalog](../cli-takeover-candidates.md#installed-client-validation). To verify installed clients against a running gateway with available accounts, build Clipal and run the script. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
+The isolated smoke script covers all eighteen integrations. Real-client checks and executed versions are recorded in the [validation catalog](../cli-takeover.md#installed-client-validation). To verify installed clients against a running gateway with available accounts, build Clipal and run the script. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
 
 ```sh
 go build -o /tmp/clipal-takeover ./cmd/clipal
@@ -96,7 +96,7 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 - `Aider` takeover updates `openai-api-base` and uses an existing OpenAI-compatible model or an explicit model choice; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
 - `Goose` takeover manages `custom_providers/clipal.json` in its configuration directory, preserving headers, authentication, streaming settings, and model metadata
 
-New clients and their exact defaults, environment overrides, required launch flags and blocked configurations are documented in the [complete takeover catalog](../cli-takeover-candidates.md). Controls are driven by each card's `target_capabilities`. Kimi additionally supports an explicit positive `context_window`; TRAE requires selecting its YAML file. Crush supports only legacy JSON without overriding executable shell configuration, and Copilot uses a managed shell BYOK block. No live inference result is implied by configuration inspection.
+Client defaults, environment overrides, required launch flags and blocked configurations are documented in the [complete takeover catalog](../cli-takeover.md). Controls are driven by each card's `target_capabilities`. Kimi additionally supports an explicit positive `context_window`; TRAE requires selecting its YAML file. Crush supports only legacy JSON without overriding executable shell configuration, and Copilot uses a managed shell BYOK block. No live inference result is implied by configuration inspection.
 
 ### Export Full Backup
 

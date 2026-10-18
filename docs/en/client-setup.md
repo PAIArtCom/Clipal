@@ -228,4 +228,4 @@ If setup still fails, continue with [Troubleshooting](troubleshooting.md).
 
 ## Additional CLI takeover clients
 
-Pi, Qwen Code, Kimi Code CLI, Copilot CLI, Kilo CLI, CodeBuddy Code, Crush, iFlow CLI, TRAE Agent, Grok Build and DeepSeek Harness use the same preview/apply/rollback lifecycle. See the [configuration catalog](../cli-takeover-candidates.md) for verified paths, model requirements, overrides and bounded support. Select the client card in CLI Takeover, save its configuration location and model, inspect the preview, then apply. Runtime requests still require separate verification.
+Pi, Qwen Code, Kimi Code CLI, Copilot CLI, Kilo CLI, CodeBuddy Code, Crush, iFlow CLI, TRAE Agent, Grok Build and DeepSeek Harness use the same preview/apply/rollback lifecycle. See the [configuration catalog](../cli-takeover.md) for verified paths, model requirements, overrides and bounded support. Select the client card in CLI Takeover, save its configuration location and model, inspect the preview, then apply. Runtime requests still require separate verification.

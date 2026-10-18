@@ -4,7 +4,7 @@
 
 - Go version: use the version pinned in [`go.mod`](go.mod)
 - Python 3.9+ for isolated CLI verification and its dependency-free harness regressions
-- Lint: `golangci-lint`
+- Lint: `golangci-lint` v2.13.2 (matching CI)
 - Security scan: `govulncheck`
 
 ## Common Commands
@@ -28,6 +28,17 @@ make install-hooks
 ```
 
 The pre-commit hook runs `gofmt` on staged Go files, stages formatting changes, runs `golangci-lint run --fix ./...`, stages auto-fixed Go files, and finishes with `golangci-lint run ./...`. If a staged Go file also has unstaged changes, the hook blocks first so it does not accidentally add unrelated work to the commit. If `golangci-lint` is installed outside the usual locations, set `GOLANGCI_LINT=/path/to/golangci-lint` before committing.
+
+Make defaults `GOTOOLCHAIN` to the exact Go version declared in `go.mod`,
+matching CI for builds, tests, lint and vulnerability scans. This keeps a newer
+host compiler from producing export data or source syntax unsupported by the
+analysis tools. Go downloads that toolchain if it is not already installed.
+An explicit `GOTOOLCHAIN` overrides this default; ensure the selected compiler
+is supported by the installed analysis tools.
+
+`make lint` and `make lint-fix` share tool discovery in `scripts/lint.sh`.
+The pre-commit hook invokes these Make targets, using the same toolchain and
+`GOLANGCI_LINT` override as manual checks.
 
 ## Code Organization
 

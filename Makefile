@@ -1,9 +1,11 @@
 .PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
+# Match CI and keep analysis tools compatible with compiler export data.
+export GOTOOLCHAIN ?= go$(shell awk '$$1 == "go" { print $$2; exit }' go.mod)
 PYTHON ?= python3
 GOBIN := $(shell $(GO) env GOPATH)/bin
-GOLANGCI_LINT ?= $(shell command -v golangci-lint 2>/dev/null || echo "$(GOBIN)/golangci-lint")
+export GOLANGCI_LINT
 GOVULNCHECK ?= $(shell command -v govulncheck 2>/dev/null || echo "$(GOBIN)/govulncheck")
 
 build:
@@ -82,10 +84,10 @@ update-model-specs:
 	./scripts/update_model_specs.sh
 
 lint:
-	$(GOLANGCI_LINT) run ./...
+	./scripts/lint.sh ./...
 
 lint-fix:
-	$(GOLANGCI_LINT) run --fix ./...
+	./scripts/lint.sh --fix ./...
 
 vuln:
 	$(GOVULNCHECK) ./...

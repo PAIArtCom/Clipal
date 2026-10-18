@@ -46,10 +46,6 @@ func (m Manager) backupProductRoot(product ProductID) string {
 func (m Manager) Status(product ProductID, cfg *config.Config) (Status, error) {
 	takeoverMu.Lock()
 	defer takeoverMu.Unlock()
-	return m.status(product, cfg)
-}
-
-func (m Manager) status(product ProductID, cfg *config.Config) (Status, error) {
 	return m.takeoverStatus(product, cfg)
 }
 

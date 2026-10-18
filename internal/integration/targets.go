@@ -23,11 +23,6 @@ type TargetOptions struct {
 
 var profileName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
-func unifiedProduct(product ProductID) bool {
-	_, ok := lookupProduct(product)
-	return ok
-}
-
 func (m Manager) targetOptions(product ProductID) (TargetOptions, error) {
 	data, err := os.ReadFile(filepath.Join(m.configDir, "integration-targets.json"))
 	if os.IsNotExist(err) {
@@ -53,7 +48,7 @@ func (m Manager) GetTarget(product ProductID) (TargetOptions, error) {
 }
 
 func validateTarget(product ProductID, target TargetOptions) error {
-	if !unifiedProduct(product) {
+	if !IsSupportedProduct(product) {
 		return fmt.Errorf("target selection is unsupported for %s", product)
 	}
 	for _, path := range []string{target.ConfigDir, target.ShellDir, target.ConfigFile} {
