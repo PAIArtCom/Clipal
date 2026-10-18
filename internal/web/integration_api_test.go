@@ -385,10 +385,6 @@ func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
 		t.Run(string(product), func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
-			for _, key := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "CONTINUE_GLOBAL_DIR", "GOOSE_PATH_ROOT", "XDG_CONFIG_HOME"} {
-				t.Setenv(key, "")
-			}
-			t.Setenv("SHELL", "/bin/sh")
 			api := NewAPI(t.TempDir(), "test", nil)
 			model := ""
 			if product == integration.ProductOpenCode || product == integration.ProductContinue || product == integration.ProductAider || product == integration.ProductGoose {

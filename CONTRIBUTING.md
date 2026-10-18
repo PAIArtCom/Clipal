@@ -45,6 +45,20 @@ The pre-commit hook runs `gofmt` on staged Go files, stages formatting changes, 
 
 These rules are enforced by [`.golangci.yml`](.golangci.yml).
 
+## Client Configuration Tests
+
+The integration and Web API test binaries share a `TestMain` environment setup
+from `internal/testutil`. It creates a private HOME and clears inherited client
+directory, inline configuration, and routing overrides before parallel tests
+start. Tests of environment precedence should set their overrides explicitly
+with `t.Setenv` in non-parallel tests. Do not clear environment variables inside
+parallel test helpers or disable production environment lookup to isolate tests.
+
+Subprocess regression checks rerun the existing client lifecycle and API tests
+with inherited host configuration, verify each selected test ran, and check that
+the host files and permissions remain unchanged. Extend the shared environment
+setup and these checks when a client gains another environment override.
+
 ## Before Opening a PR
 
 ```bash
