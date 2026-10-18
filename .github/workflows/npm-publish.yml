@@ -10,21 +10,13 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  publish:
-    name: Publish ${{ matrix.package_name }}
+  resolve:
+    name: Resolve release tag
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - package_dir: packaging/npm
-            package_name: clipal
-          - package_dir: packaging/npm-paiart
-            package_name: "@paiart/clipal"
-
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Validate release tag
         env:
@@ -41,6 +33,45 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ inputs.tag }}
+
+      - name: Resolve immutable commit
+        id: commit
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: resolve
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+
+  security:
+    needs: resolve
+    uses: ./.github/workflows/security-scan.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+
+  publish:
+    name: Publish ${{ matrix.package_name }}
+    needs: [resolve, ci, security]
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package_dir: packaging/npm
+            package_name: clipal
+          - package_dir: packaging/npm-paiart
+            package_name: "@paiart/clipal"
+
+    steps:
+      - name: Checkout checked commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

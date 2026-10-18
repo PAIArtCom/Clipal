@@ -73,3 +73,23 @@ If you change configuration handling or startup behavior, also verify:
 - `clipal status`
 - `clipal service status`
 - Web UI config save/reload flows
+
+## Release Checks
+
+Push the final candidate commit, including its release notes, and verify CI and
+Security Scan succeeded for that exact SHA before pushing a version tag.
+The tag-triggered release workflow also calls the same CI and security workflows
+for its commit. Its build and publication job depends on both calls succeeding;
+failed, cancelled, or skipped checks prevent GitHub Release and npm publication.
+Check jobs have read-only repository access; publication permissions belong to
+the dependent publication job.
+
+The manual npm recovery workflow resolves its input tag to an immutable commit
+once, checks that commit with the same workflows, and checks out that SHA for
+both package publications. It cannot bypass failed checks or silently switch to
+another commit if the tag moves during the run.
+
+After publication, verify the GitHub Release assets and checksums and query both
+`clipal` and `@paiart/clipal` on the public npm registry for the intended version
+and dist-tag. Local builds and successful uploads alone do not establish that
+the release is publicly available.
