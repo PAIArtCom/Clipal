@@ -62,13 +62,13 @@ http://127.0.0.1:3333/
 ### CLI Takeover
 
 - 在 UI 中查看当前支持的一键接管项
-- 一键接管 `Claude Code`、`Codex CLI`、`OpenCode`、`Antigravity CLI`、`Continue`、`Aider` 和 `Goose` 的用户级配置
+- 一键接管 `Claude Code`、`Codex CLI`、`OpenCode`、`Antigravity CLI`、`Continue`、`Aider` 和 `Goose`，以及[接管清单](../cli-takeover-candidates.md)中的十一家新增客户端的配置
 - 首次接管前自动创建备份，便于后续回滚
 - 一键回滚到接管前捕获的原始文件状态
 - 展示 Clipal 实际管理的目标配置文件路径
 - 在 apply 前预览“当前文件”和“Apply 后将写入的结果”
 
-七家客户端共用接管周期。首次 apply 捕获全部管理文件的内容、原始存在状态和权限；重复 apply 或修改入口地址时保留该基线。所有文件先验证并暂存，再替换目标；写入失败会恢复到本次操作前的状态。Rollback 恢复本周期基线并结束周期，下一次 apply 重新捕获基线。历史备份归档保留在磁盘上；若自动恢复本身失败，活动备份会保留供重试。这是可恢复的多文件操作，不承诺跨文件在断电时整体原子提交。
+所有已支持客户端共用接管周期。首次 apply 捕获全部管理文件的内容、原始存在状态和权限；重复 apply 或修改入口地址时保留该基线。所有文件先验证并暂存，再替换目标；写入失败会恢复到本次操作前的状态。Rollback 恢复本周期基线并结束周期，下一次 apply 重新捕获基线。历史备份归档保留在磁盘上；若自动恢复本身失败，活动备份会保留供重试。这是可恢复的多文件操作，不承诺跨文件在断电时整体原子提交。
 
 “**配置位置**”允许指定绝对客户端目录，以及 Codex 的可选 profile。目录留空时读取 `CODEX_HOME` / `CLAUDE_CONFIG_DIR`，再回退到客户端默认值。选择 Codex profile 后，管理 `<profile>.config.toml`，运行时应使用匹配的 `CODEX_HOME` 和 `codex --profile <profile>`。Claude 默认使用 `~/.claude.json` 保存 onboarding，自定义目录时使用 `<CLAUDE_CONFIG_DIR>/.claude.json`。Antigravity 保留官方固定的设置文件位置，允许选择 shell 类型和启动文件目录。后台服务无法检测 `SHELL` 时，需显式选择 bash、zsh 或 sh。修改位置前必须先回滚活动周期。
 
@@ -76,7 +76,7 @@ http://127.0.0.1:3333/
 
 Antigravity 管理 `.bashrc` 及首个适用的 Bash 登录文件（`.bash_profile`、`.bash_login` 或 `.profile`）；Zsh 使用 `$ZDOTDIR/.zshrc`，未设置时使用 HOME；POSIX sh 使用 `.profile`。显式选择 shell 目录时以其为准。全部文件均纳入预览与备份。Apply 和 Rollback 后都应新开终端：仅 source 恢复后的配置不会清除当前 shell 已经导出的变量。
 
-管理 API：`POST /api/integrations/<product>/target` 接受 `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`；`profile` 仅适用于 Codex，`shell_dir` / `shell` 仅适用于 Antigravity（`shell` 接受 bash、zsh 或 sh），Antigravity 不接受自定义 `config_dir`。列表及操作响应包含 `target_options` 和 `verification`（`not_verified` 或 `blocked`）。某个客户端文件损坏时，只在对应卡片报错，其他客户端及可用回滚操作仍可访问。
+管理 API：`POST /api/integrations/<product>/target` 接受 `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`；`profile` 仅适用于 Codex，`shell_dir` / `shell` 适用于 Antigravity 和 Copilot CLI（`shell` 接受 bash、zsh 或 sh），Antigravity 不接受自定义 `config_dir`。列表及操作响应包含 `target_capabilities`、`target_options` 和 `verification`（`not_verified` 或 `blocked`）。某个客户端文件损坏时，只在对应卡片报错，其他客户端及可用回滚操作仍可访问。
 
 OpenCode、Continue、Aider 和 Goose 支持 `config_dir` 和 `model`；前三家还支持优先于目录的绝对路径 `config_file`。已有模型优先保留；没有模型时必须明确选择，接管不内置默认模型或上下文长度。界面可从 `/clipal/v1/models` 加载模型建议；上游不提供列表时，可填写已确认可用的 ID，并通过真实请求验证。
 
@@ -84,7 +84,7 @@ OpenCode 遵循 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、XDG 配置目录，�
 
 OpenCode 的限制和模型按已知用户配置层合并后判断：XDG 全局目录中的 `config.json`、`opencode.json`、`opencode.jsonc`，自定义配置文件，自定义目录中的 `opencode.json`、`opencode.jsonc`，最后是 `OPENCODE_CONFIG_CONTENT`。对象递归合并，限制列表由高优先级层替换。只写入选定文件所需的接管字段，其他层保持只读；参与规划的文件变化时会中止写入。后续已知层覆盖选定文件的路由时，会提示冲突。未明确选择模型时保留别名的实际请求 ID；明确填写网关模型 ID 时会更新该请求 ID，同时保留名称、限制和其他元数据。项目、远程和受管配置仍需在客户端运行环境中验证。
 
-实际客户端验证可使用隔离的 smoke 脚本：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
+隔离 smoke 脚本覆盖全部十八家接入；新增十一家的实际版本、真实请求与两轮回滚结果见[验证清单](../cli-takeover-candidates.md#installed-client-validation)。验证已安装且有可用账号的客户端时：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
 
 ```sh
 go build -o /tmp/clipal-takeover ./cmd/clipal
@@ -95,6 +95,8 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 - `Continue` 的一键接管会新增或更新用户级 `Clipal` 模型项，保留已有模型、Key、roles、协议和能力选项；没有已有 Clipal 模型时需明确选择，不从其他模型项猜测。新模型默认仅声明 chat/edit/apply，不继承其他模型的补全能力
 - `Aider` 的一键接管会更新 `openai-api-base`，使用已有的 OpenAI 兼容模型或明确选择的模型；已有 `openai-api-key` 会保留，只有缺失时才自动补占位值 `clipal`
 - `Goose` 的一键接管会管理配置目录中 `custom_providers/clipal.json`，保留已有 headers、认证、流式和模型元数据
+
+新增客户端的默认位置、环境变量、启动参数及阻断条件见[完整接管清单](../cli-takeover-candidates.md)。配置控件由卡片的 `target_capabilities` 决定。Kimi 额外支持明确填写正数 `context_window`；TRAE 必须选择实际使用的 YAML 文件。Crush 仅支持不存在 shell 覆盖的旧式 JSON 配置；Copilot 使用受管理的 shell BYOK 区块。配置检查不代表真实请求已验证成功。
 
 ### 导出完整备份
 

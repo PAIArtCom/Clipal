@@ -42,31 +42,33 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 	}
 	status := Status{Product: product, TargetPath: files[0].TargetPath, State: StateNotConfigured, BackupAvailable: m.hasLatestBackup(product), Verification: "not_verified", TargetOptions: target}
 	configured := true
-	for i, file := range files {
+	for _, file := range files {
 		if !file.Existed {
 			configured = false
 			continue
 		}
-		if product == ProductAntigravityCLI && i > 0 {
+		if file.Format == managedBytes {
 			configured = configured && string(file.Original) == string(file.Planned)
 			continue
 		}
-		var before, after map[string]any
-		switch product {
-		case ProductContinue, ProductAider:
+		var before, after any
+		switch file.Format {
+		case managedYAML:
 			err = yaml.Unmarshal(file.Original, &before)
 			if err == nil {
 				err = yaml.Unmarshal(file.Planned, &after)
 			}
-		case ProductCodexCLI:
-			err = toml.Unmarshal(file.Original, &before)
+		case managedTOML:
+			var b, a map[string]any
+			err = toml.Unmarshal(file.Original, &b)
 			if err == nil {
-				err = toml.Unmarshal(file.Planned, &after)
+				err = toml.Unmarshal(file.Planned, &a)
 			}
+			before, after = b, a
 		default:
 			raw := file.Original
-			if product == ProductAntigravityCLI || product == ProductOpenCode {
-				raw, err = hujson.Standardize(raw)
+			if file.Format == managedJSONC {
+				raw, err = hujson.Standardize(append([]byte(nil), raw...))
 			}
 			if err == nil {
 				err = json.Unmarshal(raw, &before)
@@ -85,6 +87,9 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 	}
 	warnings := []string{"Configuration inspection only; runtime routing has not been verified. Restart the client after apply or rollback."}
 	blocked := []string{}
+	if definition, ok := lookupProduct(product); ok && definition.Warning != "" {
+		warnings = append(warnings, definition.Warning)
+	}
 	switch product {
 	case ProductCodexCLI:
 		if target.Profile != "" {
@@ -136,9 +141,12 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 		warnings = append(warnings, "Launch Aider with --config and this file to avoid repo/current-directory overrides. CLI flags and .env can also override routing. Existing weak-model/editor-model settings are preserved and may use other providers.")
 	case ProductGoose:
 		warnings = append(warnings, "Select the Clipal custom provider and a gateway-supported model in Goose. Use the matching GOOSE_PATH_ROOT/config directory; environment and saved provider selection may override routing.")
-	case ProductAntigravityCLI:
+	case ProductAntigravityCLI, ProductCopilotCLI:
 		var paths []string
-		for _, file := range files[1:] {
+		for _, file := range files {
+			if file.Format != managedBytes {
+				continue
+			}
 			paths = append(paths, file.TargetPath)
 		}
 		warnings = append(warnings, "Shell startup files: "+strings.Join(paths, ", ")+". Open a fresh terminal to load or clear exported credentials; sourcing a restored profile does not unset old variables.")

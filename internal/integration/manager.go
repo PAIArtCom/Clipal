@@ -146,7 +146,7 @@ func parseJSONCMap(data []byte) (map[string]any, error) {
 		return nil, err
 	}
 	if out == nil {
-		out = map[string]any{}
+		return nil, fmt.Errorf("configuration must contain an object")
 	}
 	return out, nil
 }

@@ -34,7 +34,7 @@ func TestHandleListIntegrations_ReturnsSupportedProducts(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode json: %v\nbody=%s", err, w.Body.String())
 	}
-	if len(got) != 7 {
+	if len(got) != len(integration.SupportedProducts()) {
 		t.Fatalf("len = %d", len(got))
 	}
 
@@ -46,7 +46,11 @@ func TestHandleListIntegrations_ReturnsSupportedProducts(t *testing.T) {
 		}
 		products = append(products, product)
 	}
-	if strings.Join(products, ",") != "claude,codex,opencode,antigravity,continue,aider,goose" {
+	var expected []string
+	for _, product := range integration.SupportedProducts() {
+		expected = append(expected, string(product))
+	}
+	if strings.Join(products, ",") != strings.Join(expected, ",") {
 		t.Fatalf("products = %v", products)
 	}
 }
@@ -386,11 +390,21 @@ func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
 			api := NewAPI(t.TempDir(), "test", nil)
-			model := ""
-			if product == integration.ProductOpenCode || product == integration.ProductContinue || product == integration.ProductAider || product == integration.ProductGoose {
-				model = "test-model"
+			target := integration.TargetOptions{}
+			if integration.ProductTargetCapabilities(product).Model {
+				target.Model = "test-model"
 			}
-			if err := api.integrations.SetTarget(product, integration.TargetOptions{Model: model}); err != nil {
+			if integration.ProductTargetCapabilities(product).Shell {
+				target.Shell = "sh"
+			}
+			if product == integration.ProductKimiCLI {
+				target.ContextWindow = 32768
+			}
+			if product == integration.ProductTRAEAgent {
+				target.ConfigFile = filepath.Join(home, "trae_config.yaml")
+			}
+			model := target.Model
+			if err := api.integrations.SetTarget(product, target); err != nil {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
@@ -406,7 +420,11 @@ func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
 			if product == integration.ProductClaudeCode && !strings.Contains(w.Body.String(), "hasCompletedOnboarding") {
 				t.Fatal("preview omitted onboarding file")
 			}
-			if err := os.WriteFile(before.TargetPath, []byte("{invalid"), 0600); err != nil {
+			malformed := []byte("{invalid")
+			if product == integration.ProductCopilotCLI {
+				malformed = []byte("# >>> Clipal Copilot CLI >>>\n")
+			}
+			if err := os.WriteFile(before.TargetPath, malformed, 0600); err != nil {
 				t.Fatal(err)
 			}
 			w = httptest.NewRecorder()
@@ -437,5 +455,45 @@ func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestIntegrationCatalogCapabilitiesAndTargets(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	api := NewAPI(t.TempDir(), "test", nil)
+	w := httptest.NewRecorder()
+	api.HandleListIntegrations(w, httptest.NewRequest(http.MethodGet, "/api/integrations", nil))
+	var cards []IntegrationResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &cards); err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != len(integration.SupportedProducts()) {
+		t.Fatal("incomplete catalog")
+	}
+	for _, card := range cards {
+		product := integration.ProductID(card.Product)
+		if card.Name != integration.ProductName(product) || card.TargetCapabilities != integration.ProductTargetCapabilities(product) {
+			t.Fatalf("wrong metadata %+v", card)
+		}
+		if got, action := extractIntegrationAction("/api/integrations/" + card.Product + "/target"); got != product || action != "target" {
+			t.Fatal("missing action", product)
+		}
+	}
+	for _, body := range []string{`null`, `[]`, `{"unknown":true}`, `{} {}`, `{} true`, `{"context_window":-1}`, `{"context_window":"32768"}`, `{"context_window":1.5}`, `{"config_file":"relative"}`} {
+		w = httptest.NewRecorder()
+		api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/kimi/target", strings.NewReader(body)))
+		if w.Code == http.StatusOK {
+			t.Fatal("accepted invalid target", body)
+		}
+	}
+	w = httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/kimi/target", strings.NewReader(`{"model":"chosen","context_window":32768}`)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("valid Kimi target %d: %s", w.Code, w.Body.String())
+	}
+	if product, _ := extractIntegrationAction("/api/integrations/unknown/apply"); product != "" {
+		t.Fatal("unknown product accepted")
 	}
 }

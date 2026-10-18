@@ -98,7 +98,7 @@ func TestSupportedProducts_IncludesAntigravityCLI(t *testing.T) {
 	t.Parallel()
 
 	got := SupportedProducts()
-	want := []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose}
+	want := []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose, ProductPi, ProductQwenCode, ProductKimiCLI, ProductCopilotCLI, ProductKiloCLI, ProductCodeBuddy, ProductCrush, ProductIFlow, ProductTRAEAgent, ProductGrokBuild, ProductDeepSeekHarness}
 	if len(got) != len(want) {
 		t.Fatalf("len = %d want %d", len(got), len(want))
 	}

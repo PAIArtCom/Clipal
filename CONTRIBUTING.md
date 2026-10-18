@@ -3,6 +3,7 @@
 ## Toolchain
 
 - Go version: use the version pinned in [`go.mod`](go.mod)
+- Python 3.9+ for isolated CLI verification and its dependency-free harness regressions
 - Lint: `golangci-lint`
 - Security scan: `govulncheck`
 
@@ -58,6 +59,15 @@ Subprocess regression checks rerun the existing client lifecycle and API tests
 with inherited host configuration, verify each selected test ran, and check that
 the host files and permissions remain unchanged. Extend the shared environment
 setup and these checks when a client gains another environment override.
+
+The real-client runner `scripts/cli_takeover_smoke.py` accepts repeated
+`--client-manifest` install manifests with a `products` object keyed by product
+ID. Each entry supplies an absolute `binary`, actual `version`, and optional
+`version_args`. It checks fresh gateway activity, assistant output and successful
+client completion, restores baseline bytes and permissions, and verifies a
+second cycle. It makes real model requests; harness unit tests in `make test-unit`
+use no upstream accounts. Kimi validation requires an explicit positive
+`--context-window` budget.
 
 ## Before Opening a PR
 

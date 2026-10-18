@@ -17,7 +17,7 @@ import (
 // configuration or change takeover inspection. Tests of overrides set them
 // explicitly with t.Setenv after TestMain has established this baseline.
 func clientEnvironment(home string) map[string]string {
-	return map[string]string{
+	values := map[string]string{
 		"HOME": home, "USERPROFILE": home, "SHELL": "/bin/sh",
 		"XDG_CONFIG_HOME": "", "CODEX_HOME": "", "CLAUDE_CONFIG_DIR": "",
 		"OPENCODE_CONFIG": "", "OPENCODE_CONFIG_DIR": "", "OPENCODE_CONFIG_CONTENT": "",
@@ -26,7 +26,19 @@ func clientEnvironment(home string) map[string]string {
 		"CLAUDE_CODE_USE_FOUNDRY": "", "CLAUDE_CODE_USE_ANTHROPIC_AWS": "",
 		"CLAUDE_CODE_USE_MANTLE": "", "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST": "",
 		"CLAUDE_CODE_OAUTH_TOKEN": "",
+		"PI_CODING_AGENT_DIR":     "", "QWEN_HOME": "", "KIMI_CODE_HOME": "", "GROK_HOME": "", "GROK_CONFIG_PATH": "", "DSH_HOME": "",
+		"KILO_CONFIG": "", "KILO_CONFIG_DIR": "", "KILO_CONFIG_CONTENT": "", "CODEBUDDY_CONFIG_DIR": "", "COPILOT_HOME": "", "COPILOT_PROVIDERS_CONFIG": "",
+		"CRUSH_GLOBAL_CONFIG": "", "CRUSH_GLOBAL_DATA": "", "XDG_DATA_HOME": "", "LOCALAPPDATA": "",
+		"OPENAI_API_KEY": "", "OPENAI_BASE_URL": "",
+		"COPILOT_PROVIDER_BASE_URL": "", "COPILOT_PROVIDER_TYPE": "", "COPILOT_PROVIDER_WIRE_API": "", "COPILOT_PROVIDER_API_KEY": "", "COPILOT_MODEL": "",
+		"COPILOT_PROVIDER_WIRE_MODEL": "", "COPILOT_PROVIDER_MODEL_ID": "", "COPILOT_PROVIDER_BEARER_TOKEN": "", "COPILOT_PROVIDER_API_KEY_COMMAND": "", "COPILOT_PROVIDER_TRANSPORT": "", "COPILOT_PROVIDER_HEADERS": "",
 	}
+	for _, prefix := range []string{"IFLOW_", "iflow_"} {
+		for _, key := range []string{"baseUrl", "BASE_URL", "apiKey", "API_KEY", "modelName", "MODEL_NAME", "selectedAuthType", "SELECTED_AUTH_TYPE"} {
+			values[prefix+key] = ""
+		}
+	}
+	return values
 }
 
 // RunWithClientEnvironment is a TestMain entry point, called before any tests

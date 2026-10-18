@@ -849,32 +849,36 @@
                         <template x-if="integration.target_options">
                             <details class="integration-full-files">
                                 <summary x-text="t('integrations.targetOptions')"></summary>
-                                <div class="form-group" x-show="integration.product !== 'antigravity'">
+                                <div class="form-group" x-show="integration.target_capabilities?.config_dir">
                                     <label class="form-label" :for="'integration-config-dir-' + integration.product" x-text="t('integrations.configDir')"></label>
                                     <input :id="'integration-config-dir-' + integration.product" type="text" class="form-input" x-model="integration.target_options.config_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
                                 </div>
-                                <div class="form-group" x-show="['opencode', 'continue', 'aider'].includes(integration.product)">
+                                <div class="form-group" x-show="integration.target_capabilities?.config_file">
                                     <label class="form-label" :for="'integration-config-file-' + integration.product" x-text="t('integrations.configFile')"></label>
                                     <input :id="'integration-config-file-' + integration.product" type="text" class="form-input" x-model="integration.target_options.config_file" :disabled="integration.backup_available" placeholder="/absolute/path">
                                 </div>
-                                <div class="form-group" x-show="['opencode', 'continue', 'aider', 'goose'].includes(integration.product)">
+                                <div class="form-group" x-show="integration.target_capabilities?.model">
                                     <label class="form-label" :for="'integration-model-' + integration.product" x-text="t('integrations.gatewayModel')"></label>
                                     <input :id="'integration-model-' + integration.product" type="text" class="form-input" x-model="integration.target_options.model" :disabled="integration.backup_available" :list="'integration-models-' + integration.product">
                                     <datalist :id="'integration-models-' + integration.product"><template x-for="model in integrationModels" :key="model"><option :value="model"></option></template></datalist>
                                     <button class="btn btn-secondary btn-sm" :disabled="integrationModelsBusy" @click="loadIntegrationModels()" x-text="t('integrations.loadModels')"></button>
                                     <p class="integration-card__muted" x-text="t('integrations.modelCatalogHint')"></p>
                                 </div>
-                                <div class="form-group" x-show="integration.product === 'codex'">
+                                <div class="form-group" x-show="integration.target_capabilities?.context_window">
+                                    <label class="form-label" :for="'integration-context-window-' + integration.product" x-text="t('integrations.contextWindow')"></label>
+                                    <input :id="'integration-context-window-' + integration.product" type="number" min="1" step="1" class="form-input" x-model.number="integration.target_options.context_window" :disabled="integration.backup_available">
+                                </div>
+                                <div class="form-group" x-show="integration.target_capabilities?.profile">
                                     <label class="form-label" for="integration-codex-profile" x-text="t('integrations.codexProfile')"></label>
                                     <input id="integration-codex-profile" type="text" class="form-input" x-model="integration.target_options.profile" :disabled="integration.backup_available">
                                 </div>
-                                <div class="form-group" x-show="integration.product === 'antigravity'">
-                                    <label class="form-label" for="integration-antigravity-shell" x-text="t('integrations.shellType')"></label>
-                                    <select id="integration-antigravity-shell" class="form-select" x-model="integration.target_options.shell" :disabled="integration.backup_available"><option value="">—</option><option value="bash">bash</option><option value="zsh">zsh</option><option value="sh">sh</option></select>
+                                <div class="form-group" x-show="integration.target_capabilities?.shell">
+                                    <label class="form-label" :for="'integration-shell-' + integration.product" x-text="t('integrations.shellType')"></label>
+                                    <select :id="'integration-shell-' + integration.product" class="form-select" x-model="integration.target_options.shell" :disabled="integration.backup_available"><option value="">—</option><option value="bash">bash</option><option value="zsh">zsh</option><option value="sh">sh</option></select>
                                 </div>
-                                <div class="form-group" x-show="integration.product === 'antigravity'">
-                                    <label class="form-label" for="integration-antigravity-shell-dir" x-text="t('integrations.shellDir')"></label>
-                                    <input id="integration-antigravity-shell-dir" type="text" class="form-input" x-model="integration.target_options.shell_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
+                                <div class="form-group" x-show="integration.target_capabilities?.shell_dir">
+                                    <label class="form-label" :for="'integration-shell-dir-' + integration.product" x-text="t('integrations.shellDir')"></label>
+                                    <input :id="'integration-shell-dir-' + integration.product" type="text" class="form-input" x-model="integration.target_options.shell_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
                                 </div>
                                 <button class="btn btn-secondary btn-sm" :disabled="integration.backup_available || !!integrationBusyProduct" @click="runIntegrationAction(integration.product, 'target')" x-text="t('integrations.saveTarget')"></button>
                             </details>

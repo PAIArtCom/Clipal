@@ -83,6 +83,10 @@ func readTOMLMap(path string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseTOMLMap(data)
+}
+
+func parseTOMLMap(data []byte) (map[string]any, error) {
 	var out map[string]any
 	if err := toml.Unmarshal(data, &out); err != nil {
 		return nil, err

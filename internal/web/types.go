@@ -445,18 +445,19 @@ type ServiceStatusResponse struct {
 }
 
 type IntegrationResponse struct {
-	Verification        string                       `json:"verification,omitempty"`
-	TargetOptions       integrationpkg.TargetOptions `json:"target_options"`
-	Product             string                       `json:"product"`
-	Name                string                       `json:"name"`
-	State               string                       `json:"state"`
-	TargetPath          string                       `json:"target_path"`
-	BackupAvailable     bool                         `json:"backup_available"`
-	Warning             string                       `json:"warning,omitempty"`
-	CurrentContent      string                       `json:"current_content,omitempty"`
-	PlannedContent      string                       `json:"planned_content,omitempty"`
-	BackupContent       string                       `json:"backup_content,omitempty"`
-	BackupTargetExisted bool                         `json:"backup_target_existed"`
+	TargetCapabilities  integrationpkg.TargetCapabilities `json:"target_capabilities"`
+	Verification        string                            `json:"verification,omitempty"`
+	TargetOptions       integrationpkg.TargetOptions      `json:"target_options"`
+	Product             string                            `json:"product"`
+	Name                string                            `json:"name"`
+	State               string                            `json:"state"`
+	TargetPath          string                            `json:"target_path"`
+	BackupAvailable     bool                              `json:"backup_available"`
+	Warning             string                            `json:"warning,omitempty"`
+	CurrentContent      string                            `json:"current_content,omitempty"`
+	PlannedContent      string                            `json:"planned_content,omitempty"`
+	BackupContent       string                            `json:"backup_content,omitempty"`
+	BackupTargetExisted bool                              `json:"backup_target_existed"`
 }
 
 type IntegrationActionResponse struct {
@@ -673,6 +674,7 @@ func toProviderOverrideSupport(s providerOverrideSupport) ProviderOverrideSuppor
 func toIntegrationResponse(product integrationpkg.ProductID, status integrationpkg.Status, preview integrationpkg.Preview) IntegrationResponse {
 	return IntegrationResponse{
 		Product:             string(product),
+		TargetCapabilities:  integrationpkg.ProductTargetCapabilities(product),
 		Verification:        status.Verification,
 		TargetOptions:       status.TargetOptions,
 		Name:                integrationpkg.ProductName(product),

@@ -23,8 +23,8 @@ func (e *openCodeConflictError) Error() string { return e.reason }
 
 // Read only the known user layers in the order used by OpenCode. Project,
 // remote, and managed configuration requires the client's launch context.
-func (m Manager) readOpenCodeConfig(targetPath string) (openCodeConfig, error) {
-	target, err := m.targetOptions(ProductOpenCode)
+func (m Manager) readOpenCodeCompatibleConfig(product ProductID, targetPath string) (openCodeConfig, error) {
+	target, err := m.targetOptions(product)
 	if err != nil {
 		return openCodeConfig{}, err
 	}
@@ -32,21 +32,27 @@ func (m Manager) readOpenCodeConfig(targetPath string) (openCodeConfig, error) {
 	if err != nil {
 		return openCodeConfig{}, err
 	}
-	global := filepath.Join(clientXDGRoot(home), "opencode")
-	paths := []string{filepath.Join(global, "config.json"), filepath.Join(global, "opencode.json"), filepath.Join(global, "opencode.jsonc")}
+	name, prefix, globalNames, dirNames := openCodeLayout(product)
+	global := filepath.Join(clientXDGRoot(home), name)
+	var paths []string
+	for _, filename := range globalNames {
+		paths = append(paths, filepath.Join(global, filename))
+	}
 	customFile := target.ConfigFile
 	if customFile == "" {
-		customFile = os.Getenv("OPENCODE_CONFIG")
+		customFile = os.Getenv(prefix + "_CONFIG")
 	}
 	if customFile != "" {
 		paths = append(paths, customFile)
 	}
-	customDir := os.Getenv("OPENCODE_CONFIG_DIR")
+	customDir := os.Getenv(prefix + "_CONFIG_DIR")
 	if target.ConfigFile == "" && target.ConfigDir != "" {
 		customDir = target.ConfigDir
 	}
 	if customDir != "" {
-		paths = append(paths, filepath.Join(customDir, "opencode.json"), filepath.Join(customDir, "opencode.jsonc"))
+		for _, filename := range dirNames {
+			paths = append(paths, filepath.Join(customDir, filename))
+		}
 	}
 	file, err := readBackupFile(targetPath)
 	if err != nil {
@@ -57,7 +63,7 @@ func (m Manager) readOpenCodeConfig(targetPath string) (openCodeConfig, error) {
 	guarded := map[string]bool{}
 	for _, path := range paths {
 		if !filepath.IsAbs(path) {
-			return state, fmt.Errorf("OpenCode configuration paths must be absolute")
+			return state, fmt.Errorf("client configuration paths must be absolute")
 		}
 		path = filepath.Clean(path)
 		snapshot, ok := cache[path]
@@ -72,7 +78,7 @@ func (m Manager) readOpenCodeConfig(targetPath string) (openCodeConfig, error) {
 		if snapshot.Existed {
 			body, err = parseJSONCMap(snapshot.Original)
 			if err != nil {
-				return state, fmt.Errorf("read OpenCode layer %s: %w", path, err)
+				return state, fmt.Errorf("read client layer %s: %w", path, err)
 			}
 		}
 		state.layers = append(state.layers, openCodeLayer{file: snapshot, body: body})
@@ -81,10 +87,10 @@ func (m Manager) readOpenCodeConfig(targetPath string) (openCodeConfig, error) {
 			guarded[snapshot.TargetPath] = true
 		}
 	}
-	if inline := os.Getenv("OPENCODE_CONFIG_CONTENT"); inline != "" {
+	if inline := os.Getenv(prefix + "_CONFIG_CONTENT"); inline != "" {
 		body, e := parseJSONCMap([]byte(inline))
 		if e != nil {
-			return state, fmt.Errorf("read OPENCODE_CONFIG_CONTENT: %w", e)
+			return state, fmt.Errorf("read %s_CONFIG_CONTENT: %w", prefix, e)
 		}
 		state.layers = append(state.layers, openCodeLayer{body: body})
 	}
@@ -176,4 +182,46 @@ func openCodeRouteShadow(planned, effective map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// Kilo and OpenCode share the provider schema but have distinct ordered loaders.
+func openCodeLayout(product ProductID) (name, prefix string, globalNames, dirNames []string) {
+	if product == ProductKiloCLI {
+		return "kilo", "KILO", []string{"config.json", "kilo.json", "kilo.jsonc", "opencode.json", "opencode.jsonc"}, []string{"kilo.jsonc", "kilo.json", "opencode.jsonc", "opencode.json"}
+	}
+	return "opencode", "OPENCODE", []string{"config.json", "opencode.json", "opencode.jsonc"}, []string{"opencode.json", "opencode.jsonc"}
+}
+func (m Manager) openCodeCompatiblePath(product ProductID) (string, error) {
+	if product == ProductOpenCode {
+		return m.opencodeTargetPath()
+	}
+	target, err := m.targetOptions(product)
+	if err != nil {
+		return "", err
+	}
+	if target.ConfigFile != "" {
+		return target.ConfigFile, nil
+	}
+	_, prefix, globalNames, dirNames := openCodeLayout(product)
+	if target.ConfigDir == "" && os.Getenv(prefix+"_CONFIG") != "" {
+		return m.customClientPath(product, "kilo.json")
+	}
+	dir, err := m.clientConfigDir(product)
+	if err != nil {
+		return "", err
+	}
+	names := globalNames
+	if target.ConfigDir != "" || os.Getenv(prefix+"_CONFIG_DIR") != "" {
+		names = dirNames
+	}
+	selected := filepath.Join(dir, "kilo.json")
+	for _, name := range names {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			selected = path
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+	}
+	return selected, nil
 }

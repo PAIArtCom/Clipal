@@ -16,6 +16,7 @@ import (
 var takeoverMu sync.Mutex
 
 type takeoverFile struct {
+	Format managedFormat
 	backupFile
 	Dependencies []backupFile
 	Planned      []byte
@@ -24,35 +25,23 @@ type takeoverFile struct {
 }
 
 func (m Manager) planTakeover(product ProductID, cfg *config.Config) ([]takeoverFile, error) {
-	switch product {
-	case ProductCodexCLI:
-		return m.planCodex(cfg)
-	case ProductClaudeCode:
-		return m.planClaude(cfg)
-	case ProductAntigravityCLI:
-		return m.planAntigravity(cfg)
-	case ProductOpenCode:
-		return m.planOpenCode(cfg)
-	case ProductContinue:
-		path, err := m.continueTargetPath()
-		if err != nil {
-			return nil, err
-		}
-		return planSingleFile(path, func() (Preview, error) { return m.previewContinue(cfg) })
-	case ProductAider:
-		path, err := m.aiderTargetPath()
-		if err != nil {
-			return nil, err
-		}
-		return planSingleFile(path, func() (Preview, error) { return m.previewAider(cfg) })
-	case ProductGoose:
-		path, err := m.gooseTargetPath()
-		if err != nil {
-			return nil, err
-		}
-		return planSingleFile(path, func() (Preview, error) { return m.previewGoose(cfg) })
+	definition, ok := lookupProduct(product)
+	if !ok || definition.Plan == nil {
+		return nil, fmt.Errorf("unsupported takeover %s", product)
 	}
-	return nil, fmt.Errorf("unsupported takeover %s", product)
+	files, err := definition.Plan(m, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%s returned an empty takeover plan", product)
+	}
+	for i := range files {
+		if files[i].Format == managedAuto {
+			files[i].Format = definition.Format
+		}
+	}
+	return files, nil
 }
 
 func planSingleFile(path string, preview func() (Preview, error)) ([]takeoverFile, error) {

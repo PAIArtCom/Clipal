@@ -1,6 +1,7 @@
 .PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
+PYTHON ?= python3
 GOBIN := $(shell $(GO) env GOPATH)/bin
 GOLANGCI_LINT ?= $(shell command -v golangci-lint 2>/dev/null || echo "$(GOBIN)/golangci-lint")
 GOVULNCHECK ?= $(shell command -v govulncheck 2>/dev/null || echo "$(GOBIN)/govulncheck")
@@ -12,6 +13,7 @@ test: test-unit
 
 test-unit:
 	$(GO) test ./...
+	$(PYTHON) -m unittest discover -s scripts -p 'test_cli_takeover_smoke.py'
 
 test-smoke:
 	./scripts/smoke_test.sh

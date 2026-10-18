@@ -62,13 +62,13 @@ The current section and client are kept in the URL hash (for example `#/provider
 ### CLI Takeover
 
 - Inspect supported CLI integrations from the UI
-- Apply one-click user-level takeover for `Claude Code`, `Codex CLI`, `OpenCode`, `Antigravity CLI`, `Continue`, `Aider`, and `Goose`
+- Apply one-click user-level takeover for `Claude Code`, `Codex CLI`, `OpenCode`, `Antigravity CLI`, `Continue`, `Aider`, and `Goose`, plus the eleven clients in the [takeover catalog](../cli-takeover-candidates.md)
 - Create a backup before the first takeover so rollback can restore the original file
 - Roll back to the last captured pre-takeover state
 - See the exact target config file path that Clipal manages
 - Preview the current file and the exact result Clipal will write before applying changes
 
-All seven clients share a takeover cycle. The first apply captures every managed file, including whether it existed and its permissions. Reapply and endpoint updates keep that baseline. All files are validated and staged before replacement; a write failure restores the immediately preceding state. Rollback restores the cycle baseline and ends the cycle; the next apply captures a fresh baseline. Immutable backup archives remain on disk. If automatic recovery itself fails, the active backup is retained for a retry. These are recoverable multi-file operations, not filesystem-wide atomic transactions across a power loss.
+All supported clients share a takeover cycle. The first apply captures every managed file, including whether it existed and its permissions. Reapply and endpoint updates keep that baseline. All files are validated and staged before replacement; a write failure restores the immediately preceding state. Rollback restores the cycle baseline and ends the cycle; the next apply captures a fresh baseline. Immutable backup archives remain on disk. If automatic recovery itself fails, the active backup is retained for a retry. These are recoverable multi-file operations, not filesystem-wide atomic transactions across a power loss.
 
 The **Configuration location** controls select an absolute client directory and, for Codex, an optional profile. Empty directories use `CODEX_HOME` / `CLAUDE_CONFIG_DIR`, then client defaults. A selected Codex profile manages `<profile>.config.toml`; launch with `codex --profile <profile>` and the matching `CODEX_HOME`. Claude's onboarding state is `~/.claude.json` by default and `<CLAUDE_CONFIG_DIR>/.claude.json` for a custom directory. Antigravity retains its documented settings location; its shell type and startup directory can be selected. Select bash, zsh, or sh explicitly when the background service cannot detect `SHELL`. Restore an active cycle before changing locations.
 
@@ -76,7 +76,7 @@ The **Configuration location** controls select an absolute client directory and,
 
 Antigravity manages `.bashrc` and the first applicable Bash login file (`.bash_profile`, `.bash_login`, or `.profile`), `$ZDOTDIR/.zshrc` for Zsh (HOME when unset), or `.profile` for POSIX sh. An explicit shell directory overrides that location. All affected files appear in preview and backup. Open a fresh terminal after apply **and rollback**: sourcing a restored profile does not unset variables already exported in the current shell.
 
-Management API: `POST /api/integrations/<product>/target` accepts `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`; `profile` is Codex-only, and `shell_dir` / `shell` are Antigravity-only (`shell` accepts bash, zsh, or sh). Antigravity does not accept a custom `config_dir`. List/action responses include `target_options` and `verification` (`not_verified` or `blocked`). A malformed client's files produce an error on its own card; other clients and available rollback actions remain accessible.
+Management API: `POST /api/integrations/<product>/target` accepts `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`; `profile` is Codex-only, and `shell_dir` / `shell` support Antigravity and Copilot CLI (`shell` accepts bash, zsh, or sh). Antigravity does not accept a custom `config_dir`. List/action responses include `target_capabilities`, `target_options` and `verification` (`not_verified` or `blocked`). A malformed client's files produce an error on its own card; other clients and available rollback actions remain accessible.
 
 OpenCode, Continue, Aider, and Goose support `config_dir` and `model`; the first three also support an absolute `config_file`, which takes precedence over the directory. Existing models are preserved; without one, select a model explicitly. Takeover has no built-in default model or context length. The UI can load suggestions from `/clipal/v1/models`; when the upstream does not expose a catalog, enter a verified model ID and validate it with a real request.
 
@@ -84,7 +84,7 @@ OpenCode follows `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, and XDG configuration
 
 OpenCode restrictions and model selection use the merged known user layers: `config.json`, `opencode.json`, and `opencode.jsonc` in the XDG global directory; the custom config file; `opencode.json` and `opencode.jsonc` in the custom directory; then `OPENCODE_CONFIG_CONTENT`. Objects merge recursively and higher-priority restriction lists replace earlier lists. Only required takeover fields are written to the selected file; other layers stay read-only, and changes to planning inputs abort the write. A later known layer overriding the selected file's routing produces a conflict. Existing alias wire IDs are preserved unless a gateway model ID is explicitly selected, in which case that wire ID is updated while names, limits, and other metadata remain intact. Project, remote, and managed settings still need verification in the client's launch environment.
 
-To verify installed clients against a running gateway with available accounts, build Clipal and run the isolated smoke test. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
+The isolated smoke script covers all eighteen integrations. The eleven additional clients and their executed versions are recorded in the [validation catalog](../cli-takeover-candidates.md#installed-client-validation). To verify installed clients against a running gateway with available accounts, build Clipal and run the script. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
 
 ```sh
 go build -o /tmp/clipal-takeover ./cmd/clipal
@@ -95,6 +95,8 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 - `Continue` takeover adds or updates a user-level `Clipal` model entry while preserving its model, key, roles, protocol and capability options. Without an existing Clipal model, select one explicitly instead of inferring from unrelated entries. New entries declare chat/edit/apply roles without inheriting another model's autocomplete capability.
 - `Aider` takeover updates `openai-api-base` and uses an existing OpenAI-compatible model or an explicit model choice; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
 - `Goose` takeover manages `custom_providers/clipal.json` in its configuration directory, preserving headers, authentication, streaming settings, and model metadata
+
+New clients and their exact defaults, environment overrides, required launch flags and blocked configurations are documented in the [complete takeover catalog](../cli-takeover-candidates.md). Controls are driven by each card's `target_capabilities`. Kimi additionally supports an explicit positive `context_window`; TRAE requires selecting its YAML file. Crush supports only legacy JSON without overriding executable shell configuration, and Copilot uses a managed shell BYOK block. No live inference result is implied by configuration inspection.
 
 ### Export Full Backup
 

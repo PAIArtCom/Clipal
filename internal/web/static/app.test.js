@@ -3796,3 +3796,24 @@ test('takeover loads distinct model IDs without a hardcoded fallback', async () 
     assert.deepEqual(Array.from(state.integrationModels), ['another','provider/model']);
     assert.equal(state.integrationModelsBusy,false);
 });
+
+test('takeover preserves server capabilities and names across new-client actions', async () => {
+    const state = loadApp();
+    const capabilities = {config_dir: true, model: true, context_window: true};
+    state.integrations = [state.normalizeIntegration({product: 'kimi', name: 'Kimi Code CLI', target_capabilities: capabilities, target_options: {model: 'arbitrary', context_window: '32768'}})];
+    let request;
+    state.apiCall = async (url, input) => {
+        request = JSON.parse(input.body);
+        return {message: 'Saved', status: {product: 'kimi', name: 'Kimi Code CLI', target_capabilities: capabilities, target_options: request, state: 'not_configured'}};
+    };
+    await state.runIntegrationAction('kimi', 'target');
+    assert.equal(request.context_window, 32768);
+    assert.equal(state.integrations[0].name, 'Kimi Code CLI');
+    assert.equal(state.integrations[0].target_capabilities.context_window, true);
+    state.integrations[0].target_options.context_window = '';
+    assert.equal(Object.hasOwn(state.integrationTargetPayload('kimi'), 'context_window'), false);
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    for (const key of ['config_dir', 'config_file', 'model', 'profile', 'shell', 'shell_dir', 'context_window']) {
+        assert.ok(html.includes('integration.target_capabilities?.' + key));
+    }
+});

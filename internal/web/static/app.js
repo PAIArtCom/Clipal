@@ -523,6 +523,7 @@ function app() {
                     targetOptions: 'Configuration location',
                     configDir: 'Client configuration directory (optional)',
                     configFile: 'Configuration file (optional, overrides directory)',
+                    contextWindow: 'Context window in tokens (required if no model metadata)',
                     gatewayModel: 'Gateway model ID (required when none is configured)',
                     loadModels: 'Load gateway models',
                     modelCatalogHint: 'If the model list is unavailable, enter a verified gateway model ID. Runtime routing still needs verification.',
@@ -1037,6 +1038,7 @@ function app() {
                     targetOptions: '配置位置',
                     configDir: '客户端配置目录（可选）',
                     configFile: '配置文件（可选，优先于目录）',
+                    contextWindow: '上下文长度（tokens，无现有模型元数据时必填）',
                     gatewayModel: '网关模型 ID（无现有模型时必填）',
                     loadModels: '加载网关模型',
                     modelCatalogHint: '无法获取列表时填写已确认可用的网关模型 ID，运行时仍需验证。',
@@ -3021,24 +3023,8 @@ function app() {
         },
 
         integrationProductName(product) {
-            switch (String(product || '').trim()) {
-                case 'claude':
-                    return 'Claude Code';
-                case 'codex':
-                    return 'Codex CLI';
-                case 'opencode':
-                    return 'OpenCode';
-                case 'antigravity':
-                    return 'Antigravity CLI';
-                case 'continue':
-                    return 'Continue';
-                case 'aider':
-                    return 'Aider';
-                case 'goose':
-                    return 'Goose';
-                default:
-                    return product;
-            }
+            const item = this.integrations.find(item => item.product === product);
+            return item?.name || product;
         },
 
         integrationApplyLabel() {
@@ -3189,14 +3175,21 @@ function app() {
         normalizeIntegration(item) {
             return {
                 ...item,
-                target_options: {config_dir: '', config_file: '', model: '', profile: '', shell_dir: '', shell: '', ...((item && item.target_options) || {})},
+                target_options: {config_dir: '', config_file: '', model: '', context_window: '', profile: '', shell_dir: '', shell: '', ...((item && item.target_options) || {})},
                 changes: this.integrationChanges(String(item.current_content || ''), this.integrationSecondaryPreviewContent(item)),
-                name: this.integrationProductName(item.product) || item.name,
+                name: item.name || item.product,
                 current_content: String((item && item.current_content) || ''),
                 planned_content: String((item && item.planned_content) || ''),
                 backup_content: String((item && item.backup_content) || ''),
                 backup_target_existed: !!(item && item.backup_target_existed)
             };
+        },
+
+        integrationTargetPayload(product) {
+            const target = { ...((this.integrations.find(item => item.product === product) || {}).target_options || {}) };
+            if (target.context_window === '') delete target.context_window;
+            else if (target.context_window !== undefined) target.context_window = Number(target.context_window);
+            return target;
         },
 
         async loadIntegrations(background = false) {
@@ -3236,11 +3229,11 @@ function app() {
             try {
                 const response = await this.apiCall(`/api/integrations/${encodeURIComponent(name)}/${op}`, {
                     method: 'POST',
-                    ...(op === 'target' ? { body: JSON.stringify((this.integrations.find(item => item.product === name) || {}).target_options || {}) } : {})
+                    ...(op === 'target' ? { body: JSON.stringify(this.integrationTargetPayload(name)) } : {})
                 }, false, true);
                 this.integrations = (this.integrations || []).map(item =>
                     item && item.product === name
-                        ? this.normalizeIntegration({ ...response.status, name: this.integrationProductName(name) || response.status.name })
+                        ? this.normalizeIntegration({ ...response.status, name: response.status.name || name })
                         : item
                 );
                 if (op === 'target') {

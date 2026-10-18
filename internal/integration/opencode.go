@@ -22,12 +22,16 @@ func (m Manager) advertisedOpenCodeBaseURL(cfg *config.Config) string {
 }
 
 func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
-	targetPath, err := m.opencodeTargetPath()
+	return m.planOpenCodeCompatible(ProductOpenCode, cfg)
+}
+
+func (m Manager) planOpenCodeCompatible(product ProductID, cfg *config.Config) ([]takeoverFile, error) {
+	targetPath, err := m.openCodeCompatiblePath(product)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := m.readOpenCodeConfig(targetPath)
+	state, err := m.readOpenCodeCompatibleConfig(product, targetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +48,11 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 	}
 
 	if _, ok := doc["$schema"]; !ok {
-		doc["$schema"] = openCodeSchemaURL
+		schema := openCodeSchemaURL
+		if product == ProductKiloCLI {
+			schema = "https://app.kilo.ai/config.json"
+		}
+		doc["$schema"] = schema
 	}
 
 	selections := map[string]string{}
@@ -52,11 +60,11 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 		selections[field], _ = effective[field].(string)
 	}
 	primaryID, primaryName := inferOpenCodeModel(effective, "model", "")
-	target, err := m.targetOptions(ProductOpenCode)
+	target, err := m.targetOptions(product)
 	if err != nil {
 		return nil, err
 	}
-	chosen, err := m.selectedModel(ProductOpenCode, targetPath, primaryID)
+	chosen, err := m.selectedModel(product, targetPath, primaryID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +79,13 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 		doc["small_model"] = "clipal/" + smallID
 	}
 
-	providers, _ := doc["provider"].(map[string]any)
-	if providers == nil {
-		providers = map[string]any{}
+	providers, err := objectField(doc, "provider")
+	if err != nil {
+		return nil, err
 	}
-	clipalProvider, _ := providers["clipal"].(map[string]any)
-	if clipalProvider == nil {
-		clipalProvider = map[string]any{}
+	clipalProvider, err := objectField(providers, "clipal")
+	if err != nil {
+		return nil, err
 	}
 	if clipalProvider["npm"] == nil {
 		clipalProvider["npm"] = openCodeProviderNPM
@@ -92,9 +100,9 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 		}
 	}
 
-	options, _ := clipalProvider["options"].(map[string]any)
-	if options == nil {
-		options = map[string]any{}
+	options, err := objectField(clipalProvider, "options")
+	if err != nil {
+		return nil, err
 	}
 	options["baseURL"] = m.advertisedOpenCodeBaseURL(cfg)
 	inheritedOptions, _ := openCodeProvider(effective)["options"].(map[string]any)
@@ -104,9 +112,9 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 	}
 	clipalProvider["options"] = options
 
-	models, _ := clipalProvider["models"].(map[string]any)
-	if models == nil {
-		models = map[string]any{}
+	models, err := objectField(clipalProvider, "models")
+	if err != nil {
+		return nil, err
 	}
 	// Seed only the selected models from the merged view; leave all other
 	// inherited provider metadata in its original files.
@@ -150,11 +158,11 @@ func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 
 	plannedBytes, err := marshalJSONMap(doc)
 	if err != nil {
-		return nil, fmt.Errorf("marshal OpenCode preview: %w", err)
+		return nil, fmt.Errorf("marshal compatible client preview: %w", err)
 	}
 
 	if openCodeRouteShadow(doc, state.effective(doc)) {
-		return nil, &openCodeConflictError{path: targetPath, reason: "A later known OpenCode configuration layer overrides the selected file's model or provider routing; select the higher-priority file or resolve that override."}
+		return nil, &openCodeConflictError{path: targetPath, reason: "A later known configuration layer overrides the selected file's model or provider routing; select the higher-priority file or resolve that override."}
 	}
 	return []takeoverFile{{backupFile: state.target, Planned: plannedBytes, Dependencies: state.dependencies}}, nil
 }

@@ -8,13 +8,24 @@ import (
 type ProductID string
 
 const (
-	ProductClaudeCode     ProductID = "claude"
-	ProductCodexCLI       ProductID = "codex"
-	ProductOpenCode       ProductID = "opencode"
-	ProductAntigravityCLI ProductID = "antigravity"
-	ProductContinue       ProductID = "continue"
-	ProductAider          ProductID = "aider"
-	ProductGoose          ProductID = "goose"
+	ProductClaudeCode      ProductID = "claude"
+	ProductCodexCLI        ProductID = "codex"
+	ProductOpenCode        ProductID = "opencode"
+	ProductAntigravityCLI  ProductID = "antigravity"
+	ProductContinue        ProductID = "continue"
+	ProductAider           ProductID = "aider"
+	ProductGoose           ProductID = "goose"
+	ProductPi              ProductID = "pi"
+	ProductQwenCode        ProductID = "qwen"
+	ProductKimiCLI         ProductID = "kimi"
+	ProductCopilotCLI      ProductID = "copilot"
+	ProductKiloCLI         ProductID = "kilo"
+	ProductCodeBuddy       ProductID = "codebuddy"
+	ProductCrush           ProductID = "crush"
+	ProductIFlow           ProductID = "iflow"
+	ProductTRAEAgent       ProductID = "trae"
+	ProductGrokBuild       ProductID = "grok"
+	ProductDeepSeekHarness ProductID = "deepseek-harness"
 )
 
 type backupFile struct {
@@ -65,29 +76,4 @@ type Preview struct {
 	PlannedContent      string    `json:"planned_content"`
 	BackupContent       string    `json:"backup_content"`
 	BackupTargetExisted bool      `json:"backup_target_existed"`
-}
-
-func SupportedProducts() []ProductID {
-	return []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose}
-}
-
-func ProductName(product ProductID) string {
-	switch product {
-	case ProductClaudeCode:
-		return "Claude Code"
-	case ProductCodexCLI:
-		return "Codex CLI"
-	case ProductOpenCode:
-		return "OpenCode"
-	case ProductAntigravityCLI:
-		return "Antigravity CLI"
-	case ProductContinue:
-		return "Continue"
-	case ProductAider:
-		return "Aider"
-	case ProductGoose:
-		return "Goose"
-	default:
-		return string(product)
-	}
 }

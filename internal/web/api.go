@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -690,16 +691,23 @@ func (a *API) HandleIntegrationAction(w http.ResponseWriter, r *http.Request) {
 	)
 	switch action {
 	case "target":
-		var target integration.TargetOptions
-		if decodeErr := json.NewDecoder(r.Body).Decode(&target); decodeErr != nil {
+		var target *integration.TargetOptions
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if decodeErr := decoder.Decode(&target); decodeErr != nil || target == nil {
 			writeError(w, "invalid target options", http.StatusBadRequest)
 			return
 		}
-		if err = a.integrations.SetTarget(product, target); err == nil {
+		var extra any
+		if decodeErr := decoder.Decode(&extra); decodeErr != io.EOF {
+			writeError(w, "invalid target options", http.StatusBadRequest)
+			return
+		}
+		if err = a.integrations.SetTarget(product, *target); err == nil {
 			result.Product = product
 			result.Status, err = a.integrations.Status(product, cfg)
 			if err != nil {
-				result.Status = integration.Status{Product: product, State: integration.StateError, Warning: err.Error(), TargetOptions: target}
+				result.Status = integration.Status{Product: product, State: integration.StateError, Warning: err.Error(), TargetOptions: *target}
 				err = nil
 			}
 			result.Message = "Target saved; preview the files before applying takeover."
@@ -927,9 +935,7 @@ func extractIntegrationAction(path string) (integration.ProductID, string) {
 		return "", ""
 	}
 	product := integration.ProductID(strings.TrimSpace(parts[2]))
-	switch product {
-	case integration.ProductClaudeCode, integration.ProductCodexCLI, integration.ProductOpenCode, integration.ProductAntigravityCLI, integration.ProductContinue, integration.ProductAider, integration.ProductGoose:
-	default:
+	if !integration.IsSupportedProduct(product) {
 		return "", strings.TrimSpace(parts[3])
 	}
 	return product, strings.TrimSpace(parts[3])

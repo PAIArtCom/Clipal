@@ -17,6 +17,8 @@ func TestInheritedClientEnvironmentIsIsolated(t *testing.T) {
 		"TestOpenCodeStatus_NotConfiguredWhenFileMissing",
 		"TestGooseStatus_NotConfiguredWhenFileMissing",
 		"TestTakeoverTargetsRespectEnvironmentAndSelection",
+		"TestNewClientPathOverridesAndSelection",
+		"TestNewClientsRejectMalformedBeforeCreatingBackup",
 		"TestOtherClientPathsFollowClientContracts",
 		"TestAntigravityFreshShellLoadsAndClearsTakeover",
 	)

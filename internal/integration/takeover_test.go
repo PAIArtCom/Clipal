@@ -16,29 +16,39 @@ func takeoverFixture(t *testing.T, product ProductID) (Manager, *config.Config, 
 	t.Helper()
 	m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
-	if product == ProductAntigravityCLI && os.Getenv("SHELL") == "" {
-		if err := m.SetTarget(product, TargetOptions{Shell: "sh"}); err != nil {
-			t.Fatal(err)
-		}
+	target := TargetOptions{}
+	if ProductTargetCapabilities(product).Shell {
+		target.Shell = "sh"
 	}
 	if modelSelectionProduct(product) {
-		if err := m.SetTarget(product, TargetOptions{Model: "test-model"}); err != nil {
-			t.Fatal(err)
-		}
+		target.Model = "test-model"
+	}
+	if product == ProductKimiCLI {
+		target.ContextWindow = 32768
+	}
+	if product == ProductTRAEAgent {
+		target.ConfigFile = filepath.Join(m.homeDir, "trae_config.yaml")
+	}
+	if err := m.SetTarget(product, target); err != nil {
+		t.Fatal(err)
 	}
 	files, err := m.planTakeover(product, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var originals []backupFile
-	for i, file := range files {
+	for _, file := range files {
 		body := []byte("{\"theme\":\"original\"}\n")
-		if product == ProductCodexCLI {
-			body = []byte("model = 'original'\n")
-		} else if product == ProductContinue || product == ProductAider {
+		switch file.Format {
+		case managedTOML:
+			body = []byte("theme = 'original'\n")
+		case managedYAML:
 			body = []byte("theme: original\n")
-		} else if product == ProductAntigravityCLI && i > 0 {
+		case managedBytes:
 			body = []byte("# original shell settings\nexport KEEP='original'\n")
+		}
+		if product == ProductDeepSeekHarness {
+			body = []byte("- id: keep-original\n  config: {}\n")
 		}
 		if err := os.MkdirAll(filepath.Dir(file.TargetPath), 0700); err != nil {
 			t.Fatal(err)
@@ -434,7 +444,8 @@ func TestTakeoverPreservesConfigurationSymlinks(t *testing.T) {
 }
 
 func TestTakeoverAdoptsLegacyBaseline(t *testing.T) {
-	for _, product := range SupportedProducts() {
+	// Only products shipped with the old backup format have legacy baselines.
+	for _, product := range []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose} {
 		t.Run(string(product), func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, product)
 			paths := []string{}
