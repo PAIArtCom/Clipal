@@ -16,11 +16,10 @@ const (
 	ToolCodex       Tool = "codex"
 	ToolClaude      Tool = "claude"
 	ToolAntigravity Tool = "antigravity"
-	ToolGemini      Tool = "gemini"
 )
 
 func SupportedTools() []Tool {
-	return []Tool{ToolCodex, ToolClaude, ToolAntigravity, ToolGemini}
+	return []Tool{ToolCodex, ToolClaude, ToolAntigravity}
 }
 
 func ParseTools(raw string) ([]Tool, error) {
@@ -32,7 +31,7 @@ func ParseTools(raw string) ([]Tool, error) {
 	for _, value := range strings.Split(raw, ",") {
 		tool := Tool(strings.ToLower(strings.TrimSpace(value)))
 		switch tool {
-		case ToolCodex, ToolClaude, ToolAntigravity, ToolGemini:
+		case ToolCodex, ToolClaude, ToolAntigravity:
 		default:
 			return nil, fmt.Errorf("unsupported tool %q", value)
 		}
@@ -71,6 +70,9 @@ type Bootstrapper struct {
 func New() Bootstrapper { return Bootstrapper{Runner: systemRunner{}, GOOS: runtime.GOOS} }
 
 func (b Bootstrapper) Ensure(ctx context.Context, tool Tool, dryRun bool) (Result, error) {
+	if parsed, err := ParseTools(string(tool)); err != nil || len(parsed) != 1 || parsed[0] != tool {
+		return Result{}, fmt.Errorf("unsupported tool %q", tool)
+	}
 	if b.Runner == nil {
 		b.Runner = systemRunner{}
 	}
@@ -115,8 +117,6 @@ func installHint(tool Tool) string {
 		return "npm install -g @anthropic-ai/claude-code"
 	case ToolAntigravity:
 		return "curl -fsSL https://antigravity.google/cli/install.sh | bash"
-	case ToolGemini:
-		return "npm install -g @google/gemini-cli"
 	default:
 		return ""
 	}
@@ -131,8 +131,6 @@ func installCommand(tool Tool, goos string) (string, []string, error) {
 		return "npm", []string{"install", "-g", "@openai/codex"}, nil
 	case ToolClaude:
 		return "npm", []string{"install", "-g", "@anthropic-ai/claude-code"}, nil
-	case ToolGemini:
-		return "npm", []string{"install", "-g", "@google/gemini-cli"}, nil
 	case ToolAntigravity:
 		return "sh", []string{"-c", "curl -fsSL https://antigravity.google/cli/install.sh | bash"}, nil
 	default:

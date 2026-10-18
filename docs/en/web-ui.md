@@ -29,7 +29,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Import OAuth credential files from the Add Provider dialog. Supported files are Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles; Clipal imports only accounts matching the selected service.
 - Route Claude and Codex OAuth requests through Agent SDK-compatible upstream wrapping by default, with required transport fields handled by Clipal.
 - View OAuth auth status and refresh summary in each provider's details
-- Load OAuth plan and rate-limit details for supported providers (currently Codex)
+- Load OAuth plan and rate-limit details for Codex, Claude, and Google accounts (Antigravity)
 - See each provider's runtime state in its row: in use, standby, disabled, cooling down (with time remaining), unavailable, or probing recovery
 
 ### Global Settings
@@ -62,7 +62,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 ### CLI Takeover
 
 - Inspect supported CLI integrations from the UI
-- Apply one-click user-level takeover for `Claude Code`, `Codex CLI`, `OpenCode`, `Gemini CLI`, `Continue`, `Aider`, and `Goose`
+- Apply one-click user-level takeover for `Claude Code`, `Codex CLI`, `OpenCode`, `Antigravity CLI`, `Continue`, `Aider`, and `Goose`
 - Create a backup before the first takeover so rollback can restore the original file
 - Roll back to the last captured pre-takeover state
 - See the exact target config file path that Clipal manages
@@ -73,7 +73,7 @@ Notes:
 - This feature currently edits user-level config only
 - `Claude Code` takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, inserts a placeholder `ANTHROPIC_API_KEY` only when no Claude client auth env is present, may also mark `~/.claude.json` onboarding as complete, and does not overwrite existing `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`
 - `OpenCode` takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>`
-- `Gemini CLI` takeover only updates `GEMINI_API_BASE` in `~/.gemini/.env`
+- `Antigravity CLI` takeover sets `modelProvider: "gemini"` in `~/.gemini/antigravity-cli/settings.json` and manages a marked block in the user’s bash, zsh, or POSIX sh profile exporting `GOOGLE_GEMINI_BASE_URL` and the local placeholder `GEMINI_API_KEY=clipal`. Both files are previewed and backed up; rollback restores both. Open a new terminal after applying or rolling back.
 - `Continue` takeover adds or updates a user-level `Clipal` model entry
 - `Aider` takeover updates the home-level `openai-api-base` and a minimal OpenAI-compatible `model`; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
 - `Goose` takeover manages a dedicated custom provider file under `~/.config/goose/custom_providers/`
@@ -151,6 +151,8 @@ The Claude / OpenAI / Gemini tabs sit on the top edge of a panel, and everything
 Below that row, the panel is split in two. On the left, providers are listed one per row in priority order: drag handle (its tooltip includes the configured priority), name, runtime state (in use, standby, disabled, cooling down with time remaining, unavailable, or probing recovery), and the enable switch. Click a row, or focus its name and press Enter, to show that provider on the right; the first provider is shown until you choose another.
 
 The right-hand inspector shows the provider's name, state, OAuth tag and upstream host or provider ID, with pin, edit (OAuth accounts open the account environment instead) and delete at the top right. Below that come the reason for a degraded state; three fixed columns for credential status and last refresh (OAuth) or key count (API key), token usage with input/output, and spend today and over 7 days, where a dash marks a figure with no data yet; OAuth plan and limits with usage gauges; and rows for base URL, proxy, and provider ID, with copy buttons. Hovering or focusing usage or spend shows exact amounts and the token breakdown.
+
+In **Plan & Limits**, click **Load** to retrieve the account’s upstream subscription and quota data, or **Refresh** to update it. Google quotas show the used percentage for each returned model or quota group and its reset time when available; 100% remaining appears as 0% used. Antigravity falls back to the model catalog’s explicit quota fields when the quota APIs are empty or unsupported; entries without quota values are omitted. Account initialization or authorization failures are shown as errors. Missing quota data is stated explicitly. A failed refresh shows an error and retains the previous data.
 
 On desktop, the inspector stays below the app toolbar while the page scrolls. Long details scroll inside the inspector while its title and actions remain visible. Choosing another provider starts its details at the top without moving the provider list. Usage and spend tooltips remain visible outside the scrolling area, on hover or keyboard focus. Narrow or very short windows use normal page scrolling for details.
 

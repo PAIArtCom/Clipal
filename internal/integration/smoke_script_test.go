@@ -87,14 +87,7 @@ func TestMakefileDispatchesLiveOAuthSmokeTargetByProvider(t *testing.T) {
 		`$(or $(CLAUDE_OAUTH_FILE),$(OAUTH_FILE))`,
 		`$(or $(CLAUDE_MODEL),$(MODEL))`,
 		`$(or $(CLAUDE_SKIP_COUNT_TOKENS),$(SKIP_COUNT_TOKENS))`,
-		`else ifeq ($(PROVIDER),gemini)`,
-		`$(MAKE) test-live-gemini-oauth`,
-		`$(or $(GEMINI_CONFIG_DIR),$(CONFIG_DIR))`,
-		`$(or $(GEMINI_OAUTH_EMAIL),$(OAUTH_EMAIL))`,
-		`$(or $(GEMINI_OAUTH_REF),$(OAUTH_REF))`,
-		`$(or $(GEMINI_OAUTH_FILE),$(OAUTH_FILE))`,
-		`$(or $(GEMINI_MODEL),$(MODEL))`,
-		`usage: make test-live-oauth PROVIDER=codex|claude|gemini`,
+		`usage: make test-live-oauth PROVIDER=codex|claude`,
 	} {
 		if !strings.Contains(makefile, want) {
 			t.Fatalf("Makefile missing %q", want)

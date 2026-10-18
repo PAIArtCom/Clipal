@@ -34,7 +34,7 @@
 ## ✨ 为什么选择 Clipal？
 
 ### 🚀 **一键 CLI 接管 (CLI Takeover)**
-告别手动寻找、修改隐藏配置文件的烦恼。在 Web UI 中只需一键，Clipal 就能自动接管 **Claude Code、Codex CLI、OpenCode、Gemini CLI、Continue、Aider** 以及 **Goose** 的配置。
+告别手动寻找、修改隐藏配置文件的烦恼。在 Web UI 中只需一键，Clipal 就能自动接管 **Claude Code、Codex CLI、OpenCode、Antigravity CLI、Continue、Aider** 以及 **Goose** 的配置。
 - 自动帮你配置本地 Base URL。
 - 接管前自动备份原始配置。
 - 随时支持一键回滚。
@@ -69,7 +69,7 @@ Clipal 现已将所有客户端入口统一规范到单一路由：`http://127.0
 - **Google Gemini**
 
 **常见支持工具：**
-- **AI 编程助手：** Claude Code、Codex CLI、OpenCode、Gemini CLI、Continue、Aider、Goose
+- **AI 编程助手：** Claude Code、Codex CLI、OpenCode、Antigravity CLI、Continue、Aider、Goose
 - **桌面端 AI 聊天：** Cherry Studio、Kelivo、Chatbox、ChatWise (兼容 OpenAI API)
 
 ---

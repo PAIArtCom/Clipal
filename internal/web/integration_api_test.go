@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestHandleListIntegrations_ReturnsSupportedProducts(t *testing.T) {
 		}
 		products = append(products, product)
 	}
-	if strings.Join(products, ",") != "claude,codex,opencode,gemini,continue,aider,goose" {
+	if strings.Join(products, ",") != "claude,codex,opencode,antigravity,continue,aider,goose" {
 		t.Fatalf("products = %v", products)
 	}
 }
@@ -281,38 +282,28 @@ func TestHandleListIntegrations_ConfiguredShowsLatestBackup(t *testing.T) {
 	}
 }
 
-func TestHandleIntegrationApply_Gemini(t *testing.T) {
+func TestHandleIntegrationApply_Antigravity(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-profile takeover is Unix-only")
+	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-
-	geminiDir := filepath.Join(home, ".gemini")
-	if err := os.MkdirAll(geminiDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	target := filepath.Join(geminiDir, ".env")
-	if err := os.WriteFile(target, []byte("GOOGLE_API_KEY=secret\n"), 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
+	t.Setenv("SHELL", "/bin/bash")
 	api := NewAPI(t.TempDir(), "test", nil)
-	req := httptest.NewRequest(http.MethodPost, "/api/integrations/gemini/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/integrations/antigravity/apply", nil)
 	w := httptest.NewRecorder()
-
 	api.HandleIntegrationAction(w, req)
-	if w.Result().StatusCode != http.StatusOK {
-		t.Fatalf("status=%d body=%s", w.Result().StatusCode, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
-
-	body, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	body, err := os.ReadFile(filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"))
+	if err != nil || !strings.Contains(string(body), `"modelProvider": "gemini"`) {
+		t.Fatalf("settings=%s error=%v", body, err)
 	}
-	if !strings.Contains(string(body), "GEMINI_API_BASE=http://127.0.0.1:3333/clipal") {
-		t.Fatalf("expected Gemini .env to be updated: %s", body)
-	}
-	if !strings.Contains(string(body), "GOOGLE_API_KEY=secret") {
-		t.Fatalf("expected Gemini .env to preserve other entries: %s", body)
+	profile, err := os.ReadFile(filepath.Join(home, ".bashrc"))
+	if err != nil || !strings.Contains(string(profile), "GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'") {
+		t.Fatalf("profile=%s error=%v", profile, err)
 	}
 }
 

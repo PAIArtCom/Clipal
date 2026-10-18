@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-live-gemini-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
+.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
 GOBIN := $(shell $(GO) env GOPATH)/bin
@@ -44,18 +44,9 @@ else ifeq ($(PROVIDER),claude)
 		SKIP_COUNT_TOKENS="$(or $(CLAUDE_SKIP_COUNT_TOKENS),$(SKIP_COUNT_TOKENS))" \
 		SKIP_REFRESH_RETRY="$(SKIP_REFRESH_RETRY)" \
 		KEEP_TEMP="$(KEEP_TEMP)"
-else ifeq ($(PROVIDER),gemini)
-	$(MAKE) test-live-gemini-oauth \
-		CONFIG_DIR="$(or $(GEMINI_CONFIG_DIR),$(CONFIG_DIR))" \
-		OAUTH_EMAIL="$(or $(GEMINI_OAUTH_EMAIL),$(OAUTH_EMAIL))" \
-		OAUTH_REF="$(or $(GEMINI_OAUTH_REF),$(OAUTH_REF))" \
-		OAUTH_FILE="$(or $(GEMINI_OAUTH_FILE),$(OAUTH_FILE))" \
-		MODEL="$(or $(GEMINI_MODEL),$(MODEL))" \
-		SKIP_STREAM="$(SKIP_STREAM)" \
-		SKIP_REFRESH_RETRY="$(SKIP_REFRESH_RETRY)" \
-		KEEP_TEMP="$(KEEP_TEMP)"
+
 else
-	@echo "usage: make test-live-oauth PROVIDER=codex|claude|gemini [CONFIG_DIR=... or <PROVIDER>_CONFIG_DIR=...] [OAUTH_EMAIL=...|OAUTH_REF=...|OAUTH_FILE=... or <PROVIDER>_OAUTH_*=...] [MODEL=... or <PROVIDER>_MODEL=...]"
+	@echo "usage: make test-live-oauth PROVIDER=codex|claude [CONFIG_DIR=... or <PROVIDER>_CONFIG_DIR=...] [OAUTH_EMAIL=...|OAUTH_REF=...|OAUTH_FILE=... or <PROVIDER>_OAUTH_*=...] [MODEL=... or <PROVIDER>_MODEL=...]"
 	@exit 1
 endif
 
@@ -81,17 +72,6 @@ test-live-claude-oauth:
 	CLIPAL_LIVE_SKIP_REFRESH_RETRY="$(SKIP_REFRESH_RETRY)" \
 	CLIPAL_LIVE_KEEP_TEMP="$(KEEP_TEMP)" \
 	./scripts/live_claude_oauth_smoke.sh
-
-test-live-gemini-oauth:
-	CLIPAL_LIVE_CONFIG_DIR="$(CONFIG_DIR)" \
-	CLIPAL_LIVE_OAUTH_EMAIL="$(OAUTH_EMAIL)" \
-	CLIPAL_LIVE_OAUTH_REF="$(OAUTH_REF)" \
-	CLIPAL_LIVE_OAUTH_FILE="$(OAUTH_FILE)" \
-	CLIPAL_LIVE_MODEL="$(MODEL)" \
-	CLIPAL_LIVE_SKIP_STREAM="$(SKIP_STREAM)" \
-	CLIPAL_LIVE_SKIP_REFRESH_RETRY="$(SKIP_REFRESH_RETRY)" \
-	CLIPAL_LIVE_KEEP_TEMP="$(KEEP_TEMP)" \
-	./scripts/live_gemini_oauth_smoke.sh
 
 test-oauth-authorize:
 	./scripts/oauth_authorize_smoke.sh --mock

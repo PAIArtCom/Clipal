@@ -104,16 +104,16 @@ func TestRequestPayloadCachesGeminiOAuthRewrite(t *testing.T) {
 	}
 	provider := config.Provider{Name: "gemini"}
 
-	_, _, first, err := payload.geminiOAuthRequest(req, requestCtx, provider, "/v1beta/models/gemini-2.5-pro:generateContent", "project-1")
+	_, first, err := payload.antigravityOAuthRequest(req, requestCtx, provider, "/v1beta/models/gemini-2.5-pro:generateContent", "project-1")
 	if err != nil {
-		t.Fatalf("geminiOAuthRequest first: %v", err)
+		t.Fatalf("antigravityOAuthRequest first: %v", err)
 	}
-	_, _, second, err := payload.geminiOAuthRequest(req, requestCtx, provider, "/v1beta/models/gemini-2.5-pro:generateContent", "project-1")
+	_, second, err := payload.antigravityOAuthRequest(req, requestCtx, provider, "/v1beta/models/gemini-2.5-pro:generateContent", "project-1")
 	if err != nil {
-		t.Fatalf("geminiOAuthRequest second: %v", err)
+		t.Fatalf("antigravityOAuthRequest second: %v", err)
 	}
 	if len(first) == 0 || len(second) == 0 || &first[0] != &second[0] {
-		t.Fatalf("expected cached gemini rewrite body to be reused")
+		t.Fatalf("expected cached antigravity rewrite body to be reused")
 	}
 }
 
@@ -152,18 +152,6 @@ func oauthPayloadCases() []oauthPayloadCase {
 			build: func(path string, body []byte) (string, string, []byte, error) {
 				target, stream, out, err := buildCodexOAuthRequest(path, body)
 				return target, strconv.FormatBool(stream), out, err
-			},
-		},
-		{
-			name: "gemini",
-			ctx:  RequestContext{ClientType: ClientGemini, Family: ProtocolFamilyGemini, Capability: CapabilityGeminiGenerateContent},
-			path: "/v1beta/models/gemini-2.5-pro:generateContent",
-			body: `{"contents":[{"role":"user","parts":[{"text":"PROMPT"}]}]}`,
-			prepare: func(p *requestPayload, r *http.Request, c RequestContext, provider config.Provider, path string) (string, string, []byte, error) {
-				return p.geminiOAuthRequest(r, c, provider, path, "project-1")
-			},
-			build: func(path string, body []byte) (string, string, []byte, error) {
-				return buildGeminiOAuthRequest(CapabilityGeminiGenerateContent, path, body, "project-1")
 			},
 		},
 		{

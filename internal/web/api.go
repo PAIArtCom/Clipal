@@ -909,7 +909,7 @@ func extractIntegrationAction(path string) (integration.ProductID, string) {
 	}
 	product := integration.ProductID(strings.TrimSpace(parts[2]))
 	switch product {
-	case integration.ProductClaudeCode, integration.ProductCodexCLI, integration.ProductOpenCode, integration.ProductGeminiCLI, integration.ProductContinue, integration.ProductAider, integration.ProductGoose:
+	case integration.ProductClaudeCode, integration.ProductCodexCLI, integration.ProductOpenCode, integration.ProductAntigravityCLI, integration.ProductContinue, integration.ProductAider, integration.ProductGoose:
 	default:
 		return "", strings.TrimSpace(parts[3])
 	}

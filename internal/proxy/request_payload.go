@@ -15,20 +15,12 @@ type requestPayload struct {
 	root             map[string]any
 	overrideCache    map[string][]byte
 	codexCache       map[string]codexOAuthPreparedRequest
-	geminiCache      map[string]geminiOAuthPreparedRequest
 	antigravityCache map[string]antigravityOAuthPreparedRequest
 }
 
 type codexOAuthPreparedRequest struct {
 	targetPath string
 	stream     bool
-	body       []byte
-	err        error
-}
-
-type geminiOAuthPreparedRequest struct {
-	targetPath string
-	modelName  string
 	body       []byte
 	err        error
 }
@@ -153,44 +145,6 @@ func (p *requestPayload) codexOAuthRequest(original *http.Request, requestCtx Re
 		err:        err,
 	}
 	return targetPath, stream, requestBody, err
-}
-
-func (p *requestPayload) geminiOAuthRequest(original *http.Request, requestCtx RequestContext, provider config.Provider, path string, projectID string) (string, string, []byte, error) {
-	if p == nil {
-		return buildGeminiOAuthRequest(requestCtx.Capability, path, nil, projectID)
-	}
-	key := strings.Join([]string{
-		"gemini",
-		string(requestCtx.Capability),
-		normalizeUpstreamPath(path),
-		strings.TrimSpace(projectID),
-		providerOverrideCacheKey(requestCtx, provider),
-	}, "\x00")
-	if p.geminiCache != nil {
-		if cached, ok := p.geminiCache[key]; ok {
-			return cached.targetPath, cached.modelName, cached.body, cached.err
-		}
-	}
-
-	body := p.providerBody(original, requestCtx, provider)
-	var targetPath, modelName string
-	var requestBody []byte
-	var err error
-	if root, ok := p.providerRoot(original, requestCtx, provider); ok {
-		targetPath, modelName, requestBody, err = buildGeminiOAuthRequestFromRoot(requestCtx.Capability, path, root, projectID)
-	} else {
-		targetPath, modelName, requestBody, err = buildGeminiOAuthRequest(requestCtx.Capability, path, body, projectID)
-	}
-	if p.geminiCache == nil {
-		p.geminiCache = make(map[string]geminiOAuthPreparedRequest)
-	}
-	p.geminiCache[key] = geminiOAuthPreparedRequest{
-		targetPath: targetPath,
-		modelName:  modelName,
-		body:       requestBody,
-		err:        err,
-	}
-	return targetPath, modelName, requestBody, err
 }
 
 func (p *requestPayload) antigravityOAuthRequest(original *http.Request, requestCtx RequestContext, provider config.Provider, path string, projectID string) (string, []byte, error) {

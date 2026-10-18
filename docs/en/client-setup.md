@@ -85,20 +85,29 @@ Notes:
 - The Web UI takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>` when possible
 - Project-local `opencode.json` or environment-based overrides may still take precedence
 
-## Gemini CLI (Legacy)
+## Antigravity CLI (`agy`)
 
-Edit `~/.gemini/.env`:
+Use **CLI Takeover → Antigravity CLI**. Clipal updates
+`~/.gemini/antigravity-cli/settings.json` with `"modelProvider": "gemini"` and
+adds a marked block to `.zshrc`, `.bashrc`, or `.profile`:
 
-```dotenv
-GEMINI_API_BASE=http://127.0.0.1:3333/clipal
+Automatic takeover supports bash, zsh, and POSIX sh on macOS and Linux.
+On Windows, set the following environment variables manually and set
+`"modelProvider": "gemini"` in the settings file.
+
+```sh
+export GEMINI_API_KEY='clipal'
+export GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'
 ```
 
-Notes:
+Open a new terminal (or source the indicated profile), then run `agy`.
+The placeholder satisfies the CLI’s nonempty-key requirement; upstream
+credentials stay in Clipal. Preview covers both files, apply preserves unrelated
+settings and profile lines, and rollback restores their originals. Existing
+signed-in Antigravity sessions do not need to be deleted.
 
-- Google has moved personal Gemini CLI OAuth toward Antigravity; use Antigravity OAuth for new Google personal OAuth providers in Clipal.
-- The Web UI takeover only updates `GEMINI_API_BASE` in the user-level Gemini CLI `.env`
-- Project-local `.env` files or exported environment variables may still take precedence
-- After applying or rolling back from `CLI Takeover`, restart Gemini CLI or open a new session so it reloads the updated environment
+Antigravity CLI does not load `.env` files. See the
+[official API-key and custom-endpoint instructions](https://www.antigravity.google/docs/install?tab=cli).
 
 ## Continue
 

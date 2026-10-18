@@ -410,6 +410,8 @@
                                         </header>
                                         <p class="provider-row__metadata-error" x-show="providerOAuthMetadataError(provider)"
                                             x-text="providerOAuthMetadataError(provider)"></p>
+                                        <p class="form-hint" x-show="providerHasLoadedOAuthMetadata(provider) && !providerOAuthMetadataBusy(provider) && !providerOAuthMetadataError(provider) && !providerOAuthRateLimitSections(provider).length"
+                                            x-text="t('providers.quotaUnavailable')"></p>
                                         <div class="limit-grid" x-show="providerOAuthRateLimitSections(provider).length">
                                             <template x-for="limit in providerOAuthRateLimitSections(provider)" :key="limit.key">
                                                 <div class="provider-limit">

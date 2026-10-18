@@ -5,22 +5,29 @@ import "time"
 type ProductID string
 
 const (
-	ProductClaudeCode ProductID = "claude"
-	ProductCodexCLI   ProductID = "codex"
-	ProductOpenCode   ProductID = "opencode"
-	ProductGeminiCLI  ProductID = "gemini"
-	ProductContinue   ProductID = "continue"
-	ProductAider      ProductID = "aider"
-	ProductGoose      ProductID = "goose"
+	ProductClaudeCode     ProductID = "claude"
+	ProductCodexCLI       ProductID = "codex"
+	ProductOpenCode       ProductID = "opencode"
+	ProductAntigravityCLI ProductID = "antigravity"
+	ProductContinue       ProductID = "continue"
+	ProductAider          ProductID = "aider"
+	ProductGoose          ProductID = "goose"
 )
 
+type backupFile struct {
+	TargetPath string `json:"target_path"`
+	Existed    bool   `json:"existed"`
+	Original   []byte `json:"original,omitempty"`
+}
+
 type backupSnapshot struct {
-	Product       ProductID `json:"product"`
-	TargetPath    string    `json:"target_path"`
-	TargetExisted bool      `json:"target_existed"`
-	CreatedAt     time.Time `json:"created_at"`
-	BackupDir     string    `json:"backup_dir"`
-	Original      []byte    `json:"-"`
+	Product         ProductID    `json:"product"`
+	TargetPath      string       `json:"target_path"`
+	TargetExisted   bool         `json:"target_existed"`
+	CreatedAt       time.Time    `json:"created_at"`
+	BackupDir       string       `json:"backup_dir"`
+	Original        []byte       `json:"-"`
+	AdditionalFiles []backupFile `json:"additional_files,omitempty"`
 }
 
 type State string
@@ -54,7 +61,7 @@ type Preview struct {
 }
 
 func SupportedProducts() []ProductID {
-	return []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductGeminiCLI, ProductContinue, ProductAider, ProductGoose}
+	return []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose}
 }
 
 func ProductName(product ProductID) string {
@@ -65,8 +72,8 @@ func ProductName(product ProductID) string {
 		return "Codex CLI"
 	case ProductOpenCode:
 		return "OpenCode"
-	case ProductGeminiCLI:
-		return "Gemini CLI"
+	case ProductAntigravityCLI:
+		return "Antigravity CLI"
 	case ProductContinue:
 		return "Continue"
 	case ProductAider:

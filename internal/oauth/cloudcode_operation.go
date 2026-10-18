@@ -27,8 +27,8 @@ func (e *cloudCodeHTTPError) Error() string {
 	return fmt.Sprintf("request failed with status %d: %s", e.Status, e.Body)
 }
 
-// Both Google clients use the same long-running-operation protocol, retaining
-// their own service origin, authorization and transport identity.
+// Poll Cloud Code operations using the caller’s service origin, authorization,
+// and transport identity.
 func pollCloudCodeOperation(ctx context.Context, token, name string, c cloudCodeOperationConfig) (map[string]any, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -46,12 +46,12 @@ func pollCloudCodeOperation(ctx context.Context, token, name string, c cloudCode
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(ctx, defaultGeminiOperationPollTimeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultGoogleOperationPollTimeout)
 	defer cancel()
 	endpoint := strings.TrimRight(c.BaseURL, "/") + "/" + strings.Trim(c.Version, "/") + "/" + strings.TrimLeft(name, "/")
-	for attempt := 0; attempt < defaultGeminiOperationPollMaxAttempts; attempt++ {
+	for attempt := 0; attempt < defaultGoogleOperationPollMaxAttempts; attempt++ {
 		if attempt > 0 {
-			if err := waitCloudCode(ctx, defaultGeminiOperationPollDelay, c.Sleep); err != nil {
+			if err := waitCloudCode(ctx, defaultGoogleOperationPollDelay, c.Sleep); err != nil {
 				return nil, err
 			}
 		}
@@ -79,8 +79,8 @@ func pollCloudCodeOperation(ctx context.Context, token, name string, c cloudCode
 			return nil, fmt.Errorf("operation response is too large")
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			if attempt+1 < defaultGeminiOperationPollMaxAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				if err := waitCloudCode(ctx, geminiCloudCodeRetryDelay(resp.Header, c.Now()), c.Sleep); err != nil {
+			if attempt+1 < defaultGoogleOperationPollMaxAttempts && googleCloudCodeShouldRetry(resp.StatusCode) {
+				if err := waitCloudCode(ctx, googleCloudCodeRetryDelay(resp.Header, c.Now()), c.Sleep); err != nil {
 					return nil, err
 				}
 				continue
@@ -98,7 +98,7 @@ func pollCloudCodeOperation(ctx context.Context, token, name string, c cloudCode
 			return data, nil
 		}
 	}
-	return nil, fmt.Errorf("operation %q did not complete after %d polls", name, defaultGeminiOperationPollMaxAttempts)
+	return nil, fmt.Errorf("operation %q did not complete after %d polls", name, defaultGoogleOperationPollMaxAttempts)
 }
 
 func cloudCodeOperationError(data map[string]any) error {

@@ -208,7 +208,7 @@ func TestFormatClientConfigYAML_OAuthProviderYAMLRoundTrip_ClaudeAndGemini(t *te
 		{
 			name:         "gemini",
 			clientType:   "gemini",
-			providerName: string(config.OAuthProviderGemini),
+			providerName: string(config.OAuthProviderAntigravity),
 			oauthRef:     "gemini_acct_123",
 		},
 	}

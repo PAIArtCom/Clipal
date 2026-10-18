@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -128,14 +129,6 @@ func (b GeminiUsageSummaryBucket) clone() GeminiUsageSummaryBucket {
 	return clone
 }
 
-func (s *Service) GetGeminiUsage(ctx context.Context, ref string) (*GeminiUsageDetails, error) {
-	return s.GetGeminiUsageWithHTTPClient(ctx, ref, nil)
-}
-
-func (s *Service) GetGeminiUsageWithHTTPClient(ctx context.Context, ref string, httpClient *http.Client) (*GeminiUsageDetails, error) {
-	return s.GetGeminiUsageForProviderWithHTTPClient(ctx, config.OAuthProviderGemini, ref, httpClient)
-}
-
 func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, provider config.OAuthProvider, ref string, httpClient *http.Client) (*GeminiUsageDetails, error) {
 	if s == nil {
 		return nil, fmt.Errorf("oauth service is nil")
@@ -145,7 +138,7 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 	}
 	provider = config.OAuthProvider(strings.TrimSpace(string(provider)))
 	if provider == "" {
-		provider = config.OAuthProviderGemini
+		provider = config.OAuthProviderAntigravity
 	}
 
 	cred, err := s.store.Load(provider, ref)
@@ -159,13 +152,8 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 	}
 
 	details := &GeminiUsageDetails{}
-	if strings.TrimSpace(cred.AccessToken) == "" || geminiCredentialProjectID(cred) == "" {
-		return details, nil
-	}
-
-	if cached, ok := s.cachedGeminiUsage(cacheKey); ok {
-		return cached, nil
-	}
+	// Refresh also repairs legacy Antigravity project setup. Do this before
+	// validating metadata, otherwise incomplete accounts silently show no quota.
 
 	wait, ok := s.beginGeminiUsageFetch(cacheKey)
 	if ok {
@@ -217,77 +205,6 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		return fetched, err
 	}
 	return details, err
-}
-
-func (c *GeminiClient) FetchUsage(ctx context.Context, cred *Credential) (*GeminiUsageDetails, error) {
-	if c == nil {
-		return nil, fmt.Errorf("gemini client is nil")
-	}
-	if cred == nil {
-		return nil, fmt.Errorf("credential is nil")
-	}
-	accessToken := strings.TrimSpace(cred.AccessToken)
-	if accessToken == "" {
-		return nil, fmt.Errorf("gemini credential %q has no access token", strings.TrimSpace(cred.Ref))
-	}
-	projectID := geminiCredentialProjectID(cred)
-	if projectID == "" {
-		return nil, fmt.Errorf("gemini credential %q has no project id", strings.TrimSpace(cred.Ref))
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	reqBody, err := json.Marshal(map[string]any{
-		"project": projectID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	endpoint := strings.TrimRight(c.cloudCodeURL(), "/") + "/" + strings.Trim(c.cloudCodeVersion(), "/") + ":retrieveUserQuota"
-	var lastErr error
-	for attempt := 0; attempt < defaultGeminiCloudCodeRetryAttempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(reqBody)))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", geminiCloudCodeUserAgent(defaultGeminiCloudCodeUserAgentModel))
-
-		resp, err := c.httpClient().Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt+1 < defaultGeminiCloudCodeRetryAttempts {
-				c.sleep(defaultGeminiCloudCodeRetryDelay)
-				continue
-			}
-			return nil, err
-		}
-
-		body, readErr := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if readErr != nil {
-			return nil, readErr
-		}
-		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-			lastErr = fmt.Errorf("gemini usage request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-			if attempt+1 < defaultGeminiCloudCodeRetryAttempts && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
-				continue
-			}
-			return nil, lastErr
-		}
-
-		var payload geminiUsagePayload
-		if err := json.Unmarshal(body, &payload); err != nil {
-			return nil, fmt.Errorf("decode gemini usage: %w", err)
-		}
-		return mapGeminiUsagePayload(payload), nil
-	}
-	return nil, lastErr
 }
 
 func mapGeminiUsagePayload(payload geminiUsagePayload) *GeminiUsageDetails {
@@ -357,7 +274,7 @@ func (c *AntigravityClient) FetchUsage(ctx context.Context, cred *Credential) (*
 	if accessToken == "" {
 		return nil, fmt.Errorf("antigravity credential %q has no access token", strings.TrimSpace(cred.Ref))
 	}
-	projectID := geminiCredentialProjectID(cred)
+	projectID := googleCredentialProjectID(cred)
 	if projectID == "" {
 		return nil, fmt.Errorf("antigravity credential %q has no project id", strings.TrimSpace(cred.Ref))
 	}
@@ -401,8 +318,11 @@ func (c *AntigravityClient) FetchUsage(ctx context.Context, cred *Credential) (*
 		}
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			lastErr = fmt.Errorf("antigravity usage request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-			if attempt+1 < defaultAntigravityCloudCodeRetry && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				c.sleep(geminiCloudCodeRetryDelay(resp.Header, c.now()))
+			if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
+				return c.fetchModelUsage(ctx, accessToken, projectID)
+			}
+			if attempt+1 < defaultAntigravityCloudCodeRetry && googleCloudCodeShouldRetry(resp.StatusCode) {
+				c.sleep(googleCloudCodeRetryDelay(resp.Header, c.now()))
 				continue
 			}
 			return nil, lastErr
@@ -416,9 +336,60 @@ func (c *AntigravityClient) FetchUsage(ctx context.Context, cred *Credential) (*
 		if summary, err := c.fetchUsageSummary(ctx, accessToken, projectID); err == nil && summary != nil {
 			details.Groups = summary.Groups
 		}
+		if !geminiUsageHasFractions(details) {
+			return c.fetchModelUsage(ctx, accessToken, projectID)
+		}
 		return details, nil
 	}
 	return nil, lastErr
+}
+
+func geminiUsageHasFractions(details *GeminiUsageDetails) bool {
+	for _, bucket := range details.Buckets {
+		if bucket.RemainingFraction != nil {
+			return true
+		}
+	}
+	for _, group := range details.Groups {
+		for _, bucket := range group.Buckets {
+			if bucket.RemainingFraction != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Antigravity can expose quota only on its model catalog. Keep model IDs and
+// explicit fractions; a catalog entry without quotaInfo is not a full bucket.
+func (c *AntigravityClient) fetchModelUsage(ctx context.Context, accessToken, projectID string) (*GeminiUsageDetails, error) {
+	data, err := c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "fetchAvailableModels", map[string]any{"project": projectID})
+	if err != nil {
+		return nil, fmt.Errorf("fetch antigravity model quotas: %w", err)
+	}
+	models, ok := data["models"].(map[string]any)
+	if data["models"] != nil && !ok {
+		return nil, fmt.Errorf("invalid antigravity model quota catalog")
+	}
+	ids := make([]string, 0, len(models))
+	for id := range models {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	details := &GeminiUsageDetails{}
+	for _, id := range ids {
+		model, _ := models[id].(map[string]any)
+		quota, _ := model["quotaInfo"].(map[string]any)
+		fraction, ok := quota["remainingFraction"].(float64)
+		if !ok {
+			continue
+		}
+		reset, _ := quota["resetTime"].(string)
+		details.Buckets = append(details.Buckets, mapGeminiUsageBucket(geminiUsageBucketPayload{
+			ModelID: id, RemainingFraction: &fraction, ResetTime: reset,
+		}))
+	}
+	return details, nil
 }
 
 func (c *AntigravityClient) fetchUsageSummary(ctx context.Context, accessToken string, projectID string) (*GeminiUsageDetails, error) {
@@ -495,7 +466,7 @@ func mapAntigravityUsageSummaryBucket(payload antigravityUsageSummaryBucket) Gem
 func geminiUsageCacheKey(provider config.OAuthProvider, ref string) string {
 	provider = config.OAuthProvider(strings.TrimSpace(string(provider)))
 	if provider == "" {
-		provider = config.OAuthProviderGemini
+		provider = config.OAuthProviderAntigravity
 	}
 	return string(provider) + ":" + strings.TrimSpace(ref)
 }
@@ -566,7 +537,7 @@ func (s *Service) invalidateGeminiUsageCache(ref string) {
 		return
 	}
 	s.mu.Lock()
-	for _, provider := range []config.OAuthProvider{config.OAuthProviderGemini, config.OAuthProviderAntigravity} {
+	for _, provider := range []config.OAuthProvider{config.OAuthProviderAntigravity} {
 		delete(s.geminiUsageCache, geminiUsageCacheKey(provider, ref))
 	}
 	s.mu.Unlock()

@@ -311,7 +311,7 @@ func validateCredentials(dataset *Dataset, native bool) error {
 	for i, item := range dataset.Data.Credentials {
 		cred := item.toOAuth()
 		switch cred.Provider {
-		case config.OAuthProviderClaude, config.OAuthProviderCodex, config.OAuthProviderGemini, config.OAuthProviderAntigravity:
+		case config.OAuthProviderClaude, config.OAuthProviderCodex, config.OAuthProviderAntigravity:
 		default:
 			return fmt.Errorf("credential %d has unsupported provider %q", i, item.Provider)
 		}
@@ -547,7 +547,7 @@ func (s *Service) currentState() (*config.Config, []oauth.Credential, telemetry.
 }
 
 func listCredentialsFromStore(store *oauth.Store) ([]oauth.Credential, error) {
-	providers := []config.OAuthProvider{config.OAuthProviderClaude, config.OAuthProviderCodex, config.OAuthProviderGemini, config.OAuthProviderAntigravity}
+	providers := []config.OAuthProvider{config.OAuthProviderClaude, config.OAuthProviderCodex, config.OAuthProviderAntigravity}
 	var out []oauth.Credential
 	for _, provider := range providers {
 		items, err := store.List(provider)
@@ -641,7 +641,7 @@ func linkExternalCredential(cfg *config.Config, store *oauth.Store, cred *oauth.
 		client = &cfg.OpenAI
 	case config.OAuthProviderClaude:
 		client = &cfg.Claude
-	case config.OAuthProviderGemini, config.OAuthProviderAntigravity:
+	case config.OAuthProviderAntigravity:
 		client = &cfg.Gemini
 	default:
 		return config.Provider{}, ""
@@ -691,7 +691,7 @@ func desiredOAuthProviderName(cred *oauth.Credential) string {
 	}
 	providerPart := slugProviderName(string(cred.Provider))
 	identityPart := slugProviderName(cred.Email)
-	if cred.Provider == config.OAuthProviderGemini || cred.Provider == config.OAuthProviderAntigravity {
+	if cred.Provider == config.OAuthProviderAntigravity {
 		projectPart := slugProviderName(cred.AccountID)
 		if projectPart == "" {
 			projectPart = slugProviderName(cred.Metadata["project_id"])

@@ -49,8 +49,8 @@ func (m Manager) Status(product ProductID, cfg *config.Config) (Status, error) {
 		return m.codexStatus(cfg)
 	case ProductOpenCode:
 		return m.opencodeStatus(cfg)
-	case ProductGeminiCLI:
-		return m.geminiStatus(cfg)
+	case ProductAntigravityCLI:
+		return m.antigravityStatus(cfg)
 	case ProductContinue:
 		return m.continueStatus(cfg)
 	case ProductAider:
@@ -70,8 +70,8 @@ func (m Manager) Apply(product ProductID, cfg *config.Config) (Result, error) {
 		return m.applyCodex(cfg)
 	case ProductOpenCode:
 		return m.applyOpenCode(cfg)
-	case ProductGeminiCLI:
-		return m.applyGemini(cfg)
+	case ProductAntigravityCLI:
+		return m.applyAntigravity(cfg)
 	case ProductContinue:
 		return m.applyContinue(cfg)
 	case ProductAider:
@@ -97,8 +97,8 @@ func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error)
 		preview, err = m.previewCodex(cfg)
 	case ProductOpenCode:
 		preview, err = m.previewOpenCode(cfg)
-	case ProductGeminiCLI:
-		preview, err = m.previewGemini(cfg)
+	case ProductAntigravityCLI:
+		preview, err = m.previewAntigravity(cfg)
 	case ProductContinue:
 		preview, err = m.previewContinue(cfg)
 	case ProductAider:
@@ -125,15 +125,8 @@ func (m Manager) Rollback(product ProductID, cfg *config.Config) (Result, error)
 	if err != nil {
 		return Result{}, fmt.Errorf("load latest backup: %w", err)
 	}
-	if snap.TargetExisted {
-		if err := os.MkdirAll(filepath.Dir(snap.TargetPath), 0o755); err != nil {
-			return Result{}, fmt.Errorf("prepare rollback target: %w", err)
-		}
-		if err := os.WriteFile(snap.TargetPath, snap.Original, 0o600); err != nil {
-			return Result{}, fmt.Errorf("restore backup: %w", err)
-		}
-	} else if err := os.Remove(snap.TargetPath); err != nil && !os.IsNotExist(err) {
-		return Result{}, fmt.Errorf("remove target during rollback: %w", err)
+	if err := restoreBackupSnapshot(snap); err != nil {
+		return Result{}, err
 	}
 
 	status, err := m.Status(product, cfg)
@@ -154,6 +147,10 @@ func (m Manager) latestBackupPreview(product ProductID) (string, bool, error) {
 			return "", false, nil
 		}
 		return "", false, fmt.Errorf("load latest backup preview: %w", err)
+	}
+	if len(snap.AdditionalFiles) > 0 {
+		files := append([]backupFile{{TargetPath: snap.TargetPath, Existed: snap.TargetExisted, Original: snap.Original}}, snap.AdditionalFiles...)
+		return formatTakeoverFiles(files), true, nil
 	}
 	return string(snap.Original), snap.TargetExisted, nil
 }

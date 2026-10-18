@@ -44,8 +44,6 @@ func sameAccountIdentityScore(a *Credential, b *Credential) accountIdentityMatch
 	switch normalizeProvider(a.Provider) {
 	case config.OAuthProviderClaude:
 		return sameClaudeAccountIdentityScore(a, b)
-	case config.OAuthProviderGemini:
-		return sameGeminiAccountIdentityScore(a, b)
 	default:
 		return sameDefaultAccountIdentityScore(a, b)
 	}
@@ -173,25 +171,7 @@ func sameClaudeAccountIdentityScore(a *Credential, b *Credential) accountIdentit
 	return accountIdentityNoMatch
 }
 
-func sameGeminiAccountIdentityScore(a *Credential, b *Credential) accountIdentityMatchScore {
-	projectA := normalizeIdentityString(geminiCredentialProjectID(a))
-	projectB := normalizeIdentityString(geminiCredentialProjectID(b))
-	if projectA != "" && projectB != "" {
-		if projectA != projectB {
-			return accountIdentityNoMatch
-		}
-		if geminiEmailsCompatible(a.Email, b.Email) {
-			return accountIdentityStrongMatch
-		}
-		return accountIdentityNoMatch
-	}
-	if sameEmailIdentity(a.Email, b.Email) {
-		return accountIdentityWeakMatch
-	}
-	return accountIdentityNoMatch
-}
-
-func geminiCredentialProjectID(cred *Credential) string {
+func googleCredentialProjectID(cred *Credential) string {
 	if cred == nil {
 		return ""
 	}
@@ -207,12 +187,6 @@ func credentialMetadataValue(cred *Credential, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(cred.Metadata[strings.TrimSpace(key)])
-}
-
-func geminiEmailsCompatible(a string, b string) bool {
-	emailA := normalizeEmailIdentity(a)
-	emailB := normalizeEmailIdentity(b)
-	return emailA == "" || emailB == "" || emailA == emailB
 }
 
 func sameEmailIdentity(a string, b string) bool {
@@ -232,8 +206,6 @@ func accountIdentityConflict(a *Credential, b *Credential) bool {
 	switch normalizeProvider(a.Provider) {
 	case config.OAuthProviderClaude:
 		return claudeAccountIdentityConflict(a, b)
-	case config.OAuthProviderGemini:
-		return geminiAccountIdentityConflict(a, b)
 	default:
 		return defaultAccountIdentityConflict(a, b)
 	}
@@ -267,18 +239,6 @@ func claudeAccountIdentityConflict(a *Credential, b *Credential) bool {
 	return conflictingEmailOnlyIdentity(a.Email, b.Email)
 }
 
-func geminiAccountIdentityConflict(a *Credential, b *Credential) bool {
-	projectA := normalizeIdentityString(geminiCredentialProjectID(a))
-	projectB := normalizeIdentityString(geminiCredentialProjectID(b))
-	if projectA != "" && projectB != "" {
-		if projectA != projectB {
-			return true
-		}
-		return conflictingEmailOnlyIdentity(a.Email, b.Email)
-	}
-	return conflictingEmailOnlyIdentity(a.Email, b.Email)
-}
-
 func conflictingEmailOnlyIdentity(a string, b string) bool {
 	emailA := normalizeEmailIdentity(a)
 	emailB := normalizeEmailIdentity(b)
@@ -297,10 +257,6 @@ func canonicalAccountIdentityKey(cred *Credential) string {
 		}
 		if orgID := normalizeIdentityString(credentialMetadataValue(cred, "organization_id")); orgID != "" {
 			return "org:" + orgID
-		}
-	case config.OAuthProviderGemini:
-		if projectID := normalizeIdentityString(geminiCredentialProjectID(cred)); projectID != "" {
-			return "project:" + projectID
 		}
 	default:
 		if accountID := normalizeIdentityString(cred.AccountID); accountID != "" {

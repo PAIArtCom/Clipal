@@ -49,7 +49,7 @@ func (cp *ClientProxy) oauthCooldownForFailure(ctx context.Context, provider con
 			return cooldown
 		}
 		return fallback
-	case config.OAuthProviderGemini:
+	case config.OAuthProviderAntigravity:
 		usageCooldown, usageOK := cp.geminiOAuthCooldown(ctx, provider, providerIndex, path, now)
 		retryAfterCooldown, retryAfterOK := oauthRetryAfter(hdr, body, now)
 		if usageOK && retryAfterOK {

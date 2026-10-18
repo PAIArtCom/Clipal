@@ -291,10 +291,10 @@ func TestCompleteLoginWithCode_CompletesSessionAndClosesCallback(t *testing.T) {
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		exchangeCred: &Credential{
 			Ref:          "gemini-sean-example-com",
-			Provider:     config.OAuthProviderGemini,
+			Provider:     config.OAuthProviderAntigravity,
 			Email:        "sean@example.com",
 			AccessToken:  "access-1",
 			RefreshToken: "refresh-1",
@@ -304,7 +304,7 @@ func TestCompleteLoginWithCode_CompletesSessionAndClosesCallback(t *testing.T) {
 
 	svc.sessions["session-123"] = &LoginSession{
 		ID:          "session-123",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-123",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -336,7 +336,7 @@ func TestCompleteLoginWithCode_CompletesSessionAndClosesCallback(t *testing.T) {
 		t.Fatalf("code_verifier = %q, want verifier", client.exchangeState.pkce.CodeVerifier)
 	}
 
-	loaded, err := svc.Load(config.OAuthProviderGemini, "gemini-sean-example-com")
+	loaded, err := svc.Load(config.OAuthProviderAntigravity, "gemini-sean-example-com")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -489,14 +489,14 @@ func TestCompleteLoginWithCode_MarksSessionErrorAndClosesCallbackOnExchangeFailu
 	}
 
 	client := &stubProviderClient{
-		provider:    config.OAuthProviderGemini,
+		provider:    config.OAuthProviderAntigravity,
 		exchangeErr: errors.New("token exchange failed"),
 	}
 	svc := NewService(dir, WithProviderClient(client))
 
 	svc.sessions["session-err"] = &LoginSession{
 		ID:          "session-err",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-err",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -543,10 +543,10 @@ func TestCompleteLoginWithCode_AcceptsCallbackURLInput(t *testing.T) {
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		exchangeCred: &Credential{
 			Ref:          "gemini-sean-example-com",
-			Provider:     config.OAuthProviderGemini,
+			Provider:     config.OAuthProviderAntigravity,
 			Email:        "sean@example.com",
 			AccessToken:  "access-1",
 			RefreshToken: "refresh-1",
@@ -556,7 +556,7 @@ func TestCompleteLoginWithCode_AcceptsCallbackURLInput(t *testing.T) {
 
 	svc.sessions["session-url"] = &LoginSession{
 		ID:          "session-url",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-url",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -585,10 +585,10 @@ func TestCompleteLoginWithCode_ReturnsInvalidAuthorizationResponseWithoutMutatin
 		t.Fatalf("startCallbackServer: %v", err)
 	}
 
-	svc := NewService(dir, WithProviderClient(&stubProviderClient{provider: config.OAuthProviderGemini}))
+	svc := NewService(dir, WithProviderClient(&stubProviderClient{provider: config.OAuthProviderAntigravity}))
 	svc.sessions["session-invalid"] = &LoginSession{
 		ID:          "session-invalid",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-invalid",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -619,17 +619,17 @@ func TestCompleteLoginWithCode_MarksSessionErrorOnManualStateMismatch(t *testing
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		exchangeCred: &Credential{
 			Ref:      "gemini-sean-example-com",
-			Provider: config.OAuthProviderGemini,
+			Provider: config.OAuthProviderAntigravity,
 			Email:    "sean@example.com",
 		},
 	}
 	svc := NewService(dir, WithProviderClient(client))
 	svc.sessions["session-mismatch"] = &LoginSession{
 		ID:          "session-mismatch",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-mismatch",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -1123,10 +1123,10 @@ func TestStartLogin_CallbackHandlerRendersFinalSuccessPage(t *testing.T) {
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		startSession: &LoginSession{
 			ID:          "session-success",
-			Provider:    config.OAuthProviderGemini,
+			Provider:    config.OAuthProviderAntigravity,
 			AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=" + url.QueryEscape(redirectURI) + "&state=session-success",
 			Status:      LoginStatusPending,
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -1136,7 +1136,7 @@ func TestStartLogin_CallbackHandlerRendersFinalSuccessPage(t *testing.T) {
 		},
 		exchangeCred: &Credential{
 			Ref:          "gemini-sean-example-com",
-			Provider:     config.OAuthProviderGemini,
+			Provider:     config.OAuthProviderAntigravity,
 			Email:        "sean@example.com",
 			AccessToken:  "access-1",
 			RefreshToken: "refresh-1",
@@ -1144,7 +1144,7 @@ func TestStartLogin_CallbackHandlerRendersFinalSuccessPage(t *testing.T) {
 	}
 	svc := NewService(dir, WithProviderClient(client))
 
-	session, err := svc.StartLogin(config.OAuthProviderGemini)
+	session, err := svc.StartLogin(config.OAuthProviderAntigravity)
 	if err != nil {
 		t.Fatalf("StartLogin: %v", err)
 	}
@@ -1163,8 +1163,8 @@ func TestStartLogin_CallbackHandlerRendersFinalSuccessPage(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d body=%s", resp.StatusCode, http.StatusOK, string(body))
 	}
-	if got := string(body); !strings.Contains(got, "Gemini authorized") {
-		t.Fatalf("callback page = %q, want Gemini authorized", got)
+	if got := string(body); !strings.Contains(got, "Antigravity authorized") {
+		t.Fatalf("callback page = %q, want Antigravity authorized", got)
 	}
 	if got := string(body); !strings.Contains(got, "sean@example.com") {
 		t.Fatalf("callback page = %q, want authorized email", got)
@@ -1193,10 +1193,10 @@ func TestStartLogin_CallbackHandlerRendersFinalFailurePage(t *testing.T) {
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		startSession: &LoginSession{
 			ID:          "session-failure",
-			Provider:    config.OAuthProviderGemini,
+			Provider:    config.OAuthProviderAntigravity,
 			AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=" + url.QueryEscape(redirectURI) + "&state=session-failure",
 			Status:      LoginStatusPending,
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -1208,7 +1208,7 @@ func TestStartLogin_CallbackHandlerRendersFinalFailurePage(t *testing.T) {
 	}
 	svc := NewService(dir, WithProviderClient(client))
 
-	session, err := svc.StartLogin(config.OAuthProviderGemini)
+	session, err := svc.StartLogin(config.OAuthProviderAntigravity)
 	if err != nil {
 		t.Fatalf("StartLogin: %v", err)
 	}
@@ -1254,10 +1254,10 @@ func TestStartLogin_CallbackHandlerRendersProviderErrorDescription(t *testing.T)
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		startSession: &LoginSession{
 			ID:          "session-provider-error",
-			Provider:    config.OAuthProviderGemini,
+			Provider:    config.OAuthProviderAntigravity,
 			AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=" + url.QueryEscape(redirectURI) + "&state=session-provider-error",
 			Status:      LoginStatusPending,
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -1268,7 +1268,7 @@ func TestStartLogin_CallbackHandlerRendersProviderErrorDescription(t *testing.T)
 	}
 	svc := NewService(dir, WithProviderClient(client))
 
-	session, err := svc.StartLogin(config.OAuthProviderGemini)
+	session, err := svc.StartLogin(config.OAuthProviderAntigravity)
 	if err != nil {
 		t.Fatalf("StartLogin: %v", err)
 	}
@@ -1369,10 +1369,10 @@ func TestCompleteLoginWithCode_SerializesConcurrentCompletionAttempts(t *testing
 	}
 
 	client := &stubProviderClient{
-		provider: config.OAuthProviderGemini,
+		provider: config.OAuthProviderAntigravity,
 		exchangeCred: &Credential{
 			Ref:      "gemini-sean-example-com-project-123",
-			Provider: config.OAuthProviderGemini,
+			Provider: config.OAuthProviderAntigravity,
 			Email:    "sean@example.com",
 		},
 		exchangeWait: make(chan struct{}),
@@ -1380,7 +1380,7 @@ func TestCompleteLoginWithCode_SerializesConcurrentCompletionAttempts(t *testing
 	svc := NewService(dir, WithProviderClient(client))
 	svc.sessions["session-race"] = &LoginSession{
 		ID:          "session-race",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-race",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -1435,8 +1435,8 @@ func TestCompleteLoginWithCode_SerializesConcurrentCompletionAttempts(t *testing
 	}
 
 	page := <-pageResult
-	if page.Title != "Gemini authorized" {
-		t.Fatalf("page title = %q, want Gemini authorized", page.Title)
+	if page.Title != "Antigravity authorized" {
+		t.Fatalf("page title = %q, want Antigravity authorized", page.Title)
 	}
 	if got := atomic.LoadInt32(&client.exchangeCalls); got != 1 {
 		t.Fatalf("exchange calls = %d, want 1", got)
@@ -1520,7 +1520,7 @@ func TestHandleCallbackResult_UsesBoundedExchangeTimeout(t *testing.T) {
 	}
 
 	client := &stubProviderClient{
-		provider:     config.OAuthProviderGemini,
+		provider:     config.OAuthProviderAntigravity,
 		exchangeWait: make(chan struct{}),
 	}
 	svc := NewService(dir,
@@ -1529,7 +1529,7 @@ func TestHandleCallbackResult_UsesBoundedExchangeTimeout(t *testing.T) {
 	)
 	svc.sessions["session-timeout"] = &LoginSession{
 		ID:          "session-timeout",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth?state=session-timeout",
 		Status:      LoginStatusPending,
 		ExpiresAt:   time.Now().Add(5 * time.Minute),

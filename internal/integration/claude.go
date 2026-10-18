@@ -189,22 +189,6 @@ func (m Manager) rollbackClaude(cfg *config.Config) (Result, error) {
 	}, nil
 }
 
-func restoreBackupSnapshot(snap backupSnapshot) error {
-	if snap.TargetExisted {
-		if err := os.MkdirAll(filepath.Dir(snap.TargetPath), 0o755); err != nil {
-			return fmt.Errorf("prepare rollback target: %w", err)
-		}
-		if err := os.WriteFile(snap.TargetPath, snap.Original, 0o600); err != nil {
-			return fmt.Errorf("restore backup: %w", err)
-		}
-		return nil
-	}
-	if err := os.Remove(snap.TargetPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove target during rollback: %w", err)
-	}
-	return nil
-}
-
 func (m Manager) ensureClaudeOnboardingCompleted() error {
 	targetPath, err := m.claudeHomeConfigPath()
 	if err != nil {

@@ -142,7 +142,6 @@ type OAuthProvider string
 
 const (
 	OAuthProviderCodex       OAuthProvider = "codex"
-	OAuthProviderGemini      OAuthProvider = "gemini"
 	OAuthProviderAntigravity OAuthProvider = "antigravity"
 	OAuthProviderClaude      OAuthProvider = "claude"
 )
@@ -848,6 +847,21 @@ func Load(configDir string) (*Config, error) {
 		return nil, fmt.Errorf("failed to load gemini config: %w", err)
 	}
 
+	for _, client := range []*ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Gemini} {
+		active := make([]Provider, 0, len(client.Providers))
+		for _, provider := range client.Providers {
+			if provider.UsesOAuth() && provider.NormalizedOAuthProvider() == OAuthProvider("gemini") {
+				if client.PinnedProvider == provider.Name {
+					client.PinnedProvider = ""
+					client.Mode = ClientModeAuto
+				}
+				continue
+			}
+			active = append(active, provider)
+		}
+		client.Providers = active
+	}
+
 	applyClientDefaults(&cfg.Claude)
 	applyClientDefaults(&cfg.OpenAI)
 	applyClientDefaults(&cfg.Gemini)
@@ -1248,7 +1262,7 @@ func validateProviders(clientName string, providers []Provider) error {
 				if clientName != "openai" {
 					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for openai client", clientName, p.Name, OAuthProviderCodex)
 				}
-			case OAuthProviderGemini, OAuthProviderAntigravity:
+			case OAuthProviderAntigravity:
 				if clientName != "gemini" {
 					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for gemini client", clientName, p.Name, p.NormalizedOAuthProvider())
 				}

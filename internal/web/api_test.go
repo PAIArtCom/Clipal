@@ -899,27 +899,29 @@ providers:
 	}
 }
 
-func TestHandleGetProviderOAuthMetadata_IncludesAntigravityUsageBuckets(t *testing.T) {
-	now := time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)
-	resetTime := now.Add(5 * time.Hour)
-	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("method = %s, want POST", r.Method)
-		}
-		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
-			t.Fatalf("authorization = %q", got)
-		}
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("ReadAll: %v", err)
-		}
-		if got := string(body); got != `{"project":"project-123"}` {
-			t.Fatalf("body = %q", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/v1internal:retrieveUserQuota":
-			_, _ = io.WriteString(w, fmt.Sprintf(`{
+func TestHandleGetProviderOAuthMetadata_IncludesGoogleUsageBuckets(t *testing.T) {
+	for _, oauthProvider := range []config.OAuthProvider{config.OAuthProviderAntigravity} {
+		t.Run(string(oauthProvider), func(t *testing.T) {
+			now := time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)
+			resetTime := now.Add(5 * time.Hour)
+			usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("method = %s, want POST", r.Method)
+				}
+				if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
+					t.Fatalf("authorization = %q", got)
+				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("ReadAll: %v", err)
+				}
+				if got := string(body); got != `{"project":"project-123"}` {
+					t.Fatalf("body = %q", got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/v1internal:retrieveUserQuota":
+					_, _ = io.WriteString(w, fmt.Sprintf(`{
   "buckets": [
     {
       "modelId": "gemini-3.1-pro",
@@ -930,8 +932,8 @@ func TestHandleGetProviderOAuthMetadata_IncludesAntigravityUsageBuckets(t *testi
     }
   ]
 }`, resetTime.Format(time.RFC3339)))
-		case "/v1internal:retrieveUserQuotaSummary":
-			_, _ = io.WriteString(w, fmt.Sprintf(`{
+				case "/v1internal:retrieveUserQuotaSummary":
+					_, _ = io.WriteString(w, fmt.Sprintf(`{
   "groups": [
     {
       "displayName": "Gemini Models",
@@ -947,98 +949,124 @@ func TestHandleGetProviderOAuthMetadata_IncludesAntigravityUsageBuckets(t *testi
     }
   ]
 }`, resetTime.Format(time.RFC3339)))
-		default:
-			t.Fatalf("path = %s, want quota or quota summary", r.URL.Path)
-		}
-	}))
-	defer usageServer.Close()
+				default:
+					t.Fatalf("path = %s, want quota or quota summary", r.URL.Path)
+				}
+			}))
+			defer usageServer.Close()
 
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte(`
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte(fmt.Sprintf(`
 providers:
   - name: antigravity-sean-example-com
     auth_type: oauth
-    oauth_provider: antigravity
+    oauth_provider: %s
     oauth_ref: antigravity-sean-example-com
     priority: 1
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+`, oauthProvider)), 0o600); err != nil {
+				t.Fatal(err)
+			}
 
-	api := NewAPI(dir, "test", nil)
-	api.oauth = oauthpkg.NewService(
-		dir,
-		oauthpkg.WithNowFunc(func() time.Time { return now }),
-		oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
-			DailyCloudCodeURL: usageServer.URL,
-			CloudCodeVersion:  "v1internal",
-			HTTPClient:        usageServer.Client(),
-			Now:               func() time.Time { return now },
-		}),
-	)
+			api := NewAPI(dir, "test", nil)
+			clientOption := oauthpkg.WithAntigravityClient(&oauthpkg.AntigravityClient{
+				DailyCloudCodeURL: usageServer.URL,
+				CloudCodeVersion:  "v1internal",
+				HTTPClient:        usageServer.Client(),
+				Now:               func() time.Time { return now },
+			})
+			api.oauth = oauthpkg.NewService(dir, oauthpkg.WithNowFunc(func() time.Time { return now }), clientOption)
 
-	if err := api.oauth.Store().Save(&oauthpkg.Credential{
-		Ref:          "antigravity-sean-example-com",
-		Provider:     config.OAuthProviderAntigravity,
-		Email:        "sean@example.com",
-		AccountID:    "project-123",
-		AccessToken:  "access-1",
-		RefreshToken: "refresh-1",
-		ExpiresAt:    now.Add(24 * time.Hour),
-		LastRefresh:  now.Add(-30 * time.Minute),
-		Metadata: map[string]string{
-			"project_id":        "project-123",
-			"tier_id":           "free-tier",
-			"current_tier_id":   "free-tier",
-			"current_tier_name": "Antigravity",
-			"paid_tier_id":      "g1-pro-tier",
-			"paid_tier_name":    "Google AI Pro",
-		},
-	}); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
+			if err := api.oauth.Store().Save(&oauthpkg.Credential{
+				Ref:          "antigravity-sean-example-com",
+				Provider:     oauthProvider,
+				Email:        "sean@example.com",
+				AccountID:    "project-123",
+				AccessToken:  "access-1",
+				RefreshToken: "refresh-1",
+				ExpiresAt:    now.Add(24 * time.Hour),
+				LastRefresh:  now.Add(-30 * time.Minute),
+				Metadata: map[string]string{
+					"project_id":        "project-123",
+					"tier_id":           "free-tier",
+					"current_tier_id":   "free-tier",
+					"current_tier_name": "Antigravity",
+					"paid_tier_id":      "g1-pro-tier",
+					"paid_tier_name":    "Google AI Pro",
+				},
+			}); err != nil {
+				t.Fatalf("Save: %v", err)
+			}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/providers/gemini/antigravity-sean-example-com/oauth-metadata", nil)
-	w := httptest.NewRecorder()
-	api.HandleGetProviderOAuthMetadata(w, req)
-	if w.Result().StatusCode != http.StatusOK {
-		t.Fatalf("status=%d body=%s", w.Result().StatusCode, w.Body.String())
-	}
+			req := httptest.NewRequest(http.MethodGet, "/api/providers/gemini/antigravity-sean-example-com/oauth-metadata", nil)
+			w := httptest.NewRecorder()
+			api.HandleGetProviderOAuthMetadata(w, req)
+			if w.Result().StatusCode != http.StatusOK {
+				t.Fatalf("status=%d body=%s", w.Result().StatusCode, w.Body.String())
+			}
 
-	var got map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatalf("decode json: %v\nbody=%s", err, w.Body.String())
+			var got map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode json: %v\nbody=%s", err, w.Body.String())
+			}
+			if got["oauth_plan_type"] != "Google AI Pro" {
+				t.Fatalf("oauth_plan_type = %v, want Google AI Pro", got["oauth_plan_type"])
+			}
+			limits, ok := got["oauth_rate_limits"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected oauth_rate_limits object, got %#v", got["oauth_rate_limits"])
+			}
+			additional, ok := limits["additional"].([]any)
+			if !ok || len(additional) != 1 {
+				t.Fatalf("expected one additional rate limit, got %#v", limits["additional"])
+			}
+			quota, ok := additional[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected additional limit object, got %#v", additional[0])
+			}
+			wantID, wantName := "gemini-models:pro", "Gemini Models Gemini Pro"
+			if quota["limit_id"] != wantID || quota["limit_name"] != wantName {
+				t.Fatalf("quota identity = %#v, want %q / %q", quota, wantID, wantName)
+			}
+			primary, ok := quota["primary"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected primary quota window, got %#v", quota["primary"])
+			}
+			if primary["used_percent"] != float64(75) {
+				t.Fatalf("primary.used_percent = %v, want 75", primary["used_percent"])
+			}
+			if primary["resets_at"] != resetTime.Format(time.RFC3339) {
+				t.Fatalf("primary.resets_at = %v, want %s", primary["resets_at"], resetTime.Format(time.RFC3339))
+			}
+		})
 	}
-	if got["oauth_plan_type"] != "Google AI Pro" {
-		t.Fatalf("oauth_plan_type = %v, want Google AI Pro", got["oauth_plan_type"])
-	}
-	limits, ok := got["oauth_rate_limits"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected oauth_rate_limits object, got %#v", got["oauth_rate_limits"])
-	}
-	additional, ok := limits["additional"].([]any)
-	if !ok || len(additional) != 1 {
-		t.Fatalf("expected one additional rate limit, got %#v", limits["additional"])
-	}
-	quota, ok := additional[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected additional limit object, got %#v", additional[0])
-	}
-	if quota["limit_id"] != "gemini-models:pro" {
-		t.Fatalf("limit_id = %v, want gemini-models:pro", quota["limit_id"])
-	}
-	if quota["limit_name"] != "Gemini Models Gemini Pro" {
-		t.Fatalf("limit_name = %v, want Gemini Models Gemini Pro", quota["limit_name"])
-	}
-	primary, ok := quota["primary"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected primary quota window, got %#v", quota["primary"])
-	}
-	if primary["used_percent"] != float64(75) {
-		t.Fatalf("primary.used_percent = %v, want 75", primary["used_percent"])
-	}
-	if primary["resets_at"] != resetTime.Format(time.RFC3339) {
-		t.Fatalf("primary.resets_at = %v, want %s", primary["resets_at"], resetTime.Format(time.RFC3339))
+}
+
+func TestMapProviderGeminiOAuthLimits_PreservesZeroUsageAndSkipsUnknownFractions(t *testing.T) {
+	full, empty := 1.0, 0.0
+	for _, grouped := range []bool{false, true} {
+		t.Run(fmt.Sprintf("grouped=%t", grouped), func(t *testing.T) {
+			details := &oauthpkg.GeminiUsageDetails{}
+			if grouped {
+				details.Groups = []oauthpkg.GeminiUsageGroup{{Buckets: []oauthpkg.GeminiUsageSummaryBucket{
+					{BucketID: "unused", RemainingFraction: &full},
+					{BucketID: "exhausted", RemainingFraction: &empty},
+					{BucketID: "unknown", ResetTime: time.Now()},
+				}}}
+			} else {
+				details.Buckets = []oauthpkg.GeminiUsageBucket{
+					{ModelID: "unused", RemainingFraction: &full},
+					{ModelID: "exhausted", RemainingFraction: &empty},
+					{ModelID: "unknown", ResetTime: time.Now()},
+				}
+			}
+			limits := mapProviderGeminiOAuthLimitsResponse(details)
+			if limits == nil || len(limits.Additional) != 2 {
+				t.Fatalf("limits = %#v, want only two buckets with known fractions", limits)
+			}
+			if limits.Additional[0].Primary.UsedPercent != 0 || limits.Additional[1].Primary.UsedPercent != 100 {
+				t.Fatalf("expected 0%% used and 100%% used, got %#v", limits)
+			}
+		})
 	}
 }
 

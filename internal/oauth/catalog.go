@@ -19,11 +19,6 @@ var providerCatalog = []ProviderDescriptor{
 		Available:   true,
 	},
 	{
-		Provider:    config.OAuthProviderGemini,
-		ClientTypes: []string{"gemini"},
-		Available:   false,
-	},
-	{
 		Provider:    config.OAuthProviderAntigravity,
 		ClientTypes: []string{"gemini"},
 		Available:   true,

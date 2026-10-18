@@ -14,6 +14,8 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
+const testAntigravityRedirectURI = "http://127.0.0.1:9876/oauth2callback"
+
 func TestAntigravityFallbackVersionMatchesCurrentRelease(t *testing.T) {
 	if defaultAntigravityVersionLabel != "2.13.0" {
 		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.13.0", defaultAntigravityVersionLabel)
@@ -25,15 +27,15 @@ func TestAntigravityGenerateAuthURLUsesAntigravityClientAndScopes(t *testing.T) 
 		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
 		ClientID: "antigravity-client",
 		Scopes: []string{
-			defaultGeminiScopeCloudPlatform,
-			defaultGeminiScopeUserInfoEmail,
+			defaultGoogleScopeCloudPlatform,
+			defaultGoogleScopeUserInfoEmail,
 			defaultAntigravityScopeCCLog,
 			defaultAntigravityScopeExperiments,
 		},
 	}
 	pkce := PKCECodes{CodeVerifier: "verifier-123", CodeChallenge: "challenge-123"}
 
-	authURL, err := client.GenerateAuthURL("state-123", testGeminiRedirectURI, pkce)
+	authURL, err := client.GenerateAuthURL("state-123", testAntigravityRedirectURI, pkce)
 	if err != nil {
 		t.Fatalf("GenerateAuthURL: %v", err)
 	}
@@ -196,7 +198,7 @@ func TestAntigravityMetadataFromTokenStoresPaidAndCurrentTiers(t *testing.T) {
 		Scopes:       []string{"scope-a", "scope-b"},
 	}
 
-	metadata := client.metadataFromToken(&geminiTokenResponse{
+	metadata := client.metadataFromToken(&googleTokenResponse{
 		AccessToken:  "access-1",
 		RefreshToken: "refresh-1",
 		Scope:        "scope-a",
@@ -391,7 +393,7 @@ func TestAntigravityCredentialFromTokenRequiresUsableProject(t *testing.T) {
 			}))
 			defer server.Close()
 			client := &AntigravityClient{UserInfoURL: server.URL + "/userinfo", CloudCodeURL: server.URL, DailyCloudCodeURL: server.URL, ProjectID: tc.requested, HTTPClient: server.Client(), Sleep: func(time.Duration) {}}
-			cred, err := client.credentialFromToken(context.Background(), &geminiTokenResponse{AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 3600}, nil)
+			cred, err := client.credentialFromToken(context.Background(), &googleTokenResponse{AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 3600}, nil)
 			if tc.wantError != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantError) || cred != nil {
 					t.Fatalf("credential present=%v error=%v, want %q", cred != nil, err, tc.wantError)

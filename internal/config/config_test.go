@@ -440,36 +440,10 @@ func TestValidate_ProviderOAuthClaudeSupportedForClaudeWithoutBaseURL(t *testing
 	}
 }
 
-func TestValidate_ProviderOAuthGeminiSupportedForGeminiWithoutBaseURL(t *testing.T) {
-	t.Parallel()
-
-	cfg := &Config{
-		Global: DefaultGlobalConfig(),
-		Gemini: ClientConfig{
-			Mode: ClientModeAuto,
-			Providers: []Provider{
-				{
-					Name:          "gemini-oauth",
-					AuthType:      ProviderAuthTypeOAuth,
-					OAuthProvider: OAuthProviderGemini,
-					OAuthRef:      "gemini_sean_example_com_project_123",
-					Priority:      1,
-				},
-			},
-		},
-		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Claude: ClientConfig{Mode: ClientModeAuto},
-	}
-
-	applyClientDefaults(&cfg.Gemini)
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("expected validation success, got: %v", err)
-	}
-	if got := cfg.Gemini.Providers[0].NormalizedAuthType(); got != ProviderAuthTypeOAuth {
-		t.Fatalf("auth_type = %q, want %q", got, ProviderAuthTypeOAuth)
-	}
-	if got := cfg.Gemini.Providers[0].NormalizedOAuthProvider(); got != OAuthProviderGemini {
-		t.Fatalf("oauth_provider = %q, want %q", got, OAuthProviderGemini)
+func TestValidate_RejectsRetiredGeminiOAuth(t *testing.T) {
+	cfg := &Config{Global: DefaultGlobalConfig(), Gemini: ClientConfig{Mode: ClientModeAuto, Providers: []Provider{{Name: "old", AuthType: ProviderAuthTypeOAuth, OAuthProvider: OAuthProvider("gemini"), OAuthRef: "old"}}}, OpenAI: ClientConfig{Mode: ClientModeAuto}, Claude: ClientConfig{Mode: ClientModeAuto}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("retired Gemini OAuth must not validate")
 	}
 }
 
@@ -1250,4 +1224,27 @@ func TestApplyUpstreamProxySettings(t *testing.T) {
 			t.Fatalf("ApplyUpstreamProxySettings err = %v", err)
 		}
 	})
+}
+
+func TestLoadExcludesRetiredGeminiOAuthWithoutEditingStoredFiles(t *testing.T) {
+	dir := t.TempDir()
+	body := []byte("mode: manual\npinned_provider: old\nproviders:\n  - name: old\n    auth_type: oauth\n    oauth_provider: gemini\n    oauth_ref: old\n  - name: active\n    auth_type: oauth\n    oauth_provider: antigravity\n    oauth_ref: active\n")
+	path := filepath.Join(dir, "gemini.yaml")
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Gemini.Providers) != 1 || cfg.Gemini.Providers[0].Name != "active" || cfg.Gemini.PinnedProvider != "" || cfg.Gemini.Mode != ClientModeAuto {
+		t.Fatalf("retired configuration remains active: %#v", cfg.Gemini)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != string(body) {
+		t.Fatal("load rewrote the stored configuration")
+	}
 }

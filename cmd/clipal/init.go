@@ -21,7 +21,7 @@ func runInit(args []string) {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() { printInitUsage(os.Stderr) }
-	toolsRaw := fs.String("tools", "", "Comma-separated tools: codex,claude,antigravity,gemini")
+	toolsRaw := fs.String("tools", "", "Comma-separated tools: codex,claude,antigravity")
 	configDir := fs.String("config-dir", "", "Configuration directory (default: ~/.clipal)")
 	dryRun := fs.Bool("dry-run", false, "Print installation actions without executing them")
 	skipInstall := fs.Bool("skip-install", false, "Do not install missing CLI binaries")
@@ -110,11 +110,6 @@ func runInit(args []string) {
 		}
 		fmt.Printf("%s: %s\n", tool, result.Message)
 	}
-	for _, tool := range tools {
-		if tool == bootstrap.ToolAntigravity {
-			fmt.Println("antigravity: installed; proxy takeover is pending the official agy configuration contract")
-		}
-	}
 	fmt.Println("Management UI is localhost-only. From your computer: ssh -L 3333:127.0.0.1:3333 user@server")
 }
 
@@ -124,8 +119,8 @@ func initIntegrationProduct(tool bootstrap.Tool) (integration.ProductID, bool) {
 		return integration.ProductCodexCLI, true
 	case bootstrap.ToolClaude:
 		return integration.ProductClaudeCode, true
-	case bootstrap.ToolGemini:
-		return integration.ProductGeminiCLI, true
+	case bootstrap.ToolAntigravity:
+		return integration.ProductAntigravityCLI, true
 	default:
 		return "", false
 	}

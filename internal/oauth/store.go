@@ -398,7 +398,7 @@ func credentialRefDisambiguators(cred *Credential) []string {
 	}
 	candidates := []string{
 		normalizeIdentityString(cred.AccountID),
-		normalizeIdentityString(geminiCredentialProjectID(cred)),
+		normalizeIdentityString(googleCredentialProjectID(cred)),
 		normalizeIdentityString(credentialMetadataValue(cred, "organization_id")),
 		normalizeEmailIdentity(cred.Email),
 	}

@@ -29,7 +29,7 @@ http://127.0.0.1:3333/
 - 在 Add Provider 对话框里导入 OAuth 授权文件。当前支持 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，以及 sub2api 导出的 JSON；Clipal 只会导入与当前所选服务匹配的账号。
 - 对 Claude 和 Codex OAuth 请求默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
 - 在 provider 详情中查看 OAuth 鉴权状态和最近刷新摘要
-- 为支持的 OAuth provider 加载套餐和限额详情（当前仅 Codex）
+- 为 Codex、Claude 和 Google 账号（Antigravity）加载套餐和限额详情
 - 在 provider 行内直接查看运行态：使用中、待命、已停用、冷却中（含剩余时间）、不可用、恢复探测中
 
 ### Global Settings
@@ -62,7 +62,7 @@ http://127.0.0.1:3333/
 ### CLI Takeover
 
 - 在 UI 中查看当前支持的一键接管项
-- 一键接管 `Claude Code`、`Codex CLI`、`OpenCode`、`Gemini CLI`、`Continue`、`Aider` 和 `Goose` 的用户级配置
+- 一键接管 `Claude Code`、`Codex CLI`、`OpenCode`、`Antigravity CLI`、`Continue`、`Aider` 和 `Goose` 的用户级配置
 - 首次接管前自动创建备份，便于后续回滚
 - 一键回滚到接管前捕获的原始文件状态
 - 展示 Clipal 实际管理的目标配置文件路径
@@ -73,7 +73,7 @@ http://127.0.0.1:3333/
 - 当前阶段只修改用户级配置
 - `Claude Code` 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`，只有缺少 Claude 客户端认证环境变量时才补占位 `ANTHROPIC_API_KEY`，必要时也会把 `~/.claude.json` 的 onboarding 标记补成完成；已有 `ANTHROPIC_API_KEY` 和 `ANTHROPIC_AUTH_TOKEN` 不会被覆盖
 - `OpenCode` 的一键接管会新增或更新 `provider.clipal`，并把当前 `model` 改写为 `clipal/<当前模型ID>`
-- `Gemini CLI` 的一键接管只会更新 `~/.gemini/.env` 里的 `GEMINI_API_BASE`
+- `Antigravity CLI` 接管在 `~/.gemini/antigravity-cli/settings.json` 设置 `modelProvider: "gemini"`，并在 bash、zsh 或 POSIX sh 的用户配置中维护带标记的区块，导出 `GOOGLE_GEMINI_BASE_URL` 和本地占位值 `GEMINI_API_KEY=clipal`。两个文件均提供预览与备份，回滚恢复两者；接管或回滚后请打开新终端。
 - `Continue` 的一键接管会新增或更新用户级 `Clipal` 模型项
 - `Aider` 的一键接管会更新 home 级 `openai-api-base`，并补一个最小 OpenAI 兼容 `model`；已有 `openai-api-key` 会保留，只有缺失时才自动补占位值 `clipal`
 - `Goose` 的一键接管会管理 `~/.config/goose/custom_providers/` 下的独立 custom provider 文件
@@ -151,6 +151,8 @@ Claude / OpenAI / Gemini 标签位于一个面板的上边缘，面板内的内�
 这一行下方分为左右两栏。左栏按优先级一行一个列出 Provider：拖拽手柄（提示中含配置优先级）、名称、运行态（使用中、待命、已停用、冷却中含剩余时间、不可用、恢复探测中）和启用开关。点击某行，或聚焦名称后按回车，即在右栏显示该 Provider；未选择时显示第一个。
 
 右栏详情显示名称、运行态、OAuth 标记及上游主机或 Provider ID，右上角为固定、编辑（OAuth 账号改为打开账号环境）和删除。其下依次为：异常原因；固定三列的关键数据——鉴权状态与最近刷新时间（OAuth）或 Key 数量（API Key）、Token 用量及输入/输出、今日与近 7 天花费，尚无数据时显示短横线；OAuth 套餐与额度及用量进度条；Base URL、代理和 Provider ID 列表行，可一键复制。悬停或聚焦用量、花费可查看精确金额和 Token 细分。
+
+“套餐与限额”中点击“加载”读取账号的上游订阅与额度，之后可点击“刷新”。Google 额度按上游返回的模型或额度分组显示已用比例，有重置时间时一并显示；剩余额度为 100% 时显示已用 0%。Antigravity 的额度接口为空或不受支持时，改读模型目录中明确返回的额度字段，没有额度值的模型不生成进度条。账号初始化或授权失败会显示错误。上游未返回额度时明确提示，刷新失败则显示错误并保留上次数据。
 
 桌面端滚动页面时，右栏详情吸附在顶部导航下方。详情过长时正文在卡片内滚动，名称与操作按钮保持可见。切换 Provider 后新详情从顶部显示，列表位置保持不变。用量和花费的提示浮层在悬停或键盘聚焦时显示，不受正文滚动区域裁切。窄屏和低窗口的详情使用普通页面滚动。
 

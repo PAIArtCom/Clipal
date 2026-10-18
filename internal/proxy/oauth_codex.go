@@ -75,10 +75,6 @@ func providerSupportsCapability(provider config.Provider, capability RequestCapa
 		return capability == CapabilityOpenAIResponses
 	case config.OAuthProviderClaude:
 		return capability == CapabilityClaudeMessages || capability == CapabilityClaudeCountTokens
-	case config.OAuthProviderGemini:
-		return capability == CapabilityGeminiGenerateContent ||
-			capability == CapabilityGeminiStreamGenerate ||
-			capability == CapabilityGeminiCountTokens
 	case config.OAuthProviderAntigravity:
 		return capability == CapabilityGeminiGenerateContent ||
 			capability == CapabilityGeminiStreamGenerate ||
@@ -99,8 +95,6 @@ func supportedCapabilitySummary(provider config.Provider) string {
 		return "OpenAI Responses requests"
 	case config.OAuthProviderClaude:
 		return "Claude messages and count_tokens requests"
-	case config.OAuthProviderGemini:
-		return "Gemini generateContent, streamGenerateContent, and countTokens requests"
 	case config.OAuthProviderAntigravity:
 		return "Antigravity model listing, generateContent, streamGenerateContent, and countTokens requests"
 	default:
@@ -121,8 +115,6 @@ func (cp *ClientProxy) createOAuthProxyRequestWithPayloadForProvider(original *h
 		return cp.createCodexOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
 	case config.OAuthProviderClaude:
 		return cp.createClaudeOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
-	case config.OAuthProviderGemini:
-		return cp.createGeminiOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
 	case config.OAuthProviderAntigravity:
 		return cp.createAntigravityOAuthRequestWithPayloadForProvider(original, provider, providerIndex, path, payload)
 	default:

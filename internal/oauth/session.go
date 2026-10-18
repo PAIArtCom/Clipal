@@ -31,7 +31,6 @@ type Service struct {
 	store                *Store
 	codex                *CodexClient
 	claude               *ClaudeClient
-	gemini               *GeminiClient
 	antigravity          *AntigravityClient
 	clients              map[config.OAuthProvider]ProviderClient
 	now                  func() time.Time
@@ -70,7 +69,6 @@ func NewService(configDir string, opts ...Option) *Service {
 		store:                NewStore(configDir),
 		codex:                NewCodexClient(),
 		claude:               NewClaudeClient(),
-		gemini:               NewGeminiClient(),
 		antigravity:          NewAntigravityClient(),
 		clients:              make(map[config.OAuthProvider]ProviderClient),
 		now:                  time.Now,
@@ -86,7 +84,6 @@ func NewService(configDir string, opts ...Option) *Service {
 	}
 	svc.registerProviderClient(svc.codex)
 	svc.registerProviderClient(svc.claude)
-	svc.registerProviderClient(svc.gemini)
 	svc.registerProviderClient(svc.antigravity)
 	for _, opt := range opts {
 		if opt != nil {
@@ -117,15 +114,6 @@ func WithClaudeClient(client *ClaudeClient) Option {
 	return func(s *Service) {
 		if client != nil {
 			s.claude = client
-			s.registerProviderClient(client)
-		}
-	}
-}
-
-func WithGeminiClient(client *GeminiClient) Option {
-	return func(s *Service) {
-		if client != nil {
-			s.gemini = client
 			s.registerProviderClient(client)
 		}
 	}
@@ -489,7 +477,7 @@ func (s *Service) refreshCredential(ctx context.Context, store *Store, cred *Cre
 	}
 	// Save preserves the established environment and normalizes identity if the
 	// provider has supplied an account ID for a legacy credential.
-	if refreshed.Provider == config.OAuthProviderGemini || refreshed.Provider == config.OAuthProviderAntigravity {
+	if refreshed.Provider == config.OAuthProviderAntigravity {
 		s.invalidateGeminiUsageCache(refreshed.Ref)
 	}
 	return refreshed, nil
@@ -1196,8 +1184,6 @@ func providerDisplayName(provider config.OAuthProvider) string {
 		return "Codex"
 	case config.OAuthProviderClaude:
 		return "Claude Code"
-	case config.OAuthProviderGemini:
-		return "Gemini"
 	case config.OAuthProviderAntigravity:
 		return "Antigravity"
 	default:

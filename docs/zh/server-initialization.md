@@ -21,9 +21,9 @@ clipal init --import /tmp/clipal-data.json
 
 `--import` 以 replace 模式恢复 Clipal 的 Provider、OAuth 凭据和可迁移运行配置；部署环境的远程访问开关不会从备份恢复。随后初始化会为服务器当前 Unix 用户重新执行可用 CLI 的 takeover。它不会把本机的 CLI 配置当作服务器上已生效的配置。
 
-默认工具是 Codex CLI、Claude Code 与 Antigravity CLI（`agy`）。Gemini CLI 保持支持，可通过 `--tools gemini` 显式选择。
+默认工具是 Codex CLI、Claude Code 与 Antigravity CLI（`agy`）。
 
-Codex、Claude 与 Gemini 继续使用已有的预览、备份、apply 和 rollback 接管实现。Antigravity 会被安装并可进入官方远程登录流程；在确认 `agy` 的官方代理配置契约前，Clipal 不会声称已完成其代理接管。
+Codex、Claude 与 Antigravity 使用预览、备份、apply 和 rollback 接管流程。Antigravity 接管配置 Gemini-compatible API Key 模式，并在带标记的 shell 配置区块导出本地入口。初始化后打开新终端以加载环境变量。
 
 ## 远程访问
 
@@ -42,4 +42,4 @@ ssh -L 3333:127.0.0.1:3333 user@server
 - 请用将来实际运行 AI CLI 的同一 Unix 用户执行 `clipal init`。
 - 已存在的 CLI 不会被重复安装。
 - init 不会输出或传输 API Key / OAuth 凭据。
-- 通过 CLI Takeover 页面可预览或回滚已经完成的 Codex、Claude、Gemini 接管。
+- 通过 CLI Takeover 页面可预览或回滚已经完成的 Codex、Claude、Antigravity 接管。

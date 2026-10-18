@@ -34,7 +34,7 @@ Scan the QR codes below to join the Clipal WeChat group or contact the author.
 ## ✨ Why Clipal?
 
 ### 🚀 **One-Click CLI Takeover**
-No more hunting for hidden config files. With a single click in the Web UI, Clipal can automatically take over the configurations for **Claude Code, Codex CLI, OpenCode, Gemini CLI, Continue, Aider**, and **Goose**. 
+No more hunting for hidden config files. With a single click in the Web UI, Clipal can automatically take over the configurations for **Claude Code, Codex CLI, OpenCode, Antigravity CLI, Continue, Aider**, and **Goose**.
 - It configures the local base URL for you.
 - It backs up your original settings.
 - It provides a safe rollback whenever you want.
@@ -69,7 +69,7 @@ It natively supports the request flavors of:
 - **Google Gemini**
 
 **Popular Supported Tools:**
-- **AI Coding Assistants:** Claude Code, Codex CLI, OpenCode, Gemini CLI, Continue, Aider, Goose
+- **AI Coding Assistants:** Claude Code, Codex CLI, OpenCode, Antigravity CLI, Continue, Aider, Goose
 - **Desktop Chat Clients:** Cherry Studio, Kelivo, Chatbox, ChatWise (via OpenAI compatibility)
 
 ---

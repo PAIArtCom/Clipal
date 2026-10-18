@@ -67,15 +67,15 @@ func TestSameAccountIdentity_AllowsLegacyClaudeCredentialWithoutAccountID(t *tes
 	}
 }
 
-func TestSameAccountIdentity_AllowsLegacyGeminiCredentialWithoutProjectID(t *testing.T) {
+func TestSameAccountIdentity_AllowsAntigravityCredentialWithoutProjectID(t *testing.T) {
 	legacy := &Credential{
 		Ref:      "gemini-legacy-ref",
-		Provider: config.OAuthProviderGemini,
+		Provider: config.OAuthProviderAntigravity,
 		Email:    "sean@example.com",
 	}
 	incoming := &Credential{
 		Ref:       "gemini-sean-example-com-project-123",
-		Provider:  config.OAuthProviderGemini,
+		Provider:  config.OAuthProviderAntigravity,
 		Email:     "sean@example.com",
 		AccountID: "project-123",
 		Metadata: map[string]string{
@@ -84,6 +84,6 @@ func TestSameAccountIdentity_AllowsLegacyGeminiCredentialWithoutProjectID(t *tes
 	}
 
 	if !SameAccountIdentity(legacy, incoming) {
-		t.Fatalf("expected legacy and incoming gemini credentials to match")
+		t.Fatalf("expected existing and incoming Antigravity credentials to match")
 	}
 }

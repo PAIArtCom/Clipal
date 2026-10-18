@@ -268,6 +268,7 @@ function app() {
                     spendToday: 'Spend Today',
                     spendWeek: 'Spend 7d',
                     planAndLimits: 'Plan & Limits',
+                    quotaUnavailable: 'The upstream returned no quota data for this account.',
                     rateLimit: 'Limit',
                     rateLimitCodeReviewWeekly: 'Code review weekly limit',
                     rateLimitWeekly: 'Weekly limit',
@@ -362,7 +363,7 @@ function app() {
                         importFileHint: 'Supported files: CLIProxyAPI single-account OAuth JSON, Codex CLI auth.json, or sub2api export JSON. Clipal imports only accounts matching the selected service.',
                         importFileHintCodex: 'Supported files: Codex CLI auth.json (~/.codex/auth.json), CLIProxyAPI single-account OAuth JSON, or sub2api export JSON. Clipal imports only Codex accounts from the selected files.',
                         importFileHintClaude: 'Supported files: CLIProxyAPI single-account Claude OAuth JSON or sub2api export JSON. Clipal imports only Claude accounts from the selected files.',
-                        importFileHintGemini: 'Supported files: CLIProxyAPI single-account Gemini OAuth JSON or sub2api export JSON. Clipal imports only Gemini accounts from the selected files.',
+
                         importFileHintAntigravity: 'Supported files: CLIProxyAPI single-account Antigravity OAuth JSON or sub2api export JSON. Clipal imports only Antigravity accounts from the selected files.',
                         name: 'Name *',
                         namePlaceholder: 'e.g. provider-primary',
@@ -768,6 +769,7 @@ function app() {
                     spendToday: '今日消费',
                     spendWeek: '近 7 天消费',
                     planAndLimits: '套餐与限额',
+                    quotaUnavailable: '上游未返回此账号的额度数据。',
                     rateLimit: '限额',
                     rateLimitCodeReviewWeekly: '代码审查周限额',
                     rateLimitWeekly: '周限额',
@@ -862,7 +864,7 @@ function app() {
                         importFileHint: '支持：CLIProxyAPI 单账号 OAuth JSON、Codex CLI auth.json、sub2api 导出的 JSON。Clipal 只会导入与当前服务匹配的账号。',
                         importFileHintCodex: '支持：Codex CLI 的 auth.json（通常在 ~/.codex/auth.json）、CLIProxyAPI 单账号 OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Codex 账号。',
                         importFileHintClaude: '支持：CLIProxyAPI 单账号 Claude OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Claude 账号。',
-                        importFileHintGemini: '支持：CLIProxyAPI 单账号 Gemini OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Gemini 账号。',
+
                         importFileHintAntigravity: '支持：CLIProxyAPI 单账号 Antigravity OAuth JSON、sub2api 导出的 JSON。Clipal 只会导入文件中的 Antigravity 账号。',
                         name: '名称 *',
                         namePlaceholder: '例如 provider-primary',
@@ -2990,8 +2992,8 @@ function app() {
                     return 'Codex CLI';
                 case 'opencode':
                     return 'OpenCode';
-                case 'gemini':
-                    return 'Gemini CLI';
+                case 'antigravity':
+                    return 'Antigravity CLI';
                 case 'continue':
                     return 'Continue';
                 case 'aider':
@@ -3531,7 +3533,7 @@ function app() {
         },
 
         providerOAuthPlanRaw(provider) {
-            return String((provider && provider.oauth_plan_type) || '').trim().toLowerCase();
+            return String((provider && provider.oauth_plan_type) || '').trim();
         },
 
         providerOAuthPlanLabel(provider) {
@@ -3539,7 +3541,7 @@ function app() {
             if (!raw) {
                 return '';
             }
-            switch (raw) {
+            switch (raw.toLowerCase()) {
                 case 'free':
                     return 'Free';
                 case 'plus':
@@ -3790,7 +3792,7 @@ function app() {
         providerSupportsOAuthMetadata(provider) {
             const oauthProvider = String((provider && provider.oauth_provider) || '').trim().toLowerCase();
             return this.providerUsesOAuth(provider)
-                && (oauthProvider === 'codex' || oauthProvider === 'claude')
+                && ['codex', 'claude', 'antigravity'].includes(oauthProvider)
                 && String((provider && provider.oauth_ref) || '').trim() !== '';
         },
 
@@ -3925,8 +3927,6 @@ function app() {
             switch (String(provider || '').trim().toLowerCase()) {
                 case 'codex':
                     return this.t('modal.provider.oauthProviderCodex');
-                case 'gemini':
-                    return 'Gemini';
                 case 'antigravity':
                     return this.t('modal.provider.oauthProviderAntigravity');
                 case 'claude':
@@ -3942,8 +3942,6 @@ function app() {
                     return this.t('modal.provider.importFileHintCodex');
                 case 'claude':
                     return this.t('modal.provider.importFileHintClaude');
-                case 'gemini':
-                    return this.t('modal.provider.importFileHintGemini');
                 case 'antigravity':
                     return this.t('modal.provider.importFileHintAntigravity');
                 default:

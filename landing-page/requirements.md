@@ -147,7 +147,7 @@ $ clipal service start
 **Layout**: Two rows separated by a divider.
 
 **Row 1 — AI Clients (Tools that USE Clipal)**:
-Claude Code · Aider · Continue · Goose · Codex CLI · OpenCode · Gemini CLI · Cherry Studio
+Claude Code · Aider · Continue · Goose · Codex CLI · OpenCode · Antigravity CLI · Cherry Studio
 
 **Row 2 — LLM Providers (Backends Clipal routes TO)**:
 Anthropic · OpenAI · Google Gemini · DeepSeek · Groq · Azure OpenAI
@@ -407,7 +407,6 @@ landing-page/
     │   ├── codex-cli.svg
     │   ├── continue.svg
     │   ├── deepseek.svg
-    │   ├── gemini-cli.svg
     │   ├── google.svg
     │   ├── goose.svg
     │   ├── groq.svg

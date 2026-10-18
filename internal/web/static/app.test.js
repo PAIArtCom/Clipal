@@ -431,9 +431,10 @@ test('oauthImportFileHint names supported credential file types for the selected
     assert.match(state.oauthImportFileHint(), /Claude OAuth JSON/);
     assert.match(state.oauthImportFileHint(), /Claude accounts/);
 
-    state.providerForm.oauth_provider = 'gemini';
-    assert.match(state.oauthImportFileHint(), /Gemini OAuth JSON/);
-    assert.match(state.oauthImportFileHint(), /Gemini accounts/);
+    state.providerForm.oauth_provider = 'antigravity';
+    assert.match(state.oauthImportFileHint(), /Antigravity OAuth JSON/);
+    assert.match(state.oauthImportFileHint(), /Antigravity accounts/);
+    assert.equal(state.providerSupportsOAuthMetadata({auth_type: 'oauth', oauth_provider: 'gemini', oauth_ref: 'old'}), false);
 });
 
 test('editProvider hydrates override fields directly into the form', () => {
@@ -694,47 +695,55 @@ test('loadProviderOAuthMetadata fetches provider-scoped metadata on demand', asy
     assert.equal(state.providerOAuthMetadataButtonLabel(provider), 'Refresh');
 });
 
-test('loadProviderOAuthMetadata supports Claude OAuth providers', async () => {
-    const state = loadApp();
-    const calls = [];
-    const provider = {
-        name: 'claude-sean-example-com',
-        auth_type: 'oauth',
-        oauth_provider: 'claude',
-        oauth_ref: 'claude-sean-example-com'
-    };
-    state.selectedClient = 'claude';
-    state.apiCall = async (url, options, background, suppressAlert) => {
-        calls.push({ url, options, background, suppressAlert });
-        return {
-            oauth_rate_limits: {
-                primary: {
-                    used_percent: 88,
-                    window_minutes: 300,
-                    resets_at: '2026-05-08T13:30:00Z'
-                }
-            }
+for (const service of ['claude', 'antigravity']) {
+    test(`loadProviderOAuthMetadata supports ${service} plan and quota loading, retry and refresh`, async () => {
+        const state = loadApp();
+        const calls = [];
+        const provider = {
+            name: `${service}-account`,
+            auth_type: 'oauth',
+            oauth_provider: service,
+            oauth_ref: `${service}-account`
         };
-    };
+        state.selectedClient = service === 'claude' ? 'claude' : 'gemini';
+        state.apiCall = async (url, options, background, suppressAlert) => {
+            calls.push({ url, options, background, suppressAlert });
+            return {
+                oauth_plan_type: service === 'claude' ? 'pro' : 'Google AI Pro',
+                oauth_rate_limits: {
+                    additional: [{ limit_id: 'gemini-pro', limit_name: 'Gemini Pro', primary: { used_percent: 0 } }]
+                }
+            };
+        };
 
-    assert.equal(state.providerSupportsOAuthMetadata(provider), true);
+        assert.equal(state.providerSupportsOAuthMetadata(provider), true);
+        assert.equal(state.providerSupportsOAuthMetadata({ ...provider, oauth_ref: '' }), false);
+        assert.equal(state.providerSupportsOAuthMetadata({ ...provider, auth_type: 'api_key' }), false);
+        await state.loadProviderOAuthMetadata(provider);
+        assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{
+            url: `/api/providers/${state.selectedClient}/${provider.name}/oauth-metadata`,
+            options: {}, background: true, suppressAlert: true
+        }]);
+        assert.equal(state.providerOAuthPlanLabel(provider), service === 'claude' ? 'Pro' : 'Google AI Pro');
+        const sections = state.providerOAuthRateLimitSections(provider);
+        assert.equal(sections.length, 1);
+        assert.equal(sections[0].window.used_percent, 0);
+        assert.equal(state.providerHasLoadedOAuthMetadata(provider), true);
+        assert.equal(state.providerOAuthMetadataButtonLabel(provider), 'Refresh');
 
-    await state.loadProviderOAuthMetadata(provider);
+        state.apiCall = async () => { throw new Error('Quota service unavailable'); };
+        await state.loadProviderOAuthMetadata(provider);
+        assert.equal(state.providerOAuthMetadataError(provider), 'Quota service unavailable');
+        assert.equal(state.providerOAuthRateLimitSections(provider).length, 1, 'failed refresh preserves prior data');
+        assert.equal(state.providerOAuthMetadataBusy(provider), false);
 
-    assert.deepEqual(
-        JSON.parse(JSON.stringify(calls)),
-        [
-            {
-                url: '/api/providers/claude/claude-sean-example-com/oauth-metadata',
-                options: {},
-                background: true,
-                suppressAlert: true
-            }
-        ]
-    );
-    assert.equal(provider.oauth_rate_limits.primary.used_percent, 88);
-    assert.equal(state.providerHasLoadedOAuthMetadata(provider), true);
-});
+        state.apiCall = async () => ({ oauth_plan_type: 'Google AI Pro' });
+        await state.loadProviderOAuthMetadata(provider);
+        assert.equal(state.providerOAuthMetadataError(provider), '');
+        assert.equal(state.providerOAuthRateLimitSections(provider).length, 0, 'missing quotas never become invented rows');
+        assert.equal(state.providerHasLoadedOAuthMetadata(provider), true);
+    });
+}
 
 test('providerOAuthRateLimitSections localizes Claude additional limit ids', () => {
     const state = loadApp();

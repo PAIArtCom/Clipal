@@ -30,12 +30,10 @@ current server user; it does not treat the local machine's CLI files as active
 server configuration.
 
 The default tools are Codex CLI, Claude Code, and Antigravity CLI (`agy`).
-Gemini CLI remains supported when explicitly selected with `--tools gemini`.
-
-For Codex, Claude, and Gemini, takeover continues to use the existing preview,
-backup, apply, and rollback implementation. Antigravity is installed and ready
-for its official remote-login flow, but Clipal does not yet claim proxy takeover
-for `agy`: that requires a verified official Antigravity configuration contract.
+Codex, Claude, and Antigravity use the preview, backup, apply, and rollback
+implementation. Antigravity takeover configures its Gemini-compatible API-key
+mode and exports the local endpoint through a marked shell-profile block.
+Open a new terminal after init to load that environment.
 
 ## Remote Access
 
@@ -59,4 +57,4 @@ are disabled by default; remote access has no built-in authentication.
 - Existing CLI binaries are not reinstalled.
 - Clipal never prints or transfers API keys or OAuth credentials during init.
 - Use the CLI Takeover page to inspect its preview or roll back a completed
-  Codex, Claude, or Gemini takeover.
+  Codex, Claude, or Antigravity takeover.

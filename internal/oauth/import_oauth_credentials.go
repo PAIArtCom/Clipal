@@ -104,10 +104,10 @@ func ParseCLIProxyAPICredential(data []byte) (*Credential, error) {
 	}
 
 	switch provider {
+	case config.OAuthProviderAntigravity:
+		return parseCLIProxyAPIAntigravityCredential(raw)
 	case config.OAuthProviderCodex:
 		return parseCLIProxyAPICodexCredential(raw)
-	case config.OAuthProviderGemini:
-		return parseCLIProxyAPIGeminiCredential(raw)
 	case config.OAuthProviderClaude:
 		return parseCLIProxyAPIClaudeCredential(raw)
 	default:
@@ -328,7 +328,7 @@ func parseCLIProxyAPIClaudeCredential(raw cliProxyAPICredentialFile) (*Credentia
 	return cred, nil
 }
 
-func parseCLIProxyAPIGeminiCredential(raw cliProxyAPICredentialFile) (*Credential, error) {
+func parseCLIProxyAPIAntigravityCredential(raw cliProxyAPICredentialFile) (*Credential, error) {
 	email := strings.TrimSpace(raw.Email)
 	projectID := strings.TrimSpace(raw.ProjectID)
 	accessToken := strings.TrimSpace(firstNonEmpty(raw.AccessToken, stringValue(raw.Token, "access_token")))
@@ -337,24 +337,24 @@ func parseCLIProxyAPIGeminiCredential(raw cliProxyAPICredentialFile) (*Credentia
 	expiryValue := firstNonNil(raw.Expired, raw.ExpiresAt, raw.Expiry, stringValue(raw.Token, "expiry"))
 
 	if accessToken == "" {
-		return nil, fmt.Errorf("gemini credential missing access_token")
+		return nil, fmt.Errorf("antigravity credential missing access_token")
 	}
 	if projectID == "" {
-		return nil, fmt.Errorf("gemini credential missing project_id")
+		return nil, fmt.Errorf("antigravity credential missing project_id")
 	}
 
 	expiresAt, err := parseCLIProxyAPITimeValue(expiryValue)
 	if err != nil {
-		return nil, fmt.Errorf("parse gemini credential expiry time: %w", err)
+		return nil, fmt.Errorf("parse antigravity credential expiry time: %w", err)
 	}
 	lastRefresh, err := parseCLIProxyAPITimeValue(raw.LastRefresh)
 	if err != nil {
-		return nil, fmt.Errorf("parse gemini credential last_refresh time: %w", err)
+		return nil, fmt.Errorf("parse antigravity credential last_refresh time: %w", err)
 	}
 
 	cred := &Credential{
-		Ref:          geminiCredentialRef(email, projectID),
-		Provider:     config.OAuthProviderGemini,
+		Ref:          antigravityCredentialRef(email, projectID),
+		Provider:     config.OAuthProviderAntigravity,
 		Email:        email,
 		AccountID:    projectID,
 		AccessToken:  accessToken,
@@ -462,8 +462,10 @@ func sub2APIAccountProvider(account sub2APIExportEntry) config.OAuthProvider {
 	switch strings.ToLower(strings.TrimSpace(account.Platform)) {
 	case "openai":
 		return config.OAuthProviderCodex
+	case "antigravity":
+		return config.OAuthProviderAntigravity
 	case "gemini":
-		return config.OAuthProviderGemini
+		return config.OAuthProvider("gemini")
 	case "anthropic":
 		return config.OAuthProviderClaude
 	default:

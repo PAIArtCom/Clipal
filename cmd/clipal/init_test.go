@@ -16,8 +16,7 @@ func TestInitIntegrationProduct(t *testing.T) {
 	}{
 		{bootstrap.ToolCodex, integration.ProductCodexCLI, true},
 		{bootstrap.ToolClaude, integration.ProductClaudeCode, true},
-		{bootstrap.ToolGemini, integration.ProductGeminiCLI, true},
-		{bootstrap.ToolAntigravity, "", false},
+		{bootstrap.ToolAntigravity, integration.ProductAntigravityCLI, true},
 	}
 	for _, tt := range tests {
 		got, ok := initIntegrationProduct(tt.tool)

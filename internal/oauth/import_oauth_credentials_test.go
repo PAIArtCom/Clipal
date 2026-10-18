@@ -101,66 +101,6 @@ func TestParseCLIProxyAPICredential_Claude(t *testing.T) {
 	}
 }
 
-func TestParseCLIProxyAPICredential_Gemini(t *testing.T) {
-	cred, err := ParseCLIProxyAPICredential([]byte(`{
-  "type": "gemini",
-  "email": "sean@example.com",
-  "project_id": "gen-lang-client-123",
-  "access_token": "access-1",
-  "refresh_token": "refresh-1",
-  "expiry": "2026-04-29T11:54:11+08:00",
-  "last_refresh": "2026-04-21T11:54:11+08:00",
-  "token": {
-    "access_token": "access-1",
-    "refresh_token": "refresh-1",
-    "token_type": "Bearer"
-  },
-  "token_type": "Bearer",
-  "auto": true,
-  "checked": true,
-  "disabled": false
-}`))
-	if err != nil {
-		t.Fatalf("ParseCLIProxyAPICredential: %v", err)
-	}
-
-	if got := cred.Provider; got != config.OAuthProviderGemini {
-		t.Fatalf("provider = %q, want gemini", got)
-	}
-	if got := cred.Ref; got != "gemini-sean-example-com-gen-lang-client-123" {
-		t.Fatalf("ref = %q, want gemini-sean-example-com-gen-lang-client-123", got)
-	}
-	if got := cred.Email; got != "sean@example.com" {
-		t.Fatalf("email = %q", got)
-	}
-	if got := cred.AccountID; got != "gen-lang-client-123" {
-		t.Fatalf("account_id = %q", got)
-	}
-	if got := cred.Metadata["project_id"]; got != "gen-lang-client-123" {
-		t.Fatalf("metadata project_id = %q", got)
-	}
-	if got := cred.Metadata["auto_project"]; got != "true" {
-		t.Fatalf("metadata auto_project = %q", got)
-	}
-	if got := cred.Metadata["checked"]; got != "true" {
-		t.Fatalf("metadata checked = %q", got)
-	}
-	if got := cred.Metadata["token_type"]; got != "Bearer" {
-		t.Fatalf("metadata token_type = %q", got)
-	}
-	if got := cred.Metadata["token_json"]; got == "" {
-		t.Fatalf("expected token_json metadata to be preserved")
-	}
-	wantExpiresAt := time.Date(2026, 4, 29, 3, 54, 11, 0, time.UTC)
-	if !cred.ExpiresAt.Equal(wantExpiresAt) {
-		t.Fatalf("expires_at = %s, want %s", cred.ExpiresAt, wantExpiresAt)
-	}
-	wantLastRefresh := time.Date(2026, 4, 21, 3, 54, 11, 0, time.UTC)
-	if !cred.LastRefresh.Equal(wantLastRefresh) {
-		t.Fatalf("last_refresh = %s, want %s", cred.LastRefresh, wantLastRefresh)
-	}
-}
-
 func TestParseCLIProxyAPICredential_FillsIdentityFromIDToken(t *testing.T) {
 	cred, err := ParseCLIProxyAPICredential([]byte(`{
   "type": "codex",
@@ -340,44 +280,6 @@ func TestParseOAuthImportEntries_Sub2APIBundle(t *testing.T) {
 	}
 }
 
-func TestParseOAuthImportEntries_Sub2APIBundleGeminiWithoutEmail(t *testing.T) {
-	results, err := ParseOAuthImportEntries([]byte(`{
-  "exported_at": "2026-04-23T09:35:45Z",
-  "accounts": [
-    {
-      "name": "Gemini OAuth",
-      "platform": "gemini",
-      "type": "oauth",
-      "credentials": {
-        "access_token": "access-1",
-        "refresh_token": "refresh-1",
-        "project_id": "proj-123",
-        "oauth_type": "code_assist",
-        "expires_at": "2026-04-29T11:54:11+08:00"
-      }
-    }
-  ]
-}`))
-	if err != nil {
-		t.Fatalf("ParseOAuthImportEntries: %v", err)
-	}
-	if len(results) != 1 {
-		t.Fatalf("results len = %d, want 1", len(results))
-	}
-	if results[0].Err != nil {
-		t.Fatalf("results[0].Err = %v, want nil", results[0].Err)
-	}
-	if results[0].Credential == nil {
-		t.Fatalf("results[0].Credential = nil")
-	}
-	if got := results[0].Credential.Provider; got != config.OAuthProviderGemini {
-		t.Fatalf("provider = %q, want gemini", got)
-	}
-	if got := results[0].Credential.AccountID; got != "proj-123" {
-		t.Fatalf("account_id = %q, want proj-123", got)
-	}
-}
-
 func TestParseOAuthImportEntries_Sub2APIBundleClaudeWithoutEmail(t *testing.T) {
 	results, err := ParseOAuthImportEntries([]byte(`{
   "exported_at": "2026-04-23T09:35:45Z",
@@ -461,4 +363,17 @@ func testOAuthJWTWithExp(email string, accountID string, expiresAt time.Time) st
 	payload := `{"email":"` + email + `","sub":"sub_123","exp":` + strconv.FormatInt(expiresAt.Unix(), 10) + `,"https://api.openai.com/auth":{"chatgpt_account_id":"` + accountID + `"}}`
 	return base64.RawURLEncoding.EncodeToString([]byte(header)) + "." +
 		base64.RawURLEncoding.EncodeToString([]byte(payload)) + "."
+}
+
+func TestParseOAuthImportRejectsGeminiAndAcceptsAntigravity(t *testing.T) {
+	for _, provider := range []string{"gemini", "antigravity"} {
+		cred, err := ParseCLIProxyAPICredential([]byte(`{"type":"` + provider + `","email":"test@example.com","project_id":"project-123","access_token":"access","refresh_token":"refresh"}`))
+		if provider == "gemini" {
+			if !errors.Is(err, ErrCLIProxyAPIUnsupportedType) {
+				t.Fatalf("retired import error=%v", err)
+			}
+		} else if err != nil || cred.Provider != config.OAuthProviderAntigravity || cred.AccountID != "project-123" {
+			t.Fatalf("antigravity import=%#v error=%v", cred, err)
+		}
+	}
 }

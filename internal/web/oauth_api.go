@@ -384,10 +384,10 @@ func (a *API) HandleGetProviderOAuthMetadata(w http.ResponseWriter, r *http.Requ
 		}
 	case config.OAuthProviderAntigravity:
 		var details *oauthpkg.GeminiUsageDetails
-		details, metadataErr = a.oauth.GetGeminiUsageForProviderWithHTTPClient(usageCtx, config.OAuthProviderAntigravity, provider.NormalizedOAuthRef(), httpClient)
+		details, metadataErr = a.oauth.GetGeminiUsageForProviderWithHTTPClient(usageCtx, oauthProvider, provider.NormalizedOAuthRef(), httpClient)
 		if details != nil {
 			resp = ProviderOAuthMetadataResponse{
-				OAuthPlanType:   googleOAuthPlanTypeWithRefresh(usageCtx, a.oauth, config.OAuthProviderAntigravity, provider.NormalizedOAuthRef(), httpClient),
+				OAuthPlanType:   googleOAuthPlanTypeWithRefresh(usageCtx, a.oauth, oauthProvider, provider.NormalizedOAuthRef(), httpClient),
 				OAuthRateLimits: mapProviderGeminiOAuthLimitsResponse(details),
 			}
 		}
@@ -521,7 +521,7 @@ func mapProviderGeminiOAuthLimitsResponse(details *oauthpkg.GeminiUsageDetails) 
 	resp := &ProviderOAuthLimits{}
 	for _, group := range details.Groups {
 		for _, bucket := range group.Buckets {
-			window := mapProviderGeminiSummaryOAuthLimitWindow(bucket)
+			window := mapProviderGeminiOAuthLimitWindow(bucket.RemainingFraction, bucket.ResetTime)
 			if window == nil {
 				continue
 			}
@@ -536,7 +536,7 @@ func mapProviderGeminiOAuthLimitsResponse(details *oauthpkg.GeminiUsageDetails) 
 		return resp
 	}
 	for _, bucket := range details.Buckets {
-		window := mapProviderGeminiOAuthLimitWindow(bucket)
+		window := mapProviderGeminiOAuthLimitWindow(bucket.RemainingFraction, bucket.ResetTime)
 		if window == nil {
 			continue
 		}
@@ -560,44 +560,23 @@ func mapProviderGeminiOAuthLimitsResponse(details *oauthpkg.GeminiUsageDetails) 
 	return resp
 }
 
-func mapProviderGeminiSummaryOAuthLimitWindow(bucket oauthpkg.GeminiUsageSummaryBucket) *ProviderOAuthLimitWindow {
-	window := &ProviderOAuthLimitWindow{
-		ResetsAt: formatTimeRFC3339(bucket.ResetTime),
-	}
-	if bucket.RemainingFraction != nil {
-		remaining := *bucket.RemainingFraction
-		if remaining < 0 {
-			remaining = 0
-		}
-		if remaining > 1 {
-			remaining = 1
-		}
-		window.UsedPercent = (1 - remaining) * 100
-	}
-	if window.UsedPercent == 0 && window.ResetsAt == "" {
+func mapProviderGeminiOAuthLimitWindow(remainingFraction *float64, resetTime time.Time) *ProviderOAuthLimitWindow {
+	// A reset time alone does not establish usage. An explicit 1 means 0% used,
+	// which is valid quota data even when the upstream omits its reset time.
+	if remainingFraction == nil {
 		return nil
 	}
-	return window
-}
-
-func mapProviderGeminiOAuthLimitWindow(bucket oauthpkg.GeminiUsageBucket) *ProviderOAuthLimitWindow {
-	window := &ProviderOAuthLimitWindow{
-		ResetsAt: formatTimeRFC3339(bucket.ResetTime),
+	remaining := *remainingFraction
+	if remaining < 0 {
+		remaining = 0
 	}
-	if bucket.RemainingFraction != nil {
-		remaining := *bucket.RemainingFraction
-		if remaining < 0 {
-			remaining = 0
-		}
-		if remaining > 1 {
-			remaining = 1
-		}
-		window.UsedPercent = (1 - remaining) * 100
+	if remaining > 1 {
+		remaining = 1
 	}
-	if window.UsedPercent == 0 && window.ResetsAt == "" {
-		return nil
+	return &ProviderOAuthLimitWindow{
+		UsedPercent: (1 - remaining) * 100,
+		ResetsAt:    formatTimeRFC3339(resetTime),
 	}
-	return window
 }
 
 func geminiOAuthLimitName(bucket oauthpkg.GeminiUsageBucket) string {
@@ -909,7 +888,7 @@ func desiredOAuthProviderName(cred *oauthpkg.Credential) string {
 
 	providerPart := slugOAuthProviderNamePart(string(cred.Provider))
 	identityPart := slugOAuthProviderNamePart(cred.Email)
-	if cred.Provider == config.OAuthProviderGemini || cred.Provider == config.OAuthProviderAntigravity {
+	if cred.Provider == config.OAuthProviderAntigravity {
 		projectPart := slugOAuthProviderNamePart(cred.AccountID)
 		if projectPart == "" {
 			projectPart = slugOAuthProviderNamePart(cred.Metadata["project_id"])

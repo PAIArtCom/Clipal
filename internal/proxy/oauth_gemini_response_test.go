@@ -19,7 +19,7 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
 		Ref:         "gemini-sean-example-com-gen-lang-client-123",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		Email:       "sean@example.com",
 		AccessToken: "access-1",
 		Metadata: map[string]string{
@@ -33,7 +33,7 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 		{
 			Name:          "gemini-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
-			OAuthProvider: config.OAuthProviderGemini,
+			OAuthProvider: config.OAuthProviderAntigravity,
 			OAuthRef:      "gemini-sean-example-com-gen-lang-client-123",
 			Priority:      1,
 		},
@@ -95,7 +95,7 @@ func TestPrepareGeminiOAuthResponse_UnwrapsGenerateResponseWithoutContentType(t 
 	})
 	resp := newResponse(http.StatusOK, nil, `{"response":{"candidates":[{"content":{"parts":[{"text":"hello"}]}}]},"traceId":"trace-1"}`)
 
-	rewritten, err := prepareGeminiOAuthResponse(req, resp)
+	rewritten, err := prepareAntigravityOAuthResponse(req, resp)
 	if err != nil {
 		t.Fatalf("prepareGeminiOAuthResponse: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 	svc := oauthpkg.NewService(dir)
 	if err := svc.Store().Save(&oauthpkg.Credential{
 		Ref:         "gemini-sean-example-com-gen-lang-client-123",
-		Provider:    config.OAuthProviderGemini,
+		Provider:    config.OAuthProviderAntigravity,
 		Email:       "sean@example.com",
 		AccessToken: "access-1",
 		Metadata: map[string]string{
@@ -170,7 +170,7 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 		{
 			Name:          "gemini-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
-			OAuthProvider: config.OAuthProviderGemini,
+			OAuthProvider: config.OAuthProviderAntigravity,
 			OAuthRef:      "gemini-sean-example-com-gen-lang-client-123",
 			Priority:      1,
 		},
@@ -248,7 +248,7 @@ func TestPrepareGeminiOAuthResponse_RewritesStreamWithoutContentType(t *testing.
 	}, "\n")
 	resp := newResponse(http.StatusOK, nil, streamBody)
 
-	rewritten, err := prepareGeminiOAuthResponse(req, resp)
+	rewritten, err := prepareAntigravityOAuthResponse(req, resp)
 	if err != nil {
 		t.Fatalf("prepareGeminiOAuthResponse: %v", err)
 	}

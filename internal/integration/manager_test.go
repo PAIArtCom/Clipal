@@ -94,11 +94,11 @@ func TestBackupAndLatestManifest_ForExistingAndMissingFiles(t *testing.T) {
 	}
 }
 
-func TestSupportedProducts_IncludesGeminiCLI(t *testing.T) {
+func TestSupportedProducts_IncludesAntigravityCLI(t *testing.T) {
 	t.Parallel()
 
 	got := SupportedProducts()
-	want := []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductGeminiCLI, ProductContinue, ProductAider, ProductGoose}
+	want := []ProductID{ProductClaudeCode, ProductCodexCLI, ProductOpenCode, ProductAntigravityCLI, ProductContinue, ProductAider, ProductGoose}
 	if len(got) != len(want) {
 		t.Fatalf("len = %d want %d", len(got), len(want))
 	}
@@ -110,8 +110,8 @@ func TestSupportedProducts_IncludesGeminiCLI(t *testing.T) {
 	if got := ProductName(ProductOpenCode); got != "OpenCode" {
 		t.Fatalf("ProductName(OpenCode) = %q", got)
 	}
-	if got := ProductName(ProductGeminiCLI); got != "Gemini CLI" {
-		t.Fatalf("ProductName(GeminiCLI) = %q", got)
+	if got := ProductName(ProductAntigravityCLI); got != "Antigravity CLI" {
+		t.Fatalf("ProductName(AntigravityCLI) = %q", got)
 	}
 	if got := ProductName(ProductContinue); got != "Continue" {
 		t.Fatalf("ProductName(Continue) = %q", got)

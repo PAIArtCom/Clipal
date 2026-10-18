@@ -292,7 +292,7 @@ func TestApplyUsageCostSnapshot_GeminiUsesThoughtTokensAndLargePromptTier(t *tes
 
 	provider := config.Provider{
 		AuthType:      config.ProviderAuthTypeOAuth,
-		OAuthProvider: config.OAuthProviderGemini,
+		OAuthProvider: config.OAuthProviderAntigravity,
 	}
 
 	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload([]byte(`{"contents":[]}`)), telemetry.UsageSnapshot{

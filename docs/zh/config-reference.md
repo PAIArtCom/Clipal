@@ -202,7 +202,7 @@ providers:
 
 OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provider 使用相同的顺序、置顶、启停与 failover 逻辑。
 
-- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: antigravity`。历史 `oauth_provider: gemini` 配置仍可加载以保持兼容，但新的 Gemini CLI OAuth 授权入口不再提供。
+- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: antigravity`。Google OAuth 仅支持 `antigravity`；加载配置时会排除已移除的 `oauth_provider: gemini` 条目，其凭据文件保留在磁盘上。
 - 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Antigravity OAuth 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens`、模型列表，以及通过 `generateContent` 调用 Gemini 图片模型。它不包装 Imagen/Veo `predict*` 端点；这些路由请使用 Google AI Studio API key 或 Vertex provider。
 - Claude OAuth 请求默认使用轻量 Agent SDK 兼容 envelope，并由 Clipal 生成当前传输 header 和 billing fingerprint。
 - Codex OAuth Responses 请求会归一化为轻量 Agent SDK 兼容形态，并由 Clipal 处理必要传输字段。

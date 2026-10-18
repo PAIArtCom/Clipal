@@ -85,20 +85,27 @@ wire_api = "responses"
 - Web UI 的一键接管会新增或更新 `provider.clipal`，并在可能的情况下把当前 `model` 改写为 `clipal/<当前模型ID>`
 - 项目级 `opencode.json` 或环境变量覆盖仍可能影响最终生效结果
 
-## Gemini CLI（Legacy）
+## Antigravity CLI（`agy`）
 
-编辑 `~/.gemini/.env`：
+在 **CLI 接管 → Antigravity CLI** 中操作。Clipal 在
+`~/.gemini/antigravity-cli/settings.json` 设置 `"modelProvider": "gemini"`，
+并在 `.zshrc`、`.bashrc` 或 `.profile` 中维护带标记的区块：
 
-```dotenv
-GEMINI_API_BASE=http://127.0.0.1:3333/clipal
+自动接管支持 macOS、Linux 上的 bash、zsh 和 POSIX sh。
+Windows 请手动设置以下环境变量，并在上述设置文件中配置 `"modelProvider": "gemini"`。
+
+```sh
+export GEMINI_API_KEY='clipal'
+export GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'
 ```
 
-说明：
+打开新终端（或 source 页面提示的配置文件）后运行 `agy`。
+占位 Key 满足 CLI 的非空 Key 检查，上游凭据仍由 Clipal 管理。
+预览涵盖两个文件，接管保留无关配置和 shell 内容，回滚恢复两者的原始内容。
+不需要删除已有的 Antigravity 登录会话。
 
-- Google 已把个人 Gemini CLI OAuth 迁移到 Antigravity；Clipal 新增 Google 个人 OAuth provider 时请使用 Antigravity OAuth。
-- Web UI 的一键接管只会更新 Gemini CLI 用户级 `.env` 里的 `GEMINI_API_BASE`
-- 项目级 `.env` 或当前 shell 已导出的环境变量，仍可能覆盖最终生效结果
-- 在 `CLI Takeover` 里 apply / rollback 之后，建议重启 Gemini CLI 或新开一个会话，让它重新加载环境变量
+Antigravity CLI 不读取 `.env` 文件，配置协议见
+[官方 API Key 与自定义入口说明](https://www.antigravity.google/docs/install?tab=cli)。
 
 ## Continue
 

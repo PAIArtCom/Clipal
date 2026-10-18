@@ -56,3 +56,15 @@ func TestEnsureDryRunDoesNotExecute(t *testing.T) {
 		t.Fatalf("result=%+v err=%v calls=%v", result, err, runner.calls)
 	}
 }
+
+func TestEnsureRejectsRetiredToolEvenWhenInstalled(t *testing.T) {
+	runner := &fakeRunner{paths: map[string]string{"gemini": "/bin/gemini"}}
+	for _, dryRun := range []bool{false, true} {
+		if _, err := (Bootstrapper{Runner: runner}).Ensure(context.Background(), Tool("gemini"), dryRun); err == nil {
+			t.Fatal("retired tool accepted")
+		}
+	}
+	if len(runner.calls) != 0 {
+		t.Fatal("retired tool executed")
+	}
+}

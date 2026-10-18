@@ -29,8 +29,8 @@ const (
 	defaultAntigravityScopeCCLog         = "https://www.googleapis.com/auth/cclog"
 	defaultAntigravityScopeExperiments   = "https://www.googleapis.com/auth/experimentsandconfigs"
 	defaultAntigravityFreeTierID         = "free-tier"
-	defaultAntigravityCloudCodeRetry     = defaultGeminiCloudCodeRetryAttempts
-	defaultAntigravityCloudCodeRetryWait = defaultGeminiCloudCodeRetryDelay
+	defaultAntigravityCloudCodeRetry     = defaultGoogleCloudCodeRetryAttempts
+	defaultAntigravityCloudCodeRetryWait = defaultGoogleCloudCodeRetryDelay
 	defaultAntigravityVersionLabel       = "2.13.0"
 	defaultAntigravityInfoPlist          = "/Applications/Antigravity.app/Contents/Info.plist"
 )
@@ -58,9 +58,9 @@ var (
 )
 
 var defaultAntigravityScopes = []string{
-	defaultGeminiScopeCloudPlatform,
-	defaultGeminiScopeUserInfoEmail,
-	defaultGeminiScopeUserInfoProfile,
+	defaultGoogleScopeCloudPlatform,
+	defaultGoogleScopeUserInfoEmail,
+	defaultGoogleScopeUserInfoProfile,
 	defaultAntigravityScopeCCLog,
 	defaultAntigravityScopeExperiments,
 }
@@ -100,9 +100,9 @@ type antigravityTierMetadata struct {
 
 func NewAntigravityClient() *AntigravityClient {
 	client := &AntigravityClient{
-		AuthURL:           defaultGeminiAuthURL,
-		TokenURL:          defaultGeminiTokenURL,
-		UserInfoURL:       defaultGeminiUserInfoURL,
+		AuthURL:           defaultGoogleAuthURL,
+		TokenURL:          defaultGoogleTokenURL,
+		UserInfoURL:       defaultGoogleUserInfoURL,
 		CloudCodeURL:      defaultAntigravityCloudCodeURL,
 		DailyCloudCodeURL: defaultAntigravityDailyCloudCodeURL,
 		CloudCodeVersion:  defaultAntigravityCloudCodeVersion,
@@ -250,12 +250,11 @@ func (c *AntigravityClient) RepairProject(ctx context.Context, cred *Credential)
 	return repaired, nil
 }
 
-func (c *AntigravityClient) exchange(ctx context.Context, form url.Values) (*geminiTokenResponse, error) {
-	gemini := &GeminiClient{TokenURL: c.tokenURL(), HTTPClient: c.httpClient()}
-	return gemini.exchange(ctx, form)
+func (c *AntigravityClient) exchange(ctx context.Context, form url.Values) (*googleTokenResponse, error) {
+	return exchangeGoogleToken(ctx, c.httpClient(), c.tokenURL(), form)
 }
 
-func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *geminiTokenResponse, previous *Credential) (*Credential, error) {
+func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *googleTokenResponse, previous *Credential) (*Credential, error) {
 	now := c.now()
 	email, err := c.fetchUserEmail(ctx, token.AccessToken)
 	if err != nil && strings.TrimSpace(previousValue(previous, func(v *Credential) string { return v.Email })) == "" {
@@ -329,26 +328,25 @@ func (c *AntigravityClient) credentialFromToken(ctx context.Context, token *gemi
 }
 
 func (c *AntigravityClient) fetchUserEmail(ctx context.Context, accessToken string) (string, error) {
-	gemini := &GeminiClient{UserInfoURL: c.userInfoURL(), HTTPClient: c.httpClient()}
-	return gemini.fetchUserEmail(ctx, accessToken)
+	return fetchGoogleUserEmail(ctx, c.httpClient(), c.userInfoURL(), accessToken)
 }
 
 func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken string, previous *Credential) (string, antigravityTierMetadata, bool, error) {
 	requestedProject := c.requestedProjectID(previous)
-	if err := validateGeminiProjectID(requestedProject); err != nil {
+	if err := validateGoogleProjectID(requestedProject); err != nil {
 		return "", antigravityTierMetadata{}, false, err
 	}
 	loadResp, err := c.callCloudCode(ctx, accessToken, c.cloudCodeURL(), "loadCodeAssist", map[string]any{
 		"metadata": antigravityClientMetadata(),
 	})
 	if err != nil {
-		if fallbackProject := previousGeminiMetadata(previous, "project_id"); fallbackProject != "" {
-			return fallbackProject, antigravityTierMetadataFromCredential(previous), previousGeminiMetadata(previous, "auto_project") == "true", nil
+		if fallbackProject := credentialMetadataValue(previous, "project_id"); fallbackProject != "" {
+			return fallbackProject, antigravityTierMetadataFromCredential(previous), credentialMetadataValue(previous, "auto_project") == "true", nil
 		}
 		return "", antigravityTierMetadata{}, false, fmt.Errorf("load code assist: %w", err)
 	}
 	tiers := extractAntigravityTierMetadata(loadResp)
-	projectID := strings.TrimSpace(firstNonEmpty(extractGeminiProjectID(loadResp), requestedProject, previousGeminiMetadata(previous, "project_id")))
+	projectID := strings.TrimSpace(firstNonEmpty(extractGoogleProjectID(loadResp), requestedProject, credentialMetadataValue(previous, "project_id")))
 	if projectID != "" {
 		return projectID, tiers, requestedProject == "", nil
 	}
@@ -357,11 +355,11 @@ func (c *AntigravityClient) resolveProjectID(ctx context.Context, accessToken st
 	}
 	projectID, err = c.onboardUser(ctx, accessToken, tiers.onboardTierID())
 	if err != nil {
-		if fallbackProject := previousGeminiMetadata(previous, "project_id"); fallbackProject != "" {
+		if fallbackProject := credentialMetadataValue(previous, "project_id"); fallbackProject != "" {
 			if tiers.isZero() {
 				tiers = antigravityTierMetadataFromCredential(previous)
 			}
-			return fallbackProject, tiers, previousGeminiMetadata(previous, "auto_project") == "true", nil
+			return fallbackProject, tiers, credentialMetadataValue(previous, "auto_project") == "true", nil
 		}
 		return "", tiers, false, fmt.Errorf("onboard user: %w", err)
 	}
@@ -381,32 +379,32 @@ func (c *AntigravityClient) onboardUser(ctx context.Context, accessToken string,
 	if err != nil {
 		return "", err
 	}
-	for attempt := 0; attempt < defaultGeminiOnboardAttempts; attempt++ {
+	for attempt := 0; attempt < defaultGoogleOnboardAttempts; attempt++ {
 		if err := cloudCodeOperationError(resp); err != nil {
 			return "", err
 		}
 		if done, _ := resp["done"].(bool); done {
-			projectID := extractGeminiProjectIDFromOnboard(resp)
+			projectID := extractGoogleProjectIDFromOnboard(resp)
 			if projectID == "" {
 				return "", fmt.Errorf("project onboarding completed without project_id metadata")
 			}
 			return projectID, nil
 		}
-		if name := extractGeminiOperationName(resp); name != "" {
+		if name := extractGoogleOperationName(resp); name != "" {
 			completed, err := pollCloudCodeOperation(ctx, accessToken, name, cloudCodeOperationConfig{Client: c.httpClient(), BaseURL: c.dailyCloudCodeURL(), Version: c.cloudCodeVersion(), UserAgent: antigravityUserAgent(), Now: c.now, Sleep: c.Sleep})
 			if err != nil {
 				return "", err
 			}
-			projectID := extractGeminiProjectIDFromOnboard(completed)
+			projectID := extractGoogleProjectIDFromOnboard(completed)
 			if projectID == "" {
 				return "", fmt.Errorf("project onboarding completed without project_id metadata")
 			}
 			return projectID, nil
 		}
-		if attempt+1 == defaultGeminiOnboardAttempts {
+		if attempt+1 == defaultGoogleOnboardAttempts {
 			break
 		}
-		if err := waitCloudCode(ctx, defaultGeminiOnboardDelay, c.Sleep); err != nil {
+		if err := waitCloudCode(ctx, defaultGoogleOnboardDelay, c.Sleep); err != nil {
 			return "", err
 		}
 		resp, err = c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "onboardUser", payload)
@@ -521,18 +519,11 @@ func (m antigravityTierMetadata) isZero() bool {
 }
 
 func (c *AntigravityClient) callCloudCode(ctx context.Context, accessToken string, baseURL string, action string, body map[string]any) (map[string]any, error) {
-	gemini := &GeminiClient{
-		CloudCodeURL:     baseURL,
-		CloudCodeVersion: c.cloudCodeVersion(),
-		HTTPClient:       c.httpClient(),
-		Now:              c.Now,
-		Sleep:            c.Sleep,
-	}
 	rawBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := strings.TrimRight(gemini.cloudCodeURL(), "/") + "/" + strings.Trim(gemini.cloudCodeVersion(), "/") + ":" + strings.TrimSpace(action)
+	endpoint := strings.TrimRight(baseURL, "/") + "/" + strings.Trim(c.cloudCodeVersion(), "/") + ":" + strings.TrimSpace(action)
 	var lastErr error
 	for attempt := 0; attempt < defaultAntigravityCloudCodeRetry; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(rawBody)))
@@ -563,8 +554,8 @@ func (c *AntigravityClient) callCloudCode(ctx context.Context, accessToken strin
 		}
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			lastErr = &cloudCodeHTTPError{Status: resp.StatusCode, Body: strings.TrimSpace(string(respBody))}
-			if attempt+1 < defaultAntigravityCloudCodeRetry && geminiCloudCodeShouldRetry(resp.StatusCode) {
-				if err := waitCloudCode(ctx, geminiCloudCodeRetryDelay(resp.Header, c.now()), c.Sleep); err != nil {
+			if attempt+1 < defaultAntigravityCloudCodeRetry && googleCloudCodeShouldRetry(resp.StatusCode) {
+				if err := waitCloudCode(ctx, googleCloudCodeRetryDelay(resp.Header, c.now()), c.Sleep); err != nil {
 					return nil, err
 				}
 				continue
@@ -588,7 +579,7 @@ func ioReadAllAndClose(resp *http.Response) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (c *AntigravityClient) metadataFromToken(token *geminiTokenResponse, projectID string, tiers antigravityTierMetadata, autoProject bool) map[string]string {
+func (c *AntigravityClient) metadataFromToken(token *googleTokenResponse, projectID string, tiers antigravityTierMetadata, autoProject bool) map[string]string {
 	tokenJSON := map[string]any{
 		"access_token":  strings.TrimSpace(token.AccessToken),
 		"client_id":     c.clientID(),
@@ -702,14 +693,14 @@ func (c *AntigravityClient) requestedProjectID(previous *Credential) string {
 	if c != nil && strings.TrimSpace(c.ProjectID) != "" {
 		return strings.TrimSpace(c.ProjectID)
 	}
-	if projectID := geminiProjectIDFromOfficialEnv(); projectID != "" {
+	if projectID := googleProjectIDFromOfficialEnv(); projectID != "" {
 		return projectID
 	}
 	if previous != nil {
-		if projectID := previousGeminiMetadata(previous, "requested_project_id"); projectID != "" {
+		if projectID := credentialMetadataValue(previous, "requested_project_id"); projectID != "" {
 			return projectID
 		}
-		if projectID := previousGeminiMetadata(previous, "project_id"); projectID != "" {
+		if projectID := credentialMetadataValue(previous, "project_id"); projectID != "" {
 			return projectID
 		}
 		if projectID := strings.TrimSpace(previous.AccountID); projectID != "" {
@@ -723,21 +714,21 @@ func (c *AntigravityClient) authURL() string {
 	if c != nil && strings.TrimSpace(c.AuthURL) != "" {
 		return strings.TrimSpace(c.AuthURL)
 	}
-	return defaultGeminiAuthURL
+	return defaultGoogleAuthURL
 }
 
 func (c *AntigravityClient) tokenURL() string {
 	if c != nil && strings.TrimSpace(c.TokenURL) != "" {
 		return strings.TrimSpace(c.TokenURL)
 	}
-	return defaultGeminiTokenURL
+	return defaultGoogleTokenURL
 }
 
 func (c *AntigravityClient) userInfoURL() string {
 	if c != nil && strings.TrimSpace(c.UserInfoURL) != "" {
 		return strings.TrimSpace(c.UserInfoURL)
 	}
-	return defaultGeminiUserInfoURL
+	return defaultGoogleUserInfoURL
 }
 
 func (c *AntigravityClient) cloudCodeURL() string {
@@ -859,7 +850,7 @@ func applyAntigravityClientEnvOverrides(c *AntigravityClient) {
 	}
 	if v, ok := lookupNonEmptyEnv("CLIPAL_OAUTH_ANTIGRAVITY_PROJECT_ID"); ok {
 		c.ProjectID = v
-	} else if v := geminiProjectIDFromOfficialEnv(); v != "" {
+	} else if v := googleProjectIDFromOfficialEnv(); v != "" {
 		c.ProjectID = v
 	}
 	if v, ok := lookupNonEmptyEnv("CLIPAL_OAUTH_ANTIGRAVITY_SCOPE"); ok {
