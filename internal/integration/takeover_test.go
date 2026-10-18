@@ -21,6 +21,11 @@ func takeoverFixture(t *testing.T, product ProductID) (Manager, *config.Config, 
 			t.Fatal(err)
 		}
 	}
+	if modelSelectionProduct(product) {
+		if err := m.SetTarget(product, TargetOptions{Model: "test-model"}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	files, err := m.planTakeover(product, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +35,8 @@ func takeoverFixture(t *testing.T, product ProductID) (Manager, *config.Config, 
 		body := []byte("{\"theme\":\"original\"}\n")
 		if product == ProductCodexCLI {
 			body = []byte("model = 'original'\n")
+		} else if product == ProductContinue || product == ProductAider {
+			body = []byte("theme: original\n")
 		} else if product == ProductAntigravityCLI && i > 0 {
 			body = []byte("# original shell settings\nexport KEEP='original'\n")
 		}
@@ -62,7 +69,7 @@ func assertTakeoverFiles(t *testing.T, want []backupFile) {
 }
 
 func TestTakeoverCyclesPreserveBaselineAcrossUpdates(t *testing.T) {
-	for _, product := range []ProductID{ProductCodexCLI, ProductClaudeCode, ProductAntigravityCLI} {
+	for _, product := range SupportedProducts() {
 		t.Run(string(product), func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, product)
 			for cycle := 0; cycle < 2; cycle++ {
@@ -108,7 +115,7 @@ func TestTakeoverCyclesPreserveBaselineAcrossUpdates(t *testing.T) {
 }
 
 func TestTakeoverFailureRestoresFilesAndCycle(t *testing.T) {
-	for _, product := range []ProductID{ProductCodexCLI, ProductClaudeCode, ProductAntigravityCLI} {
+	for _, product := range SupportedProducts() {
 		t.Run(string(product), func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, product)
 			failAt := 0
@@ -396,33 +403,38 @@ func TestTakeoverRollbackRestoresPermissionsAfterFailure(t *testing.T) {
 }
 
 func TestTakeoverPreservesConfigurationSymlinks(t *testing.T) {
-	m, cfg, originals := takeoverFixture(t, ProductCodexCLI)
-	link := originals[0].TargetPath
-	target := filepath.Join(t.TempDir(), "shared.toml")
-	if err := os.Rename(link, target); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(target, link); err != nil {
-		t.Skip(err)
-	}
-	if _, err := m.Apply(ProductCodexCLI, cfg); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := m.Rollback(ProductCodexCLI, cfg); err != nil {
-		t.Fatal(err)
-	}
-	info, err := os.Lstat(link)
-	if err != nil || info.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("replaced configuration symlink")
-	}
-	raw, err := os.ReadFile(target)
-	if err != nil || !bytes.Equal(raw, originals[0].Original) {
-		t.Fatal("did not restore symlink target")
+	for _, product := range SupportedProducts() {
+		t.Run(string(product), func(t *testing.T) {
+			m, cfg, originals := takeoverFixture(t, product)
+			link := originals[0].TargetPath
+			target := filepath.Join(t.TempDir(), "shared.toml")
+			if err := os.Rename(link, target); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Skip(err)
+			}
+			if _, err := m.Apply(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := m.Rollback(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Lstat(link)
+			if err != nil || info.Mode()&os.ModeSymlink == 0 {
+				t.Fatal("replaced configuration symlink")
+			}
+			raw, err := os.ReadFile(target)
+			if err != nil || !bytes.Equal(raw, originals[0].Original) {
+				t.Fatal("did not restore symlink target")
+			}
+
+		})
 	}
 }
 
 func TestTakeoverAdoptsLegacyBaseline(t *testing.T) {
-	for _, product := range []ProductID{ProductCodexCLI, ProductClaudeCode, ProductAntigravityCLI} {
+	for _, product := range SupportedProducts() {
 		t.Run(string(product), func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, product)
 			paths := []string{}
@@ -448,5 +460,200 @@ func TestTakeoverAdoptsLegacyBaseline(t *testing.T) {
 			}
 			assertTakeoverFiles(t, originals)
 		})
+	}
+}
+
+func TestTakeoverMissingFilesRestoreAbsence(t *testing.T) {
+	for _, product := range SupportedProducts() {
+		t.Run(string(product), func(t *testing.T) {
+			m, cfg, originals := takeoverFixture(t, product)
+			for _, file := range originals {
+				if err := os.Remove(file.TargetPath); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := m.Apply(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := m.Rollback(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range originals {
+				if _, err := os.Stat(file.TargetPath); !os.IsNotExist(err) {
+					t.Fatalf("file was not removed: %s: %v", file.TargetPath, err)
+				}
+			}
+		})
+	}
+}
+
+func TestTakeoverRequiresExplicitModelWithoutExistingSelection(t *testing.T) {
+	for _, product := range []ProductID{ProductOpenCode, ProductContinue, ProductAider, ProductGoose} {
+		t.Run(string(product), func(t *testing.T) {
+			m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			status, err := m.Status(product, cfg)
+			if err != nil || status.State != StateNotConfigured {
+				t.Fatalf("status: %+v %v", status, err)
+			}
+			if _, err = m.Apply(product, cfg); err == nil {
+				t.Fatal("guessed a model")
+			}
+			if _, err = os.Stat(status.TargetPath); !os.IsNotExist(err) {
+				t.Fatal("failed validation created target")
+			}
+			if m.hasLatestBackup(product) {
+				t.Fatal("failed validation created baseline")
+			}
+			if err = m.SetTarget(product, TargetOptions{Model: "gateway/arbitrary-id"}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = m.Apply(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestTakeoverPreservesContinueAndGooseOptions(t *testing.T) {
+	for _, product := range []ProductID{ProductContinue, ProductGoose} {
+		t.Run(string(product), func(t *testing.T) {
+			m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			var path string
+			var raw []byte
+			if product == ProductContinue {
+				path, _ = m.continueTargetPath()
+				raw = []byte("name: User\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Other\n    provider: openai\n    model: old\n  - name: Clipal\n    provider: openai\n    model: chosen\n    apiBase: http://old\n    apiKey: user\n    useResponsesApi: false\n    capabilities: [tool_use]\n    roles: [chat]\n")
+			} else {
+				path, _ = m.gooseTargetPath()
+				raw = []byte(`{"name":"clipal","engine":"openai","base_url":"http://old","models":[{"name":"chosen","context_limit":32768}],"headers":{"X-Team":"keep"},"requires_auth":false,"supports_streaming":false}`)
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, raw, 0640); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				cfg.Global.Port++
+				if _, err := m.Apply(product, cfg); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if product == ProductContinue {
+				doc, err := readYAMLMap(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				model := findContinueClipalModel(doc)
+				roles, ok := model["roles"].([]any)
+				if !ok {
+					t.Fatal("missing roles")
+				}
+				if model["model"] != "chosen" || model["apiKey"] != "user" || model["useResponsesApi"] != false || model["capabilities"] == nil || len(roles) != 1 {
+					t.Fatalf("lost options: %#v", model)
+				}
+			} else {
+				doc, err := readJSONMap(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				headers, ok := doc["headers"].(map[string]any)
+				if !ok {
+					t.Fatal("missing headers")
+				}
+				models, ok := doc["models"].([]any)
+				if !ok || len(models) == 0 {
+					t.Fatal("missing models")
+				}
+				model, ok := models[0].(map[string]any)
+				if !ok {
+					t.Fatal("invalid model")
+				}
+				if headers["X-Team"] != "keep" || doc["supports_streaming"] != false || doc["requires_auth"] != false || model["name"] != "chosen" {
+					t.Fatalf("lost options: %#v", doc)
+				}
+			}
+			if _, err := m.Rollback(product, cfg); err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(got, raw) {
+				t.Fatal("rollback was not byte-exact")
+			}
+		})
+	}
+}
+
+func TestOpenCodeRestrictionsBlockWithoutChangingFiles(t *testing.T) {
+	for _, restriction := range []string{`"disabled_providers":["clipal"]`, `"enabled_providers":["other"]`, `"enabled_providers":[]`} {
+		t.Run(restriction, func(t *testing.T) {
+			m, cfg, originals := takeoverFixture(t, ProductOpenCode)
+			raw := []byte("{" + restriction + ` ,"model":"openai/test"}`)
+			if err := os.WriteFile(originals[0].TargetPath, raw, 0640); err != nil {
+				t.Fatal(err)
+			}
+			status, err := m.Status(ProductOpenCode, cfg)
+			if err != nil || status.Verification != "blocked" {
+				t.Fatalf("missing restriction: %+v %v", status, err)
+			}
+			if _, err = m.Apply(ProductOpenCode, cfg); err == nil {
+				t.Fatal("applied a disabled provider")
+			}
+			got, err := os.ReadFile(originals[0].TargetPath)
+			if err != nil || !bytes.Equal(got, raw) {
+				t.Fatal("changed restricted configuration")
+			}
+		})
+	}
+}
+
+func TestOtherClientPathsFollowClientContracts(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	m := Manager{homeDir: home, configDir: t.TempDir()}
+	t.Setenv("XDG_CONFIG_HOME", root)
+	t.Setenv("OPENCODE_CONFIG", "")
+	t.Setenv("OPENCODE_CONFIG_DIR", "")
+	path, err := m.opencodeTargetPath()
+	if err != nil || path != filepath.Join(root, "opencode", "opencode.json") {
+		t.Fatalf("XDG: %s %v", path, err)
+	}
+	jsonc := filepath.Join(root, "opencode", "opencode.jsonc")
+	if err = os.MkdirAll(filepath.Dir(jsonc), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(jsonc, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path, err = m.opencodeTargetPath()
+	if err != nil || path != jsonc {
+		t.Fatal("did not prefer higher-priority JSONC file")
+	}
+	custom := filepath.Join(t.TempDir(), "custom.jsonc")
+	t.Setenv("OPENCODE_CONFIG", custom)
+	path, err = m.opencodeTargetPath()
+	if err != nil || path != custom {
+		t.Fatal("ignored OPENCODE_CONFIG")
+	}
+	t.Setenv("CONTINUE_GLOBAL_DIR", root)
+	path, err = m.continueTargetPath()
+	if err != nil || path != filepath.Join(root, "config.yaml") {
+		t.Fatal("ignored CONTINUE_GLOBAL_DIR")
+	}
+	t.Setenv("GOOSE_PATH_ROOT", root)
+	path, err = m.gooseTargetPath()
+	if err != nil || path != filepath.Join(root, "config", "custom_providers", "clipal.json") {
+		t.Fatal("ignored GOOSE_PATH_ROOT")
+	}
+	for _, product := range []ProductID{ProductOpenCode, ProductContinue, ProductAider} {
+		chosen := filepath.Join(t.TempDir(), "explicit.conf")
+		if err = m.SetTarget(product, TargetOptions{ConfigFile: chosen, Model: "chosen"}); err != nil {
+			t.Fatal(err)
+		}
+		status, e := m.Status(product, &config.Config{Global: config.DefaultGlobalConfig()})
+		if e != nil || status.TargetPath != chosen {
+			t.Fatalf("explicit file: %+v %v", status, e)
+		}
 	}
 }

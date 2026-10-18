@@ -58,7 +58,7 @@ wire_api = "responses"
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "clipal/gpt-5.4",
+  "model": "clipal/YOUR_GATEWAY_MODEL_ID",
   "provider": {
     "clipal": {
       "npm": "@ai-sdk/openai-compatible",
@@ -68,8 +68,8 @@ wire_api = "responses"
         "apiKey": "clipal"
       },
       "models": {
-        "gpt-5.4": {
-          "name": "GPT-5.4"
+        "YOUR_GATEWAY_MODEL_ID": {
+          "name": "Gateway model"
         }
       }
     }
@@ -78,6 +78,7 @@ wire_api = "responses"
 ```
 
 - OpenCode 的 `baseURL` 保持为 `http://127.0.0.1:3333/clipal` 即可，不要手动再补 `/v1`
+- 接管支持自定义文件、`OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR` 和 XDG 目录，并优先选择同目录的 `opencode.jsonc`。已禁用 Clipal provider 时会提示冲突，不改写用户限制。
 
 说明：
 
@@ -122,7 +123,7 @@ Antigravity CLI 不读取 `.env` 文件，配置协议见
 models:
   - name: Clipal
     provider: openai
-    model: gpt-5.4
+    model: YOUR_GATEWAY_MODEL_ID
     apiBase: http://127.0.0.1:3333/clipal
     apiKey: clipal
     roles:
@@ -135,6 +136,7 @@ models:
 
 - Web UI 的一键接管会在用户级 Continue 配置里新增或更新一个 `Clipal` 模型项
 - Continue 应用内当前选中的模型仍可能不是它，所以你可能还需要在 Continue 里手动切到 `Clipal`
+- CLI 使用 `cn --config <管理的文件路径>` 可避开保存的其他配置选择；支持 `CONTINUE_GLOBAL_DIR`。接管保留已有 Clipal 模型的高级选项，不推断补全能力。
 - workspace 级 Continue 配置仍可能覆盖用户级配置
 
 ## Aider
@@ -142,14 +144,15 @@ models:
 编辑 `~/.aider.conf.yml`：
 
 ```yaml
-model: openai/gpt-5.4
+model: openai/YOUR_GATEWAY_MODEL_ID
 openai-api-base: http://127.0.0.1:3333/clipal
 openai-api-key: clipal
 ```
 
 说明：
 
-- Web UI 的一键接管会更新 home 级 Aider 配置中的 `openai-api-base`，并补一个最小可用的 `model`
+- Web UI 的一键接管会更新 `openai-api-base`，使用已有的 OpenAI 兼容模型或明确选择的网关模型
+- 可选择配置目录或文件，并用 `aider --config <文件>` 启动。没有模型或原模型来自其他 provider 时，需明确选择网关模型；原 API Key 和辅助模型设置保留。
 - repo 内 `.aider.conf.yml`、`.env`、当前目录配置和 CLI 参数仍可能覆盖 home 配置
 - 已有的 `openai-api-key` 不会被改写
 - 如果 `openai-api-key` 缺失，Clipal 会自动补一个占位值 `clipal`，保证用户级配置可直接使用
@@ -166,8 +169,7 @@ openai-api-key: clipal
   "base_url": "http://127.0.0.1:3333/clipal/v1/chat/completions",
   "models": [
     {
-      "name": "gpt-5.4",
-      "context_limit": 128000
+      "name": "YOUR_GATEWAY_MODEL_ID"
     }
   ]
 }
@@ -176,6 +178,7 @@ openai-api-key: clipal
 说明：
 
 - Web UI 的一键接管会管理一个独立的 Goose custom provider 文件，而不是重写内建 provider
+- 支持 `GOOSE_PATH_ROOT/config` 或显式配置目录，保留已有 headers、认证、流式及模型元数据；新建 provider 不填造默认模型或上下文长度。
 - 你可能仍需要在 Goose 内手动选择 Clipal provider 或对应模型
 - Apply / Rollback 后建议重启 Goose 或新开一个会话，让它重新加载 provider 配置
 

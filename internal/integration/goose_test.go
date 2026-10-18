@@ -15,6 +15,9 @@ func TestGooseStatus_NotConfiguredWhenFileMissing(t *testing.T) {
 	home := t.TempDir()
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductGoose, TargetOptions{Model: "test-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	status, err := m.Status(ProductGoose, cfg)
 	if err != nil {
@@ -35,6 +38,9 @@ func TestGooseApply_CreatesManagedCustomProviderFile(t *testing.T) {
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	cfg.Global.Port = 4455
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductGoose, TargetOptions{Model: "test-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := m.Apply(ProductGoose, cfg)
 	if err != nil {
@@ -71,7 +77,7 @@ func TestGooseApply_CreatesManagedCustomProviderFile(t *testing.T) {
 		t.Fatalf("models len = %d", len(models))
 	}
 	model, _ := models[0].(map[string]any)
-	if got, _ := model["name"].(string); got != "gpt-5.4" {
+	if got, _ := model["name"].(string); got != "test-model" {
 		t.Fatalf("model name = %q", got)
 	}
 }
@@ -82,6 +88,9 @@ func TestGooseApply_IsIdempotentAndRollbackRemovesManagedFile(t *testing.T) {
 	home := t.TempDir()
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductGoose, TargetOptions{Model: "test-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := m.Apply(ProductGoose, cfg); err != nil {
 		t.Fatalf("Apply first: %v", err)

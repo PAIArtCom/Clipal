@@ -32,15 +32,7 @@ func (m Manager) planCodex(cfg *config.Config) ([]takeoverFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := readBackupFile(path)
-	if err != nil {
-		return nil, err
-	}
-	preview, err := m.previewCodex(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return []takeoverFile{{backupFile: file, Planned: []byte(preview.PlannedContent)}}, nil
+	return planSingleFile(path, func() (Preview, error) { return m.previewCodex(cfg) })
 }
 
 func (m Manager) previewCodex(cfg *config.Config) (Preview, error) {

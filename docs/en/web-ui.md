@@ -68,7 +68,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - See the exact target config file path that Clipal manages
 - Preview the current file and the exact result Clipal will write before applying changes
 
-Codex CLI, Claude Code, and Antigravity CLI share a takeover cycle. The first apply captures every managed file, including whether it existed and its permissions. Reapply and endpoint updates keep that baseline. All files are validated and staged before replacement; a write failure restores the immediately preceding state. Rollback restores the cycle baseline and ends the cycle; the next apply captures a fresh baseline. Immutable backup archives remain on disk. If automatic recovery itself fails, the active backup is retained for a retry. These are recoverable multi-file operations, not filesystem-wide atomic transactions across a power loss.
+All seven clients share a takeover cycle. The first apply captures every managed file, including whether it existed and its permissions. Reapply and endpoint updates keep that baseline. All files are validated and staged before replacement; a write failure restores the immediately preceding state. Rollback restores the cycle baseline and ends the cycle; the next apply captures a fresh baseline. Immutable backup archives remain on disk. If automatic recovery itself fails, the active backup is retained for a retry. These are recoverable multi-file operations, not filesystem-wide atomic transactions across a power loss.
 
 The **Configuration location** controls select an absolute client directory and, for Codex, an optional profile. Empty directories use `CODEX_HOME` / `CLAUDE_CONFIG_DIR`, then client defaults. A selected Codex profile manages `<profile>.config.toml`; launch with `codex --profile <profile>` and the matching `CODEX_HOME`. Claude's onboarding state is `~/.claude.json` by default and `<CLAUDE_CONFIG_DIR>/.claude.json` for a custom directory. Antigravity retains its documented settings location; its shell type and startup directory can be selected. Select bash, zsh, or sh explicitly when the background service cannot detect `SHELL`. Restore an active cycle before changing locations.
 
@@ -78,6 +78,9 @@ Antigravity manages `.bashrc` and the first applicable Bash login file (`.bash_p
 
 Management API: `POST /api/integrations/<product>/target` accepts `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`; `profile` is Codex-only, and `shell_dir` / `shell` are Antigravity-only (`shell` accepts bash, zsh, or sh). Antigravity does not accept a custom `config_dir`. List/action responses include `target_options` and `verification` (`not_verified` or `blocked`). A malformed client's files produce an error on its own card; other clients and available rollback actions remain accessible.
 
+OpenCode, Continue, Aider, and Goose support `config_dir` and `model`; the first three also support an absolute `config_file`, which takes precedence over the directory. Existing models are preserved; without one, select a model explicitly. Takeover has no built-in default model or context length. The UI can load suggestions from `/clipal/v1/models`; when the upstream does not expose a catalog, enter a verified model ID and validate it with a real request.
+
+OpenCode follows `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, and XDG configuration directories, preferring the later-loaded `opencode.jsonc` in the selected directory. Provider restrictions that exclude Clipal block apply and remain unchanged. Continue honors `CONTINUE_GLOBAL_DIR`, but `--config` and saved configuration selection can override the default file. Goose honors absolute `GOOSE_PATH_ROOT/config`; an explicit `config_dir` selects the configuration directory itself and requires a matching launch environment. Launch Aider with `--config` for a selected file. Moving an Aider model from another provider requires an explicit gateway model choice; auxiliary models are preserved with a warning that they may use other providers.
 
 To verify installed clients against a running gateway with available accounts, build Clipal and run the isolated smoke test. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
 
@@ -87,9 +90,9 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 ```
 
 - `OpenCode` takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>`
-- `Continue` takeover adds or updates a user-level `Clipal` model entry
-- `Aider` takeover updates the home-level `openai-api-base` and a minimal OpenAI-compatible `model`; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
-- `Goose` takeover manages a dedicated custom provider file under `~/.config/goose/custom_providers/`
+- `Continue` takeover adds or updates a user-level `Clipal` model entry while preserving its model, key, roles, protocol and capability options. Without an existing Clipal model, select one explicitly instead of inferring from unrelated entries. New entries declare chat/edit/apply roles without inheriting another model's autocomplete capability.
+- `Aider` takeover updates `openai-api-base` and uses an existing OpenAI-compatible model or an explicit model choice; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
+- `Goose` takeover manages `custom_providers/clipal.json` in its configuration directory, preserving headers, authentication, streaming settings, and model metadata
 
 ### Export Full Backup
 

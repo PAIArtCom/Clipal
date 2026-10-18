@@ -96,6 +96,8 @@ function app() {
         oauthLinkingPromise: null,
         oauthAuthorization: defaultOAuthAuthorizationState(),
         integrations: [],
+        integrationModels: [],
+        integrationModelsBusy: false,
         integrationBusyProduct: '',
         integrationPreviewOpen: {},
         environmentVisible: false,
@@ -520,6 +522,10 @@ function app() {
                     fullFiles: 'Full files',
                     targetOptions: 'Configuration location',
                     configDir: 'Client configuration directory (optional)',
+                    configFile: 'Configuration file (optional, overrides directory)',
+                    gatewayModel: 'Gateway model ID (required when none is configured)',
+                    loadModels: 'Load gateway models',
+                    modelCatalogHint: 'If the model list is unavailable, enter a verified gateway model ID. Runtime routing still needs verification.',
                     codexProfile: 'Codex profile (optional)',
                     shellDir: 'Shell startup directory (optional)',
                     shellType: 'Shell (automatic when available)',
@@ -1030,6 +1036,10 @@ function app() {
                     fullFiles: '完整文件',
                     targetOptions: '配置位置',
                     configDir: '客户端配置目录（可选）',
+                    configFile: '配置文件（可选，优先于目录）',
+                    gatewayModel: '网关模型 ID（无现有模型时必填）',
+                    loadModels: '加载网关模型',
+                    modelCatalogHint: '无法获取列表时填写已确认可用的网关模型 ID，运行时仍需验证。',
                     codexProfile: 'Codex profile（可选）',
                     shellDir: 'Shell 启动文件目录（可选）',
                     shellType: 'Shell（可自动检测时留空）',
@@ -3179,7 +3189,7 @@ function app() {
         normalizeIntegration(item) {
             return {
                 ...item,
-                target_options: {config_dir: '', profile: '', shell_dir: '', shell: '', ...((item && item.target_options) || {})},
+                target_options: {config_dir: '', config_file: '', model: '', profile: '', shell_dir: '', shell: '', ...((item && item.target_options) || {})},
                 changes: this.integrationChanges(String(item.current_content || ''), this.integrationSecondaryPreviewContent(item)),
                 name: this.integrationProductName(item.product) || item.name,
                 current_content: String((item && item.current_content) || ''),
@@ -3201,6 +3211,18 @@ function app() {
             } catch (error) {
                 console.error('Failed to load integrations:', error);
                 this.integrations = [];
+            }
+        },
+
+        async loadIntegrationModels() {
+            this.integrationModelsBusy = true;
+            try {
+                const catalog = await this.apiCall('/clipal/v1/models', {}, false, true);
+                this.integrationModels = [...new Set((catalog.data || []).map(item => item.id).filter(id => typeof id === 'string' && id.trim()))].sort();
+            } catch (error) {
+                this.showAlert('error', error.message);
+            } finally {
+                this.integrationModelsBusy = false;
             }
         },
 

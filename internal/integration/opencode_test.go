@@ -167,3 +167,58 @@ func TestOpenCodeApply_SupportsJSONCAndRollbackRestoresOriginal(t *testing.T) {
 		t.Fatalf("restored body = %q want %q", got, original)
 	}
 }
+
+func TestOpenCodePreservesProviderAndModelMetadata(t *testing.T) {
+	m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+	path, err := m.opencodeTargetPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{"model":"custom/alias","provider":{"custom":{"models":{"alias":{"id":"wire-model","name":"User model","limit":{"context":32000,"output":8000}}}},"clipal":{"name":"User gateway","npm":"@ai-sdk/openai","options":{"headers":{"X-Team":"keep"}}}}}`)
+	if err = os.WriteFile(path, raw, 0640); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		cfg.Global.Port++
+		if _, err = m.Apply(ProductOpenCode, cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc, err := readJSONMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, ok := doc["provider"].(map[string]any)
+	if !ok {
+		t.Fatal("missing providers")
+	}
+	managed, ok := providers["clipal"].(map[string]any)
+	if !ok {
+		t.Fatal("missing provider")
+	}
+	if managed["name"] != "User gateway" || managed["npm"] != "@ai-sdk/openai" {
+		t.Fatal("replaced provider metadata")
+	}
+	models, ok := managed["models"].(map[string]any)
+	if !ok {
+		t.Fatal("missing models")
+	}
+	model, ok := models["alias"].(map[string]any)
+	if !ok {
+		t.Fatal("missing model")
+	}
+	if model["id"] != "wire-model" || model["name"] != "User model" || model["limit"] == nil {
+		t.Fatalf("lost wire metadata: %#v", model)
+	}
+	if _, err = m.Rollback(ProductOpenCode, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(raw) {
+		t.Fatal("did not restore original")
+	}
+}

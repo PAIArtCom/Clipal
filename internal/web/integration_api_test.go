@@ -324,6 +324,9 @@ func TestHandleIntegrationApply_Continue(t *testing.T) {
 	}
 
 	api := NewAPI(t.TempDir(), "test", nil)
+	if err := api.integrations.SetTarget(integration.ProductContinue, integration.TargetOptions{Model: "selected-model"}); err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/api/integrations/continue/apply", nil)
 	w := httptest.NewRecorder()
 
@@ -378,45 +381,65 @@ func TestIntegrationTargetSelectsCodexProfile(t *testing.T) {
 }
 
 func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	api := NewAPI(t.TempDir(), "test", nil)
-	w := httptest.NewRecorder()
-	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/claude/apply", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("apply %d %s", w.Code, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), "hasCompletedOnboarding") {
-		t.Fatal("preview omitted onboarding file")
-	}
-	if err := os.WriteFile(filepath.Join(home, ".claude", "settings.json"), []byte("{invalid"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	w = httptest.NewRecorder()
-	api.HandleListIntegrations(w, httptest.NewRequest(http.MethodGet, "/api/integrations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("list %d %s", w.Code, w.Body.String())
-	}
-	var entries []IntegrationResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &entries); err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != len(integration.SupportedProducts()) {
-		t.Fatal("one malformed client hid other integrations")
-	}
-	found := false
-	for _, entry := range entries {
-		if entry.Product == "claude" {
-			found = entry.State == "error" && entry.BackupAvailable
-		}
-	}
-	if !found {
-		t.Fatal("malformed client lost rollback availability")
-	}
-	w = httptest.NewRecorder()
-	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/claude/rollback", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("rollback %d %s", w.Code, w.Body.String())
+	for _, product := range integration.SupportedProducts() {
+		t.Run(string(product), func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			for _, key := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "CONTINUE_GLOBAL_DIR", "GOOSE_PATH_ROOT", "XDG_CONFIG_HOME"} {
+				t.Setenv(key, "")
+			}
+			t.Setenv("SHELL", "/bin/sh")
+			api := NewAPI(t.TempDir(), "test", nil)
+			model := ""
+			if product == integration.ProductOpenCode || product == integration.ProductContinue || product == integration.ProductAider || product == integration.ProductGoose {
+				model = "test-model"
+			}
+			if err := api.integrations.SetTarget(product, integration.TargetOptions{Model: model}); err != nil {
+				t.Fatal(err)
+			}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			before, err := api.integrations.Status(product, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := httptest.NewRecorder()
+			api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/"+string(product)+"/apply", nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("apply %d %s", w.Code, w.Body.String())
+			}
+			if product == integration.ProductClaudeCode && !strings.Contains(w.Body.String(), "hasCompletedOnboarding") {
+				t.Fatal("preview omitted onboarding file")
+			}
+			if err := os.WriteFile(before.TargetPath, []byte("{invalid"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			w = httptest.NewRecorder()
+			api.HandleListIntegrations(w, httptest.NewRequest(http.MethodGet, "/api/integrations", nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("list %d %s", w.Code, w.Body.String())
+			}
+			var entries []IntegrationResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &entries); err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != len(integration.SupportedProducts()) {
+				t.Fatal("one malformed client hid other integrations")
+			}
+			found := false
+			for _, entry := range entries {
+				if entry.Product == string(product) {
+					found = entry.State == "error" && entry.BackupAvailable && entry.TargetOptions.Model == model
+				}
+			}
+			if !found {
+				t.Fatal("malformed client lost rollback availability")
+			}
+			w = httptest.NewRecorder()
+			api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/"+string(product)+"/rollback", nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("rollback %d %s", w.Code, w.Body.String())
+			}
+
+		})
 	}
 }

@@ -652,6 +652,9 @@ func (a *API) HandleListIntegrations(w http.ResponseWriter, r *http.Request) {
 		status, err := a.integrations.Status(product, cfg)
 		if err != nil {
 			status = integration.Status{Product: product, State: integration.StateError, Warning: err.Error(), BackupAvailable: a.integrations.BackupAvailable(product)}
+			if target, targetErr := a.integrations.GetTarget(product); targetErr == nil {
+				status.TargetOptions = target
+			}
 		}
 		preview, previewErr := a.integrations.Preview(product, cfg)
 		if previewErr != nil {

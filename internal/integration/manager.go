@@ -49,41 +49,13 @@ func (m Manager) Status(product ProductID, cfg *config.Config) (Status, error) {
 }
 
 func (m Manager) status(product ProductID, cfg *config.Config) (Status, error) {
-	if unifiedProduct(product) {
-		return m.takeoverStatus(product, cfg)
-	}
-	switch product {
-	case ProductOpenCode:
-		return m.opencodeStatus(cfg)
-	case ProductContinue:
-		return m.continueStatus(cfg)
-	case ProductAider:
-		return m.aiderStatus(cfg)
-	case ProductGoose:
-		return m.gooseStatus(cfg)
-	default:
-		return Status{}, fmt.Errorf("unknown product: %s", product)
-	}
+	return m.takeoverStatus(product, cfg)
 }
 
 func (m Manager) Apply(product ProductID, cfg *config.Config) (Result, error) {
 	takeoverMu.Lock()
 	defer takeoverMu.Unlock()
-	if unifiedProduct(product) {
-		return m.applyTakeover(product, cfg)
-	}
-	switch product {
-	case ProductOpenCode:
-		return m.applyOpenCode(cfg)
-	case ProductContinue:
-		return m.applyContinue(cfg)
-	case ProductAider:
-		return m.applyAider(cfg)
-	case ProductGoose:
-		return m.applyGoose(cfg)
-	default:
-		return Result{}, fmt.Errorf("unknown product: %s", product)
-	}
+	return m.applyTakeover(product, cfg)
 }
 
 func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error) {
@@ -94,28 +66,11 @@ func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error)
 		return Preview{}, err
 	}
 
-	var preview Preview
-	switch product {
-	case ProductClaudeCode, ProductCodexCLI, ProductAntigravityCLI:
-		var files []takeoverFile
-		files, err = m.planTakeover(product, cfg)
-		if err == nil {
-			preview = previewTakeoverFiles(product, files)
-		}
-	case ProductOpenCode:
-		preview, err = m.previewOpenCode(cfg)
-	case ProductContinue:
-		preview, err = m.previewContinue(cfg)
-	case ProductAider:
-		preview, err = m.previewAider(cfg)
-	case ProductGoose:
-		preview, err = m.previewGoose(cfg)
-	default:
-		return Preview{}, fmt.Errorf("unknown product: %s", product)
-	}
+	files, err := m.planTakeover(product, cfg)
 	if err != nil {
 		return Preview{}, err
 	}
+	preview := previewTakeoverFiles(product, files)
 	preview.BackupContent = backupContent
 	preview.BackupTargetExisted = backupTargetExisted
 	return preview, nil
@@ -124,37 +79,11 @@ func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error)
 func (m Manager) Rollback(product ProductID, cfg *config.Config) (Result, error) {
 	takeoverMu.Lock()
 	defer takeoverMu.Unlock()
-	if unifiedProduct(product) {
-		return m.rollbackTakeover(product, cfg)
-	}
-
-	snap, err := m.loadLatestBackup(product)
-	if err != nil {
-		return Result{}, fmt.Errorf("load latest backup: %w", err)
-	}
-	if err := restoreBackupSnapshot(snap); err != nil {
-		return Result{}, err
-	}
-
-	status, err := m.status(product, cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	return Result{
-		Product: product,
-		Status:  status,
-		Message: "rollback completed",
-	}, nil
+	return m.rollbackTakeover(product, cfg)
 }
 
 func (m Manager) latestBackupPreview(product ProductID) (string, bool, error) {
-	var snap backupSnapshot
-	var err error
-	if unifiedProduct(product) {
-		snap, err = m.loadTakeoverBackup(product)
-	} else {
-		snap, err = m.loadLatestBackup(product)
-	}
+	snap, err := m.loadTakeoverBackup(product)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", false, nil

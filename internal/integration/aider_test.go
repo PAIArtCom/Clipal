@@ -43,6 +43,9 @@ func TestAiderApply_UpsertsOpenAIBasePreservingOtherKeys(t *testing.T) {
 	cfg.Global.Port = 4455
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
 
+	if err := m.SetTarget(ProductAider, TargetOptions{Model: "claude-sonnet-4-5"}); err != nil {
+		t.Fatal(err)
+	}
 	result, err := m.Apply(ProductAider, cfg)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
@@ -143,5 +146,14 @@ func TestAiderApply_IsIdempotentAndRollbackRestoresOriginal(t *testing.T) {
 	}
 	if string(got) != original {
 		t.Fatalf("restored body = %q want %q", got, original)
+	}
+}
+
+func TestAiderExplicitModelPreservesOpaqueGatewayID(t *testing.T) {
+	for _, id := range []string{"vendor/model", "openai/model", "bare-model"} {
+		got, err := managedOpenAIModel(id, true)
+		if err != nil || got != "openai/"+id {
+			t.Fatalf("changed gateway ID: %q %v", got, err)
+		}
 	}
 }

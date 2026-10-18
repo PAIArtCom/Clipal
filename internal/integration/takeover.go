@@ -30,8 +30,44 @@ func (m Manager) planTakeover(product ProductID, cfg *config.Config) ([]takeover
 		return m.planClaude(cfg)
 	case ProductAntigravityCLI:
 		return m.planAntigravity(cfg)
+	case ProductOpenCode:
+		path, err := m.opencodeTargetPath()
+		if err != nil {
+			return nil, err
+		}
+		return planSingleFile(path, func() (Preview, error) { return m.previewOpenCode(cfg) })
+	case ProductContinue:
+		path, err := m.continueTargetPath()
+		if err != nil {
+			return nil, err
+		}
+		return planSingleFile(path, func() (Preview, error) { return m.previewContinue(cfg) })
+	case ProductAider:
+		path, err := m.aiderTargetPath()
+		if err != nil {
+			return nil, err
+		}
+		return planSingleFile(path, func() (Preview, error) { return m.previewAider(cfg) })
+	case ProductGoose:
+		path, err := m.gooseTargetPath()
+		if err != nil {
+			return nil, err
+		}
+		return planSingleFile(path, func() (Preview, error) { return m.previewGoose(cfg) })
 	}
 	return nil, fmt.Errorf("unsupported takeover %s", product)
+}
+
+func planSingleFile(path string, preview func() (Preview, error)) ([]takeoverFile, error) {
+	file, err := readBackupFile(path)
+	if err != nil {
+		return nil, err
+	}
+	planned, err := preview()
+	if err != nil {
+		return nil, err
+	}
+	return []takeoverFile{{backupFile: file, Planned: []byte(planned.PlannedContent)}}, nil
 }
 
 func previewTakeoverFiles(product ProductID, files []takeoverFile) Preview {
@@ -203,6 +239,9 @@ func (m Manager) applyTakeover(product ProductID, cfg *config.Config) (Result, e
 	if err != nil {
 		return Result{}, err
 	}
+	if product == ProductOpenCode && status.Verification == "blocked" {
+		return Result{}, fmt.Errorf("resolve the OpenCode provider restriction before applying: %s", status.Warning)
+	}
 	if status.State == StateConfigured {
 		return Result{Product: product, Status: status, Message: "already configured"}, nil
 	}
@@ -320,6 +359,24 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 		body, err := readJSONMap(files[0].TargetPath)
 		env, _ := body["env"].(map[string]any)
 		return err == nil && strings.HasSuffix(claudeEnvValue(env, "ANTHROPIC_BASE_URL"), "/clipal")
+	case ProductOpenCode:
+		doc, err := readJSONCMap(files[0].TargetPath)
+		if err != nil {
+			return false
+		}
+		model, _ := doc["model"].(string)
+		return strings.HasPrefix(model, "clipal/")
+	case ProductContinue:
+		doc, err := readYAMLMap(files[0].TargetPath)
+		return err == nil && findContinueClipalModel(doc) != nil
+	case ProductAider:
+		doc, err := readYAMLMap(files[0].TargetPath)
+		base, _ := doc["openai-api-base"].(string)
+		return err == nil && strings.HasSuffix(base, "/clipal")
+	case ProductGoose:
+		doc, err := readJSONMap(files[0].TargetPath)
+		base, _ := doc["base_url"].(string)
+		return err == nil && strings.HasSuffix(base, "/clipal/v1/chat/completions")
 	case ProductAntigravityCLI:
 		for _, file := range files[1:] {
 			if strings.Contains(string(file.Original), antigravityBlockStart) {

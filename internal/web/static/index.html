@@ -846,12 +846,23 @@
                         <template x-if="integration.verification">
                             <p class="integration-card__muted" x-text="t(integration.verification === 'blocked' ? 'integrations.runtimeBlocked' : 'integrations.runtimeUnverified')"></p>
                         </template>
-                        <template x-if="['codex', 'claude', 'antigravity'].includes(integration.product)">
+                        <template x-if="integration.target_options">
                             <details class="integration-full-files">
                                 <summary x-text="t('integrations.targetOptions')"></summary>
                                 <div class="form-group" x-show="integration.product !== 'antigravity'">
                                     <label class="form-label" :for="'integration-config-dir-' + integration.product" x-text="t('integrations.configDir')"></label>
                                     <input :id="'integration-config-dir-' + integration.product" type="text" class="form-input" x-model="integration.target_options.config_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
+                                </div>
+                                <div class="form-group" x-show="['opencode', 'continue', 'aider'].includes(integration.product)">
+                                    <label class="form-label" :for="'integration-config-file-' + integration.product" x-text="t('integrations.configFile')"></label>
+                                    <input :id="'integration-config-file-' + integration.product" type="text" class="form-input" x-model="integration.target_options.config_file" :disabled="integration.backup_available" placeholder="/absolute/path">
+                                </div>
+                                <div class="form-group" x-show="['opencode', 'continue', 'aider', 'goose'].includes(integration.product)">
+                                    <label class="form-label" :for="'integration-model-' + integration.product" x-text="t('integrations.gatewayModel')"></label>
+                                    <input :id="'integration-model-' + integration.product" type="text" class="form-input" x-model="integration.target_options.model" :disabled="integration.backup_available" :list="'integration-models-' + integration.product">
+                                    <datalist :id="'integration-models-' + integration.product"><template x-for="model in integrationModels" :key="model"><option :value="model"></option></template></datalist>
+                                    <button class="btn btn-secondary btn-sm" :disabled="integrationModelsBusy" @click="loadIntegrationModels()" x-text="t('integrations.loadModels')"></button>
+                                    <p class="integration-card__muted" x-text="t('integrations.modelCatalogHint')"></p>
                                 </div>
                                 <div class="form-group" x-show="integration.product === 'codex'">
                                     <label class="form-label" for="integration-codex-profile" x-text="t('integrations.codexProfile')"></label>

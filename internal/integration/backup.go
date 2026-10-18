@@ -146,15 +146,3 @@ func restoreBackupFile(snap backupFile) error {
 	}
 	return nil
 }
-
-func restoreBackupSnapshot(snap backupSnapshot) error {
-	if err := restoreBackupFile(backupFile{TargetPath: snap.TargetPath, Existed: snap.TargetExisted, Original: snap.Original}); err != nil {
-		return err
-	}
-	for _, file := range snap.AdditionalFiles {
-		if err := restoreBackupFile(file); err != nil {
-			return err
-		}
-	}
-	return nil
-}

@@ -17,6 +17,9 @@ func TestContinueStatus_NotConfiguredWhenFileMissing(t *testing.T) {
 	home := t.TempDir()
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductContinue, TargetOptions{Model: "selected-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	status, err := m.Status(ProductContinue, cfg)
 	if err != nil {
@@ -65,6 +68,9 @@ models:
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	cfg.Global.Port = 4455
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductContinue, TargetOptions{Model: "selected-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := m.Apply(ProductContinue, cfg)
 	if err != nil {
@@ -108,7 +114,7 @@ models:
 			if got, _ := model["provider"].(string); got != "openai" {
 				t.Fatalf("clipal provider = %q", got)
 			}
-			if got, _ := model["model"].(string); got != "claude-sonnet-4-5" {
+			if got, _ := model["model"].(string); got != "selected-model" {
 				t.Fatalf("clipal model = %q", got)
 			}
 			if got, _ := model["apiBase"].(string); got != "http://127.0.0.1:4455/clipal" {
@@ -118,7 +124,7 @@ models:
 				t.Fatalf("clipal apiKey = %q", got)
 			}
 			roles, _ := model["roles"].([]any)
-			if !hasAllStringValues(roles, "chat", "edit", "apply", "autocomplete") {
+			if !hasAllStringValues(roles, "chat", "edit", "apply") || hasAllStringValues(roles, "autocomplete") {
 				t.Fatalf("clipal roles = %#v", roles)
 			}
 		case "Existing Chat":
@@ -157,6 +163,9 @@ models:
 
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductContinue, TargetOptions{Model: "selected-model"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := m.Apply(ProductContinue, cfg); err != nil {
 		t.Fatalf("Apply first: %v", err)
@@ -204,4 +213,27 @@ func hasAllStringValues(values []any, wants ...string) bool {
 		}
 	}
 	return true
+}
+
+func TestContinueDoesNotGuessFromUnrelatedModels(t *testing.T) {
+	m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+	path, err := m.continueTargetPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("models:\n  - name: Other\n    provider: anthropic\n    model: unrelated\n")
+	if err = os.WriteFile(path, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.Apply(ProductContinue, cfg); err == nil {
+		t.Fatal("guessed from another provider")
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(original) {
+		t.Fatal("changed user configuration")
+	}
 }

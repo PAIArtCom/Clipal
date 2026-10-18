@@ -3772,7 +3772,7 @@ test('takeover distinguishes written configuration from a routing conflict and a
 
 test('takeover saves explicit client location through the target endpoint', async () => {
     const state = loadApp();
-    const options = {config_dir: '/tmp/client', profile: 'work', shell_dir: '', shell: ''};
+    const options = {config_dir: '/tmp/client', config_file: '', model: '', profile: 'work', shell_dir: '', shell: ''};
     state.integrations = [state.normalizeIntegration({product: 'codex', target_options: options})];
     let request;
     state.apiCall = async (url, input) => {
@@ -3783,4 +3783,16 @@ test('takeover saves explicit client location through the target endpoint', asyn
     assert.equal(request.url, '/api/integrations/codex/target');
     assert.deepEqual(JSON.parse(request.input.body), options);
     assert.equal(state.integrations[0].target_options.profile, 'work');
+});
+
+
+test('takeover loads distinct model IDs without a hardcoded fallback', async () => {
+    const state = loadApp();
+    state.apiCall = async url => {
+        assert.equal(url, '/clipal/v1/models');
+        return {data:[{id:'provider/model'},{id:'another'},{id:'provider/model'},{}]};
+    };
+    await state.loadIntegrationModels();
+    assert.deepEqual(Array.from(state.integrationModels), ['another','provider/model']);
+    assert.equal(state.integrationModelsBusy,false);
 });

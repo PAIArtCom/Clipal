@@ -2,6 +2,7 @@ package integration
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,11 +12,20 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 	toml "github.com/pelletier/go-toml/v2"
 	"github.com/tailscale/hujson"
+	"gopkg.in/yaml.v3"
 )
 
 func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, error) {
 	files, err := m.planTakeover(product, cfg)
 	if err != nil {
+		var selection *modelSelectionError
+		if errors.As(err, &selection) {
+			target, e := m.targetOptions(product)
+			if e != nil {
+				return Status{}, e
+			}
+			return Status{Product: product, State: StateNotConfigured, TargetPath: selection.path, TargetOptions: target, BackupAvailable: m.hasLatestBackup(product), Verification: "not_verified", Warning: selection.Error()}, nil
+		}
 		return Status{}, err
 	}
 	target, err := m.targetOptions(product)
@@ -34,14 +44,20 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 			continue
 		}
 		var before, after map[string]any
-		if product == ProductCodexCLI {
+		switch product {
+		case ProductContinue, ProductAider:
+			err = yaml.Unmarshal(file.Original, &before)
+			if err == nil {
+				err = yaml.Unmarshal(file.Planned, &after)
+			}
+		case ProductCodexCLI:
 			err = toml.Unmarshal(file.Original, &before)
 			if err == nil {
 				err = toml.Unmarshal(file.Planned, &after)
 			}
-		} else {
+		default:
 			raw := file.Original
-			if product == ProductAntigravityCLI {
+			if product == ProductAntigravityCLI || product == ProductOpenCode {
 				raw, err = hujson.Standardize(raw)
 			}
 			if err == nil {
@@ -101,6 +117,28 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 		if claudeEnvHasClientAuth(env) && os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" {
 			warnings = append(warnings, "A shell OAuth token is present; check Claude /status for credential conflicts.")
 		}
+	case ProductOpenCode:
+		warnings = append(warnings, "OpenCode project, inline, or managed configuration may override this file. Use the selected OPENCODE_CONFIG/OPENCODE_CONFIG_DIR when launching.")
+		body, e := readJSONCMap(files[0].TargetPath)
+		if e == nil {
+			disabled, _ := body["disabled_providers"].([]any)
+			enabled, _ := body["enabled_providers"].([]any)
+			if stringListContains(disabled, "clipal") {
+				blocked = append(blocked, "disabled_providers disables clipal")
+			}
+			if _, specified := body["enabled_providers"]; specified && !stringListContains(enabled, "clipal") {
+				blocked = append(blocked, "enabled_providers excludes clipal")
+			}
+		}
+		if os.Getenv("OPENCODE_CONFIG_CONTENT") != "" {
+			warnings = append(warnings, "OPENCODE_CONFIG_CONTENT is present and may override routing.")
+		}
+	case ProductContinue:
+		warnings = append(warnings, "Continue saved config and --config override the default file; launch cn --config with this path and select the Clipal model. IDE model selection is separate.")
+	case ProductAider:
+		warnings = append(warnings, "Launch Aider with --config and this file to avoid repo/current-directory overrides. CLI flags and .env can also override routing. Existing weak-model/editor-model settings are preserved and may use other providers.")
+	case ProductGoose:
+		warnings = append(warnings, "Select the Clipal custom provider and a gateway-supported model in Goose. Use the matching GOOSE_PATH_ROOT/config directory; environment and saved provider selection may override routing.")
 	case ProductAntigravityCLI:
 		var paths []string
 		for _, file := range files[1:] {
@@ -122,4 +160,13 @@ func takeoverFlagEnabled(value string) bool {
 		return false
 	}
 	return true
+}
+
+func stringListContains(values []any, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

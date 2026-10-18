@@ -3,7 +3,6 @@ package integration
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
@@ -13,53 +12,14 @@ const (
 	openCodeSchemaURL      = "https://opencode.ai/config.json"
 	openCodeProviderNPM    = "@ai-sdk/openai-compatible"
 	openCodeProviderAPIKey = "clipal"
-	openCodeFallbackModel  = "gpt-5.4"
 )
 
 func (m Manager) opencodeTargetPath() (string, error) {
-	home, err := m.resolveHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "opencode", "opencode.json"), nil
+	return m.customClientPath(ProductOpenCode, "opencode.json")
 }
 
 func (m Manager) advertisedOpenCodeBaseURL(cfg *config.Config) string {
 	return m.advertisedBaseURL(cfg)
-}
-
-func (m Manager) opencodeStatus(cfg *config.Config) (Status, error) {
-	targetPath, err := m.opencodeTargetPath()
-	if err != nil {
-		return Status{}, err
-	}
-
-	status := Status{
-		Product:         ProductOpenCode,
-		State:           StateNotConfigured,
-		TargetPath:      targetPath,
-		BackupAvailable: m.hasLatestBackup(ProductOpenCode),
-		Warning:         "Project-local opencode.json and environment variables can still override user config.",
-	}
-
-	doc, err := readJSONCMap(targetPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return status, nil
-		}
-		return Status{}, fmt.Errorf("read OpenCode config: %w", err)
-	}
-
-	model, _ := doc["model"].(string)
-	providers, _ := doc["provider"].(map[string]any)
-	clipalProvider, _ := providers["clipal"].(map[string]any)
-	options, _ := clipalProvider["options"].(map[string]any)
-	baseURL, _ := options["baseURL"].(string)
-
-	if strings.HasPrefix(strings.TrimSpace(model), "clipal/") && baseURL == m.advertisedOpenCodeBaseURL(cfg) {
-		status.State = StateConfigured
-	}
-	return status, nil
 }
 
 func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
@@ -84,7 +44,23 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 		doc["$schema"] = openCodeSchemaURL
 	}
 
-	primaryID, primaryName := inferOpenCodeModel(doc, "model", openCodeFallbackModel)
+	selections := map[string]string{}
+	for _, field := range []string{"model", "small_model"} {
+		selections[field], _ = doc[field].(string)
+	}
+	primaryID, primaryName := inferOpenCodeModel(doc, "model", "")
+	target, err := m.targetOptions(ProductOpenCode)
+	if err != nil {
+		return Preview{}, err
+	}
+	chosen, err := m.selectedModel(ProductOpenCode, targetPath, primaryID)
+	if err != nil {
+		return Preview{}, err
+	}
+	if target.Model != "" {
+		primaryName = chosen
+	}
+	primaryID = chosen
 	doc["model"] = "clipal/" + primaryID
 
 	smallID, smallName := inferOpenCodeModel(doc, "small_model", "")
@@ -100,20 +76,45 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 	if clipalProvider == nil {
 		clipalProvider = map[string]any{}
 	}
-	clipalProvider["npm"] = openCodeProviderNPM
-	clipalProvider["name"] = "Clipal"
+	if clipalProvider["npm"] == nil {
+		clipalProvider["npm"] = openCodeProviderNPM
+	}
+	if clipalProvider["name"] == nil {
+		clipalProvider["name"] = "Clipal"
+	}
 
 	options, _ := clipalProvider["options"].(map[string]any)
 	if options == nil {
 		options = map[string]any{}
 	}
 	options["baseURL"] = m.advertisedOpenCodeBaseURL(cfg)
-	options["apiKey"] = openCodeProviderAPIKey
+	if key, _ := options["apiKey"].(string); strings.TrimSpace(key) == "" {
+		options["apiKey"] = openCodeProviderAPIKey
+	}
 	clipalProvider["options"] = options
 
 	models, _ := clipalProvider["models"].(map[string]any)
 	if models == nil {
 		models = map[string]any{}
+	}
+	// Preserve declared wire IDs, limits and capabilities when moving an
+	// existing model into the Clipal provider.
+	for _, field := range []string{"model", "small_model"} {
+		value := selections[field]
+		provider, id, ok := strings.Cut(value, "/")
+		if !ok || provider == "clipal" {
+			continue
+		}
+		source, _ := providers[provider].(map[string]any)
+		declared, _ := source["models"].(map[string]any)
+		metadata, _ := declared[id].(map[string]any)
+		if models[id] == nil && metadata != nil {
+			copy := map[string]any{}
+			for key, value := range metadata {
+				copy[key] = value
+			}
+			models[id] = copy
+		}
 	}
 	upsertOpenCodeModel(models, primaryID, primaryName)
 	if smallID != "" {
@@ -133,46 +134,6 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 		Product:        ProductOpenCode,
 		CurrentContent: current,
 		PlannedContent: string(plannedBytes),
-	}, nil
-}
-
-func (m Manager) applyOpenCode(cfg *config.Config) (Result, error) {
-	status, err := m.opencodeStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	if status.State == StateConfigured {
-		return Result{
-			Product: ProductOpenCode,
-			Status:  status,
-			Message: "already configured",
-		}, nil
-	}
-
-	if _, err := m.createBackup(ProductOpenCode, status.TargetPath); err != nil {
-		return Result{}, err
-	}
-
-	preview, err := m.previewOpenCode(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-
-	if err := os.MkdirAll(filepath.Dir(status.TargetPath), 0o755); err != nil {
-		return Result{}, fmt.Errorf("prepare OpenCode config path: %w", err)
-	}
-	if err := os.WriteFile(status.TargetPath, []byte(preview.PlannedContent), 0o600); err != nil {
-		return Result{}, fmt.Errorf("write OpenCode config: %w", err)
-	}
-
-	status, err = m.opencodeStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	return Result{
-		Product: ProductOpenCode,
-		Status:  status,
-		Message: "OpenCode configured to use Clipal",
 	}, nil
 }
 
@@ -219,6 +180,8 @@ func upsertOpenCodeModel(models map[string]any, modelID, modelName string) {
 	if strings.TrimSpace(modelName) == "" {
 		modelName = modelID
 	}
-	model["name"] = modelName
+	if model["name"] == nil {
+		model["name"] = modelName
+	}
 	models[modelID] = model
 }

@@ -59,7 +59,7 @@ Edit `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "clipal/gpt-5.4",
+  "model": "clipal/YOUR_GATEWAY_MODEL_ID",
   "provider": {
     "clipal": {
       "npm": "@ai-sdk/openai-compatible",
@@ -69,8 +69,8 @@ Edit `~/.config/opencode/opencode.json`:
         "apiKey": "clipal"
       },
       "models": {
-        "gpt-5.4": {
-          "name": "GPT-5.4"
+        "YOUR_GATEWAY_MODEL_ID": {
+          "name": "Gateway model"
         }
       }
     }
@@ -83,6 +83,7 @@ Edit `~/.config/opencode/opencode.json`:
 Notes:
 
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
+- Takeover supports custom files, `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, and XDG paths, preferring the later-loaded `opencode.jsonc`. Provider restrictions that exclude Clipal block apply and remain unchanged.
 - The Web UI takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>` when possible
 - Project-local `opencode.json` or environment-based overrides may still take precedence
 
@@ -129,7 +130,7 @@ Edit `~/.continue/config.yaml`:
 models:
   - name: Clipal
     provider: openai
-    model: gpt-5.4
+    model: YOUR_GATEWAY_MODEL_ID
     apiBase: http://127.0.0.1:3333/clipal
     apiKey: clipal
     roles:
@@ -143,20 +144,22 @@ Notes:
 - The Web UI takeover adds or updates a Clipal model entry in the user-level Continue config
 - Continue may still keep another model selected in the app, so you may need to switch to `Clipal` inside Continue
 - Workspace-level Continue settings can still override the user-level config
+- CLI users can launch `cn --config <managed-file>` to override a saved alternative config. Takeover honors `CONTINUE_GLOBAL_DIR` and preserves advanced Clipal model options without inferring autocomplete capability.
 
 ## Aider
 
 Edit `~/.aider.conf.yml`:
 
 ```yaml
-model: openai/gpt-5.4
+model: openai/YOUR_GATEWAY_MODEL_ID
 openai-api-base: http://127.0.0.1:3333/clipal
 openai-api-key: clipal
 ```
 
 Notes:
 
-- The Web UI takeover updates `openai-api-base` and a minimal `model` value in the home-level Aider config
+- The Web UI takeover updates `openai-api-base` and uses an existing OpenAI-compatible model or an explicit gateway model choice
+- Select a directory or file and launch with `aider --config <file>`. Models from another provider require an explicit choice; API keys and auxiliary model settings are preserved.
 - Repo-local `.aider.conf.yml`, `.env`, current-directory config, and CLI flags can still override the home config
 - Existing `openai-api-key` values are left untouched
 - If `openai-api-key` is missing, Clipal writes a placeholder `clipal` key so the user-level config is immediately usable
@@ -173,8 +176,7 @@ Edit `~/.config/goose/custom_providers/clipal.json`:
   "base_url": "http://127.0.0.1:3333/clipal/v1/chat/completions",
   "models": [
     {
-      "name": "gpt-5.4",
-      "context_limit": 128000
+      "name": "YOUR_GATEWAY_MODEL_ID"
     }
   ]
 }
@@ -183,6 +185,7 @@ Edit `~/.config/goose/custom_providers/clipal.json`:
 Notes:
 
 - The Web UI takeover manages a dedicated Goose custom provider file rather than rewriting built-in provider config
+- Takeover supports `GOOSE_PATH_ROOT/config` or an explicit configuration directory and preserves headers, authentication, streaming settings, and model metadata. New providers require a model choice and do not invent a context length.
 - You may still need to select the Clipal provider or model inside Goose
 - Restart Goose or open a new session after apply or rollback so it reloads provider config
 
