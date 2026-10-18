@@ -634,7 +634,7 @@ test('providerOAuthRateLimitSections builds weekly and code review rows', () => 
     };
 
     assert.equal(state.providerOAuthPlanLabel(provider), 'Free');
-    assert.equal(state.providerOAuthRateLimitPercentLabel(provider.oauth_rate_limits.primary), '100%');
+    assert.equal(state.providerOAuthRateLimitPercentLabel(provider.oauth_rate_limits.primary), '100% used');
 
     const sections = state.providerOAuthRateLimitSections(provider);
 
@@ -643,8 +643,8 @@ test('providerOAuthRateLimitSections builds weekly and code review rows', () => 
     assert.deepEqual(
         JSON.parse(JSON.stringify(summaries)),
         [
-            'primary:Weekly limit:100%',
-            'additional-0-primary:Code review weekly limit:75%'
+            'primary:Weekly limit:100% used',
+            'additional-0-primary:Code review weekly limit:75% used'
         ]
     );
 });
@@ -693,6 +693,28 @@ test('loadProviderOAuthMetadata fetches provider-scoped metadata on demand', asy
     assert.equal(state.providerHasLoadedOAuthMetadata(provider), true);
     assert.equal(state.providerOAuthMetadataError(provider), '');
     assert.equal(state.providerOAuthMetadataButtonLabel(provider), 'Refresh');
+});
+
+test('quota labels identify usage instead of reversing remaining quota', () => {
+    const state = loadApp();
+    const provider = {
+        auth_type: 'oauth',
+        oauth_provider: 'antigravity',
+        oauth_rate_limits: {
+            additional: [{
+                limit_id: 'gemini-weekly',
+                limit_name: 'Gemini Models Weekly Limit Remaining',
+                primary: { used_percent: 5 }
+            }]
+        }
+    };
+    const [section] = state.providerOAuthRateLimitSections(provider);
+    assert.equal(section.label, 'Gemini Models Weekly Limit');
+    assert.equal(state.providerOAuthRateLimitPercentLabel(section.window), '5% used');
+    state.locale = 'zh-CN';
+    assert.equal(state.providerOAuthRateLimitPercentLabel(section.window), '已用 5%');
+    assert.equal(state.providerOAuthRateLimitPercentLabel({ used_percent: 0 }), '已用 0%');
+    assert.equal(state.providerOAuthRateLimitPercentLabel({ used_percent: 100 }), '已用 100%');
 });
 
 for (const service of ['claude', 'antigravity']) {

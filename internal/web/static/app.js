@@ -270,6 +270,7 @@ function app() {
                     planAndLimits: 'Plan & Limits',
                     quotaUnavailable: 'The upstream returned no quota data for this account.',
                     rateLimit: 'Limit',
+                    rateLimitUsed: '{percent}% used',
                     rateLimitCodeReviewWeekly: 'Code review weekly limit',
                     rateLimitWeekly: 'Weekly limit',
                     rateLimitDaily: 'Daily limit',
@@ -771,6 +772,7 @@ function app() {
                     planAndLimits: '套餐与限额',
                     quotaUnavailable: '上游未返回此账号的额度数据。',
                     rateLimit: '限额',
+                    rateLimitUsed: '已用 {percent}%',
                     rateLimitCodeReviewWeekly: '代码审查周限额',
                     rateLimitWeekly: '周限额',
                     rateLimitDaily: '日限额',
@@ -3659,7 +3661,9 @@ function app() {
         },
 
         humanizeRateLimitName(value) {
-            const raw = String(value || '').trim();
+            // All windows carry used_percent, even when an upstream title says
+            // "Remaining". Keep the title neutral so it cannot invert the metric.
+            const raw = String(value || '').trim().replace(/\s+remaining$/i, '');
             if (!raw) {
                 return '';
             }
@@ -3718,7 +3722,9 @@ function app() {
         },
 
         providerOAuthRateLimitPercentLabel(window) {
-            return `${Math.round(this.providerOAuthRateLimitPercent(window))}%`;
+            return this.tf('providers.rateLimitUsed', {
+                percent: Math.round(this.providerOAuthRateLimitPercent(window))
+            });
         },
 
         providerOAuthRateLimitResetLabel(window) {
