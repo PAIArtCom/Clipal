@@ -18,6 +18,60 @@ function defaultOAuthAuthorizationState() {
     };
 }
 
+// Keep metric tooltips outside the inspector's scroll clipping boundary.
+// Alpine owns the teleported element and calls destroy when its provider changes.
+function floatingTooltip() {
+    let onViewportChange;
+    return {
+        open: false,
+        position: { left: '0px', top: '0px' },
+        init() {
+            onViewportChange = () => { if (this.open) this.place(); };
+            window.addEventListener('scroll', onViewportChange, true);
+            window.addEventListener('resize', onViewportChange);
+        },
+        destroy() {
+            window.removeEventListener('scroll', onViewportChange, true);
+            window.removeEventListener('resize', onViewportChange);
+        },
+        show() {
+            if (!this.$el.classList.contains('tooltip')) return;
+            this.open = true;
+            this.$nextTick(() => this.place());
+        },
+        leave() {
+            if (!this.$el.contains(document.activeElement)) this.open = false;
+        },
+        blur() {
+            this.$nextTick(() => {
+                if (!this.$el.matches(':hover') && !this.$el.contains(document.activeElement)) this.open = false;
+            });
+        },
+        place() {
+            const tip = document.getElementById(this.$id('metric-tooltip'));
+            if (!tip || !this.open) return;
+            const anchor = this.$el.getBoundingClientRect();
+            const body = this.$el.closest('.provider-inspector__body');
+            const clip = body?.getBoundingClientRect();
+            const toolbarBottom = document.querySelector('.toolbar')?.getBoundingClientRect().bottom || 0;
+            if (anchor.bottom <= Math.max(toolbarBottom, clip?.top || 0) ||
+                anchor.top >= Math.min(window.innerHeight, clip?.bottom ?? window.innerHeight)) {
+                this.open = false;
+                return;
+            }
+            const gap = 8;
+            const bounds = tip.getBoundingClientRect();
+            const left = this.$el.classList.contains('tooltip--end') ? anchor.right - bounds.width : anchor.left;
+            const below = anchor.bottom + gap;
+            const top = below + bounds.height <= window.innerHeight - gap ? below : anchor.top - bounds.height - gap;
+            this.position = {
+                left: `${Math.max(gap, Math.min(left, window.innerWidth - bounds.width - gap))}px`,
+                top: `${Math.max(gap, top)}px`
+            };
+        }
+    };
+}
+
 function app() {
     let oauthAuthorizationPopup = null;
     const countryOptionsByLocale = new Map();
@@ -1151,7 +1205,7 @@ function app() {
         dialogReturnFocus: null,
         providerSearch: '',
         selectedProviderName: '',
-        providerDetailOpen: false,   // narrow screens: the inspector replaces the list
+        providerDetailOpen: false,   // compact windows: the inspector replaces the list
         providerReordering: false,
         clientConfigSaving: false,
         providerUpdating: false,
@@ -1299,8 +1353,8 @@ function app() {
         selectProvider(provider) {
             this.selectedProviderName = provider.name;
             this.providerDetailOpen = true;
-            // Narrow screens push the inspector over the list: start it at the top, focus its Back button.
-            if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+            // Compact windows push the inspector over the list: start at the top and focus Back.
+            if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px), (max-height: 360px)').matches) {
                 window.scrollTo({ top: 0 });
                 this.$nextTick(() => document.querySelector('.provider-inspector__back')?.focus());
             }

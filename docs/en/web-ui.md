@@ -152,9 +152,11 @@ Below that row, the panel is split in two. On the left, providers are listed one
 
 The right-hand inspector shows the provider's name, state, OAuth tag and upstream host or provider ID, with pin, edit (OAuth accounts open the account environment instead) and delete at the top right. Below that come the reason for a degraded state; three fixed columns for credential status and last refresh (OAuth) or key count (API key), token usage with input/output, and spend today and over 7 days, where a dash marks a figure with no data yet; OAuth plan and limits with usage gauges; and rows for base URL, proxy, and provider ID, with copy buttons. Hovering or focusing usage or spend shows exact amounts and the token breakdown.
 
+On desktop, the inspector stays below the app toolbar while the page scrolls. Long details scroll inside the inspector while its title and actions remain visible. Choosing another provider starts its details at the top without moving the provider list. Usage and spend tooltips remain visible outside the scrolling area, on hover or keyboard focus. Narrow or very short windows use normal page scrolling for details.
+
 Reorder by dragging the handle, or focus the handle and press Alt+↑ / Alt+↓. Reordering is paused while a search is active, because the visible order is then only a subset. A failed reorder save restores the previous order.
 
-On narrow screens the list and the inspector take turns: choosing a provider opens its inspector in place of the list, with a **Back** button to return. A search with no matches shows the list’s empty-result message; clearing it restores the selected detail. The current candidate is a routing preference, not proof of a completed request.
+In windows up to 760px wide or up to 360px high, the list and the inspector take turns: choosing a provider opens its inspector in place of the list, with a **Back** button to return. A search with no matches shows the list’s empty-result message; clearing it restores the selected detail. The current candidate is a routing preference, not proof of a completed request.
 
 Automatic routing can stay on a provider that is succeeding or skip unavailable ones, so the configured order does not predict every request.
 

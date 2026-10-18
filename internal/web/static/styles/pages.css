@@ -107,7 +107,7 @@
 
 /*
  * List and inspector side by side: the list stays short and scannable, the
- * selected provider's details get the room. Narrow screens show one at a time.
+ * selected provider's details get the room. Compact windows show one at a time.
  */
 .provider-split {
     display: grid;
@@ -266,6 +266,14 @@
 /* ---------- Inspector ---------- */
 
 .provider-inspector {
+    --inspector-top: calc(var(--toolbar-offset) + var(--space-md));
+    /* The split ends above the panel/container bottom insets. Reserve them so
+       its sticky boundary cannot push a long inspector behind the toolbar. */
+    --inspector-bottom: calc(var(--inset-group) + var(--gap-section) + var(--space-md));
+    position: sticky;
+    top: var(--inspector-top);
+    max-height: calc(100vh - var(--inspector-top) - var(--inspector-bottom));
+    max-height: calc(100dvh - var(--inspector-top) - var(--inspector-bottom));
     display: flex;
     flex-direction: column;
     gap: var(--gap-module);
@@ -276,7 +284,22 @@
     box-shadow: var(--shadow-group);
 }
 
-/* Only narrow screens push the inspector over the list and need a way back. */
+.provider-inspector__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-module);
+    min-height: 0;
+    overflow-y: auto;
+    /* Leave room for keyboard focus rings at the scroll boundary. */
+    padding: 3px;
+    margin: -3px;
+}
+
+.provider-inspector__body > * {
+    flex-shrink: 0;
+}
+
+/* Only compact windows push the inspector over the list and need a way back. */
 .provider-inspector__back {
     display: none;
     align-self: flex-start;
@@ -285,6 +308,7 @@
 }
 
 .provider-inspector__header {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -1143,17 +1167,15 @@
 
 /* ========== Responsive ========== */
 
-@media (max-width: 760px) {
-    .providers-bar__end {
-        width: 100%;
+/* Very short windows also use a single pane so details retain usable space. */
+@media (max-width: 760px), (max-height: 360px) {
+    .provider-inspector {
+        position: static;
+        max-height: none;
     }
 
-    .providers-bar__end .search-field {
-        flex: 1;
-    }
-
-    .search-field input {
-        width: 100%;
+    .provider-inspector__body {
+        overflow: visible;
     }
 
     /* One pane at a time: the list, or the selected provider pushed over it. */
@@ -1168,6 +1190,20 @@
 
     .provider-inspector__back {
         display: inline-flex;
+    }
+}
+
+@media (max-width: 760px) {
+    .providers-bar__end {
+        width: 100%;
+    }
+
+    .providers-bar__end .search-field {
+        flex: 1;
+    }
+
+    .search-field input {
+        width: 100%;
     }
 
     .inspector-metric__value {

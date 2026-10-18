@@ -264,7 +264,7 @@
                     </div>
 
                     <!-- Providers: priority list on the left, the selected provider's inspector on the right.
-                         Narrow screens show one at a time; selecting a row pushes the inspector. -->
+                         Compact windows show one at a time; selecting a row pushes the inspector. -->
                     <div class="provider-split" :class="{'is-detail-open': providerDetailVisible}" x-show="providers.length > 0">
                         <section class="provider-panel" :aria-label="t('nav.providers')">
                             <p class="provider-panel__note" x-show="visibleProviders.length === 0" x-text="t('providers.noMatch')"></p>
@@ -342,100 +342,110 @@
                                     </div>
                                 </header>
 
-                                <div class="provider-inspector__reason" role="status" :class="'is-' + providerRowState(provider).tone"
-                                    x-show="providerNeedsAttention(provider) && providerRowState(provider).reason">
-                                    <svg class="ic" aria-hidden="true"><use href="#i-warning"/></svg>
-                                    <div class="provider-inspector__reason-text">
-                                        <strong x-show="providerRowState(provider).reason && providerRowState(provider).reason.summary" x-text="providerRowState(provider).reason && providerRowState(provider).reason.summary"></strong>
-                                        <span class="provider-inspector__reason-message" x-show="providerRowState(provider).reason && providerRowState(provider).reason.message"
-                                            x-text="providerRowState(provider).reason && providerRowState(provider).reason.message"></span>
+                                <div class="provider-inspector__body">
+                                    <div class="provider-inspector__reason" role="status" :class="'is-' + providerRowState(provider).tone"
+                                        x-show="providerNeedsAttention(provider) && providerRowState(provider).reason">
+                                        <svg class="ic" aria-hidden="true"><use href="#i-warning"/></svg>
+                                        <div class="provider-inspector__reason-text">
+                                            <strong x-show="providerRowState(provider).reason && providerRowState(provider).reason.summary" x-text="providerRowState(provider).reason && providerRowState(provider).reason.summary"></strong>
+                                            <span class="provider-inspector__reason-message" x-show="providerRowState(provider).reason && providerRowState(provider).reason.message"
+                                                x-text="providerRowState(provider).reason && providerRowState(provider).reason.message"></span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- Three fixed columns; a missing figure shows a dash so columns never shift. -->
-                                <div class="inspector-metrics">
-                                    <div class="inspector-metric" x-show="providerUsesOAuth(provider)">
-                                        <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg><span x-text="t('providers.oauthAuth')"></span></span>
-                                        <span class="inspector-metric__value status-text" :class="'is-' + providerOAuthAuthStatusTone(provider)">
-                                            <span class="status-dot" aria-hidden="true"></span>
-                                            <span x-text="providerOAuthAuthStatusLabel(provider)"></span>
-                                        </span>
-                                        <span class="inspector-metric__sub" x-text="tf('providers.refreshed', { time: providerOAuthRefreshSummary(provider) })"></span>
+                                    <!-- Three fixed columns; a missing figure shows a dash so columns never shift. -->
+                                    <div class="inspector-metrics">
+                                        <div class="inspector-metric" x-show="providerUsesOAuth(provider)">
+                                            <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg><span x-text="t('providers.oauthAuth')"></span></span>
+                                            <span class="inspector-metric__value status-text" :class="'is-' + providerOAuthAuthStatusTone(provider)">
+                                                <span class="status-dot" aria-hidden="true"></span>
+                                                <span x-text="providerOAuthAuthStatusLabel(provider)"></span>
+                                            </span>
+                                            <span class="inspector-metric__sub" x-text="tf('providers.refreshed', { time: providerOAuthRefreshSummary(provider) })"></span>
+                                        </div>
+                                        <div class="inspector-metric" x-show="!providerUsesOAuth(provider)">
+                                            <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span x-text="t('providers.keys')"></span></span>
+                                            <span class="inspector-metric__value" x-text="Number(provider.key_count || 0)"></span>
+                                        </div>
+                                        <div class="inspector-metric" x-data="floatingTooltip()" x-id="['metric-tooltip']"
+                                            x-effect="if (activeTab !== 'providers' || !providerDetailVisible || visibleDialog || !provider.usage?.has_usage) open = false"
+                                            @mouseenter="show()" @mouseleave="leave()" @focusin="show()" @focusout="blur()"
+                                            @keydown.escape.stop="open = false" :aria-describedby="open ? $id('metric-tooltip') : null" :class="{'tooltip': provider.usage && provider.usage.has_usage}"
+                                            :tabindex="provider.usage && provider.usage.has_usage ? 0 : null">
+                                            <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-activity"/></svg><span x-text="t('providers.usageTotal')"></span></span>
+                                            <span class="inspector-metric__value" x-text="provider.usage && provider.usage.has_usage ? providerUsageTotalMain(provider) : '—'"></span>
+                                            <span class="inspector-metric__sub" x-show="provider.usage && provider.usage.has_usage"
+                                                x-text="tf('providers.tokensInOut', { input: formatCompactTokenCount(provider.usage && provider.usage.input_tokens), output: formatCompactTokenCount(provider.usage && provider.usage.output_tokens) })"></span>
+                                            <template x-teleport="body"><span class="tooltip-content tooltip-content--floating" role="tooltip"
+                                                :id="$id('metric-tooltip')" x-cloak :style="{ ...position, display: open ? 'block' : 'none' }"
+                                                x-text="providerUsageTotalTitle(provider) + '\n' + providerUsageInOutTitle(provider)"></span></template>
+                                        </div>
+                                        <div class="inspector-metric tooltip--end" x-data="floatingTooltip()" x-id="['metric-tooltip']"
+                                            x-effect="if (activeTab !== 'providers' || !providerDetailVisible || visibleDialog || !providerSpendVisible(provider)) open = false"
+                                            @mouseenter="show()" @mouseleave="leave()" @focusin="show()" @focusout="blur()"
+                                            @keydown.escape.stop="open = false" :aria-describedby="open ? $id('metric-tooltip') : null" :class="{'tooltip': providerSpendVisible(provider)}"
+                                            :tabindex="providerSpendVisible(provider) ? 0 : null">
+                                            <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-coin"/></svg><span x-text="t('providers.spend')"></span></span>
+                                            <span class="inspector-metric__value">
+                                                <span x-text="providerSpendVisible(provider) ? providerSpendToday(provider) : '—'"></span>
+                                                <small x-show="providerSpendVisible(provider)" x-text="t('providers.today')"></small>
+                                            </span>
+                                            <span class="inspector-metric__sub" x-show="providerSpendVisible(provider)" x-text="tf('providers.week', { amount: providerSpendWeek(provider) })"></span>
+                                            <template x-teleport="body"><span class="tooltip-content tooltip-content--floating" role="tooltip"
+                                                :id="$id('metric-tooltip')" x-cloak :style="{ ...position, display: open ? 'block' : 'none' }"
+                                                x-text="t('providers.spendToday') + ' ' + providerSpendTodayTitle(provider) + '\n' + t('providers.spendWeek') + ' ' + providerSpendWeekTitle(provider)"></span></template>
+                                        </div>
                                     </div>
-                                    <div class="inspector-metric" x-show="!providerUsesOAuth(provider)">
-                                        <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span x-text="t('providers.keys')"></span></span>
-                                        <span class="inspector-metric__value" x-text="Number(provider.key_count || 0)"></span>
-                                    </div>
-                                    <div class="inspector-metric" :class="{'tooltip': provider.usage && provider.usage.has_usage}"
-                                        :tabindex="provider.usage && provider.usage.has_usage ? 0 : null">
-                                        <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-activity"/></svg><span x-text="t('providers.usageTotal')"></span></span>
-                                        <span class="inspector-metric__value" x-text="provider.usage && provider.usage.has_usage ? providerUsageTotalMain(provider) : '—'"></span>
-                                        <span class="inspector-metric__sub" x-show="provider.usage && provider.usage.has_usage"
-                                            x-text="tf('providers.tokensInOut', { input: formatCompactTokenCount(provider.usage && provider.usage.input_tokens), output: formatCompactTokenCount(provider.usage && provider.usage.output_tokens) })"></span>
-                                        <span class="tooltip-content" role="tooltip" x-show="provider.usage && provider.usage.has_usage"
-                                            x-text="providerUsageTotalTitle(provider) + '\n' + providerUsageInOutTitle(provider)"></span>
-                                    </div>
-                                    <div class="inspector-metric tooltip--end" :class="{'tooltip': providerSpendVisible(provider)}"
-                                        :tabindex="providerSpendVisible(provider) ? 0 : null">
-                                        <span class="inspector-metric__label"><svg class="ic" aria-hidden="true"><use href="#i-coin"/></svg><span x-text="t('providers.spend')"></span></span>
-                                        <span class="inspector-metric__value">
-                                            <span x-text="providerSpendVisible(provider) ? providerSpendToday(provider) : '—'"></span>
-                                            <small x-show="providerSpendVisible(provider)" x-text="t('providers.today')"></small>
-                                        </span>
-                                        <span class="inspector-metric__sub" x-show="providerSpendVisible(provider)" x-text="tf('providers.week', { amount: providerSpendWeek(provider) })"></span>
-                                        <span class="tooltip-content" role="tooltip" x-show="providerSpendVisible(provider)"
-                                            x-text="t('providers.spendToday') + ' ' + providerSpendTodayTitle(provider) + '\n' + t('providers.spendWeek') + ' ' + providerSpendWeekTitle(provider)"></span>
-                                    </div>
-                                </div>
 
-                                <!-- OAuth plan and rate-limit windows. -->
-                                <section class="inspector-section" x-show="providerUsesOAuth(provider) && (providerSupportsOAuthMetadata(provider) || providerOAuthPlanLabel(provider))">
-                                    <header class="inspector-section__header">
-                                        <h3 class="inspector-section__title" x-text="t('providers.planAndLimits')"></h3>
-                                        <span class="pill pill--sm pill--primary" x-show="providerOAuthPlanLabel(provider)" x-text="providerOAuthPlanLabel(provider)"></span>
-                                        <button type="button" class="btn btn-secondary btn-sm inspector-section__action" x-show="providerSupportsOAuthMetadata(provider)"
-                                            @click="loadProviderOAuthMetadata(provider)" :disabled="providerOAuthMetadataBusy(provider)">
-                                            <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
-                                            <span x-text="providerOAuthMetadataButtonLabel(provider)"></span>
-                                        </button>
-                                    </header>
-                                    <p class="provider-row__metadata-error" x-show="providerOAuthMetadataError(provider)"
-                                        x-text="providerOAuthMetadataError(provider)"></p>
-                                    <div class="limit-grid" x-show="providerOAuthRateLimitSections(provider).length">
-                                        <template x-for="limit in providerOAuthRateLimitSections(provider)" :key="limit.key">
-                                            <div class="provider-limit">
-                                                <div class="provider-limit__header">
-                                                    <span class="provider-limit__label" x-text="limit.label"></span>
-                                                    <span class="provider-limit__percent" x-text="providerOAuthRateLimitPercentLabel(limit.window)"></span>
+                                    <!-- OAuth plan and rate-limit windows. -->
+                                    <section class="inspector-section" x-show="providerUsesOAuth(provider) && (providerSupportsOAuthMetadata(provider) || providerOAuthPlanLabel(provider))">
+                                        <header class="inspector-section__header">
+                                            <h3 class="inspector-section__title" x-text="t('providers.planAndLimits')"></h3>
+                                            <span class="pill pill--sm pill--primary" x-show="providerOAuthPlanLabel(provider)" x-text="providerOAuthPlanLabel(provider)"></span>
+                                            <button type="button" class="btn btn-secondary btn-sm inspector-section__action" x-show="providerSupportsOAuthMetadata(provider)"
+                                                @click="loadProviderOAuthMetadata(provider)" :disabled="providerOAuthMetadataBusy(provider)">
+                                                <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
+                                                <span x-text="providerOAuthMetadataButtonLabel(provider)"></span>
+                                            </button>
+                                        </header>
+                                        <p class="provider-row__metadata-error" x-show="providerOAuthMetadataError(provider)"
+                                            x-text="providerOAuthMetadataError(provider)"></p>
+                                        <div class="limit-grid" x-show="providerOAuthRateLimitSections(provider).length">
+                                            <template x-for="limit in providerOAuthRateLimitSections(provider)" :key="limit.key">
+                                                <div class="provider-limit">
+                                                    <div class="provider-limit__header">
+                                                        <span class="provider-limit__label" x-text="limit.label"></span>
+                                                        <span class="provider-limit__percent" x-text="providerOAuthRateLimitPercentLabel(limit.window)"></span>
+                                                    </div>
+                                                    <div class="provider-limit__track">
+                                                        <div class="provider-limit__bar" :style="providerOAuthRateLimitBarStyle(limit.window)"></div>
+                                                    </div>
+                                                    <span class="provider-limit__reset" x-text="providerOAuthRateLimitResetLabel(limit.window)"></span>
                                                 </div>
-                                                <div class="provider-limit__track">
-                                                    <div class="provider-limit__bar" :style="providerOAuthRateLimitBarStyle(limit.window)"></div>
-                                                </div>
-                                                <span class="provider-limit__reset" x-text="providerOAuthRateLimitResetLabel(limit.window)"></span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </section>
+                                            </template>
+                                        </div>
+                                    </section>
 
-                                <!-- Connection facts with copy actions. -->
-                                <dl class="detail-list" x-show="provider.base_url || normalizeProviderProxyMode(provider.proxy_mode) !== 'default' || (provider.display_name && provider.display_name !== provider.name)">
-                                    <div class="detail-list__row" x-show="provider.base_url">
-                                        <dt><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span x-text="t('providers.baseUrl')"></span></dt>
-                                        <dd class="is-mono" :title="provider.base_url" x-text="provider.base_url"></dd>
-                                        <button type="button" class="row-icon" @click="copyValue(provider.base_url)"
-                                            :title="t('common.copy')" :aria-label="t('common.copy')"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button>
-                                    </div>
-                                    <div class="detail-list__row" x-show="normalizeProviderProxyMode(provider.proxy_mode) !== 'default'">
-                                        <dt><svg class="ic" aria-hidden="true"><use href="#i-proxy"/></svg><span x-text="t('providers.proxy')"></span></dt>
-                                        <dd x-text="providerProxySummary(provider)"></dd>
-                                    </div>
-                                    <div class="detail-list__row" x-show="provider.display_name && provider.display_name !== provider.name">
-                                        <dt><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg><span x-text="t('providers.providerId')"></span></dt>
-                                        <dd class="is-mono" :title="provider.name" x-text="provider.name"></dd>
-                                        <button type="button" class="row-icon" @click="copyValue(provider.name)"
-                                            :title="t('common.copy')" :aria-label="t('common.copy')"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button>
-                                    </div>
-                                </dl>
+                                    <!-- Connection facts with copy actions. -->
+                                    <dl class="detail-list" x-show="provider.base_url || normalizeProviderProxyMode(provider.proxy_mode) !== 'default' || (provider.display_name && provider.display_name !== provider.name)">
+                                        <div class="detail-list__row" x-show="provider.base_url">
+                                            <dt><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span x-text="t('providers.baseUrl')"></span></dt>
+                                            <dd class="is-mono" :title="provider.base_url" x-text="provider.base_url"></dd>
+                                            <button type="button" class="row-icon" @click="copyValue(provider.base_url)"
+                                                :title="t('common.copy')" :aria-label="t('common.copy')"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button>
+                                        </div>
+                                        <div class="detail-list__row" x-show="normalizeProviderProxyMode(provider.proxy_mode) !== 'default'">
+                                            <dt><svg class="ic" aria-hidden="true"><use href="#i-proxy"/></svg><span x-text="t('providers.proxy')"></span></dt>
+                                            <dd x-text="providerProxySummary(provider)"></dd>
+                                        </div>
+                                        <div class="detail-list__row" x-show="provider.display_name && provider.display_name !== provider.name">
+                                            <dt><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg><span x-text="t('providers.providerId')"></span></dt>
+                                            <dd class="is-mono" :title="provider.name" x-text="provider.name"></dd>
+                                            <button type="button" class="row-icon" @click="copyValue(provider.name)"
+                                                :title="t('common.copy')" :aria-label="t('common.copy')"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button>
+                                        </div>
+                                    </dl>
+                                </div>
                             </section>
                         </template>
                     </div>

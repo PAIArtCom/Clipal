@@ -765,6 +765,13 @@ button.kv-item:hover {
     right: 0;
 }
 
+/* Teleported tooltips escape scroll containers and use viewport coordinates. */
+.tooltip-content--floating {
+    position: fixed;
+    display: block;
+    animation: none;
+}
+
 /* Inline help: an info glyph whose text appears on hover or focus. */
 .hint {
     vertical-align: middle;

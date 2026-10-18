@@ -2915,7 +2915,116 @@ test('provider row meta names the upstream host or OAuth and selects into the in
     assert.equal(state.selectedProvider, null);
 });
 
-test('narrow provider layout shows the list and empty-state feedback when search has no matches', () => {
+test('floating metric tooltip flips above the trigger and stays inside the viewport', () => {
+    const listeners = [];
+    let toolbarBottom = 100;
+    const state = loadApp({ context: {
+        window: {
+            innerWidth: 800, innerHeight: 500,
+            addEventListener(...args) { listeners.push(['add', ...args]); },
+            removeEventListener(...args) { listeners.push(['remove', ...args]); }
+        },
+        document: {
+            getElementById: () => ({ getBoundingClientRect: () => ({ width: 280, height: 70 }) }),
+            querySelector: () => ({ getBoundingClientRect: () => ({ bottom: toolbarBottom }) })
+        }
+    } });
+    const tip = state.__context.floatingTooltip();
+    let clipped = false;
+    let hovered = false;
+    let focused = false;
+    let alignEnd = false;
+    tip.$el = {
+        classList: { contains: name => name === 'tooltip' || (name === 'tooltip--end' && alignEnd) },
+        getBoundingClientRect: () => ({ left: 750, right: 790, top: 430, bottom: 470 }),
+        closest: () => ({ getBoundingClientRect: () => ({ top: 100, bottom: clipped ? 400 : 490 }) }),
+        contains: () => focused,
+        matches: () => hovered
+    };
+    tip.$id = () => 'metric-tooltip-1';
+    tip.$nextTick = callback => callback();
+    tip.init();
+    tip.show();
+    assert.equal(tip.open, true);
+    assert.equal(tip.position.left, '512px');
+    assert.equal(tip.position.top, '352px');
+    alignEnd = true;
+    tip.place();
+    assert.equal(tip.position.left, '510px');
+    focused = true;
+    tip.leave();
+    assert.equal(tip.open, true, 'mouse leave retains the keyboard tooltip');
+    focused = false;
+    hovered = true;
+    tip.blur();
+    assert.equal(tip.open, true, 'blur retains the hovered tooltip');
+    hovered = false;
+    tip.blur();
+    assert.equal(tip.open, false);
+    tip.show();
+    clipped = true;
+    listeners[0][2]();
+    assert.equal(tip.open, false, 'scrolling the trigger out of its body hides the tooltip');
+    clipped = false;
+    tip.show();
+    toolbarBottom = 480;
+    listeners[0][2]();
+    assert.equal(tip.open, false, 'the sticky toolbar occludes the trigger even inside the viewport');
+    tip.destroy();
+    assert.equal(listeners.length, 4);
+    for (let index = 0; index < 2; index++) {
+        assert.equal(listeners[index][1], listeners[index + 2][1]);
+        assert.equal(listeners[index][2], listeners[index + 2][2]);
+        assert.equal(listeners[index][3], listeners[index + 2][3]);
+    }
+});
+
+test('floating metric tooltip clamps the left edge and ignores metrics without data', () => {
+    const state = loadApp({ context: {
+        window: { innerWidth: 800, innerHeight: 500 },
+        document: {
+            getElementById: () => ({ getBoundingClientRect: () => ({ width: 280, height: 70 }) }),
+            querySelector: () => null
+        }
+    } });
+    const tip = state.__context.floatingTooltip();
+    let enabled = false;
+    tip.$el = {
+        classList: { contains: name => name === 'tooltip' && enabled },
+        getBoundingClientRect: () => ({ left: -10, right: 100, top: 150, bottom: 180 }),
+        closest: () => null
+    };
+    tip.$id = () => 'metric-tooltip-1';
+    tip.$nextTick = callback => callback();
+    tip.show();
+    assert.equal(tip.open, false);
+    enabled = true;
+    tip.show();
+    assert.equal(tip.position.left, '8px');
+    assert.equal(tip.position.top, '188px');
+});
+
+test('short wide windows use the same provider navigation as narrow screens', () => {
+    let scrollTop = 900;
+    let focused = false;
+    const state = loadApp({ context: {
+        window: {
+            innerWidth: 1280, innerHeight: 320,
+            matchMedia(query) {
+                return { matches: query === '(max-width: 760px), (max-height: 360px)' };
+            },
+            scrollTo({ top }) { scrollTop = top; }
+        },
+        document: { querySelector: () => ({ focus() { focused = true; } }) }
+    } });
+    state.providers = [{ name: 'short-window-provider' }];
+    state.selectProvider(state.providers[0]);
+    assert.equal(state.providerDetailVisible, true);
+    assert.equal(scrollTop, 0);
+    assert.equal(focused, true);
+});
+
+test('compact provider layout shows the list and empty-state feedback when search has no matches', () => {
     const state = loadApp();
     state.providers = Array.from({ length: 9 }, (_, index) => ({ name: `provider-${index}` }));
     assert.equal(state.providerDetailVisible, false);
