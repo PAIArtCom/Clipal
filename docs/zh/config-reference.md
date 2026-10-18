@@ -13,8 +13,10 @@
 config.yaml
 claude.yaml
 openai.yaml
-gemini.yaml
+google.yaml
 ```
+
+Google 渠道配置使用 `google.yaml`。加载时会将 `gemini.yaml` 重命名迁移，保留文件内容与权限；若两份配置等价则移除旧文件，内容不同时明确报错并保留两份。所有写入均使用 `google.yaml`，包括经由旧 `gemini` 管理 API 别名提交的修改。
 
 `config.yaml` 是全局配置，其余三个文件分别管理不同客户端分组。
 
@@ -23,7 +25,7 @@ gemini.yaml
 - [../../examples/config.yaml](../../examples/config.yaml)
 - [../../examples/claude.yaml](../../examples/claude.yaml)
 - [../../examples/openai.yaml](../../examples/openai.yaml)
-- [../../examples/gemini.yaml](../../examples/gemini.yaml)
+- [../../examples/google.yaml](../../examples/google.yaml)
 
 ## 最小示例
 
@@ -52,7 +54,7 @@ providers:
     enabled: true
 ```
 
-`openai.yaml`、`claude.yaml`、`gemini.yaml` 都支持 OAuth 上游。推荐通过 Web UI 的授权流程创建，而不是手写这些字段。
+`openai.yaml`、`claude.yaml`、`google.yaml` 都支持 OAuth 上游。推荐通过 Web UI 的授权流程创建，而不是手写这些字段。
 
 ## 全局配置 `config.yaml`
 
@@ -147,7 +149,7 @@ routing:
 
 - `claude.yaml`
 - `openai.yaml`
-- `gemini.yaml`
+- `google.yaml`
 
 示例：
 
@@ -188,7 +190,7 @@ providers:
 | `base_url` | string | 仅 API Key | 上游 API Base URL；OAuth provider 不允许设置 |
 | `api_key` | string | 仅 API Key | 单个 API Key |
 | `api_keys` | array | 仅 API Key | 多个 API Key，按顺序使用 |
-| `oauth_provider` | string | 仅 OAuth | 支持的组合是：`openai.yaml` 用 `codex`，`claude.yaml` 用 `claude`，`gemini.yaml` 用 `antigravity` |
+| `oauth_provider` | string | 仅 OAuth | 支持的组合是：`openai.yaml` 用 `codex`，`claude.yaml` 用 `claude`，`google.yaml` 用 `antigravity` |
 | `oauth_ref` | string | 仅 OAuth | 指向本地 OAuth 凭据文件的引用 ID |
 | `proxy_mode` | string | 否 | 该 provider 的上游代理模式；`default` 表示使用全局默认代理 |
 | `proxy_url` | string | 否 | 当 `proxy_mode: custom` 时必填；支持 `http://`、`https://`、`socks5://` 和 `socks5h://` 代理 URL |
@@ -202,7 +204,7 @@ providers:
 
 OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provider 使用相同的顺序、置顶、启停与 failover 逻辑。
 
-- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`gemini.yaml` 中的 `auth_type: oauth` + `oauth_provider: antigravity`。Google OAuth 仅支持 `antigravity`；加载配置时会排除已移除的 `oauth_provider: gemini` 条目，其凭据文件保留在磁盘上。
+- 当前支持：`openai.yaml` 中的 `auth_type: oauth` + `oauth_provider: codex`；`claude.yaml` 中的 `auth_type: oauth` + `oauth_provider: claude`；`google.yaml` 中的 `auth_type: oauth` + `oauth_provider: antigravity`。Google OAuth 仅支持 `antigravity`；加载配置时会排除已移除的 `oauth_provider: gemini` 条目，其凭据文件保留在磁盘上。
 - 当前协议范围：Codex OAuth 支持 OpenAI `/v1/responses*`；Claude OAuth 支持 `/v1/messages` 和 `/v1/messages/count_tokens`；Antigravity OAuth 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens`、模型列表，以及通过 `generateContent` 调用 Gemini 图片模型。它不包装 Imagen/Veo `predict*` 端点；这些路由请使用 Google AI Studio API key 或 Vertex provider。
 - Claude OAuth 请求默认使用轻量 Agent SDK 兼容 envelope，并由 Clipal 生成当前传输 header 和 billing fingerprint。
 - Codex OAuth Responses 请求会归一化为轻量 Agent SDK 兼容形态，并由 Clipal 处理必要传输字段。

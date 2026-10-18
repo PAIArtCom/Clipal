@@ -62,7 +62,7 @@ func TestRecordCompletedUsageCountsOnlySuccessfulGenerationRequests(t *testing.T
 		},
 		{
 			name:        "gemini generate content success counts",
-			clientType:  ClientGemini,
+			clientType:  ClientGoogle,
 			capability:  CapabilityGeminiGenerateContent,
 			method:      http.MethodPost,
 			statusCode:  http.StatusOK,

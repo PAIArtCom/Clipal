@@ -11,6 +11,7 @@ Clipal 现在将客户端入口统一规范为这些本地路径：
 | `/clipal/*` | 首选统一入口，接收 Claude / OpenAI / Gemini 风格请求 |
 | `/claudecode/*` | 兼容保留的 Claude 别名入口 |
 | `/codex/*` | 兼容保留的 OpenAI 别名入口 |
+| `/google/*` | Google 渠道入口，接收 Gemini 兼容请求 |
 | `/gemini/*` | 兼容保留的 Gemini 别名入口 |
 
 在 `/clipal/*` 下，Clipal 会根据上游路径自动识别请求协议族。旧别名仍保留给历史客户端配置使用。底层三组 backend client 仍然维持各自独立的 provider 列表和运行状态。

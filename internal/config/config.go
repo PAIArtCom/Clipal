@@ -707,7 +707,7 @@ type Config struct {
 	Global    GlobalConfig
 	Claude    ClientConfig
 	OpenAI    ClientConfig
-	Gemini    ClientConfig
+	Google    ClientConfig
 	configDir string
 }
 
@@ -720,7 +720,7 @@ type clientConfigFileSpec struct {
 var clientConfigFileSpecs = []clientConfigFileSpec{
 	{clientType: "claude", currentName: "claude.yaml", legacyName: "claude-code.yaml"},
 	{clientType: "openai", currentName: "openai.yaml", legacyName: "codex.yaml"},
-	{clientType: "gemini", currentName: "gemini.yaml", legacyName: ""},
+	{clientType: "google", currentName: "google.yaml", legacyName: "gemini.yaml"},
 }
 
 func CanonicalClientType(clientType string) (string, bool) {
@@ -729,8 +729,8 @@ func CanonicalClientType(clientType string) (string, bool) {
 		return "claude", true
 	case "openai", "codex":
 		return "openai", true
-	case "gemini":
-		return "gemini", true
+	case "google", "gemini":
+		return "google", true
 	default:
 		return "", false
 	}
@@ -842,12 +842,12 @@ func Load(configDir string) (*Config, error) {
 		return nil, fmt.Errorf("failed to load openai config: %w", err)
 	}
 
-	geminiPath := filepath.Join(configDir, "gemini.yaml")
-	if err := loadYAML(geminiPath, &cfg.Gemini); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to load gemini config: %w", err)
+	googlePath := filepath.Join(configDir, "google.yaml")
+	if err := loadYAML(googlePath, &cfg.Google); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to load google config: %w", err)
 	}
 
-	for _, client := range []*ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Gemini} {
+	for _, client := range []*ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Google} {
 		active := make([]Provider, 0, len(client.Providers))
 		for _, provider := range client.Providers {
 			if provider.UsesOAuth() && provider.NormalizedOAuthProvider() == OAuthProvider("gemini") {
@@ -864,12 +864,12 @@ func Load(configDir string) (*Config, error) {
 
 	applyClientDefaults(&cfg.Claude)
 	applyClientDefaults(&cfg.OpenAI)
-	applyClientDefaults(&cfg.Gemini)
+	applyClientDefaults(&cfg.Google)
 
 	// Sort providers by priority
 	sortProviders(cfg.Claude.Providers)
 	sortProviders(cfg.OpenAI.Providers)
-	sortProviders(cfg.Gemini.Providers)
+	sortProviders(cfg.Google.Providers)
 
 	return cfg, nil
 }
@@ -1165,7 +1165,7 @@ func (c *Config) Validate() error {
 	if err := validateClientConfig("openai", c.OpenAI); err != nil {
 		return err
 	}
-	if err := validateClientConfig("gemini", c.Gemini); err != nil {
+	if err := validateClientConfig("google", c.Google); err != nil {
 		return err
 	}
 
@@ -1176,7 +1176,7 @@ func (c *Config) Validate() error {
 	if err := validateProviders("openai", c.OpenAI.Providers); err != nil {
 		return err
 	}
-	if err := validateProviders("gemini", c.Gemini.Providers); err != nil {
+	if err := validateProviders("google", c.Google.Providers); err != nil {
 		return err
 	}
 
@@ -1263,8 +1263,8 @@ func validateProviders(clientName string, providers []Provider) error {
 					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for openai client", clientName, p.Name, OAuthProviderCodex)
 				}
 			case OAuthProviderAntigravity:
-				if clientName != "gemini" {
-					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for gemini client", clientName, p.Name, p.NormalizedOAuthProvider())
+				if clientName != "google" {
+					return fmt.Errorf("%s provider %s: oauth_provider %q is only supported for google client", clientName, p.Name, p.NormalizedOAuthProvider())
 				}
 			case OAuthProviderClaude:
 				if clientName != "claude" {
@@ -1314,7 +1314,7 @@ func providerOverridesSupportedForClient(clientName string, overrides *ProviderO
 	case "claude":
 		return overrides.Model == nil && overrides.OpenAI == nil && overrides.Claude == nil ||
 			overrides.OpenAI == nil
-	case "gemini":
+	case "google":
 		return overrides == nil
 	default:
 		return false

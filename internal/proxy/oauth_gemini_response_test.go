@@ -29,7 +29,7 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "gemini-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -51,7 +51,7 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -87,7 +87,7 @@ func TestForwardWithFailover_GeminiOAuthUnwrapsGenerateResponse(t *testing.T) {
 func TestPrepareGeminiOAuthResponse_UnwrapsGenerateResponseWithoutContentType(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:generateContent", nil)
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -115,7 +115,7 @@ func TestPrepareGeminiOAuthResponse_UnwrapsGenerateResponseWithoutContentType(t 
 func TestPrepareOAuthProviderResponse_RewritesAntigravityModels(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/gemini/v1beta/models", nil)
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiModels,
 		UpstreamPath:   "/v1beta/models",
@@ -166,7 +166,7 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "gemini-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -195,7 +195,7 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:streamGenerateContent", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiStreamGenerate,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:streamGenerateContent",
@@ -231,7 +231,7 @@ func TestForwardWithFailover_GeminiOAuthRewritesStreamResponse(t *testing.T) {
 func TestPrepareGeminiOAuthResponse_RewritesStreamWithoutContentType(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/gemini/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiStreamGenerate,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:streamGenerateContent",

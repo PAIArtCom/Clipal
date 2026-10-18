@@ -19,7 +19,7 @@ func emptyDataset() *Dataset {
 			Clients: map[string]Client{
 				"claude": {Mode: "auto", Providers: []Provider{}},
 				"openai": {Mode: "auto", Providers: []Provider{}},
-				"gemini": {Mode: "auto", Providers: []Provider{}},
+				"google": {Mode: "auto", Providers: []Provider{}},
 			},
 			Credentials: []Credential{},
 			Usage:       Usage{Clients: map[string]map[string]ProviderUsage{}},
@@ -34,7 +34,7 @@ func datasetFromState(cfg *config.Config, credentials []oauth.Credential, usage 
 	dataset.Data.Global = globalFromConfig(cfg.Global)
 	dataset.Data.Clients["claude"] = clientFromConfig(cfg.Claude)
 	dataset.Data.Clients["openai"] = clientFromConfig(cfg.OpenAI)
-	dataset.Data.Clients["gemini"] = clientFromConfig(cfg.Gemini)
+	dataset.Data.Clients["google"] = clientFromConfig(cfg.Google)
 	dataset.Data.Credentials = make([]Credential, 0, len(credentials))
 	for _, credential := range credentials {
 		dataset.Data.Credentials = append(dataset.Data.Credentials, credentialFromOAuth(credential))
@@ -144,7 +144,7 @@ func cloneStrings(in map[string]string) map[string]string {
 
 func usageFromTelemetry(in telemetry.DataSnapshot) Usage {
 	out := Usage{Clients: make(map[string]map[string]ProviderUsage, len(in.Clients))}
-	for clientName, providers := range in.Clients {
+	for clientName, providers := range telemetry.NormalizeClientNames(in).Clients {
 		next := make(map[string]ProviderUsage, len(providers))
 		for providerName, usage := range providers {
 			daily := make(map[string]DailyCostBucket, len(usage.DailyCosts))
@@ -171,7 +171,7 @@ func (in Usage) toTelemetry() telemetry.DataSnapshot {
 		}
 		out.Clients[clientName] = next
 	}
-	return out
+	return telemetry.NormalizeClientNames(out)
 }
 
 func cloneAnyMap(in map[string]any) map[string]any {

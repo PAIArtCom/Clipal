@@ -535,10 +535,10 @@ func TestHandleSubmitOAuthSessionCode_AutoCreatesAntigravityProvider(t *testing.
 	if err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
-	if len(cfg.Gemini.Providers) != 1 {
-		t.Fatalf("providers len = %d, want 1", len(cfg.Gemini.Providers))
+	if len(cfg.Google.Providers) != 1 {
+		t.Fatalf("providers len = %d, want 1", len(cfg.Google.Providers))
 	}
-	if got := cfg.Gemini.Providers[0].Name; got != "antigravity-sean-example-com-gen-lang-client-123" {
+	if got := cfg.Google.Providers[0].Name; got != "antigravity-sean-example-com-gen-lang-client-123" {
 		t.Fatalf("provider name = %q, want antigravity-sean-example-com-gen-lang-client-123", got)
 	}
 }
@@ -2021,8 +2021,8 @@ func TestHandleGetOAuthSession_AntigravityFlowRequiresExplicitLink(t *testing.T)
 	if err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
-	if len(cfg.Gemini.Providers) != 0 {
-		t.Fatalf("providers len = %d, want 0 before link", len(cfg.Gemini.Providers))
+	if len(cfg.Google.Providers) != 0 {
+		t.Fatalf("providers len = %d, want 0 before link", len(cfg.Google.Providers))
 	}
 
 	got = linkOAuthSessionFor(t, api, start.SessionID, "gemini")
@@ -2037,10 +2037,10 @@ func TestHandleGetOAuthSession_AntigravityFlowRequiresExplicitLink(t *testing.T)
 	if err != nil {
 		t.Fatalf("config.Load after link: %v", err)
 	}
-	if len(cfg.Gemini.Providers) != 1 {
-		t.Fatalf("providers len = %d, want 1 after link", len(cfg.Gemini.Providers))
+	if len(cfg.Google.Providers) != 1 {
+		t.Fatalf("providers len = %d, want 1 after link", len(cfg.Google.Providers))
 	}
-	provider := cfg.Gemini.Providers[0]
+	provider := cfg.Google.Providers[0]
 	if provider.Name != "antigravity-sean-example-com-gen-lang-client-123" {
 		t.Fatalf("provider name = %q", provider.Name)
 	}

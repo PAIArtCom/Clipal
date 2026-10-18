@@ -112,7 +112,7 @@ func runStatus(args []string) {
 	report.Providers = []providerStatus{
 		summarizeProviders("claude", cfg.Claude),
 		summarizeProviders("openai", cfg.OpenAI),
-		summarizeProviders("gemini", cfg.Gemini),
+		summarizeProviders("google", cfg.Google),
 	}
 
 	if !*noService {
@@ -341,7 +341,7 @@ func displayClientLabel(client string) string {
 		return "Claude"
 	case "openai", "codex":
 		return "OpenAI"
-	case "gemini":
+	case "google", "gemini":
 		return "Google"
 	default:
 		return client

@@ -106,7 +106,7 @@ func detectClipalRequestContext(path string) (RequestContext, bool) {
 	case "":
 	default:
 		return RequestContext{
-			ClientType:     ClientGemini,
+			ClientType:     ClientGoogle,
 			Family:         ProtocolFamilyGemini,
 			Capability:     capability,
 			UpstreamPath:   path,
@@ -144,7 +144,7 @@ func requestContextForClientPath(clientType ClientType, path string, unified boo
 	case ClientOpenAI:
 		requestCtx.Family = ProtocolFamilyOpenAI
 		requestCtx.Capability = capabilityOrDefault(detectOpenAICapability(path), CapabilityOpenAICompatible)
-	case ClientGemini:
+	case ClientGoogle:
 		requestCtx.Family = ProtocolFamilyGemini
 		requestCtx.Capability = capabilityOrDefault(detectGeminiCapability(path), CapabilityGeminiCompatible)
 	}

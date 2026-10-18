@@ -36,7 +36,7 @@ func newUnifiedIngressTestRouter() *Router {
 				{Name: "codex", BaseURL: "http://codex", APIKey: "k-codex", Priority: 1},
 			},
 		},
-		Gemini: config.ClientConfig{
+		Google: config.ClientConfig{
 			Mode: config.ClientModeAuto,
 			Providers: []config.Provider{
 				{Name: "gemini", BaseURL: "http://gemini", APIKey: "k-gemini", Priority: 1},
@@ -90,7 +90,7 @@ func TestClipalClaudeRequestUsesClaudePool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/messages", bytes.NewReader([]byte(`{"x":1}`)))
@@ -121,7 +121,7 @@ func TestClipalResponsesRequestUsesCodexPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader([]byte(`{"x":1}`)))
@@ -243,7 +243,7 @@ func TestClipalBareGeminiMethodPathCanonicalizesToV1Beta(t *testing.T) {
 
 	var geminiCalls int32
 	installPathAssertingTransport(
-		router.proxies[ClientGemini],
+		router.proxies[ClientGoogle],
 		"gemini",
 		"/v1beta/models/gemini-2.5-pro:generateContent",
 		"gemini-ok",
@@ -298,7 +298,7 @@ func TestClipalBareGeminiModelMetadataPathUsesGeminiPool(t *testing.T) {
 	router := newUnifiedIngressTestRouter()
 
 	var geminiCalls int32
-	installPathAssertingTransport(router.proxies[ClientGemini], "gemini", "/v1/models/gemini-2.5-pro", "gemini-ok", &geminiCalls)
+	installPathAssertingTransport(router.proxies[ClientGoogle], "gemini", "/v1/models/gemini-2.5-pro", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/models/gemini-2.5-pro", nil)
@@ -321,7 +321,7 @@ func TestClipalGeminiInteractionsPathUsesGeminiPool(t *testing.T) {
 	router := newUnifiedIngressTestRouter()
 
 	var geminiCalls int32
-	installPathAssertingTransport(router.proxies[ClientGemini], "gemini", "/v1beta/interactions", "gemini-ok", &geminiCalls)
+	installPathAssertingTransport(router.proxies[ClientGoogle], "gemini", "/v1beta/interactions", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/interactions", bytes.NewReader([]byte(`{"input":[]}`)))
@@ -345,7 +345,7 @@ func TestClipalVertexGeminiPathUsesGeminiPool(t *testing.T) {
 
 	vertexPath := "/v1/projects/proj/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent"
 	var geminiCalls int32
-	installPathAssertingTransport(router.proxies[ClientGemini], "gemini", vertexPath, "gemini-ok", &geminiCalls)
+	installPathAssertingTransport(router.proxies[ClientGoogle], "gemini", vertexPath, "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal"+vertexPath, bytes.NewReader([]byte(`{"contents":[]}`)))
@@ -369,7 +369,7 @@ func TestClipalBareGeminiPredictLongRunningPathUsesGeminiPool(t *testing.T) {
 
 	var geminiCalls int32
 	installPathAssertingTransport(
-		router.proxies[ClientGemini],
+		router.proxies[ClientGoogle],
 		"gemini",
 		"/v1beta/models/veo-3.1-lite-generate-preview:predictLongRunning",
 		"gemini-ok",
@@ -534,7 +534,7 @@ func TestClipalImagesRequestUsesCodexPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/images/edits", bytes.NewReader([]byte(`{"x":1}`)))
@@ -565,7 +565,7 @@ func TestClipalAudioRequestUsesCodexPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/audio/transcriptions", bytes.NewReader([]byte(`{"x":1}`)))
@@ -596,7 +596,7 @@ func TestClipalFilesRequestUsesCodexPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1/files", nil)
@@ -627,7 +627,7 @@ func TestClipalGeminiRequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
@@ -658,7 +658,7 @@ func TestClipalGeminiV1RequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
@@ -685,13 +685,13 @@ func TestClipalGeminiGenerateDoesNotShiftStreamCursor(t *testing.T) {
 	t.Parallel()
 
 	router := newUnifiedIngressTestRouter()
-	router.proxies[ClientGemini] = newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	router.proxies[ClientGoogle] = newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "p1", BaseURL: "http://p1", APIKey: "k1", Priority: 1},
 		{Name: "p2", BaseURL: "http://p2", APIKey: "k2", Priority: 2},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
 	var p1GenerateCalls, p1StreamCalls, p2GenerateCalls, p2StreamCalls int32
-	router.proxies[ClientGemini].httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+	router.proxies[ClientGoogle].httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Host {
 		case "p1":
 			switch r.URL.Path {
@@ -772,7 +772,7 @@ func TestClipalModelsRequestUsesCodexPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1/models", nil)
@@ -803,7 +803,7 @@ func TestClipalGeminiModelsListUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1beta/models", nil)
@@ -834,7 +834,7 @@ func TestClipalGeminiModelGetUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1/models/gemini-2.5-flash-image", nil)
@@ -865,7 +865,7 @@ func TestClipalGeminiFilesRequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1beta/files", nil)
@@ -896,7 +896,7 @@ func TestClipalGeminiUploadFilesRequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/upload/v1beta/files", bytes.NewReader([]byte("file-bytes")))
@@ -927,7 +927,7 @@ func TestClipalGeminiCachedContentsRequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1beta/cachedContents", nil)
@@ -958,7 +958,7 @@ func TestClipalGeminiTunedModelsRequestUsesGeminiPool(t *testing.T) {
 	var claudeCalls, codexCalls, geminiCalls int32
 	installMarkerTransport(router.proxies[ClientClaude], "claude", "claude-ok", &claudeCalls)
 	installMarkerTransport(router.proxies[ClientOpenAI], "codex", "codex-ok", &codexCalls)
-	installMarkerTransport(router.proxies[ClientGemini], "gemini", "gemini-ok", &geminiCalls)
+	installMarkerTransport(router.proxies[ClientGoogle], "gemini", "gemini-ok", &geminiCalls)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1beta/tunedModels", nil)
@@ -1077,7 +1077,7 @@ func TestClipalGeminiPlatformRESTPathsUseGeminiPool(t *testing.T) {
 
 			router := newUnifiedIngressTestRouter()
 			var geminiCalls int32
-			installPathAssertingTransport(router.proxies[ClientGemini], "gemini", tt.wantPath, "gemini-ok", &geminiCalls)
+			installPathAssertingTransport(router.proxies[ClientGoogle], "gemini", tt.wantPath, "gemini-ok", &geminiCalls)
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(tt.method, "http://proxy"+tt.urlPath, bytes.NewReader([]byte(`{"x":1}`)))
@@ -1173,5 +1173,23 @@ func TestCompatibilityAliasUnknownSubpathStillForwards(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&codexCalls); got != 1 {
 		t.Fatalf("codex calls: got %d want 1", got)
+	}
+}
+
+func TestGoogleAndGeminiIngressAliases(t *testing.T) {
+	for _, prefix := range []string{"/google", "/gemini", "/clipal"} {
+		t.Run(prefix, func(t *testing.T) {
+			router := newUnifiedIngressTestRouter()
+			var calls int32
+			installPathAssertingTransport(router.proxies[ClientGoogle], "gemini", "/v1beta/models/test-model:generateContent", "google-ok", &calls)
+			rr := httptest.NewRecorder()
+			router.handleRequest(rr, httptest.NewRequest(http.MethodPost, "http://proxy"+prefix+"/v1beta/models/test-model:generateContent", bytes.NewBufferString(`{"contents":[]}`)))
+			if rr.Code != http.StatusOK || rr.Body.String() != "google-ok" || atomic.LoadInt32(&calls) != 1 {
+				t.Fatalf("status %d body %s calls %d", rr.Code, rr.Body.String(), calls)
+			}
+			if _, ok := router.RuntimeSnapshot().Clients[ClientGoogle]; !ok {
+				t.Fatal("missing google runtime channel")
+			}
+		})
 	}
 }

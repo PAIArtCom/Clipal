@@ -11,6 +11,7 @@ Clipal standardizes client ingress on these local paths:
 | `/clipal/*` | Preferred unified ingress for Claude-, OpenAI-, and Gemini-style requests |
 | `/claudecode/*` | Legacy Claude-compatible alias |
 | `/codex/*` | Legacy OpenAI-compatible alias |
+| `/google/*` | Google channel ingress for Gemini-compatible requests |
 | `/gemini/*` | Legacy Gemini-compatible alias |
 
 Clipal detects the request family from the upstream path under `/clipal/*`. The compatibility aliases remain available for older client configs. Each backend client group still keeps its own provider list and runtime state.

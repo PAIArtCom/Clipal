@@ -13,7 +13,7 @@ import (
 func TestPrepareOAuthProviderResponse_RewritesAntigravityModelsDedicatedAdapter(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/gemini/v1beta/models", nil)
 	req = withRequestContext(req, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiModels,
 		UpstreamPath:   "/v1beta/models",

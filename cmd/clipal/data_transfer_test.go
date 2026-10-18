@@ -228,7 +228,7 @@ func writeCLITransferConfig(t *testing.T, dir string) {
 		"config.yaml": global,
 		"claude.yaml": config.ClientConfig{Mode: config.ClientModeAuto},
 		"openai.yaml": config.ClientConfig{Mode: config.ClientModeAuto},
-		"gemini.yaml": config.ClientConfig{Mode: config.ClientModeAuto},
+		"google.yaml": config.ClientConfig{Mode: config.ClientModeAuto},
 	}
 	for name, value := range values {
 		data, err := yaml.Marshal(value)

@@ -283,7 +283,7 @@ func TestApplyUsageCostSnapshot_GeminiUsesThoughtTokensAndLargePromptTier(t *tes
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
 	req.Header.Set("Content-Type", "application/json")
 	requestCtx := RequestContext{
-		ClientType:   ClientGemini,
+		ClientType:   ClientGoogle,
 		Family:       ProtocolFamilyGemini,
 		Capability:   CapabilityGeminiGenerateContent,
 		UpstreamPath: "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -470,7 +470,7 @@ func TestApplyUsageCostSnapshot_GeminiSupportsLiveUsageFields(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
 	req.Header.Set("Content-Type", "application/json")
 	requestCtx := RequestContext{
-		ClientType:   ClientGemini,
+		ClientType:   ClientGoogle,
 		Family:       ProtocolFamilyGemini,
 		Capability:   CapabilityGeminiGenerateContent,
 		UpstreamPath: "/v1beta/models/gemini-2.5-pro:generateContent",

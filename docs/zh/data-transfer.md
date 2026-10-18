@@ -23,7 +23,7 @@ OAuth 凭据会包含已有的 access token 和 refresh token。该明文导出�
     "clients": {
       "claude": { "mode": "auto", "providers": [] },
       "openai": { "mode": "auto", "providers": [] },
-      "gemini": { "mode": "auto", "providers": [] }
+      "google": { "mode": "auto", "providers": [] }
     },
     "credentials": [],
     "usage": { "clients": {} }
@@ -32,6 +32,8 @@ OAuth 凭据会包含已有的 access token 和 refresh token。该明文导出�
 ```
 
 这是全新的数据契约，旧版 Web UI 仅包含配置的 JSON 导出不会被兼容导入。
+
+导出在 `data.clients` 和用量键中统一使用 `google`。导入接受旧的 `gemini` 键并规范化为 `google`，保留用量计数与花费；若同一备份中的 `google` 与 `gemini` 渠道配置不同，则拒绝导入且不应用变更。
 
 ## CLI
 

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 const (
@@ -189,7 +191,14 @@ func (s *Store) load() error {
 	if state.Clients == nil {
 		state.Clients = map[string]clientUsage{}
 	}
+	snapshot := DataSnapshot{Clients: make(map[string]map[string]ProviderUsage, len(state.Clients))}
 	for client, usage := range state.Clients {
+		snapshot.Clients[client] = usage.Providers
+		needsMigration = needsMigration || canonicalClientType(client) != client
+	}
+	state.Clients = make(map[string]clientUsage, len(snapshot.Clients))
+	for client, providers := range NormalizeClientNames(snapshot).Clients {
+		usage := clientUsage{Providers: providers}
 		if usage.Providers == nil {
 			usage.Providers = map[string]ProviderUsage{}
 		}
@@ -211,7 +220,7 @@ func (s *Store) RecordUsage(clientType string, provider string, snapshot UsageSn
 }
 
 func (s *Store) Record(clientType string, provider string, snapshot UsageSnapshot, when time.Time, options RecordOptions) error {
-	clientType = strings.TrimSpace(clientType)
+	clientType = canonicalClientType(clientType)
 	provider = strings.TrimSpace(provider)
 	if s == nil || clientType == "" || provider == "" || (!options.CountRequest && !options.CountSuccess) {
 		return nil
@@ -289,7 +298,7 @@ func (s *Store) Record(clientType string, provider string, snapshot UsageSnapsho
 }
 
 func (s *Store) ProviderSnapshot(clientType string, provider string) (ProviderUsage, bool) {
-	clientType = strings.TrimSpace(clientType)
+	clientType = canonicalClientType(clientType)
 	provider = strings.TrimSpace(provider)
 	if s == nil || clientType == "" || provider == "" {
 		return ProviderUsage{}, false
@@ -306,7 +315,7 @@ func (s *Store) ProviderSnapshot(clientType string, provider string) (ProviderUs
 }
 
 func (s *Store) ProviderSnapshots(clientType string) map[string]ProviderUsage {
-	clientType = strings.TrimSpace(clientType)
+	clientType = canonicalClientType(clientType)
 	if s == nil || clientType == "" {
 		return nil
 	}
@@ -441,7 +450,7 @@ func (s *Store) restoreLocked(snapshot DataSnapshot, merge bool) {
 	if s.state.Clients == nil {
 		s.state.Clients = map[string]clientUsage{}
 	}
-	for clientName, providers := range snapshot.Clients {
+	for clientName, providers := range NormalizeClientNames(snapshot).Clients {
 		client := s.state.Clients[clientName]
 		if client.Providers == nil {
 			client.Providers = map[string]ProviderUsage{}
@@ -492,7 +501,7 @@ func dataSnapshotFromState(state storeState) DataSnapshot {
 }
 
 func (s *Store) RenameProvider(clientType string, from string, to string) error {
-	clientType = strings.TrimSpace(clientType)
+	clientType = canonicalClientType(clientType)
 	from = strings.TrimSpace(from)
 	to = strings.TrimSpace(to)
 	if s == nil || clientType == "" || from == "" || to == "" || from == to {
@@ -525,7 +534,7 @@ func (s *Store) RenameProvider(clientType string, from string, to string) error 
 }
 
 func (s *Store) DeleteProvider(clientType string, provider string) error {
-	clientType = strings.TrimSpace(clientType)
+	clientType = canonicalClientType(clientType)
 	provider = strings.TrimSpace(provider)
 	if s == nil || clientType == "" || provider == "" {
 		return nil
@@ -728,7 +737,7 @@ func normalizeProviderRefs(refs []ProviderRef) []ProviderRef {
 	seen := make(map[string]struct{}, len(refs))
 	out := make([]ProviderRef, 0, len(refs))
 	for _, ref := range refs {
-		clientType := strings.TrimSpace(ref.ClientType)
+		clientType := canonicalClientType(ref.ClientType)
 		provider := strings.TrimSpace(ref.Provider)
 		if clientType == "" || provider == "" {
 			continue
@@ -994,4 +1003,39 @@ func atomicWriteFile(path string, data []byte, perm fs.FileMode) error {
 	}
 	success = true
 	return nil
+}
+
+// NormalizeClientNames returns a detached snapshot keyed by canonical channel
+// names. Historical aliases merge with their current channel without losing
+// counters, costs, or the most recent upstream usage details.
+func NormalizeClientNames(snapshot DataSnapshot) DataSnapshot {
+	out := DataSnapshot{Clients: make(map[string]map[string]ProviderUsage, len(snapshot.Clients))}
+	names := make([]string, 0, len(snapshot.Clients))
+	for name := range snapshot.Clients {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		canonical := canonicalClientType(name)
+		providers := out.Clients[canonical]
+		if providers == nil {
+			providers = make(map[string]ProviderUsage)
+			out.Clients[canonical] = providers
+		}
+		for provider, usage := range snapshot.Clients[name] {
+			if previous, ok := providers[provider]; ok {
+				providers[provider] = mergeProviderUsage(previous, usage)
+			} else {
+				providers[provider] = cloneProviderUsage(usage)
+			}
+		}
+	}
+	return out
+}
+
+func canonicalClientType(client string) string {
+	if canonical, ok := config.CanonicalClientType(client); ok {
+		return canonical
+	}
+	return strings.TrimSpace(client)
 }

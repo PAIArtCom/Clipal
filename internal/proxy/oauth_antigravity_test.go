@@ -35,7 +35,7 @@ func TestAntigravitySetupFailureIsActionableBeforeGeneration(t *testing.T) {
 				if err := svc.Store().Save(cred); err != nil {
 					t.Fatal(err)
 				}
-				cp := newClientProxy(ClientGemini, mode, "target", []config.Provider{{Name: "target", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderAntigravity, OAuthRef: cred.Ref, Priority: 1}}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+				cp := newClientProxy(ClientGoogle, mode, "target", []config.Provider{{Name: "target", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderAntigravity, OAuthRef: cred.Ref, Priority: 1}}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 				cp.oauth = svc
 				cp.httpClient.Transport = roundTripperFunc(func(*http.Request) (*http.Response, error) {
 					t.Error("generation was sent despite failed account setup")
@@ -70,7 +70,7 @@ func TestCreateProxyRequest_AntigravityOAuthRebuildsUpstreamContextAndWrapsGener
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "antigravity-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -95,7 +95,7 @@ func TestCreateProxyRequest_AntigravityOAuthRebuildsUpstreamContextAndWrapsGener
 	original.Header.Set("X-Antigravity-Session", "client-session")
 	original.Header.Set("X-Cloud-Code-Project", "client-project")
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-3.1-flash-image:generateContent",
@@ -188,7 +188,7 @@ func TestCreateProxyRequest_AntigravityOAuthStreamForcesAltSSE(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "antigravity-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -202,7 +202,7 @@ func TestCreateProxyRequest_AntigravityOAuthStreamForcesAltSSE(t *testing.T) {
 	body := []byte(`{"contents":[]}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-3.1-pro:streamGenerateContent?alt=json&key=client-key", bytes.NewReader(body))
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiStreamGenerate,
 		UpstreamPath:   "/v1beta/models/gemini-3.1-pro:streamGenerateContent",
@@ -236,7 +236,7 @@ func TestCreateProxyRequest_AntigravityOAuthCountTokensPreservesOfficialFields(t
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "antigravity-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -257,7 +257,7 @@ func TestCreateProxyRequest_AntigravityOAuthCountTokensPreservesOfficialFields(t
 	}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-3.1-pro:countTokens", bytes.NewReader(body))
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiCountTokens,
 		UpstreamPath:   "/v1beta/models/gemini-3.1-pro:countTokens",

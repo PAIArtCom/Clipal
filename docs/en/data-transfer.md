@@ -25,7 +25,7 @@ The top-level contract is:
     "clients": {
       "claude": { "mode": "auto", "providers": [] },
       "openai": { "mode": "auto", "providers": [] },
-      "gemini": { "mode": "auto", "providers": [] }
+      "google": { "mode": "auto", "providers": [] }
     },
     "credentials": [],
     "usage": { "clients": {} }
@@ -34,6 +34,8 @@ The top-level contract is:
 ```
 
 This is a new contract. Older Web UI configuration-only JSON exports are intentionally not accepted.
+
+Exports use `google` in `data.clients` and usage keys. Imports accept legacy `gemini` keys and normalize them to `google`, preserving usage counters and costs. A backup with differing `google` and `gemini` channel configurations is rejected without applying changes.
 
 ## CLI
 

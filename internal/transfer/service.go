@@ -329,7 +329,7 @@ func validateCredentials(dataset *Dataset, native bool) error {
 	}
 	if native {
 		cfg := configFromDataset(dataset)
-		for _, client := range []*config.ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Gemini} {
+		for _, client := range []*config.ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Google} {
 			for _, provider := range client.Providers {
 				if !provider.UsesOAuth() {
 					continue
@@ -566,7 +566,7 @@ func listCredentialsFromStore(store *oauth.Store) ([]oauth.Credential, error) {
 }
 
 func configFromDataset(dataset *Dataset) *config.Config {
-	return &config.Config{Global: dataset.Data.Global.toConfig(), Claude: dataset.Data.Clients["claude"].toConfig(), OpenAI: dataset.Data.Clients["openai"].toConfig(), Gemini: dataset.Data.Clients["gemini"].toConfig()}
+	return &config.Config{Global: dataset.Data.Global.toConfig(), Claude: dataset.Data.Clients["claude"].toConfig(), OpenAI: dataset.Data.Clients["openai"].toConfig(), Google: dataset.Data.Clients["google"].toConfig()}
 }
 
 func mergeConfig(current, incoming *config.Config) *config.Config {
@@ -574,7 +574,7 @@ func mergeConfig(current, incoming *config.Config) *config.Config {
 	out.Global = incoming.Global
 	out.Claude = mergeClient(current.Claude, incoming.Claude)
 	out.OpenAI = mergeClient(current.OpenAI, incoming.OpenAI)
-	out.Gemini = mergeClient(current.Gemini, incoming.Gemini)
+	out.Google = mergeClient(current.Google, incoming.Google)
 	return &out
 }
 
@@ -612,7 +612,7 @@ func relinkCredentialRef(cfg *config.Config, store *oauth.Store, provider config
 			oldRefIdentity = oauth.AccountIdentityKey(existing)
 		}
 	}
-	for _, client := range []*config.ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Gemini} {
+	for _, client := range []*config.ClientConfig{&cfg.Claude, &cfg.OpenAI, &cfg.Google} {
 		for i := range client.Providers {
 			p := &client.Providers[i]
 			if !p.UsesOAuth() || p.NormalizedOAuthProvider() != provider || p.NormalizedOAuthRef() != oldRef {
@@ -642,7 +642,7 @@ func linkExternalCredential(cfg *config.Config, store *oauth.Store, cred *oauth.
 	case config.OAuthProviderClaude:
 		client = &cfg.Claude
 	case config.OAuthProviderAntigravity:
-		client = &cfg.Gemini
+		client = &cfg.Google
 	default:
 		return config.Provider{}, ""
 	}
@@ -748,7 +748,7 @@ func writeConfigWithHook(dir string, cfg *config.Config, beforeWrite func(index 
 	files := []struct {
 		name  string
 		value any
-	}{{"config.yaml", cfg.Global}, {"claude.yaml", cfg.Claude}, {"openai.yaml", cfg.OpenAI}, {"gemini.yaml", cfg.Gemini}}
+	}{{"config.yaml", cfg.Global}, {"claude.yaml", cfg.Claude}, {"openai.yaml", cfg.OpenAI}, {"google.yaml", cfg.Google}}
 	for index, file := range files {
 		if beforeWrite != nil {
 			if err := beforeWrite(index, file.name); err != nil {

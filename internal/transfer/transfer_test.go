@@ -161,7 +161,7 @@ func TestServiceImportPersistExportPreservesLargeRawUsageInteger(t *testing.T) {
 	dataset := emptyDataset()
 	dataset.Producer.Version = "test"
 	dataset.Data.Global = globalFromConfig(config.DefaultGlobalConfig())
-	for _, client := range []string{"openai", "claude", "gemini"} {
+	for _, client := range []string{"openai", "claude", "google"} {
 		dataset.Data.Usage.Clients[client] = map[string]ProviderUsage{"p1": {Usage: map[string]any{"cost_micros": json.Number("9007199254740993")}}}
 	}
 	encoded, err := (nativeAdapter{}).Encode(dataset, EncodeOptions{})
@@ -179,7 +179,7 @@ func TestServiceImportPersistExportPreservesLargeRawUsageInteger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, client := range []string{"openai", "claude", "gemini"} {
+	for _, client := range []string{"openai", "claude", "google"} {
 		value, ok := exported.Data.Usage.Clients[client]["p1"].Usage["cost_micros"].(json.Number)
 		if !ok || value.String() != "9007199254740993" {
 			t.Fatalf("%s cost_micros = %#v", client, value)
@@ -966,7 +966,7 @@ func snapshotTestTree(t *testing.T, root string) map[string]testTreeEntry {
 
 func writeTestState(t *testing.T, dir, provider, key string) {
 	t.Helper()
-	cfg := &config.Config{Global: config.DefaultGlobalConfig(), Claude: config.ClientConfig{Mode: config.ClientModeAuto}, OpenAI: config.ClientConfig{Mode: config.ClientModeAuto, Providers: []config.Provider{{Name: provider, BaseURL: "https://example.com", APIKey: key, Priority: 1}}}, Gemini: config.ClientConfig{Mode: config.ClientModeAuto}}
+	cfg := &config.Config{Global: config.DefaultGlobalConfig(), Claude: config.ClientConfig{Mode: config.ClientModeAuto}, OpenAI: config.ClientConfig{Mode: config.ClientModeAuto, Providers: []config.Provider{{Name: provider, BaseURL: "https://example.com", APIKey: key, Priority: 1}}}, Google: config.ClientConfig{Mode: config.ClientModeAuto}}
 	if err := writeConfig(dir, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -1091,7 +1091,7 @@ func TestRelinkKeepsProvidersBoundToOtherAccounts(t *testing.T) {
 			Name: "work", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderCodex,
 			OAuthRef: existing.Ref, OAuthIdentity: oauth.AccountIdentityKey(existing), Priority: 1, Enabled: &enabled,
 		}}},
-		Gemini: config.ClientConfig{Mode: config.ClientModeAuto},
+		Google: config.ClientConfig{Mode: config.ClientModeAuto},
 	}
 	if err := writeConfig(dir, cfg); err != nil {
 		t.Fatal(err)
@@ -1222,5 +1222,76 @@ func TestRegistryRejectsMalformedJSONBeforeFormatDetection(t *testing.T) {
 	})
 	if err == nil || err.Error() != `invalid JSON in import file "truncated.json"` {
 		t.Fatalf("mixed input did not identify the malformed file: %v", err)
+	}
+}
+
+func TestNativeLegacyGoogleChannelMigration(t *testing.T) {
+	dataset := emptyDataset()
+	dataset.Producer.Version = "test"
+	dataset.Data.Global = globalFromConfig(config.DefaultGlobalConfig())
+	dataset.Data.Clients["gemini"] = Client{Mode: "auto", Providers: []Provider{{Name: "account", BaseURL: "https://example.com", APIKeys: []string{"secret"}, Priority: 1}}}
+	delete(dataset.Data.Clients, "google")
+	dataset.Data.Usage.Clients["gemini"] = map[string]ProviderUsage{"account": {RequestCount: 2, TotalCostMicros: 100, HasCost: true}}
+	dataset.Data.Usage.Clients["google"] = map[string]ProviderUsage{"account": {RequestCount: 3, TotalCostMicros: 200, HasCost: true}}
+	raw, err := json.Marshal(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err := (nativeAdapter{}).Decode([]Input{{Name: "old.json", Data: raw}}, DecodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := decoded.Data.Clients["gemini"]; ok {
+		t.Fatal("old channel survived")
+	}
+	if len(decoded.Data.Clients["google"].Providers) != 1 {
+		t.Fatal("lost providers")
+	}
+	usage := decoded.Data.Usage.Clients["google"]["account"]
+	if usage.RequestCount != 5 || usage.TotalCostMicros != 300 {
+		t.Fatalf("lost usage: %#v", usage)
+	}
+	encoded, err := (nativeAdapter{}).Encode(decoded, EncodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), `"gemini"`) {
+		t.Fatal("legacy key exported")
+	}
+
+	dir := t.TempDir()
+	writeTestState(t, dir, "existing", "key")
+	service, err := NewService(dir, "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = service.usage.Close() }()
+	plan, err := service.Analyze([]Input{{Name: "old.json", Data: raw}}, FormatClipal, ModeReplace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(plan); err != nil {
+		t.Fatal(err)
+	}
+	exported, err := service.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exported.Data.Clients["google"].Providers) != 1 || exported.Data.Usage.Clients["google"]["account"].RequestCount != 5 {
+		t.Fatal("legacy import did not survive apply/export")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "google.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gemini.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("legacy file written: %v", err)
+	}
+	decoded.Data.Clients["gemini"] = Client{Mode: "manual", Providers: []Provider{}}
+	conflict, err := json.Marshal(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := (nativeAdapter{}).Decode([]Input{{Name: "conflict.json", Data: conflict}}, DecodeOptions{}); err == nil || !strings.Contains(err.Error(), "conflicting") {
+		t.Fatalf("expected configuration conflict, got %v", err)
 	}
 }

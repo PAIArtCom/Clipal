@@ -50,7 +50,7 @@ type ClientType string
 const (
 	ClientClaude ClientType = "claude"
 	ClientOpenAI ClientType = "openai"
-	ClientGemini ClientType = "gemini"
+	ClientGoogle ClientType = "google"
 )
 
 const defaultOAuthRefreshMaintainerTimeout = 90 * time.Second
@@ -255,11 +255,11 @@ func NewRouter(cfg *config.Config) *Router {
 		r.proxies[ClientOpenAI].applyRoutingRuntimeSettings(routingCfg)
 	}
 
-	geminiProviders := config.GetEnabledProviders(cfg.Gemini)
+	geminiProviders := config.GetEnabledProviders(cfg.Google)
 	if len(geminiProviders) > 0 {
-		r.proxies[ClientGemini] = newClientProxyWithGlobalProxy(ClientGemini, cfg.Gemini.Mode, cfg.Gemini.PinnedProvider, geminiProviders, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, cfg.Global.NormalizedUpstreamProxyMode(), cfg.Global.EffectiveUpstreamProxyIdentity(), telemetryStore)
-		r.proxies[ClientGemini].oauth = r.oauth
-		r.proxies[ClientGemini].applyRoutingRuntimeSettings(routingCfg)
+		r.proxies[ClientGoogle] = newClientProxyWithGlobalProxy(ClientGoogle, cfg.Google.Mode, cfg.Google.PinnedProvider, geminiProviders, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, cfg.Global.NormalizedUpstreamProxyMode(), cfg.Global.EffectiveUpstreamProxyIdentity(), telemetryStore)
+		r.proxies[ClientGoogle].oauth = r.oauth
+		r.proxies[ClientGoogle].applyRoutingRuntimeSettings(routingCfg)
 	}
 
 	return r
@@ -530,6 +530,7 @@ func (r *Router) Start(version string, webHandler interface{}) error {
 	registerExactAndSubtree(mux, "/clipal", r.handleRequest)
 	registerExactAndSubtree(mux, "/claude", r.handleRequest)
 	registerExactAndSubtree(mux, "/openai", r.handleRequest)
+	registerExactAndSubtree(mux, "/google", r.handleRequest)
 	registerExactAndSubtree(mux, "/gemini", r.handleRequest)
 	registerExactAndSubtree(mux, "/claudecode", r.handleRequest)
 	registerExactAndSubtree(mux, "/codex", r.handleRequest)
@@ -914,9 +915,9 @@ func (r *Router) reloadProviderConfigsLockedWithTelemetry(reconcileTelemetry boo
 		newProxies[ClientOpenAI] = newReloadedClientProxy(ClientOpenAI, newCfg.OpenAI.Mode, newCfg.OpenAI.PinnedProvider, ps, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, routingRuntimeSettingsFromConfig(newCfg.Global.Routing), globalProxyMode, globalProxyURL, oldProxies[ClientOpenAI], r.telemetry)
 		newProxies[ClientOpenAI].oauth = r.oauth
 	}
-	if ps := config.GetEnabledProviders(newCfg.Gemini); len(ps) > 0 {
-		newProxies[ClientGemini] = newReloadedClientProxy(ClientGemini, newCfg.Gemini.Mode, newCfg.Gemini.PinnedProvider, ps, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, routingRuntimeSettingsFromConfig(newCfg.Global.Routing), globalProxyMode, globalProxyURL, oldProxies[ClientGemini], r.telemetry)
-		newProxies[ClientGemini].oauth = r.oauth
+	if ps := config.GetEnabledProviders(newCfg.Google); len(ps) > 0 {
+		newProxies[ClientGoogle] = newReloadedClientProxy(ClientGoogle, newCfg.Google.Mode, newCfg.Google.PinnedProvider, ps, durations.ReactivateAfter, durations.UpstreamIdleTimeout, durations.ResponseHeaderTimeout, cbCfg, routingRuntimeSettingsFromConfig(newCfg.Global.Routing), globalProxyMode, globalProxyURL, oldProxies[ClientGoogle], r.telemetry)
+		newProxies[ClientGoogle].oauth = r.oauth
 	}
 	if reconcileTelemetry {
 		r.reconcileTelemetryUsage(oldCfg, newCfg)
@@ -1197,12 +1198,15 @@ func (r *Router) handleRequest(w http.ResponseWriter, req *http.Request) {
 	case pathMatchesPrefix(path, "/codex"):
 		clientType = ClientOpenAI
 		stripPrefix = "/codex"
+	case pathMatchesPrefix(path, "/google"):
+		clientType = ClientGoogle
+		stripPrefix = "/google"
 	case pathMatchesPrefix(path, "/gemini"):
-		clientType = ClientGemini
+		clientType = ClientGoogle
 		stripPrefix = "/gemini"
 	default:
 		logger.Warn("unknown path prefix: %s", path)
-		writeProxyError(w, "Unknown endpoint. Use /clipal (preferred), canonical aliases /claude, /openai, /gemini, or legacy aliases /claudecode, /codex", http.StatusNotFound)
+		writeProxyError(w, "Unknown endpoint. Use /clipal (preferred), canonical aliases /claude, /openai, /google, or legacy aliases /claudecode, /codex, /gemini", http.StatusNotFound)
 		return
 	}
 

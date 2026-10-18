@@ -20,7 +20,7 @@ var providerCatalog = []ProviderDescriptor{
 	},
 	{
 		Provider:    config.OAuthProviderAntigravity,
-		ClientTypes: []string{"gemini"},
+		ClientTypes: []string{"google"},
 		Available:   true,
 	},
 	{

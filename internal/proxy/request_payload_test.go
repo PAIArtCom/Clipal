@@ -98,7 +98,7 @@ func TestRequestPayloadCachesGeminiOAuthRewrite(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	requestCtx := RequestContext{
-		ClientType: ClientGemini,
+		ClientType: ClientGoogle,
 		Family:     ProtocolFamilyGemini,
 		Capability: CapabilityGeminiGenerateContent,
 	}
@@ -156,7 +156,7 @@ func oauthPayloadCases() []oauthPayloadCase {
 		},
 		{
 			name: "antigravity",
-			ctx:  RequestContext{ClientType: ClientGemini, Family: ProtocolFamilyGemini, Capability: CapabilityGeminiGenerateContent},
+			ctx:  RequestContext{ClientType: ClientGoogle, Family: ProtocolFamilyGemini, Capability: CapabilityGeminiGenerateContent},
 			path: "/v1beta/models/gemini-2.5-pro:generateContent",
 			body: `{"contents":[{"role":"user","parts":[{"text":"PROMPT"}]}],"request_id":"request-1"}`,
 			prepare: func(p *requestPayload, r *http.Request, c RequestContext, provider config.Provider, path string) (string, string, []byte, error) {

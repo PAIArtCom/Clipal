@@ -41,7 +41,7 @@ func writeProxyReloadFixture(t *testing.T, dir string, global config.GlobalConfi
 func TestProviderConfigFiles_WatchesCurrentNamesOnly(t *testing.T) {
 	router := &Router{}
 	got := strings.Join(router.providerConfigFiles(), ",")
-	for _, want := range []string{"config.yaml", "claude.yaml", "openai.yaml", "gemini.yaml"} {
+	for _, want := range []string{"config.yaml", "claude.yaml", "openai.yaml", "google.yaml"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("providerConfigFiles missing %q: %s", want, got)
 		}

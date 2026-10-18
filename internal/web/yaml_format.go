@@ -202,7 +202,7 @@ func clientConfigHeader(clientType string) string {
 		return "Claude-style API providers configuration"
 	case "openai":
 		return "OpenAI-compatible API providers configuration"
-	case "gemini":
+	case "google":
 		return "Google channel providers configuration (Gemini-compatible protocol)"
 	default:
 		return fmt.Sprintf("%s providers configuration", clientType)

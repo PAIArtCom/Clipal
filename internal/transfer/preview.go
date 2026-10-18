@@ -80,7 +80,7 @@ func providerMap(cfg *config.Config) map[string]config.Provider {
 	if cfg == nil {
 		return out
 	}
-	for client, providers := range map[string][]config.Provider{"claude": cfg.Claude.Providers, "openai": cfg.OpenAI.Providers, "gemini": cfg.Gemini.Providers} {
+	for client, providers := range map[string][]config.Provider{"claude": cfg.Claude.Providers, "openai": cfg.OpenAI.Providers, "google": cfg.Google.Providers} {
 		for _, provider := range providers {
 			out[client+"\x00"+provider.Name] = provider
 		}
@@ -182,6 +182,6 @@ func externalCredentialClient(provider config.OAuthProvider) string {
 	case config.OAuthProviderClaude:
 		return "claude"
 	default:
-		return "gemini"
+		return "google"
 	}
 }

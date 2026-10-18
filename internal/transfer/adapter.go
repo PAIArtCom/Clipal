@@ -8,10 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/PAIArtCom/Clipal/internal/oauth"
 	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
@@ -264,19 +267,24 @@ func (nativeAdapter) Decode(inputs []Input, _ DecodeOptions) (*Dataset, *Report,
 		Data: Data{Global: wire.Data.Global, Clients: wire.Data.Clients, Credentials: wire.Data.Credentials},
 	}
 	usage, warnings := decodeAndSanitizeUsage(wire.Data.Usage)
-	dataset.Data.Usage = usage
+	dataset.Data.Usage = usageFromTelemetry(usage.toTelemetry())
 	if err := validateDataset(dataset); err != nil {
 		return nil, nil, err
 	}
 	return dataset, &Report{Format: FormatClipal, Warnings: warnings}, nil
 }
 func (nativeAdapter) Encode(dataset *Dataset, _ EncodeOptions) ([]byte, error) {
-	if err := validateDataset(dataset); err != nil {
-		return nil, err
+	if dataset == nil {
+		return nil, fmt.Errorf("dataset is required")
 	}
 	clean := *dataset
 	clean.Data = dataset.Data
+	clean.Data.Clients = maps.Clone(dataset.Data.Clients)
+	if err := validateDataset(&clean); err != nil {
+		return nil, err
+	}
 	clean.Data.Usage, _ = sanitizeUsage(dataset.Data.Usage)
+	clean.Data.Usage = usageFromTelemetry(clean.Data.Usage.toTelemetry())
 	data, err := json.MarshalIndent(&clean, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode %s: %w", FormatClipal, err)
@@ -306,16 +314,22 @@ func validateDataset(dataset *Dataset) error {
 	if dataset.Data.Clients == nil {
 		return fmt.Errorf("data.clients is required")
 	}
-	if len(dataset.Data.Clients) != 3 {
-		for client := range dataset.Data.Clients {
-			switch client {
-			case "claude", "openai", "gemini":
-			default:
-				return fmt.Errorf("data.clients.%s is not supported by schema version %d", client, SchemaVersion)
-			}
+
+	// Accept old exports, but keep one canonical channel in every new export.
+	if legacy, ok := dataset.Data.Clients["gemini"]; ok {
+		if current, exists := dataset.Data.Clients["google"]; exists && !reflect.DeepEqual(current, legacy) {
+			return fmt.Errorf("data.clients.google and data.clients.gemini contain conflicting configuration")
+		}
+		dataset.Data.Clients["google"] = legacy
+		delete(dataset.Data.Clients, "gemini")
+	}
+	for client := range dataset.Data.Clients {
+		canonical, ok := config.CanonicalClientType(client)
+		if !ok || canonical != client {
+			return fmt.Errorf("data.clients.%s is not supported by schema version %d", client, SchemaVersion)
 		}
 	}
-	for _, client := range []string{"claude", "openai", "gemini"} {
+	for _, client := range []string{"claude", "openai", "google"} {
 		entry, ok := dataset.Data.Clients[client]
 		if !ok {
 			return fmt.Errorf("data.clients.%s is required", client)

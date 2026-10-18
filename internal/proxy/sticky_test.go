@@ -66,7 +66,7 @@ func TestExtractRequestStickyKey_L3UsesSecondToLastHumanMessage(t *testing.T) {
 	}
 
 	gemini := RequestContext{
-		ClientType:   ClientGemini,
+		ClientType:   ClientGoogle,
 		Family:       ProtocolFamilyGemini,
 		Capability:   CapabilityGeminiGenerateContent,
 		UpstreamPath: "/v1beta/models/gemini-2.5-pro:generateContent",

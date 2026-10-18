@@ -156,7 +156,7 @@ with open(path, encoding="utf-8") as f:
     data = json.load(f)
 assert data["schema"] == "clipal.data", data
 assert data["schema_version"] == 1, data
-assert sorted(data["data"]["clients"]) == ["claude", "gemini", "openai"], data
+assert sorted(data["data"]["clients"]) == ["claude", "google", "openai"], data
 assert len(data["data"]["credentials"]) == 1, data
 credential = data["data"]["credentials"][0]
 assert credential["access_token"] == "fake-access-token", credential

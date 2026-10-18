@@ -401,7 +401,7 @@ test('openAddProviderModal sets next priority for provider form', () => {
 test('loadOAuthProviders switches to the available oauth source for current client', async () => {
     const state = loadApp();
     const calls = [];
-    state.selectedClient = 'gemini';
+    state.selectedClient = 'google';
     state.providerForm.auth_type = 'oauth';
     state.providerForm.oauth_provider = 'codex';
     state.apiCall = async url => {
@@ -411,7 +411,7 @@ test('loadOAuthProviders switches to the available oauth source for current clie
 
     await state.loadOAuthProviders(true);
 
-    assert.deepEqual(calls, ['/api/oauth/providers?client_type=gemini']);
+    assert.deepEqual(calls, ['/api/oauth/providers?client_type=google']);
     assert.deepEqual(JSON.parse(JSON.stringify(state.oauthProviders)), [{ provider: 'antigravity' }]);
     assert.equal(state.providerForm.auth_type, 'oauth');
     assert.equal(state.providerForm.oauth_provider, 'antigravity');
@@ -727,7 +727,7 @@ for (const service of ['claude', 'antigravity']) {
             oauth_provider: service,
             oauth_ref: `${service}-account`
         };
-        state.selectedClient = service === 'claude' ? 'claude' : 'gemini';
+        state.selectedClient = service === 'claude' ? 'claude' : 'google';
         state.apiCall = async (url, options, background, suppressAlert) => {
             calls.push({ url, options, background, suppressAlert });
             return {
@@ -981,7 +981,7 @@ test('saveProvider includes custom proxy settings when configured', async () => 
 test('saveProvider omits unsupported override fields for gemini', async () => {
     const state = loadApp();
     const calls = [];
-    state.selectedClient = 'gemini';
+    state.selectedClient = 'google';
     state.providerForm = {
         name: 'gemini-primary',
         base_url: 'https://example.com',
@@ -1007,7 +1007,7 @@ test('saveProvider omits unsupported override fields for gemini', async () => {
     await state.saveProvider();
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, '/api/providers/gemini');
+    assert.equal(calls[0].url, '/api/providers/google');
     assert.deepEqual(calls[0].options, {
         name: 'gemini-primary',
         base_url: 'https://example.com',
@@ -1422,7 +1422,7 @@ test('submitPendingOAuthAuthorizationCode posts pasted input and completes the O
             'clipal.pendingOAuthSession': JSON.stringify({
                 session_id: 'sess-manual',
                 provider: 'antigravity',
-                client_type: 'gemini',
+                client_type: 'google',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',
                 auth_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=sess-manual'
@@ -1468,7 +1468,7 @@ test('submitPendingOAuthAuthorizationCode posts pasted input and completes the O
             url: '/api/oauth/sessions/sess-manual/code',
             payload: {
                 code: 'http://127.0.0.1:39393/oauth2callback?code=manual-code&state=sess-manual',
-                client_type: 'gemini'
+                client_type: 'google'
             }
         }
     ]);
@@ -1486,7 +1486,7 @@ test('submitPendingOAuthAuthorizationCode keeps OAuth session active on invalid 
             'clipal.pendingOAuthSession': JSON.stringify({
                 session_id: 'sess-manual-error',
                 provider: 'antigravity',
-                client_type: 'gemini',
+                client_type: 'google',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',
                 auth_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=sess-manual-error'
@@ -1528,7 +1528,7 @@ test('submitPendingOAuthAuthorizationCode keeps OAuth session active on invalid 
             pending: {
                 session_id: 'sess-manual-error',
                 provider: 'antigravity',
-                client_type: 'gemini',
+                client_type: 'google',
                 started_at: 1710000000000,
                 expires_at: '2099-04-21T13:00:00Z',
                 auth_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=sess-manual-error'
@@ -2464,9 +2464,11 @@ test('hash routing parses tab and client and serializes current state', async ()
     state.activeTab = 'status';
     assert.equal(state.hashForState(), '#/status');
     state.activeTab = 'providers';
-    state.selectedClient = 'gemini';
-    assert.equal(state.hashForState(), '#/providers/gemini');
+    state.selectedClient = 'google';
+    assert.equal(state.hashForState(), '#/providers/google');
 
+    state.__context.window.location.hash = '#/providers/gemini';
+    assert.deepEqual({ ...state.parseHash() }, { tab: 'providers', client: 'google' });
     state.__context.window.location.hash = '#/data';
     state.askConfirm = async () => true;
     await state.applyHash();
@@ -2624,7 +2626,7 @@ test('mode and pin changes preserve the saved selection on failure and commit on
         assert.equal(state.clientConfigSaving, true);
         assert.equal(JSON.stringify(state.clientConfig), before);
         const client = state.selectedClient;
-        await state.selectClient('gemini');
+        await state.selectClient('google');
         await state.pinProvider('backup');
         assert.equal(state.selectedClient, client);
         finish(new Error('save failed'));
@@ -2794,7 +2796,7 @@ test('navigation cannot retarget an unsaved provider draft without confirmation'
     assert.equal(await state.setTab('status'), false);
     assert.equal(state.activeTab, 'providers');
     const client = state.selectedClient;
-    await state.selectClient('gemini');
+    await state.selectClient('google');
     assert.equal(state.selectedClient, client);
     assert.equal(state.providerForm.name, 'draft');
     state.askConfirm = async () => true;
@@ -2859,7 +2861,7 @@ test('reordering locks client switches and mode changes until the save completes
     const pending = state.moveProvider(state.providers[0], 1);
     await new Promise(done => setImmediate(done));
     const client = state.selectedClient;
-    await state.selectClient('gemini');
+    await state.selectClient('google');
     await state.setClientMode('manual');
     assert.equal(state.selectedClient, client);
     assert.equal(requests, 1);
@@ -3465,15 +3467,15 @@ test('client keyboard selection wraps and supports first and last while preservi
     state.loadProviders = async () => visited.push(state.selectedClient);
     state.loadOAuthProviders = async () => {};
     await state.moveClient(-1);
-    assert.equal(state.selectedClient, 'gemini');
+    assert.equal(state.selectedClient, 'google');
     await state.moveClient('first');
     assert.equal(state.selectedClient, 'claude');
     await state.moveClient('last');
-    assert.equal(state.selectedClient, 'gemini');
+    assert.equal(state.selectedClient, 'google');
     state.clientConfigSaving = true;
     await state.moveClient(1);
-    assert.equal(state.selectedClient, 'gemini');
-    assert.deepEqual(visited, ['gemini', 'claude', 'gemini']);
+    assert.equal(state.selectedClient, 'google');
+    assert.deepEqual(visited, ['google', 'claude', 'google']);
 });
 
 test('switching client groups resets the provider selection and respects save locks', async () => {
@@ -3483,14 +3485,14 @@ test('switching client groups resets the provider selection and respects save lo
     state.loadOAuthProviders = async () => {};
     state.selectedProviderName = 'a';
     state.providerDetailOpen = true;
-    await state.selectClient('gemini');
-    assert.equal(state.selectedClient, 'gemini');
+    await state.selectClient('google');
+    assert.equal(state.selectedClient, 'google');
     assert.equal(state.selectedProviderName, '');
     assert.equal(state.providerDetailOpen, false);
     state.clientConfigSaving = true;
     await state.selectClient('claude');
-    assert.equal(state.selectedClient, 'gemini');
-    assert.deepEqual(visited, ['gemini']);
+    assert.equal(state.selectedClient, 'google');
+    assert.deepEqual(visited, ['google']);
 });
 
 test('account preference saves report success and prevent closure only while writing', async () => {
@@ -3573,7 +3575,7 @@ test('provider save keeps list actions and client selection locked through the f
     assert.equal(state.canMutateProviders, false);
     state.openAddProviderModal();
     assert.equal(state.showAddProviderModal, false);
-    await state.selectClient('gemini');
+    await state.selectClient('google');
     assert.equal(state.selectedClient, 'claude');
     finishRefresh();
     await pending;
@@ -3591,7 +3593,7 @@ test('provider toggles serialize conflicting operations and release the lock aft
     const duplicate = { target: { checked: true } };
     await state.toggleProvider(provider, duplicate);
     await state.pinProvider(provider.name);
-    await state.selectClient('gemini');
+    await state.selectClient('google');
     assert.equal(calls, 1);
     assert.equal(duplicate.target.checked, false);
     assert.equal(state.selectedClient, 'claude');
@@ -3612,7 +3614,7 @@ test('provider deletion prevents conflicting writes until the refreshed list is 
     const pending = state.deleteProvider({ name: 'primary' });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(state.canMutateProviders, false);
-    await state.selectClient('gemini');
+    await state.selectClient('google');
     assert.equal(state.selectedClient, 'claude');
     finish();
     await pending;
@@ -3743,4 +3745,19 @@ test('literal translation references resolve in both UI languages', () => {
             assert.equal(typeof state.lookupMessage(locale, key), 'string', `${locale}: ${key}`);
         }
     }
+});
+
+test('legacy Gemini page and pending OAuth session normalize to Google', async () => {
+    const state = loadApp();
+    state.parseTimestamp = () => new Date();
+    const pending = state.normalizePendingOAuthSession({session_id: 'pending', provider: 'antigravity', client_type: 'gemini'});
+    assert.equal(pending.client_type, 'google');
+    state.requestCloseProvider = async () => true;
+    state.closeEnvironment = async () => true;
+    state.loadProviders = async () => {};
+    state.loadOAuthProviders = async () => {};
+    state.$nextTick = () => {};
+    await state.selectClient('gemini');
+    assert.equal(state.selectedClient, 'google');
+    assert.equal(state.hashForState(), '#/providers/google');
 });

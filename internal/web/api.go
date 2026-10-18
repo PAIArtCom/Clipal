@@ -631,7 +631,7 @@ func (a *API) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	status.Clients["claude"] = buildClientStatus(cfg.Claude, cfg.Claude.Providers, snap.Clients[proxy.ClientClaude])
 	status.Clients["openai"] = buildClientStatus(cfg.OpenAI, cfg.OpenAI.Providers, snap.Clients[proxy.ClientOpenAI])
-	status.Clients["gemini"] = buildClientStatus(cfg.Gemini, cfg.Gemini.Providers, snap.Clients[proxy.ClientGemini])
+	status.Clients["google"] = buildClientStatus(cfg.Google, cfg.Google.Providers, snap.Clients[proxy.ClientGoogle])
 
 	writeJSON(w, status)
 }
@@ -954,8 +954,8 @@ func getClientConfigRef(cfg *config.Config, clientType string) (*config.ClientCo
 		return &cfg.Claude, nil
 	case "openai":
 		return &cfg.OpenAI, nil
-	case "gemini":
-		return &cfg.Gemini, nil
+	case "google":
+		return &cfg.Google, nil
 	default:
 		return nil, fmt.Errorf("unknown client type: %q", clientType)
 	}
@@ -1003,7 +1003,7 @@ func collectLinkedOAuthProviders(cfg *config.Config, provider config.OAuthProvid
 	}
 	appendClient("claude", cfg.Claude.Providers)
 	appendClient("openai", cfg.OpenAI.Providers)
-	appendClient("gemini", cfg.Gemini.Providers)
+	appendClient("google", cfg.Google.Providers)
 	return out
 }
 
@@ -1089,7 +1089,7 @@ func (a *API) deleteOAuthAccountLocked(cfg *config.Config, provider config.OAuth
 		restores = append(restores, restoreTelemetry)
 	}
 
-	for _, clientType := range []string{"claude", "openai", "gemini"} {
+	for _, clientType := range []string{"claude", "openai", "google"} {
 		cc := touchedClients[clientType]
 		if cc == nil {
 			continue

@@ -60,7 +60,7 @@ func newAntigravityCatalogProxy(t *testing.T, handler http.HandlerFunc) (*Client
 	if err := svc.Store().Save(cred); err != nil {
 		t.Fatal(err)
 	}
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{{Name: "catalog", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderAntigravity, OAuthRef: cred.Ref, Priority: 1}}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{{Name: "catalog", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderAntigravity, OAuthRef: cred.Ref, Priority: 1}}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 	cp.oauth = svc
 	t.Cleanup(cp.Close)
 	return cp, cred

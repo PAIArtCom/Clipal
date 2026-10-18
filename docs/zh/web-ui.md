@@ -146,7 +146,7 @@ http://127.0.0.1:3333/
 
 ## Provider 列表
 
-Google 渠道支持 Gemini API Key provider 和 Antigravity OAuth 账号。配置与 API 标识仍为 `gemini`（`gemini.yaml`、`/api/providers/gemini`）；模型名称和 Gemini 兼容协议路径沿用原名。
+Google 渠道支持 Gemini API Key provider 和 Antigravity OAuth 账号。渠道主标识为 `google`（`google.yaml`、`/api/providers/google`、`#/providers/google`）。管理 API 和页面链接中的 `gemini` 保留为兼容别名；模型名称和 Gemini 兼容协议字段沿用上游规范。状态与 OAuth 响应使用 `google`。
 
 Claude / OpenAI / Google 标签位于一个面板的上边缘，面板内的内容都属于当前选中的客户端。面板第一行是该客户端的路由：Auto / Manual 切换（ⓘ 说明模式含义）和以靶心图标标示的当前路由候选，右侧为“添加 Provider”；分组内 Provider 超过 8 个时，这一行还会出现搜索框（按名称或 Base URL）。
 

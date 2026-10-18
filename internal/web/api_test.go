@@ -2763,3 +2763,40 @@ func keys(m map[string]any) []string {
 	}
 	return out
 }
+
+func TestGoogleManagementAliasesShareConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte("mode: auto\nproviders:\n  - name: account\n    base_url: https://example.com\n    api_key: secret\n    priority: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api := NewAPI(dir, "test", nil)
+	for _, client := range []string{"google", "gemini"} {
+		w := httptest.NewRecorder()
+		api.HandleUpdateClientConfig(w, httptest.NewRequest(http.MethodPut, "/api/client-config/"+client, strings.NewReader(`{"mode":"manual","pinned_provider":"account"}`)))
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s write: %d %s", client, w.Code, w.Body.String())
+		}
+		var previous string
+		for _, alias := range []string{"google", "gemini"} {
+			w = httptest.NewRecorder()
+			api.HandleGetProviders(w, httptest.NewRequest(http.MethodGet, "/api/providers/"+alias, nil))
+			if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "account") {
+				t.Fatalf("%s read: %d %s", alias, w.Code, w.Body.String())
+			}
+			if previous != "" && previous != w.Body.String() {
+				t.Fatal("aliases diverged")
+			}
+			previous = w.Body.String()
+		}
+		cfg, err := config.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Google.Mode != config.ClientModeManual || cfg.Google.PinnedProvider != "account" {
+			t.Fatalf("lost update: %#v", cfg.Google)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "gemini.yaml")); !os.IsNotExist(err) {
+			t.Fatalf("legacy file recreated: %v", err)
+		}
+	}
+}

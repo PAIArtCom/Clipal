@@ -83,7 +83,7 @@ func (r *Router) reconcileTelemetryUsage(oldCfg *config.Config, newCfg *config.C
 	}
 	r.reconcileTelemetryUsageForClient(string(ClientClaude), oldCfg.Claude.Providers, newCfg.Claude.Providers)
 	r.reconcileTelemetryUsageForClient(string(ClientOpenAI), oldCfg.OpenAI.Providers, newCfg.OpenAI.Providers)
-	r.reconcileTelemetryUsageForClient(string(ClientGemini), oldCfg.Gemini.Providers, newCfg.Gemini.Providers)
+	r.reconcileTelemetryUsageForClient(string(ClientGoogle), oldCfg.Google.Providers, newCfg.Google.Providers)
 }
 
 func (r *Router) reconcileTelemetryUsageForClient(clientType string, oldProviders []config.Provider, newProviders []config.Provider) {

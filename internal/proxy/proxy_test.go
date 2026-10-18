@@ -594,14 +594,14 @@ func TestCreateProxyRequest_PreservesClaudeXAPIKeyStyle(t *testing.T) {
 func TestCreateProxyRequest_UsesGeminiXGoogAPIKeyStyle(t *testing.T) {
 	t.Parallel()
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "gemini", BaseURL: "https://generativelanguage.googleapis.com", APIKey: "provider-key", Priority: 1},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
 	original.Header.Set("x-goog-api-key", "client-key")
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -626,7 +626,7 @@ func TestCreateProxyRequest_UsesGeminiXGoogAPIKeyStyle(t *testing.T) {
 func TestCreateProxyRequest_UsesBearerForVertexGeminiProvider(t *testing.T) {
 	t.Parallel()
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "vertex", BaseURL: "https://us-central1-aiplatform.googleapis.com", APIKey: "provider-token", Priority: 1},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
@@ -634,7 +634,7 @@ func TestCreateProxyRequest_UsesBearerForVertexGeminiProvider(t *testing.T) {
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal"+vertexPath, bytes.NewReader([]byte(`{"contents":[]}`)))
 	original.Header.Set("x-goog-api-key", "client-key")
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   vertexPath,
@@ -729,14 +729,14 @@ func TestRegisterExactAndSubtreeRegistersExpectedServeMuxMatches(t *testing.T) {
 func TestCreateProxyRequest_PreservesExplicitAuthorizationCarrier(t *testing.T) {
 	t.Parallel()
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "gemini-gateway", BaseURL: "https://gateway.example.com", APIKey: "provider-key", Priority: 1},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
 	original.Header.Set("Authorization", "Bearer client-key")
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -758,13 +758,13 @@ func TestCreateProxyRequest_PreservesExplicitAuthorizationCarrier(t *testing.T) 
 func TestCreateProxyRequest_OverridesGeminiQueryKey(t *testing.T) {
 	t.Parallel()
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "gemini", BaseURL: "https://generativelanguage.googleapis.com", APIKey: "provider-key", Priority: 1},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-pro:generateContent?key=client-key&alt=sse", bytes.NewReader([]byte(`{"contents":[]}`)))
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
@@ -817,13 +817,13 @@ func TestCreateProxyRequest_DefaultsClaudeAuthCarrierWithoutClientAuth(t *testin
 func TestCreateProxyRequest_DefaultsGeminiAuthCarrierWithoutClientAuth(t *testing.T) {
 	t.Parallel()
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{Name: "gemini", BaseURL: "https://generativelanguage.googleapis.com", APIKey: "provider-key", Priority: 1},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
 
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-2.5-flash-image:generateContent", bytes.NewReader([]byte(`{"contents":[]}`)))
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-2.5-flash-image:generateContent",
@@ -1551,7 +1551,7 @@ func TestGeminiCountTokens_DoesNotRetryOrAffectHealthState(t *testing.T) {
 			LogLevel:        config.LogLevelDebug,
 			ReactivateAfter: "1h",
 		},
-		Gemini: config.ClientConfig{
+		Google: config.ClientConfig{
 			Providers: []config.Provider{
 				{Name: "p1", BaseURL: "http://p1", APIKey: "k1", Priority: 1},
 				{Name: "p2", BaseURL: "http://p2", APIKey: "k2", Priority: 2},
@@ -1560,7 +1560,7 @@ func TestGeminiCountTokens_DoesNotRetryOrAffectHealthState(t *testing.T) {
 	}
 
 	router := NewRouter(cfg)
-	cp := router.proxies[ClientGemini]
+	cp := router.proxies[ClientGoogle]
 	if cp == nil {
 		t.Fatalf("expected gemini proxy to be initialized")
 	}

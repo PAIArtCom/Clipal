@@ -1123,7 +1123,7 @@ function app() {
         clientOptions: [
             { value: 'claude', label: 'Claude' },
             { value: 'openai', label: 'OpenAI' },
-            { value: 'gemini', label: 'Google' }
+            { value: 'google', label: 'Google' }
         ],
         providers: [],
         providerLoadBusy: false,
@@ -1440,7 +1440,7 @@ function app() {
         parseHash() {
             const raw = String((window.location && window.location.hash) || '').replace(/^#\/?/, '');
             const [tab, client] = raw.split('/');
-            return { tab: tab || '', client: client || '' };
+            return { tab: tab || '', client: this.canonicalClientType(client) };
         },
 
         hashForState() {
@@ -1584,7 +1584,13 @@ function app() {
             this.focusLocaleButton(locale);
         },
 
+        canonicalClientType(clientType) {
+            const value = String(clientType || '').trim().toLowerCase();
+            return value === 'gemini' ? 'google' : value;
+        },
+
         isSupportedClientType(clientType) {
+            clientType = this.canonicalClientType(clientType);
             return this.clientOptions.some(option => option && option.value === clientType);
         },
 
@@ -1595,7 +1601,7 @@ function app() {
 
             const sessionId = String(session.session_id || '').trim();
             const provider = String(session.provider || '').trim().toLowerCase();
-            const clientType = String(session.client_type || '').trim().toLowerCase();
+            const clientType = this.canonicalClientType(session.client_type);
             const startedAtValue = Number(session.started_at || 0);
             const expiresAt = String(session.expires_at || '').trim();
             const authURL = String(session.auth_url || '').trim();
@@ -4412,6 +4418,7 @@ function app() {
         },
 
         async selectClient(clientType) {
+            clientType = this.canonicalClientType(clientType);
             if (this.providerMutationBusy || this.selectedClient === clientType) {
                 this.syncHash();
                 return;

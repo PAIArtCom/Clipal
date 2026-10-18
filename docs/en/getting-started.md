@@ -91,6 +91,7 @@ Compatibility aliases remain available for older setups:
 
 - `/claudecode`
 - `/codex`
+- `/google`
 - `/gemini`
 
 See [Client Setup](client-setup.md) for exact client-side configuration.

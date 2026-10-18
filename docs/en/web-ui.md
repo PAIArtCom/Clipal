@@ -146,7 +146,7 @@ Management endpoints are `GET` / `PUT /api/providers/<client>/<name>/oauth-envir
 
 ## Provider list
 
-The Google channel supports Gemini API-key providers and Antigravity OAuth accounts. Its configuration and API identifier remains `gemini` (`gemini.yaml`, `/api/providers/gemini`); model names and Gemini-compatible protocol paths retain their original names.
+The Google channel supports Gemini API-key providers and Antigravity OAuth accounts. Its canonical channel identifier is `google` (`google.yaml`, `/api/providers/google`, `#/providers/google`). The `gemini` management API identifier and page links remain compatible aliases; model names and Gemini-compatible protocol fields retain their upstream names. Status and OAuth responses use `google`.
 
 The Claude / OpenAI / Google tabs sit on the top edge of a panel, and everything inside that panel belongs to the selected client. Its first row holds the client's routing, the Auto / Manual switch (its ⓘ explains the mode) and the current routing candidate marked with a target icon, with **Add provider** on the right. A search box (name or base URL) appears there once a group has more than eight providers.
 

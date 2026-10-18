@@ -619,3 +619,44 @@ func TestStoreDeleteProvidersWithRollbackRestoresDeletedUsage(t *testing.T) {
 		t.Fatalf("reloaded snapshot = %#v ok=%v", got, ok)
 	}
 }
+
+func TestGoogleUsageMigrationPreservesAndMergesHistory(t *testing.T) {
+	dir := t.TempDir()
+	data := `{"version":4,"clients":{"gemini":{"providers":{"account":{"request_count":2,"input_tokens":12,"total_tokens":12,"total_cost_micros":200,"has_cost":true}}},"google":{"providers":{"account":{"request_count":3,"input_tokens":8,"total_tokens":8,"total_cost_micros":300,"has_cost":true}}}}}`
+	if err := os.WriteFile(filepath.Join(dir, storeFilename), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	for _, name := range []string{"google", "gemini"} {
+		got := store.ProviderSnapshots(name)["account"]
+		if got.RequestCount != 5 || got.InputTokens != 20 || got.TotalCostMicros != 500 {
+			t.Fatalf("lost history through %s: %#v", name, got)
+		}
+	}
+	if err := store.RecordUsage("gemini", "account", UsageSnapshot{UsageDelta: UsageDelta{InputTokens: 1}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := store.Snapshot()
+	if _, ok := snapshot.Clients["gemini"]; ok {
+		t.Fatal("legacy key persisted")
+	}
+	if snapshot.Clients["google"]["account"].RequestCount != 6 {
+		t.Fatal("legacy record did not join canonical history")
+	}
+	if err := store.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reloaded.Close() }()
+	got := reloaded.ProviderSnapshots("google")["account"]
+	if got.RequestCount != 6 || got.InputTokens != 21 || got.TotalCostMicros != 500 {
+		t.Fatalf("migration repeated or lost data: %#v", got)
+	}
+}

@@ -91,6 +91,7 @@ Clipal 现在统一推荐的客户端入口是：
 
 - `/claudecode`
 - `/codex`
+- `/google`
 - `/gemini`
 
 具体接入方式见 [客户端接入](client-setup.md)。

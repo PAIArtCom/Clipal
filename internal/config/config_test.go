@@ -106,9 +106,9 @@ providers:
 		if err != nil {
 			t.Fatalf("Load: %v", err)
 		}
-		if len(cfg.Claude.Providers) != 0 || len(cfg.OpenAI.Providers) != 0 || len(cfg.Gemini.Providers) != 0 {
+		if len(cfg.Claude.Providers) != 0 || len(cfg.OpenAI.Providers) != 0 || len(cfg.Google.Providers) != 0 {
 			t.Fatalf("expected empty client configs, got Claude=%d OpenAI=%d Gemini=%d",
-				len(cfg.Claude.Providers), len(cfg.OpenAI.Providers), len(cfg.Gemini.Providers))
+				len(cfg.Claude.Providers), len(cfg.OpenAI.Providers), len(cfg.Google.Providers))
 		}
 	})
 
@@ -170,7 +170,7 @@ func TestValidate_CircuitBreakerDisabled_AllowsInvalidCBFields(t *testing.T) {
 		Global: DefaultGlobalConfig(),
 		Claude: ClientConfig{Mode: ClientModeAuto},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	// Disable circuit breaker explicitly.
@@ -205,7 +205,7 @@ func TestValidate_CircuitBreakerEnabled_StillValidatesCBFields(t *testing.T) {
 		Global: DefaultGlobalConfig(),
 		Claude: ClientConfig{Mode: ClientModeAuto},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	cfg.Global.CircuitBreaker.FailureThreshold = 1
@@ -223,7 +223,7 @@ func TestValidate_CircuitBreakerFailureThresholdNegative_IsRejected(t *testing.T
 		Global: DefaultGlobalConfig(),
 		Claude: ClientConfig{Mode: ClientModeAuto},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	cfg.Global.CircuitBreaker.FailureThreshold = -1
@@ -251,7 +251,7 @@ func TestValidate_ManualMode_RequiresEnabledPinnedProvider(t *testing.T) {
 			Providers:      []Provider{provider},
 		},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	// 1. Fails if provider is disabled
@@ -296,7 +296,7 @@ func TestValidate_ProviderAPIKeys_MultiKeySupported(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	applyClientDefaults(&cfg.OpenAI)
@@ -360,7 +360,7 @@ func TestValidate_ProviderAPIKeys_RejectsMixedForms(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil {
@@ -392,7 +392,7 @@ func TestValidate_ProviderOAuthCodexSupportedForOpenAIWithoutBaseURL(t *testing.
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	applyClientDefaults(&cfg.OpenAI)
@@ -425,7 +425,7 @@ func TestValidate_ProviderOAuthClaudeSupportedForClaudeWithoutBaseURL(t *testing
 			},
 		},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	applyClientDefaults(&cfg.Claude)
@@ -441,7 +441,7 @@ func TestValidate_ProviderOAuthClaudeSupportedForClaudeWithoutBaseURL(t *testing
 }
 
 func TestValidate_RejectsRetiredGeminiOAuth(t *testing.T) {
-	cfg := &Config{Global: DefaultGlobalConfig(), Gemini: ClientConfig{Mode: ClientModeAuto, Providers: []Provider{{Name: "old", AuthType: ProviderAuthTypeOAuth, OAuthProvider: OAuthProvider("gemini"), OAuthRef: "old"}}}, OpenAI: ClientConfig{Mode: ClientModeAuto}, Claude: ClientConfig{Mode: ClientModeAuto}}
+	cfg := &Config{Global: DefaultGlobalConfig(), Google: ClientConfig{Mode: ClientModeAuto, Providers: []Provider{{Name: "old", AuthType: ProviderAuthTypeOAuth, OAuthProvider: OAuthProvider("gemini"), OAuthRef: "old"}}}, OpenAI: ClientConfig{Mode: ClientModeAuto}, Claude: ClientConfig{Mode: ClientModeAuto}}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("retired Gemini OAuth must not validate")
 	}
@@ -452,7 +452,7 @@ func TestValidate_ProviderOAuthAntigravitySupportedForGeminiWithoutBaseURL(t *te
 
 	cfg := &Config{
 		Global: DefaultGlobalConfig(),
-		Gemini: ClientConfig{
+		Google: ClientConfig{
 			Mode: ClientModeAuto,
 			Providers: []Provider{
 				{
@@ -468,11 +468,11 @@ func TestValidate_ProviderOAuthAntigravitySupportedForGeminiWithoutBaseURL(t *te
 		Claude: ClientConfig{Mode: ClientModeAuto},
 	}
 
-	applyClientDefaults(&cfg.Gemini)
+	applyClientDefaults(&cfg.Google)
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected validation success, got: %v", err)
 	}
-	if got := cfg.Gemini.Providers[0].NormalizedOAuthProvider(); got != OAuthProviderAntigravity {
+	if got := cfg.Google.Providers[0].NormalizedOAuthProvider(); got != OAuthProviderAntigravity {
 		t.Fatalf("oauth_provider = %q, want %q", got, OAuthProviderAntigravity)
 	}
 }
@@ -497,7 +497,7 @@ func TestValidate_ProviderOAuthRejectsMixedCredentialSources(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "cannot be set when auth_type=oauth") {
@@ -522,7 +522,7 @@ func TestValidate_ProviderOAuthRejectsMissingOAuthRef(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "oauth_ref is required") {
@@ -549,7 +549,7 @@ func TestValidate_ProviderOAuthRejectsBaseURL(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "base_url is not allowed") {
@@ -575,7 +575,7 @@ func TestValidate_ProviderOAuthRejectsUnsupportedClient(t *testing.T) {
 			},
 		},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), `only supported for openai client`) {
@@ -605,7 +605,7 @@ func TestValidate_ProviderThinkingBudgetRejectsNegative(t *testing.T) {
 			},
 		},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "thinking_budget_tokens") {
@@ -700,7 +700,7 @@ func TestValidate_RejectsDuplicateProviderNamesPerClient(t *testing.T) {
 			},
 		},
 		Claude: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	err := cfg.Validate()
@@ -929,7 +929,7 @@ func TestValidate_RoutingConfigRejectsInvalidValues(t *testing.T) {
 				Global: DefaultGlobalConfig(),
 				Claude: ClientConfig{Mode: ClientModeAuto},
 				OpenAI: ClientConfig{Mode: ClientModeAuto},
-				Gemini: ClientConfig{Mode: ClientModeAuto},
+				Google: ClientConfig{Mode: ClientModeAuto},
 			}
 			tt.mutate(cfg)
 
@@ -1013,7 +1013,7 @@ func TestValidate_ProviderProxySettings(t *testing.T) {
 		Global: DefaultGlobalConfig(),
 		Claude: ClientConfig{Mode: ClientModeAuto},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	makeProvider := func(mode ProviderProxyMode, proxyURL string) Provider {
@@ -1099,7 +1099,7 @@ func TestValidate_GlobalUpstreamProxySettings(t *testing.T) {
 		Global: DefaultGlobalConfig(),
 		Claude: ClientConfig{Mode: ClientModeAuto},
 		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Gemini: ClientConfig{Mode: ClientModeAuto},
+		Google: ClientConfig{Mode: ClientModeAuto},
 	}
 
 	cfg.Global.UpstreamProxyMode = GlobalUpstreamProxyModeCustom
@@ -1229,7 +1229,7 @@ func TestApplyUpstreamProxySettings(t *testing.T) {
 func TestLoadExcludesRetiredGeminiOAuthWithoutEditingStoredFiles(t *testing.T) {
 	dir := t.TempDir()
 	body := []byte("mode: manual\npinned_provider: old\nproviders:\n  - name: old\n    auth_type: oauth\n    oauth_provider: gemini\n    oauth_ref: old\n  - name: active\n    auth_type: oauth\n    oauth_provider: antigravity\n    oauth_ref: active\n")
-	path := filepath.Join(dir, "gemini.yaml")
+	path := filepath.Join(dir, "google.yaml")
 	if err := os.WriteFile(path, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1237,8 +1237,8 @@ func TestLoadExcludesRetiredGeminiOAuthWithoutEditingStoredFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Gemini.Providers) != 1 || cfg.Gemini.Providers[0].Name != "active" || cfg.Gemini.PinnedProvider != "" || cfg.Gemini.Mode != ClientModeAuto {
-		t.Fatalf("retired configuration remains active: %#v", cfg.Gemini)
+	if len(cfg.Google.Providers) != 1 || cfg.Google.Providers[0].Name != "active" || cfg.Google.PinnedProvider != "" || cfg.Google.Mode != ClientModeAuto {
+		t.Fatalf("retired configuration remains active: %#v", cfg.Google)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
@@ -1246,5 +1246,72 @@ func TestLoadExcludesRetiredGeminiOAuthWithoutEditingStoredFiles(t *testing.T) {
 	after, err := os.ReadFile(path)
 	if err != nil || string(after) != string(body) {
 		t.Fatal("load rewrote the stored configuration")
+	}
+}
+
+func TestGoogleConfigMigration(t *testing.T) {
+	const original = "# keep formatting\nmode: manual\npinned_provider: account\nproviders:\n  - name: account\n    base_url: https://example.com\n    api_key: secret\n    priority: 1\n"
+	for _, tc := range []struct {
+		name, current string
+		conflict      bool
+	}{
+		{name: "legacy only"},
+		{name: "equivalent files", current: original},
+		{name: "conflicting files", current: strings.ReplaceAll(original, "account", "other"), conflict: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			old := filepath.Join(dir, "gemini.yaml")
+			current := filepath.Join(dir, "google.yaml")
+			if err := os.WriteFile(old, []byte(original), 0o640); err != nil {
+				t.Fatal(err)
+			}
+			if tc.current != "" {
+				if err := os.WriteFile(current, []byte(tc.current), 0o640); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cfg, err := Load(dir)
+			if tc.conflict {
+				if err == nil || !strings.Contains(err.Error(), "different content") {
+					t.Fatalf("expected conflict, got %v", err)
+				}
+				for path, want := range map[string]string{old: original, current: tc.current} {
+					got, e := os.ReadFile(path)
+					if e != nil || string(got) != want {
+						t.Fatalf("conflict changed %s: %v", path, e)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Google.PinnedProvider != "account" || len(cfg.Google.Providers) != 1 {
+				t.Fatalf("lost configuration: %#v", cfg.Google)
+			}
+			if _, err := os.Stat(old); !os.IsNotExist(err) {
+				t.Fatalf("legacy file remains: %v", err)
+			}
+			got, err := os.ReadFile(current)
+			if err != nil || string(got) != original {
+				t.Fatalf("migration changed bytes: %v", err)
+			}
+			info, err := os.Stat(current)
+			if err != nil || info.Mode().Perm() != 0o640 {
+				t.Fatalf("migration changed permissions: %v", err)
+			}
+			if _, err := Load(dir); err != nil {
+				t.Fatalf("second load: %v", err)
+			}
+		})
+	}
+	for _, alias := range []string{"google", "gemini", " GOOGLE ", "GEMINI"} {
+		if got, ok := CanonicalClientType(alias); !ok || got != "google" {
+			t.Fatalf("canonical %q = %q, %v", alias, got, ok)
+		}
+		if got, err := ClientConfigFilename(alias); err != nil || got != "google.yaml" {
+			t.Fatalf("filename %q = %q, %v", alias, got, err)
+		}
 	}
 }

@@ -132,7 +132,7 @@ $ clipal service start
 
 → [claude code]  POST /clipal  →  claude-4-6-sonnet  ✓  288ms
 → [codex]        POST /clipal  →  gpt-5.4       ✓  341ms
-→ [gemini]  POST /clipal  →  gemini-3.1-flash  ✗
+→ [antigravity]  POST /clipal  →  gemini-3.1-flash  ✗
                                 →  OpenAI  [FAILOVER]  ✓  519ms
 ```
 

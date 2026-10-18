@@ -58,7 +58,7 @@ func TestCreateProxyRequest_AntigravityOAuthUsesAntigravityEndpointAndHeaders(t 
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "antigravity-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -73,7 +73,7 @@ func TestCreateProxyRequest_AntigravityOAuthUsesAntigravityEndpointAndHeaders(t 
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1beta/models/gemini-3.1-flash-image:generateContent", bytes.NewReader(body))
 	original.Header.Set("x-goog-api-key", "client-key")
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiGenerateContent,
 		UpstreamPath:   "/v1beta/models/gemini-3.1-flash-image:generateContent",
@@ -131,7 +131,7 @@ func TestCreateProxyRequest_AntigravityOAuthModelsUsesFetchAvailableModels(t *te
 		t.Fatalf("Save: %v", err)
 	}
 
-	cp := newClientProxy(ClientGemini, config.ClientModeAuto, "", []config.Provider{
+	cp := newClientProxy(ClientGoogle, config.ClientModeAuto, "", []config.Provider{
 		{
 			Name:          "antigravity-oauth",
 			AuthType:      config.ProviderAuthTypeOAuth,
@@ -144,7 +144,7 @@ func TestCreateProxyRequest_AntigravityOAuthModelsUsesFetchAvailableModels(t *te
 
 	original := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/v1beta/models", nil)
 	original = withRequestContext(original, RequestContext{
-		ClientType:     ClientGemini,
+		ClientType:     ClientGoogle,
 		Family:         ProtocolFamilyGemini,
 		Capability:     CapabilityGeminiModels,
 		UpstreamPath:   "/v1beta/models",

@@ -144,7 +144,7 @@ func (cp *ClientProxy) currentProvidersSnapshotLocked() map[string]string {
 		if name := providerNameAtIndex(cp.providers, cp.responsesIndex); name != "" {
 			out[string(CapabilityOpenAIResponses)] = name
 		}
-	case ClientGemini:
+	case ClientGoogle:
 		if name := providerNameAtIndex(cp.providers, cp.geminiStreamIndex); name != "" {
 			out[string(CapabilityGeminiStreamGenerate)] = name
 		}

@@ -1007,7 +1007,7 @@ func linkedOAuthProviders(cfg *config.Config, provider config.OAuthProvider) map
 	}
 	appendClient("claude", cfg.Claude.Providers)
 	appendClient("openai", cfg.OpenAI.Providers)
-	appendClient("gemini", cfg.Gemini.Providers)
+	appendClient("google", cfg.Google.Providers)
 	for ref := range out {
 		sort.Strings(out[ref])
 	}

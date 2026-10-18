@@ -119,7 +119,7 @@ func TestSaveGlobalConfigOrWriteError_Paths(t *testing.T) {
 func TestSaveGlobalConfigOrWriteError_RollsBackWhenRuntimeReloadFails(t *testing.T) {
 	api, router, loaded, dir := newRuntimeAPI(t)
 
-	if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte("providers: [\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "google.yaml"), []byte("providers: [\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -136,9 +136,9 @@ func TestSaveGlobalConfigOrWriteError_RollsBackWhenRuntimeReloadFails(t *testing
 		t.Fatalf("runtime log level changed on reload failure: %q", got)
 	}
 	if _, err := config.Load(dir); err == nil {
-		t.Fatalf("expected config.Load to fail because gemini.yaml is still broken")
+		t.Fatalf("expected config.Load to fail because google.yaml is still broken")
 	}
-	deleteBroken := filepath.Join(dir, "gemini.yaml")
+	deleteBroken := filepath.Join(dir, "google.yaml")
 	if err := os.Remove(deleteBroken); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestSaveClientConfigOrWriteError_Paths(t *testing.T) {
 func TestSaveClientConfigOrWriteError_RollsBackWhenRuntimeReloadFails(t *testing.T) {
 	api, router, loaded, dir := newRuntimeAPI(t)
 
-	if err := os.WriteFile(filepath.Join(dir, "gemini.yaml"), []byte("providers: [\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "google.yaml"), []byte("providers: [\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -227,7 +227,7 @@ func TestSaveClientConfigOrWriteError_RollsBackWhenRuntimeReloadFails(t *testing
 	if got := router.ConfigSnapshot().OpenAI.Mode; got != loaded.OpenAI.Mode {
 		t.Fatalf("runtime mode changed on reload failure: %q", got)
 	}
-	if err := os.Remove(filepath.Join(dir, "gemini.yaml")); err != nil {
+	if err := os.Remove(filepath.Join(dir, "google.yaml")); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
 	reloaded, err := config.Load(dir)
