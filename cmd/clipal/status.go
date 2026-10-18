@@ -342,7 +342,7 @@ func displayClientLabel(client string) string {
 	case "openai", "codex":
 		return "OpenAI"
 	case "gemini":
-		return "Gemini"
+		return "Google"
 	default:
 		return client
 	}

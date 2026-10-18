@@ -46,7 +46,7 @@ const TERMINAL_SCRIPT = [
   },
   { type: 'blank', text: '', delay: 100 },
   { type: 'ok', text: '✓ Clipal running on http://127.0.0.1:3333', delay: 180, speed: 18 },
-  { type: 'ok', text: '✓ Providers loaded: Anthropic, OpenAI (3), Gemini (2)', delay: 160, speed: 18 },
+  { type: 'ok', text: '✓ Providers loaded: Anthropic, OpenAI (3), Google (2)', delay: 160, speed: 18 },
   { type: 'ok', text: '✓ Key pool: 5 keys active across 2 providers', delay: 500, speed: 18 },
   { type: 'blank', text: '', delay: 200 },
   { type: 'log', text: '→ [claude code]  POST /clipal  →  claude-4-6-sonnet  ✓  288ms', delay: 700, speed: 22 },

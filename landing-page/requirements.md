@@ -127,7 +127,7 @@ $ clipal service start
   ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝
 
 ✓ Clipal running on http://127.0.0.1:3333
-✓ Providers loaded: Anthropic, OpenAI, Gemini (3)
+✓ Providers loaded: Anthropic, OpenAI, Google (3)
 ✓ Key pool: 5 keys active across 2 providers
 
 → [claude code]  POST /clipal  →  claude-4-6-sonnet  ✓  288ms
@@ -150,7 +150,7 @@ $ clipal service start
 Claude Code · Aider · Continue · Goose · Codex CLI · OpenCode · Antigravity CLI · Cherry Studio
 
 **Row 2 — LLM Providers (Backends Clipal routes TO)**:
-Anthropic · OpenAI · Google Gemini · DeepSeek · Groq · Azure OpenAI
+Anthropic · OpenAI · Google · DeepSeek · Groq · Azure OpenAI
 
 **Effect**:
 - All logos: grayscale `filter: grayscale(1) opacity(0.5)` by default.

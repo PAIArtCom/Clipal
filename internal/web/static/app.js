@@ -177,7 +177,7 @@ function app() {
                     title: 'Clipal Management'
                 },
                 header: {
-                    subtitle: 'Local ingress for Claude, OpenAI, and Gemini traffic',
+                    subtitle: 'Local ingress for Claude, OpenAI, and Google traffic',
                 },
                 nav: {
                     sectionsLabel: 'Sections',
@@ -679,7 +679,7 @@ function app() {
                     title: 'Clipal 管理界面'
                 },
                 header: {
-                    subtitle: '面向 Claude、OpenAI 和 Gemini 流量的本地入口',
+                    subtitle: '面向 Claude、OpenAI 和 Google 流量的本地入口',
                 },
                 nav: {
                     sectionsLabel: '功能分区',
@@ -1123,7 +1123,7 @@ function app() {
         clientOptions: [
             { value: 'claude', label: 'Claude' },
             { value: 'openai', label: 'OpenAI' },
-            { value: 'gemini', label: 'Gemini' }
+            { value: 'gemini', label: 'Google' }
         ],
         providers: [],
         providerLoadBusy: false,

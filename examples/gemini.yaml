@@ -1,4 +1,4 @@
-# Gemini-style upstream providers
+# Google channel upstream providers (Gemini-compatible protocol)
 # Preferred for Gemini-style requests sent to http://127.0.0.1:3333/clipal
 # Legacy alias: http://127.0.0.1:3333/gemini
 

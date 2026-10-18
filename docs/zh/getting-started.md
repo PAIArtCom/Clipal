@@ -53,8 +53,8 @@ http://127.0.0.1:3333/
 
 在 **Providers** 页面你可以：
 
-- 添加、编辑或删除 provider（Claude、OpenAI、Gemini 及任意 OpenAI 兼容端点）
-- 在 OpenAI 页面发起 `OAuth -> Codex`，在 Claude 页面发起 `OAuth -> Claude`，或在 Gemini 页面发起 `OAuth -> Antigravity`，让 Clipal 自动追加对应 provider
+- 添加、编辑或删除 provider（Claude、OpenAI、Google 及任意 OpenAI 兼容端点）
+- 在 OpenAI 页面发起 `OAuth -> Codex`，在 Claude 页面发起 `OAuth -> Claude`，或在 Google 页面发起 `OAuth -> Antigravity`，让 Clipal 自动追加对应 provider
 - 设置 `base_url`、`api_key` / `api_keys` 和路由权重
 - 像管理普通 provider 一样对 OAuth provider 排序、置顶、启停
 

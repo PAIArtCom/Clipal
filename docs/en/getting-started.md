@@ -53,8 +53,8 @@ http://127.0.0.1:3333/
 
 From the **Providers** page you can:
 
-- Add, edit, or remove API-key providers (Claude, OpenAI, Gemini, and any OpenAI-compatible endpoint)
-- Start `OAuth -> Codex` for OpenAI, `OAuth -> Claude` for Claude, or `OAuth -> Antigravity` for Gemini and let Clipal append the provider automatically
+- Add, edit, or remove API-key providers (Claude, OpenAI, Google, and any OpenAI-compatible endpoint)
+- Start `OAuth -> Codex` for OpenAI, `OAuth -> Claude` for Claude, or `OAuth -> Antigravity` for Google and let Clipal append the provider automatically
 - Set `base_url`, `api_key` / `api_keys`, and routing weights for API-key providers
 - Reorder, pin, enable, or disable OAuth providers the same way as API-key providers
 

@@ -146,7 +146,9 @@ Management endpoints are `GET` / `PUT /api/providers/<client>/<name>/oauth-envir
 
 ## Provider list
 
-The Claude / OpenAI / Gemini tabs sit on the top edge of a panel, and everything inside that panel belongs to the selected client. Its first row holds the client's routing, the Auto / Manual switch (its ⓘ explains the mode) and the current routing candidate marked with a target icon, with **Add provider** on the right. A search box (name or base URL) appears there once a group has more than eight providers.
+The Google channel supports Gemini API-key providers and Antigravity OAuth accounts. Its configuration and API identifier remains `gemini` (`gemini.yaml`, `/api/providers/gemini`); model names and Gemini-compatible protocol paths retain their original names.
+
+The Claude / OpenAI / Google tabs sit on the top edge of a panel, and everything inside that panel belongs to the selected client. Its first row holds the client's routing, the Auto / Manual switch (its ⓘ explains the mode) and the current routing candidate marked with a target icon, with **Add provider** on the right. A search box (name or base URL) appears there once a group has more than eight providers.
 
 Below that row, the panel is split in two. On the left, providers are listed one per row in priority order: drag handle (its tooltip includes the configured priority), name, runtime state (in use, standby, disabled, cooling down with time remaining, unavailable, or probing recovery), and the enable switch. Click a row, or focus its name and press Enter, to show that provider on the right; the first provider is shown until you choose another.
 

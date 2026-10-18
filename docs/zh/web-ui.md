@@ -146,7 +146,9 @@ http://127.0.0.1:3333/
 
 ## Provider 列表
 
-Claude / OpenAI / Gemini 标签位于一个面板的上边缘，面板内的内容都属于当前选中的客户端。面板第一行是该客户端的路由：Auto / Manual 切换（ⓘ 说明模式含义）和以靶心图标标示的当前路由候选，右侧为“添加 Provider”；分组内 Provider 超过 8 个时，这一行还会出现搜索框（按名称或 Base URL）。
+Google 渠道支持 Gemini API Key provider 和 Antigravity OAuth 账号。配置与 API 标识仍为 `gemini`（`gemini.yaml`、`/api/providers/gemini`）；模型名称和 Gemini 兼容协议路径沿用原名。
+
+Claude / OpenAI / Google 标签位于一个面板的上边缘，面板内的内容都属于当前选中的客户端。面板第一行是该客户端的路由：Auto / Manual 切换（ⓘ 说明模式含义）和以靶心图标标示的当前路由候选，右侧为“添加 Provider”；分组内 Provider 超过 8 个时，这一行还会出现搜索框（按名称或 Base URL）。
 
 这一行下方分为左右两栏。左栏按优先级一行一个列出 Provider：拖拽手柄（提示中含配置优先级）、名称、运行态（使用中、待命、已停用、冷却中含剩余时间、不可用、恢复探测中）和启用开关。点击某行，或聚焦名称后按回车，即在右栏显示该 Provider；未选择时显示第一个。
 
