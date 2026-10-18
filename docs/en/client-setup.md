@@ -84,6 +84,7 @@ Notes:
 
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
 - Takeover supports custom files, `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, and XDG paths, preferring the later-loaded `opencode.jsonc`. Provider restrictions that exclude Clipal block apply and remain unchanged.
+- Restrictions and main/small models are resolved from the merged known user layers; only the selected file is changed. An explicit gateway model selection replaces a stale alias wire ID while retaining other metadata; without an explicit selection, alias mappings are preserved. See [takeover and config merging](web-ui.md#cli-takeover).
 - The Web UI takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>` when possible
 - Project-local `opencode.json` or environment-based overrides may still take precedence
 

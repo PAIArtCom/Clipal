@@ -79,6 +79,7 @@ wire_api = "responses"
 
 - OpenCode 的 `baseURL` 保持为 `http://127.0.0.1:3333/clipal` 即可，不要手动再补 `/v1`
 - 接管支持自定义文件、`OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR` 和 XDG 目录，并优先选择同目录的 `opencode.jsonc`。已禁用 Clipal provider 时会提示冲突，不改写用户限制。
+- 接管按已知用户配置层的合并结果检查限制并解析主模型和小模型，只修改选定文件。明确选择网关模型 ID 时会覆盖旧别名的实际请求 ID，保留其他元数据；未明确选择时保留原别名映射。详见 [接管与配置合并](web-ui.md#cli-takeover)。
 
 说明：
 

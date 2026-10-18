@@ -18,6 +18,14 @@ import (
 func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, error) {
 	files, err := m.planTakeover(product, cfg)
 	if err != nil {
+		var conflict *openCodeConflictError
+		if errors.As(err, &conflict) {
+			target, e := m.targetOptions(product)
+			if e != nil {
+				return Status{}, e
+			}
+			return Status{Product: product, State: StateNotConfigured, TargetPath: conflict.path, TargetOptions: target, BackupAvailable: m.hasLatestBackup(product), Verification: "blocked", Warning: conflict.Error()}, nil
+		}
 		var selection *modelSelectionError
 		if errors.As(err, &selection) {
 			target, e := m.targetOptions(product)
@@ -119,17 +127,6 @@ func (m Manager) takeoverStatus(product ProductID, cfg *config.Config) (Status, 
 		}
 	case ProductOpenCode:
 		warnings = append(warnings, "OpenCode project, inline, or managed configuration may override this file. Use the selected OPENCODE_CONFIG/OPENCODE_CONFIG_DIR when launching.")
-		body, e := readJSONCMap(files[0].TargetPath)
-		if e == nil {
-			disabled, _ := body["disabled_providers"].([]any)
-			enabled, _ := body["enabled_providers"].([]any)
-			if stringListContains(disabled, "clipal") {
-				blocked = append(blocked, "disabled_providers disables clipal")
-			}
-			if _, specified := body["enabled_providers"]; specified && !stringListContains(enabled, "clipal") {
-				blocked = append(blocked, "enabled_providers excludes clipal")
-			}
-		}
 		if os.Getenv("OPENCODE_CONFIG_CONTENT") != "" {
 			warnings = append(warnings, "OPENCODE_CONFIG_CONTENT is present and may override routing.")
 		}

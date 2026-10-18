@@ -2,6 +2,7 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,5 +221,254 @@ func TestOpenCodePreservesProviderAndModelMetadata(t *testing.T) {
 	got, err := os.ReadFile(path)
 	if err != nil || string(got) != string(raw) {
 		t.Fatal("did not restore original")
+	}
+}
+
+func TestOpenCodeExplicitSelectionOverridesWireAlias(t *testing.T) {
+	for _, explicit := range []bool{false, true} {
+		t.Run(fmt.Sprint(explicit), func(t *testing.T) {
+			m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			if explicit {
+				if err := m.SetTarget(ProductOpenCode, TargetOptions{Model: "selected-id"}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path, err := m.opencodeTargetPath()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			raw := []byte(`{"model":"clipal/selected-id","provider":{"clipal":{"models":{"selected-id":{"id":"old-wire-id","name":"User alias","limit":{"context":32000}}}}}}`)
+			if err = os.WriteFile(path, raw, 0640); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				cfg.Global.Port++
+				if _, err = m.Apply(ProductOpenCode, cfg); err != nil {
+					t.Fatal(err)
+				}
+			}
+			doc, err := readJSONMap(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			models, ok := openCodeProvider(doc)["models"].(map[string]any)
+			if !ok {
+				t.Fatal("missing models")
+			}
+			model, ok := models["selected-id"].(map[string]any)
+			if !ok {
+				t.Fatal("missing alias")
+			}
+			want := "old-wire-id"
+			if explicit {
+				want = "selected-id"
+			}
+			if model["id"] != want || model["name"] != "User alias" || model["limit"] == nil {
+				t.Fatalf("incorrect alias or lost metadata: %#v", model)
+			}
+			if _, err = m.Rollback(ProductOpenCode, cfg); err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != string(raw) {
+				t.Fatal("rollback changed original alias")
+			}
+		})
+	}
+}
+
+func TestOpenCodeMergedRestrictionsAndOverrides(t *testing.T) {
+	cases := []struct {
+		name, lower, upper, inline string
+		blocked                    bool
+	}{
+		{"disabled in JSON", `{"disabled_providers":["clipal"]}`, `{}`, "", true},
+		{"allowlist in JSON", `{"enabled_providers":["other"]}`, `{}`, "", true},
+		{"higher allowlist excludes", `{"enabled_providers":["clipal"]}`, `{"enabled_providers":["other"]}`, "", true},
+		{"higher clears disabled", `{"disabled_providers":["clipal"]}`, `{"disabled_providers":[]}`, "", false},
+		{"higher includes provider", `{"enabled_providers":["other"]}`, `{"enabled_providers":["clipal"]}`, "", false},
+		{"inline blocks", `{}`, `{}`, `{"disabled_providers":["clipal"]}`, true},
+		{"inline allows", `{"disabled_providers":["clipal"]}`, `{}`, `{"disabled_providers":[]}`, false},
+		{"inline shadows model", `{}`, `{}`, `{"model":"other/model"}`, true},
+		{"inline shadows wire ID", `{}`, `{}`, `{"provider":{"clipal":{"models":{"selected-id":{"id":"other-wire"}}}}}`, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("OPENCODE_CONFIG_CONTENT", tc.inline)
+			m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			if err := m.SetTarget(ProductOpenCode, TargetOptions{Model: "selected-id"}); err != nil {
+				t.Fatal(err)
+			}
+			dir, err := m.clientConfigDir(ProductOpenCode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.MkdirAll(dir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			lower, upper := filepath.Join(dir, "opencode.json"), filepath.Join(dir, "opencode.jsonc")
+			for path, raw := range map[string]string{lower: tc.lower, upper: tc.upper} {
+				if err = os.WriteFile(path, []byte(raw), 0640); err != nil {
+					t.Fatal(err)
+				}
+			}
+			status, err := m.Status(ProductOpenCode, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (status.Verification == "blocked") != tc.blocked {
+				t.Fatalf("incorrect merged restriction: %+v", status)
+			}
+			_, err = m.Apply(ProductOpenCode, cfg)
+			if tc.blocked {
+				if err == nil {
+					t.Fatal("applied despite merged restriction")
+				}
+				got, e := os.ReadFile(upper)
+				if e != nil || string(got) != tc.upper {
+					t.Fatal("changed blocked file")
+				}
+				if m.hasLatestBackup(ProductOpenCode) {
+					t.Fatal("blocked apply published baseline")
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = m.Rollback(ProductOpenCode, cfg); err != nil {
+					t.Fatal(err)
+				}
+				got, e := os.ReadFile(upper)
+				if e != nil || string(got) != tc.upper {
+					t.Fatal("rollback changed upper layer")
+				}
+			}
+			got, e := os.ReadFile(lower)
+			if e != nil || string(got) != tc.lower {
+				t.Fatal("changed read-only lower layer")
+			}
+		})
+	}
+}
+
+func TestOpenCodeInheritedModelsAndReadOnlyDependency(t *testing.T) {
+	m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
+	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+	dir, err := m.clientConfigDir(ProductOpenCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	lower, upper := filepath.Join(dir, "opencode.json"), filepath.Join(dir, "opencode.jsonc")
+	raw := []byte(`{"model":"source/alias","small_model":"source/small","provider":{"source":{"models":{"alias":{"id":"wire-main","limit":{"context":32000}},"small":{"id":"wire-small"}}}},"instructions":["keep.md"]}`)
+	if err = os.WriteFile(lower, raw, 0640); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(upper, []byte(`{"permission":{"*":"deny"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.Apply(ProductOpenCode, cfg); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := readJSONMap(upper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc["model"] != "clipal/alias" || doc["small_model"] != "clipal/small" || doc["instructions"] != nil {
+		t.Fatalf("incorrect inherited selection or copied unrelated fields: %#v", doc)
+	}
+	if _, err = m.Rollback(ProductOpenCode, cfg); err != nil {
+		t.Fatal(err)
+	}
+	// Detect a lower layer changing after the plan, before replacing the target.
+	before, err := os.ReadFile(upper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.beforeTakeoverWrite = func(_ int, _ string) error {
+		return os.WriteFile(lower, []byte(`{"disabled_providers":["clipal"]}`), 0640)
+	}
+	if _, err = m.Apply(ProductOpenCode, cfg); err == nil {
+		t.Fatal("ignored a changed read-only input")
+	}
+	after, e := os.ReadFile(upper)
+	if e != nil || string(after) != string(before) {
+		t.Fatal("changed target despite stale dependency")
+	}
+	if m.hasLatestBackup(ProductOpenCode) {
+		t.Fatal("failed apply retained a new baseline")
+	}
+}
+
+func TestOpenCodeGlobalCustomFileAndDirectoryOrder(t *testing.T) {
+	for _, laterDirBlocks := range []bool{false, true} {
+		t.Run(fmt.Sprint(laterDirBlocks), func(t *testing.T) {
+			home := t.TempDir()
+			global := filepath.Join(home, "xdg", "opencode")
+			custom := filepath.Join(home, "selected.jsonc")
+			dir := filepath.Join(home, "custom-dir")
+			t.Setenv("XDG_CONFIG_HOME", filepath.Dir(global))
+			t.Setenv("OPENCODE_CONFIG", "")
+			t.Setenv("OPENCODE_CONFIG_DIR", dir)
+			t.Setenv("OPENCODE_CONFIG_CONTENT", "")
+			m := Manager{homeDir: home, configDir: t.TempDir()}
+			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			// config_file takes precedence over the separately saved directory. The
+			// launch environment's custom directory is still a later client layer.
+			if err := m.SetTarget(ProductOpenCode, TargetOptions{ConfigFile: custom, ConfigDir: filepath.Join(home, "unused"), Model: "selected-id"}); err != nil {
+				t.Fatal(err)
+			}
+			upper := `{}`
+			if laterDirBlocks {
+				upper = `{"disabled_providers":["clipal"]}`
+			}
+			files := map[string]string{
+				filepath.Join(global, "config.json"): `{"disabled_providers":["clipal"]}`,
+				custom:                               `{"disabled_providers":[]}`,
+				filepath.Join(dir, "config.json"):    `{"enabled_providers":["unused-legacy-file"]}`,
+				filepath.Join(dir, "opencode.json"):  upper,
+			}
+			for path, body := range files {
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(body), 0640); err != nil {
+					t.Fatal(err)
+				}
+			}
+			status, err := m.Status(ProductOpenCode, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (status.Verification == "blocked") != laterDirBlocks {
+				t.Fatalf("incorrect layer order: %+v", status)
+			}
+			_, err = m.Apply(ProductOpenCode, cfg)
+			if laterDirBlocks {
+				if err == nil {
+					t.Fatal("ignored later directory restriction")
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = m.Rollback(ProductOpenCode, cfg); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for path, body := range files {
+				got, e := os.ReadFile(path)
+				if e != nil || string(got) != body {
+					t.Fatalf("modified source layer %s", path)
+				}
+			}
+		})
 	}
 }

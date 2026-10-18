@@ -82,6 +82,8 @@ OpenCode、Continue、Aider 和 Goose 支持 `config_dir` 和 `model`；前三�
 
 OpenCode 遵循 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、XDG 配置目录，并优先管理同目录中后加载的 `opencode.jsonc`。`disabled_providers` 或 `enabled_providers` 排除 Clipal 时会阻止 apply，不改写限制规则。Continue 支持 `CONTINUE_GLOBAL_DIR`，但启动时的 `--config` 和保存的配置选择仍可能覆盖默认文件。Goose 支持绝对路径 `GOOSE_PATH_ROOT/config`，显式 `config_dir` 指向配置目录本身；启动时使用匹配的环境。Aider 的显式文件需用 `--config` 启动。跨 provider 的 Aider 模型需要明确选择网关模型，辅助模型设置保留并提示其可能使用其他提供商。
 
+OpenCode 的限制和模型按已知用户配置层合并后判断：XDG 全局目录中的 `config.json`、`opencode.json`、`opencode.jsonc`，自定义配置文件，自定义目录中的 `opencode.json`、`opencode.jsonc`，最后是 `OPENCODE_CONFIG_CONTENT`。对象递归合并，限制列表由高优先级层替换。只写入选定文件所需的接管字段，其他层保持只读；参与规划的文件变化时会中止写入。后续已知层覆盖选定文件的路由时，会提示冲突。未明确选择模型时保留别名的实际请求 ID；明确填写网关模型 ID 时会更新该请求 ID，同时保留名称、限制和其他元数据。项目、远程和受管配置仍需在客户端运行环境中验证。
+
 实际客户端验证可使用隔离的 smoke 脚本：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
 
 ```sh

@@ -89,6 +89,12 @@ def main():
              'goose':b'{"name":"clipal","engine":"openai","display_name":"Clipal","base_url":"http://original.invalid","models":[],"requires_auth":false}\n'}
     for product, path in other_files.items():
         originals[path] = seeds[product]
+    client_files = {product:[path] for product,path in other_files.items()}
+    if 'opencode' in products:
+        lower = client_dirs['opencode'] / 'opencode.json'
+        client_files['opencode'].append(lower)
+        originals[lower] = (json.dumps({'$schema':'https://opencode.ai/config.json', 'disabled_providers':['clipal'], 'small_model':'clipal/'+model}) + '\n').encode()
+        originals[other_files['opencode']] = (json.dumps({'$schema':'https://opencode.ai/config.json', 'permission':{'*':'deny'}, 'model':'clipal/'+model, 'provider':{'clipal':{'models':{model:{'id':'clipal-audit-stale-model', 'name':'Preserved alias'}}}}}) + '\n').encode()
     for path, data in originals.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -143,6 +149,29 @@ def main():
         for product in ['opencode','continue','aider','goose']:
             if product in products:
                 api(f'/api/integrations/{product}/target', {'config_dir':str(client_dirs[product]),'model':model})
+        if 'opencode' in products:
+            # The real client must see the lower file's restriction too.
+            resolved = json.loads(run([binaries['opencode'], 'debug', 'config', '--pure'],env,work,40))
+            if 'clipal' not in resolved.get('disabled_providers',[]):
+                raise RuntimeError('OpenCode did not merge the regression fixture')
+            before_blocked = {path:path.read_bytes() for path in client_files['opencode']}
+            blocked = next(item for item in api('/api/integrations') if item['product']=='opencode')
+            if blocked.get('verification') != 'blocked':
+                raise RuntimeError('Clipal missed the merged provider restriction')
+            try:
+                api('/api/integrations/opencode/apply',{})
+            except RuntimeError as error:
+                if 'disabled_providers' not in str(error):
+                    raise
+            else:
+                raise RuntimeError('Clipal applied a provider disabled by a lower layer')
+            if any(path.read_bytes()!=data for path,data in before_blocked.items()):
+                raise RuntimeError('Blocked takeover modified a configuration layer')
+            lower = client_dirs['opencode'] / 'opencode.json'
+            allowed = json.loads(lower.read_text())
+            allowed['disabled_providers'] = []
+            originals[lower] = (json.dumps(allowed)+'\n').encode()
+            lower.write_bytes(originals[lower])
         for product, command in commands.items():
             if product not in products:
                 continue
@@ -150,6 +179,13 @@ def main():
             api(f'/api/integrations/{product}/apply', {})
             active.append(product)
             api(f'/api/integrations/{product}/apply', {})
+            if product == 'opencode':
+                resolved = json.loads(run([binaries['opencode'],'debug','config','--pure'],env,work,40))
+                actual = resolved['provider']['clipal']['models'][model]
+                if actual.get('id') != model or actual.get('name') != 'Preserved alias':
+                    raise RuntimeError('Explicit model selection did not replace the stale wire ID while preserving metadata')
+                if resolved.get('model') != 'clipal/'+model or resolved.get('small_model') != 'clipal/'+model:
+                    raise RuntimeError('The real client did not resolve the managed model selections')
             marker = 'CLIPAL_TAKEOVER_' + product.upper() + '_OK'
             prompt = 'Reply with exactly ' + marker + '. Do not use tools.'
             if product == 'codex':
@@ -192,7 +228,7 @@ def main():
             relevant = [path for path in originals if (product == 'codex' and path.parent == codex_dir) or
                         (product == 'claude' and path.parent == claude_dir) or
                         (product == 'antigravity' and path.is_relative_to(home)) or
-                        (product in other_files and path == other_files[product])]
+                        (product in client_files and path in client_files[product])]
             for path in relevant:
                 if path.read_bytes() != originals[path]:
                     raise RuntimeError(f'{product} rollback changed {path}')
@@ -209,6 +245,8 @@ def main():
             if any(path.read_bytes() != data for path, data in modified.items()):
                 raise RuntimeError(f'{product} second-cycle rollback lost edits')
             report['clients'][product] = {'version': version, 'marker': marker, 'http_status': outcome['status'], 'rollback': 'byte-exact', 'second_cycle': 'preserved', **({'model':model} if product in other_files else {})}
+            if product == 'opencode':
+                report['clients'][product].update(explicit_alias='verified', merged_restriction='blocked', read_only_layers='preserved')
             print(product + ': request HTTP 200, rollback and second cycle verified', flush=True)
         report['real_user_files_unchanged'] = all(fingerprint(path) == before[str(path)] for path in untouched)
         if not report['real_user_files_unchanged']:

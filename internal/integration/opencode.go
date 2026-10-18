@@ -2,7 +2,6 @@ package integration
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
@@ -22,22 +21,26 @@ func (m Manager) advertisedOpenCodeBaseURL(cfg *config.Config) string {
 	return m.advertisedBaseURL(cfg)
 }
 
-func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
+func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
 	targetPath, err := m.opencodeTargetPath()
 	if err != nil {
-		return Preview{}, err
+		return nil, err
 	}
 
-	current := ""
+	state, err := m.readOpenCodeConfig(targetPath)
+	if err != nil {
+		return nil, err
+	}
+	effective := state.effective(nil)
+	if reason := openCodeRestriction(effective); reason != "" {
+		return nil, &openCodeConflictError{path: targetPath, reason: reason}
+	}
 	doc := map[string]any{}
-	if raw, err := os.ReadFile(targetPath); err == nil {
-		current = string(raw)
-		doc, err = readJSONCMap(targetPath)
+	if state.target.Existed {
+		doc, err = parseJSONCMap(state.target.Original)
 		if err != nil {
-			return Preview{}, fmt.Errorf("read OpenCode config for preview: %w", err)
+			return nil, err
 		}
-	} else if !os.IsNotExist(err) {
-		return Preview{}, fmt.Errorf("read OpenCode config for preview: %w", err)
 	}
 
 	if _, ok := doc["$schema"]; !ok {
@@ -46,16 +49,16 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 
 	selections := map[string]string{}
 	for _, field := range []string{"model", "small_model"} {
-		selections[field], _ = doc[field].(string)
+		selections[field], _ = effective[field].(string)
 	}
-	primaryID, primaryName := inferOpenCodeModel(doc, "model", "")
+	primaryID, primaryName := inferOpenCodeModel(effective, "model", "")
 	target, err := m.targetOptions(ProductOpenCode)
 	if err != nil {
-		return Preview{}, err
+		return nil, err
 	}
 	chosen, err := m.selectedModel(ProductOpenCode, targetPath, primaryID)
 	if err != nil {
-		return Preview{}, err
+		return nil, err
 	}
 	if target.Model != "" {
 		primaryName = chosen
@@ -63,7 +66,7 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 	primaryID = chosen
 	doc["model"] = "clipal/" + primaryID
 
-	smallID, smallName := inferOpenCodeModel(doc, "small_model", "")
+	smallID, smallName := inferOpenCodeModel(effective, "small_model", "")
 	if smallID != "" {
 		doc["small_model"] = "clipal/" + smallID
 	}
@@ -78,9 +81,15 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 	}
 	if clipalProvider["npm"] == nil {
 		clipalProvider["npm"] = openCodeProviderNPM
+		if inherited := openCodeProvider(effective); inherited["npm"] != nil {
+			clipalProvider["npm"] = inherited["npm"]
+		}
 	}
 	if clipalProvider["name"] == nil {
 		clipalProvider["name"] = "Clipal"
+		if inherited := openCodeProvider(effective); inherited["name"] != nil {
+			clipalProvider["name"] = inherited["name"]
+		}
 	}
 
 	options, _ := clipalProvider["options"].(map[string]any)
@@ -88,7 +97,9 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 		options = map[string]any{}
 	}
 	options["baseURL"] = m.advertisedOpenCodeBaseURL(cfg)
-	if key, _ := options["apiKey"].(string); strings.TrimSpace(key) == "" {
+	inheritedOptions, _ := openCodeProvider(effective)["options"].(map[string]any)
+	effectiveKey, _ := inheritedOptions["apiKey"].(string)
+	if key, _ := options["apiKey"].(string); strings.TrimSpace(key) == "" && strings.TrimSpace(effectiveKey) == "" {
 		options["apiKey"] = openCodeProviderAPIKey
 	}
 	clipalProvider["options"] = options
@@ -97,28 +108,40 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 	if models == nil {
 		models = map[string]any{}
 	}
-	// Preserve declared wire IDs, limits and capabilities when moving an
-	// existing model into the Clipal provider.
+	// Seed only the selected models from the merged view; leave all other
+	// inherited provider metadata in its original files.
 	for _, field := range []string{"model", "small_model"} {
-		value := selections[field]
-		provider, id, ok := strings.Cut(value, "/")
-		if !ok || provider == "clipal" {
+		id := primaryID
+		if field == "small_model" {
+			id = smallID
+		}
+		if id == "" {
 			continue
 		}
-		source, _ := providers[provider].(map[string]any)
-		declared, _ := source["models"].(map[string]any)
-		metadata, _ := declared[id].(map[string]any)
-		if models[id] == nil && metadata != nil {
-			copy := map[string]any{}
-			for key, value := range metadata {
-				copy[key] = value
+		inheritedModels, _ := openCodeProvider(effective)["models"].(map[string]any)
+		metadata, _ := inheritedModels[id].(map[string]any)
+		if metadata == nil {
+			provider, sourceID, ok := strings.Cut(selections[field], "/")
+			if ok && sourceID == id {
+				sources, _ := effective["provider"].(map[string]any)
+				source, _ := sources[provider].(map[string]any)
+				declared, _ := source["models"].(map[string]any)
+				metadata, _ = declared[id].(map[string]any)
 			}
-			models[id] = copy
 		}
+		merged := map[string]any{}
+		mergeOpenCodeRouting(merged, metadata)
+		local, _ := models[id].(map[string]any)
+		mergeOpenCodeRouting(merged, local)
+		models[id] = merged
 	}
 	upsertOpenCodeModel(models, primaryID, primaryName)
 	if smallID != "" {
 		upsertOpenCodeModel(models, smallID, smallName)
+	}
+	if target.Model != "" {
+		model, _ := models[primaryID].(map[string]any)
+		model["id"] = primaryID
 	}
 	clipalProvider["models"] = models
 
@@ -127,14 +150,13 @@ func (m Manager) previewOpenCode(cfg *config.Config) (Preview, error) {
 
 	plannedBytes, err := marshalJSONMap(doc)
 	if err != nil {
-		return Preview{}, fmt.Errorf("marshal OpenCode preview: %w", err)
+		return nil, fmt.Errorf("marshal OpenCode preview: %w", err)
 	}
 
-	return Preview{
-		Product:        ProductOpenCode,
-		CurrentContent: current,
-		PlannedContent: string(plannedBytes),
-	}, nil
+	if openCodeRouteShadow(doc, state.effective(doc)) {
+		return nil, &openCodeConflictError{path: targetPath, reason: "A later known OpenCode configuration layer overrides the selected file's model or provider routing; select the higher-priority file or resolve that override."}
+	}
+	return []takeoverFile{{backupFile: state.target, Planned: plannedBytes, Dependencies: state.dependencies}}, nil
 }
 
 func inferOpenCodeModel(doc map[string]any, field, fallback string) (string, string) {

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -132,7 +133,11 @@ func readJSONCMap(path string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	standardized, err := hujson.Standardize(data)
+	return parseJSONCMap(data)
+}
+
+func parseJSONCMap(data []byte) (map[string]any, error) {
+	standardized, err := hujson.Standardize(bytes.Clone(data))
 	if err != nil {
 		return nil, err
 	}

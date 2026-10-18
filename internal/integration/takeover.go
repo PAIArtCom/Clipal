@@ -17,9 +17,10 @@ var takeoverMu sync.Mutex
 
 type takeoverFile struct {
 	backupFile
-	Planned     []byte
-	Remove      bool
-	PlannedMode os.FileMode
+	Dependencies []backupFile
+	Planned      []byte
+	Remove       bool
+	PlannedMode  os.FileMode
 }
 
 func (m Manager) planTakeover(product ProductID, cfg *config.Config) ([]takeoverFile, error) {
@@ -31,11 +32,7 @@ func (m Manager) planTakeover(product ProductID, cfg *config.Config) ([]takeover
 	case ProductAntigravityCLI:
 		return m.planAntigravity(cfg)
 	case ProductOpenCode:
-		path, err := m.opencodeTargetPath()
-		if err != nil {
-			return nil, err
-		}
-		return planSingleFile(path, func() (Preview, error) { return m.previewOpenCode(cfg) })
+		return m.planOpenCode(cfg)
 	case ProductContinue:
 		path, err := m.continueTargetPath()
 		if err != nil {
@@ -97,17 +94,13 @@ func (m Manager) writeTakeoverFiles(files []takeoverFile, beforeCommit func() er
 		}
 	}()
 	for i, file := range files {
-		current, err := readBackupFile(file.TargetPath)
-		if err != nil {
+		if err := verifyTakeoverInput(file); err != nil {
 			return err
-		}
-		if current.TargetPath != file.TargetPath || current.Existed != file.Existed || current.Mode != file.Mode || !bytes.Equal(current.Original, file.Original) {
-			return fmt.Errorf("%s changed after preview; retry", file.TargetPath)
 		}
 		if file.Remove {
 			continue
 		}
-		if err = os.MkdirAll(filepath.Dir(file.TargetPath), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(file.TargetPath), 0700); err != nil {
 			return err
 		}
 		tmp, err := os.CreateTemp(filepath.Dir(file.TargetPath), ".clipal-takeover-*")
@@ -145,12 +138,7 @@ func (m Manager) writeTakeoverFiles(files []takeoverFile, beforeCommit func() er
 			err = m.beforeTakeoverWrite(i, file.TargetPath)
 		}
 		if err == nil {
-			current, e := readBackupFile(file.TargetPath)
-			if e != nil {
-				err = e
-			} else if current.TargetPath != file.TargetPath || current.Existed != file.Existed || current.Mode != file.Mode || !bytes.Equal(current.Original, file.Original) {
-				err = fmt.Errorf("%s changed during takeover; retry", file.TargetPath)
-			}
+			err = verifyTakeoverInput(file)
 		}
 		if err == nil {
 			if file.Remove {
@@ -433,3 +421,16 @@ type takeoverWriteError struct {
 
 func (e *takeoverWriteError) Error() string { return errors.Join(e.cause, e.recovery).Error() }
 func (e *takeoverWriteError) Unwrap() error { return errors.Join(e.cause, e.recovery) }
+
+func verifyTakeoverInput(file takeoverFile) error {
+	for _, expected := range append([]backupFile{file.backupFile}, file.Dependencies...) {
+		current, err := readBackupFile(expected.TargetPath)
+		if err != nil {
+			return err
+		}
+		if current.TargetPath != expected.TargetPath || current.Existed != expected.Existed || current.Mode != expected.Mode || !bytes.Equal(current.Original, expected.Original) {
+			return fmt.Errorf("%s changed during takeover; retry", expected.TargetPath)
+		}
+	}
+	return nil
+}
