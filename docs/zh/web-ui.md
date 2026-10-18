@@ -68,18 +68,28 @@ http://127.0.0.1:3333/
 - 展示 Clipal 实际管理的目标配置文件路径
 - 在 apply 前预览“当前文件”和“Apply 后将写入的结果”
 
-说明：
+Codex CLI、Claude Code 与 Antigravity CLI 共用接管周期。首次 apply 捕获全部管理文件的内容、原始存在状态和权限；重复 apply 或修改入口地址时保留该基线。所有文件先验证并暂存，再替换目标；写入失败会恢复到本次操作前的状态。Rollback 恢复本周期基线并结束周期，下一次 apply 重新捕获基线。历史备份归档保留在磁盘上；若自动恢复本身失败，活动备份会保留供重试。这是可恢复的多文件操作，不承诺跨文件在断电时整体原子提交。
 
-- 当前阶段只修改用户级配置
-- `Claude Code` 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`，只有缺少 Claude 客户端认证环境变量时才补占位 `ANTHROPIC_API_KEY`，必要时也会把 `~/.claude.json` 的 onboarding 标记补成完成；已有 `ANTHROPIC_API_KEY` 和 `ANTHROPIC_AUTH_TOKEN` 不会被覆盖
+“**配置位置**”允许指定绝对客户端目录，以及 Codex 的可选 profile。目录留空时读取 `CODEX_HOME` / `CLAUDE_CONFIG_DIR`，再回退到客户端默认值。选择 Codex profile 后，管理 `<profile>.config.toml`，运行时应使用匹配的 `CODEX_HOME` 和 `codex --profile <profile>`。Claude 默认使用 `~/.claude.json` 保存 onboarding，自定义目录时使用 `<CLAUDE_CONFIG_DIR>/.claude.json`。Antigravity 保留官方固定的设置文件位置，允许选择 shell 类型和启动文件目录。后台服务无法检测 `SHELL` 时，需显式选择 bash、zsh 或 sh。修改位置前必须先回滚活动周期。
+
+“**配置已写入**”仅确认文件内容，运行时请求仍为“**尚未验证**”。Claude 的其他提供商选择变量和 host-managed 环境冲突会明确提示；项目或受管设置、Codex profile 仍可能覆盖用户默认值。Clipal 不清除企业策略。后台服务与启动客户端的终端可能继承不同环境，必要时请显式选择配置位置。
+
+Antigravity 管理 `.bashrc` 及首个适用的 Bash 登录文件（`.bash_profile`、`.bash_login` 或 `.profile`）；Zsh 使用 `$ZDOTDIR/.zshrc`，未设置时使用 HOME；POSIX sh 使用 `.profile`。显式选择 shell 目录时以其为准。全部文件均纳入预览与备份。Apply 和 Rollback 后都应新开终端：仅 source 恢复后的配置不会清除当前 shell 已经导出的变量。
+
+管理 API：`POST /api/integrations/<product>/target` 接受 `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`；`profile` 仅适用于 Codex，`shell_dir` / `shell` 仅适用于 Antigravity（`shell` 接受 bash、zsh 或 sh），Antigravity 不接受自定义 `config_dir`。列表及操作响应包含 `target_options` 和 `verification`（`not_verified` 或 `blocked`）。某个客户端文件损坏时，只在对应卡片报错，其他客户端及可用回滚操作仍可访问。
+
+
+实际客户端验证可使用隔离的 smoke 脚本：先启动已配置可用账号的网关，再构建并执行以下命令。脚本会发起真实模型请求，检查回滚和第二轮接管，保持用户原有客户端文件不变。仅选择具有可用上游账号的客户端；省略 `--products` 会同时验证 Claude。
+
+```sh
+go build -o /tmp/clipal-takeover ./cmd/clipal
+python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products codex,antigravity
+```
+
 - `OpenCode` 的一键接管会新增或更新 `provider.clipal`，并把当前 `model` 改写为 `clipal/<当前模型ID>`
-- `Antigravity CLI` 接管在 `~/.gemini/antigravity-cli/settings.json` 设置 `modelProvider: "gemini"`，并在 bash、zsh 或 POSIX sh 的用户配置中维护带标记的区块，导出 `GOOGLE_GEMINI_BASE_URL` 和本地占位值 `GEMINI_API_KEY=clipal`。两个文件均提供预览与备份，回滚恢复两者；接管或回滚后请打开新终端。
 - `Continue` 的一键接管会新增或更新用户级 `Clipal` 模型项
 - `Aider` 的一键接管会更新 home 级 `openai-api-base`，并补一个最小 OpenAI 兼容 `model`；已有 `openai-api-key` 会保留，只有缺失时才自动补占位值 `clipal`
 - `Goose` 的一键接管会管理 `~/.config/goose/custom_providers/` 下的独立 custom provider 文件
-- 项目级、受管控或企业策略下发的配置仍可能覆盖最终生效结果
-- 对已经由 Clipal 接管的配置重复执行 apply 会尽量保持幂等，不覆盖最初备份
-- Apply 或 Rollback 后，建议重启客户端或新开一个会话，让它重新加载用户级配置
 
 ### 导出完整备份
 

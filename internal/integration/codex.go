@@ -12,45 +12,35 @@ import (
 )
 
 func (m Manager) codexTargetPath() (string, error) {
-	home, err := m.resolveHomeDir()
+	directory, err := m.clientConfigDir(ProductCodexCLI)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".codex", "config.toml"), nil
+	target, err := m.targetOptions(ProductCodexCLI)
+	if err != nil {
+		return "", err
+	}
+	filename := "config.toml"
+	if target.Profile != "" {
+		filename = target.Profile + ".config.toml"
+	}
+	return filepath.Join(directory, filename), nil
 }
 
-func (m Manager) codexStatus(cfg *config.Config) (Status, error) {
-	targetPath, err := m.codexTargetPath()
+func (m Manager) planCodex(cfg *config.Config) ([]takeoverFile, error) {
+	path, err := m.codexTargetPath()
 	if err != nil {
-		return Status{}, err
+		return nil, err
 	}
-
-	status := Status{
-		Product:         ProductCodexCLI,
-		State:           StateNotConfigured,
-		TargetPath:      targetPath,
-		BackupAvailable: m.hasLatestBackup(ProductCodexCLI),
-		Warning:         "Codex ignores model provider settings in project-local .codex/config.toml; keep Clipal provider settings in user-level ~/.codex/config.toml.",
-	}
-
-	doc, err := readTOMLMap(targetPath)
+	file, err := readBackupFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return status, nil
-		}
-		return Status{}, fmt.Errorf("read Codex config: %w", err)
+		return nil, err
 	}
-
-	modelProvider, _ := doc["model_provider"].(string)
-	modelProviders, _ := doc["model_providers"].(map[string]any)
-	clipalProvider, _ := modelProviders["clipal"].(map[string]any)
-	baseURL, _ := clipalProvider["base_url"].(string)
-	wireAPI, _ := clipalProvider["wire_api"].(string)
-
-	if modelProvider == "clipal" && baseURL == m.advertisedBaseURL(cfg) && wireAPI == "responses" {
-		status.State = StateConfigured
+	preview, err := m.previewCodex(cfg)
+	if err != nil {
+		return nil, err
 	}
-	return status, nil
+	return []takeoverFile{{backupFile: file, Planned: []byte(preview.PlannedContent)}}, nil
 }
 
 func (m Manager) previewCodex(cfg *config.Config) (Preview, error) {
@@ -93,46 +83,6 @@ func (m Manager) previewCodex(cfg *config.Config) (Preview, error) {
 		Product:        ProductCodexCLI,
 		CurrentContent: current,
 		PlannedContent: string(plannedBytes),
-	}, nil
-}
-
-func (m Manager) applyCodex(cfg *config.Config) (Result, error) {
-	status, err := m.codexStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	if status.State == StateConfigured {
-		return Result{
-			Product: ProductCodexCLI,
-			Status:  status,
-			Message: "already configured",
-		}, nil
-	}
-
-	if _, err := m.createBackup(ProductCodexCLI, status.TargetPath); err != nil {
-		return Result{}, err
-	}
-
-	preview, err := m.previewCodex(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-
-	if err := os.MkdirAll(filepath.Dir(status.TargetPath), 0o755); err != nil {
-		return Result{}, fmt.Errorf("prepare Codex config path: %w", err)
-	}
-	if err := os.WriteFile(status.TargetPath, []byte(preview.PlannedContent), 0o600); err != nil {
-		return Result{}, fmt.Errorf("write Codex config: %w", err)
-	}
-
-	status, err = m.codexStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	return Result{
-		Product: ProductCodexCLI,
-		Status:  status,
-		Message: "Codex configured to use Clipal",
 	}, nil
 }
 

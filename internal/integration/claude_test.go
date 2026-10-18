@@ -41,6 +41,9 @@ func TestClaudeStatus_ConfiguredWithPlaceholderAPIKey(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"hasCompletedOnboarding":true}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
 	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
 

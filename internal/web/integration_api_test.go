@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
+	"github.com/PAIArtCom/Clipal/internal/integration"
 	"github.com/PAIArtCom/Clipal/internal/proxy"
 )
 
@@ -339,5 +341,82 @@ func TestHandleIntegrationApply_Continue(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "apiBase: http://127.0.0.1:3333/clipal") {
 		t.Fatalf("expected Continue config to point at Clipal: %s", body)
+	}
+}
+
+func TestIntegrationTargetSelectsCodexProfile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	api := NewAPI(t.TempDir(), "test", nil)
+	selected := t.TempDir()
+	body, err := json.Marshal(map[string]string{"config_dir": selected, "profile": "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/codex/target", bytes.NewReader(body)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("target %d %s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/codex/apply", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(selected, "work.config.toml")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".codex", "config.toml")); !os.IsNotExist(err) {
+		t.Fatal("modified default configuration")
+	}
+	w = httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/codex/target", bytes.NewReader(body)))
+	if w.Code == http.StatusOK {
+		t.Fatal("target change allowed during active cycle")
+	}
+}
+
+func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	api := NewAPI(t.TempDir(), "test", nil)
+	w := httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/claude/apply", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "hasCompletedOnboarding") {
+		t.Fatal("preview omitted onboarding file")
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude", "settings.json"), []byte("{invalid"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	w = httptest.NewRecorder()
+	api.HandleListIntegrations(w, httptest.NewRequest(http.MethodGet, "/api/integrations", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("list %d %s", w.Code, w.Body.String())
+	}
+	var entries []IntegrationResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != len(integration.SupportedProducts()) {
+		t.Fatal("one malformed client hid other integrations")
+	}
+	found := false
+	for _, entry := range entries {
+		if entry.Product == "claude" {
+			found = entry.State == "error" && entry.BackupAvailable
+		}
+	}
+	if !found {
+		t.Fatal("malformed client lost rollback availability")
+	}
+	w = httptest.NewRecorder()
+	api.HandleIntegrationAction(w, httptest.NewRequest(http.MethodPost, "/api/integrations/claude/rollback", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("rollback %d %s", w.Code, w.Body.String())
 	}
 }

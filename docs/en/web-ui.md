@@ -68,18 +68,28 @@ The current section and client are kept in the URL hash (for example `#/provider
 - See the exact target config file path that Clipal manages
 - Preview the current file and the exact result Clipal will write before applying changes
 
-Notes:
+Codex CLI, Claude Code, and Antigravity CLI share a takeover cycle. The first apply captures every managed file, including whether it existed and its permissions. Reapply and endpoint updates keep that baseline. All files are validated and staged before replacement; a write failure restores the immediately preceding state. Rollback restores the cycle baseline and ends the cycle; the next apply captures a fresh baseline. Immutable backup archives remain on disk. If automatic recovery itself fails, the active backup is retained for a retry. These are recoverable multi-file operations, not filesystem-wide atomic transactions across a power loss.
 
-- This feature currently edits user-level config only
-- `Claude Code` takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, inserts a placeholder `ANTHROPIC_API_KEY` only when no Claude client auth env is present, may also mark `~/.claude.json` onboarding as complete, and does not overwrite existing `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`
+The **Configuration location** controls select an absolute client directory and, for Codex, an optional profile. Empty directories use `CODEX_HOME` / `CLAUDE_CONFIG_DIR`, then client defaults. A selected Codex profile manages `<profile>.config.toml`; launch with `codex --profile <profile>` and the matching `CODEX_HOME`. Claude's onboarding state is `~/.claude.json` by default and `<CLAUDE_CONFIG_DIR>/.claude.json` for a custom directory. Antigravity retains its documented settings location; its shell type and startup directory can be selected. Select bash, zsh, or sh explicitly when the background service cannot detect `SHELL`. Restore an active cycle before changing locations.
+
+**Configuration written** confirms the inspected files, not a successful client request. Runtime verification remains **not verified**. Claude provider-selection and host-managed environment conflicts are reported explicitly; project or managed settings and Codex profiles may still override user defaults. Clipal does not clear enterprise policy. Service processes may inherit a different environment from the terminal launching a client, so select a location explicitly when needed.
+
+Antigravity manages `.bashrc` and the first applicable Bash login file (`.bash_profile`, `.bash_login`, or `.profile`), `$ZDOTDIR/.zshrc` for Zsh (HOME when unset), or `.profile` for POSIX sh. An explicit shell directory overrides that location. All affected files appear in preview and backup. Open a fresh terminal after apply **and rollback**: sourcing a restored profile does not unset variables already exported in the current shell.
+
+Management API: `POST /api/integrations/<product>/target` accepts `{ "config_dir": "/absolute/path", "profile": "work", "shell_dir": "", "shell": "" }`; `profile` is Codex-only, and `shell_dir` / `shell` are Antigravity-only (`shell` accepts bash, zsh, or sh). Antigravity does not accept a custom `config_dir`. List/action responses include `target_options` and `verification` (`not_verified` or `blocked`). A malformed client's files produce an error on its own card; other clients and available rollback actions remain accessible.
+
+
+To verify installed clients against a running gateway with available accounts, build Clipal and run the isolated smoke test. This makes real model requests, checks rollback and a second takeover cycle, and leaves the user's client files untouched. Select only clients with working upstream accounts; omit `--products` to include Claude too.
+
+```sh
+go build -o /tmp/clipal-takeover ./cmd/clipal
+python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products codex,antigravity
+```
+
 - `OpenCode` takeover adds or updates `provider.clipal` and rewrites the active `model` to `clipal/<current-model-id>`
-- `Antigravity CLI` takeover sets `modelProvider: "gemini"` in `~/.gemini/antigravity-cli/settings.json` and manages a marked block in the user’s bash, zsh, or POSIX sh profile exporting `GOOGLE_GEMINI_BASE_URL` and the local placeholder `GEMINI_API_KEY=clipal`. Both files are previewed and backed up; rollback restores both. Open a new terminal after applying or rolling back.
 - `Continue` takeover adds or updates a user-level `Clipal` model entry
 - `Aider` takeover updates the home-level `openai-api-base` and a minimal OpenAI-compatible `model`; existing `openai-api-key` values stay untouched, and a placeholder `clipal` key is inserted only when missing
 - `Goose` takeover manages a dedicated custom provider file under `~/.config/goose/custom_providers/`
-- Project-local, managed, or enterprise settings may still override the effective behavior
-- Re-applying an already managed integration is designed to be a no-op, so the original backup stays restorable
-- After apply or rollback, restart the client or open a new session so it reloads the updated user config
 
 ### Export Full Backup
 

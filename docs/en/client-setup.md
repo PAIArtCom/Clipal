@@ -29,7 +29,7 @@ Notes:
 
 - The Web UI takeover updates `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`
 - If neither `ANTHROPIC_API_KEY` nor `ANTHROPIC_AUTH_TOKEN` exists, it inserts the placeholder `ANTHROPIC_API_KEY = clipal` so Claude Code can start without a separate Claude login
-- It may also set `hasCompletedOnboarding = true` in `~/.claude.json` so Claude Code honors the user-level override
+- Preview and apply include `hasCompletedOnboarding = true` in `~/.claude.json`; a custom `CLAUDE_CONFIG_DIR` stores that file inside the selected directory
 - Your existing `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` values are left untouched
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
 
@@ -50,6 +50,7 @@ Notes:
 
 - The Web UI can apply and roll back this user-level change for you from `CLI Takeover`
 - Codex ignores model provider settings in project-local `.codex/config.toml`; keep the Clipal provider in user-level `~/.codex/config.toml`
+- Takeover supports `CODEX_HOME` and an explicitly selected `<profile>.config.toml`; launch that profile with `--profile <profile>`. See [takeover cycles and configuration locations](web-ui.md#cli-takeover).
 
 ## OpenCode
 
@@ -89,7 +90,7 @@ Notes:
 
 Use **CLI Takeover → Antigravity CLI**. Clipal updates
 `~/.gemini/antigravity-cli/settings.json` with `"modelProvider": "gemini"` and
-adds a marked block to `.zshrc`, `.bashrc`, or `.profile`:
+adds marked blocks to the applicable shell startup files:
 
 Automatic takeover supports bash, zsh, and POSIX sh on macOS and Linux.
 On Windows, set the following environment variables manually and set
@@ -102,8 +103,8 @@ export GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'
 
 Open a new terminal (or source the indicated profile), then run `agy`.
 The placeholder satisfies the CLI’s nonempty-key requirement; upstream
-credentials stay in Clipal. Preview covers both files, apply preserves unrelated
-settings and profile lines, and rollback restores their originals. Existing
+credentials stay in Clipal. Preview covers the settings file and all applicable startup files; apply preserves unrelated
+settings, and rollback restores each file to its cycle baseline. Existing
 signed-in Antigravity sessions do not need to be deleted.
 
 Antigravity CLI does not load `.env` files. See the

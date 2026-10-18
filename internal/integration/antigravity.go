@@ -13,11 +13,6 @@ import (
 const antigravityBlockStart = "# >>> Clipal Antigravity CLI >>>"
 const antigravityBlockEnd = "# <<< Clipal Antigravity CLI <<<"
 
-type takeoverFile struct {
-	backupFile
-	Planned []byte
-}
-
 func (m Manager) antigravityPaths() (string, string, error) {
 	if runtime.GOOS == "windows" {
 		return "", "", fmt.Errorf("antigravity CLI takeover requires a Unix shell profile; configure its environment variables manually on Windows")
@@ -26,17 +21,41 @@ func (m Manager) antigravityPaths() (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	target, err := m.targetOptions(ProductAntigravityCLI)
+	if err != nil {
+		return "", "", err
+	}
+	shell := target.Shell
+	if shell == "" {
+		shell = filepath.Base(os.Getenv("SHELL"))
+	}
+	if shell == "." || shell == "" {
+		return "", "", fmt.Errorf("shell is unknown in this service; select bash, zsh, or sh in Configuration location")
+	}
 	profile := ".profile"
-	switch filepath.Base(os.Getenv("SHELL")) {
+	switch shell {
 	case "zsh":
 		profile = ".zshrc"
 	case "bash":
 		profile = ".bashrc"
-	case "sh", "dash", ".", "":
+	case "sh", "dash":
 	default:
 		return "", "", fmt.Errorf("antigravity CLI takeover supports bash, zsh, and POSIX sh profiles")
 	}
-	return filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), filepath.Join(home, profile), nil
+	directory, err := m.clientConfigDir(ProductAntigravityCLI)
+	if err != nil {
+		return "", "", err
+	}
+	shellDir := home
+	if target.ShellDir != "" {
+		shellDir = target.ShellDir
+	} else if profile == ".zshrc" && strings.TrimSpace(os.Getenv("ZDOTDIR")) != "" {
+		shellDir = os.Getenv("ZDOTDIR")
+		if !filepath.IsAbs(shellDir) {
+			return "", "", fmt.Errorf("ZDOTDIR must be absolute")
+		}
+	}
+	return filepath.Join(directory, "settings.json"), filepath.Join(shellDir, profile), nil
 }
 
 func managedAntigravityShell(content, baseURL string) (string, error) {
@@ -80,35 +99,33 @@ func (m Manager) planAntigravity(cfg *config.Config) ([]takeoverFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	shell, err := readBackupFile(profile)
-	if err != nil {
-		return nil, err
-	}
-	shellPlan, err := managedAntigravityShell(string(shell.Original), m.advertisedBaseURL(cfg))
-	if err != nil {
-		return nil, err
-	}
-	return []takeoverFile{{backupFile: current, Planned: planned}, {backupFile: shell, Planned: []byte(shellPlan)}}, nil
-}
-
-func (m Manager) antigravityStatus(cfg *config.Config) (Status, error) {
-	files, err := m.planAntigravity(cfg)
-	if err != nil {
-		return Status{}, err
-	}
-	status := Status{Product: ProductAntigravityCLI, State: StateNotConfigured, TargetPath: files[0].TargetPath, BackupAvailable: m.hasLatestBackup(ProductAntigravityCLI), Warning: fmt.Sprintf("Also updates %s. Open a new terminal or source this profile after applying or rolling back; exported environment variables can override it.", files[1].TargetPath)}
-	// Compare parsed settings, so formatting changes do not imply a broken takeover.
-	body := map[string]any{}
-	if files[0].Existed {
-		body, err = readJSONCMap(files[0].TargetPath)
-		if err != nil {
-			return Status{}, err
+	files := []takeoverFile{{backupFile: current, Planned: planned}}
+	profiles := []string{profile}
+	if filepath.Base(profile) == ".bashrc" {
+		login := filepath.Join(filepath.Dir(profile), ".profile")
+		for _, name := range []string{".bash_profile", ".bash_login", ".profile"} {
+			path := filepath.Join(filepath.Dir(profile), name)
+			if _, err := os.Stat(path); err == nil {
+				login = path
+				break
+			} else if !os.IsNotExist(err) {
+				return nil, err
+			}
 		}
+		profiles = append(profiles, login)
 	}
-	if body["modelProvider"] == "gemini" && string(files[1].Original) == string(files[1].Planned) {
-		status.State = StateConfigured
+	for _, path := range profiles {
+		shell, err := readBackupFile(path)
+		if err != nil {
+			return nil, err
+		}
+		shellPlan, err := managedAntigravityShell(string(shell.Original), m.advertisedBaseURL(cfg))
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, takeoverFile{backupFile: shell, Planned: []byte(shellPlan)})
 	}
-	return status, nil
+	return files, nil
 }
 
 func formatTakeoverFiles(files []backupFile) string {
@@ -117,57 +134,4 @@ func formatTakeoverFiles(files []backupFile) string {
 		fmt.Fprintf(&out, "# %s\n%s\n", file.TargetPath, file.Original)
 	}
 	return out.String()
-}
-
-func (m Manager) previewAntigravity(cfg *config.Config) (Preview, error) {
-	files, err := m.planAntigravity(cfg)
-	if err != nil {
-		return Preview{}, err
-	}
-	var current, planned []backupFile
-	for _, file := range files {
-		current = append(current, file.backupFile)
-		next := file.backupFile
-		next.Original = file.Planned
-		planned = append(planned, next)
-	}
-	return Preview{Product: ProductAntigravityCLI, CurrentContent: formatTakeoverFiles(current), PlannedContent: formatTakeoverFiles(planned)}, nil
-}
-
-func (m Manager) applyAntigravity(cfg *config.Config) (Result, error) {
-	files, err := m.planAntigravity(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	status, err := m.antigravityStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	if status.State == StateConfigured {
-		return Result{Product: ProductAntigravityCLI, Status: status, Message: "already configured"}, nil
-	}
-	if !m.hasLatestBackup(ProductAntigravityCLI) {
-		if _, err = m.createBackup(ProductAntigravityCLI, files[0].TargetPath, files[1].TargetPath); err != nil {
-			return Result{}, err
-		}
-	}
-	for i, file := range files {
-		err = os.MkdirAll(filepath.Dir(file.TargetPath), 0o755)
-		if err == nil {
-			err = os.WriteFile(file.TargetPath, file.Planned, 0o600)
-		}
-		if err != nil {
-			for _, previous := range files[:i+1] {
-				if restoreErr := restoreBackupFile(previous.backupFile); restoreErr != nil {
-					return Result{}, fmt.Errorf("apply Antigravity CLI: %v; restore %s: %w", err, previous.TargetPath, restoreErr)
-				}
-			}
-			return Result{}, fmt.Errorf("write Antigravity CLI configuration: %w", err)
-		}
-	}
-	status, err = m.antigravityStatus(cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	return Result{Product: ProductAntigravityCLI, Status: status, Message: "Antigravity CLI configured; open a new terminal to load its environment"}, nil
 }

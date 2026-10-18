@@ -3761,3 +3761,26 @@ test('legacy Gemini page and pending OAuth session normalize to Google', async (
     assert.equal(state.selectedClient, 'google');
     assert.equal(state.hashForState(), '#/providers/google');
 });
+
+test('takeover distinguishes written configuration from a routing conflict and allows recovery', () => {
+    const state = loadApp();
+    assert.equal(state.integrationStateLabel('configured'), 'Configuration written');
+    assert.equal(state.integrationStateLabel('configured', 'blocked'), 'Needs attention');
+    assert.equal(state.integrationStateTone('configured', 'blocked'), 'danger');
+    assert.equal(state.integrationActionDisabledReason({product: 'claude', state: 'error', backup_available: true}, 'rollback'), '');
+});
+
+test('takeover saves explicit client location through the target endpoint', async () => {
+    const state = loadApp();
+    const options = {config_dir: '/tmp/client', profile: 'work', shell_dir: '', shell: ''};
+    state.integrations = [state.normalizeIntegration({product: 'codex', target_options: options})];
+    let request;
+    state.apiCall = async (url, input) => {
+        request = {url, input};
+        return {message: 'Target saved', status: {product: 'codex', target_options: options, state: 'not_configured'}};
+    };
+    await state.runIntegrationAction('codex', 'target');
+    assert.equal(request.url, '/api/integrations/codex/target');
+    assert.deepEqual(JSON.parse(request.input.body), options);
+    assert.equal(state.integrations[0].target_options.profile, 'work');
+});

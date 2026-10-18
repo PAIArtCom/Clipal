@@ -761,13 +761,21 @@
                                     <svg class="ic" aria-hidden="true"><use href="#i-file"/></svg>
                                     <span :title="integration.target_path" x-text="displayHomePath(integration.target_path)"></span>
                                     <template x-if="integration.warning">
-                                        <span class="tooltip hint hint--warn"><button type="button" class="hint__btn" :aria-label="integration.warning"><svg class="ic" aria-hidden="true"><use href="#i-warning"/></svg></button><span class="tooltip-content" role="tooltip" x-text="integration.warning"></span></span>
+                                        <span class="tooltip hint hint--warn" x-data="floatingTooltip()" x-id="['metric-tooltip']"
+                                            x-effect="if (activeTab !== 'integrations' || visibleDialog) open = false"
+                                            @mouseenter="show()" @mouseleave="leave()" @focusin="show()" @focusout="blur()"
+                                            @keydown.escape.stop="open = false" :aria-describedby="open ? $id('metric-tooltip') : null">
+                                            <button type="button" class="hint__btn" :aria-label="integration.warning"><svg class="ic" aria-hidden="true"><use href="#i-warning"/></svg></button>
+                                            <template x-teleport="body"><span class="tooltip-content tooltip-content--floating" role="tooltip"
+                                                :id="$id('metric-tooltip')" x-cloak :style="{ ...position, display: open ? 'block' : 'none' }"
+                                                x-text="integration.warning"></span></template>
+                                        </span>
                                     </template>
                                 </span>
                             </div>
-                            <span class="status-text integration-card__state" :class="'is-' + integrationStateTone(integration.state)">
+                            <span class="status-text integration-card__state" :class="'is-' + integrationStateTone(integration.state, integration.verification)">
                                 <span class="status-dot" aria-hidden="true"></span>
-                                <span x-text="integrationStateLabel(integration.state)"></span>
+                                <span x-text="integrationStateLabel(integration.state, integration.verification)"></span>
                             </span>
                         </header>
 
@@ -810,7 +818,7 @@
                                     :tabindex="integrationActionDisabledReason(integration, 'rollback') ? 0 : null"
                                     :aria-label="integrationActionDisabledReason(integration, 'rollback') || null">
                                     <button type="button" class="btn btn-secondary btn-sm btn-icon"
-                                        :disabled="integrationBusyProduct === integration.product || integration.state !== 'configured' || !integration.backup_available"
+                                        :disabled="integrationBusyProduct === integration.product || !integration.backup_available"
                                         @click="runIntegrationAction(integration.product, 'rollback')"
                                         :title="integrationRollbackLabel()" :aria-label="integrationRollbackLabel()">
                                         <svg class="ic" aria-hidden="true"><use href="#i-undo"/></svg>
@@ -834,6 +842,32 @@
                                 </span>
                             </div>
                         </footer>
+
+                        <template x-if="integration.verification">
+                            <p class="integration-card__muted" x-text="t(integration.verification === 'blocked' ? 'integrations.runtimeBlocked' : 'integrations.runtimeUnverified')"></p>
+                        </template>
+                        <template x-if="['codex', 'claude', 'antigravity'].includes(integration.product)">
+                            <details class="integration-full-files">
+                                <summary x-text="t('integrations.targetOptions')"></summary>
+                                <div class="form-group" x-show="integration.product !== 'antigravity'">
+                                    <label class="form-label" :for="'integration-config-dir-' + integration.product" x-text="t('integrations.configDir')"></label>
+                                    <input :id="'integration-config-dir-' + integration.product" type="text" class="form-input" x-model="integration.target_options.config_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
+                                </div>
+                                <div class="form-group" x-show="integration.product === 'codex'">
+                                    <label class="form-label" for="integration-codex-profile" x-text="t('integrations.codexProfile')"></label>
+                                    <input id="integration-codex-profile" type="text" class="form-input" x-model="integration.target_options.profile" :disabled="integration.backup_available">
+                                </div>
+                                <div class="form-group" x-show="integration.product === 'antigravity'">
+                                    <label class="form-label" for="integration-antigravity-shell" x-text="t('integrations.shellType')"></label>
+                                    <select id="integration-antigravity-shell" class="form-select" x-model="integration.target_options.shell" :disabled="integration.backup_available"><option value="">—</option><option value="bash">bash</option><option value="zsh">zsh</option><option value="sh">sh</option></select>
+                                </div>
+                                <div class="form-group" x-show="integration.product === 'antigravity'">
+                                    <label class="form-label" for="integration-antigravity-shell-dir" x-text="t('integrations.shellDir')"></label>
+                                    <input id="integration-antigravity-shell-dir" type="text" class="form-input" x-model="integration.target_options.shell_dir" :disabled="integration.backup_available" placeholder="/absolute/path">
+                                </div>
+                                <button class="btn btn-secondary btn-sm" :disabled="integration.backup_available || !!integrationBusyProduct" @click="runIntegrationAction(integration.product, 'target')" x-text="t('integrations.saveTarget')"></button>
+                            </details>
+                        </template>
 
                         <div class="integration-card__preview" x-show="integrationPreviewOpen[integration.product]" x-cloak>
                             <p class="integration-card__muted" x-text="integrationSecondaryPreviewLabel(integration) + ' · ' + integrationBackupMeta(integration)"></p>

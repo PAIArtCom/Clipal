@@ -29,7 +29,7 @@ Clipal 不是按“某个具体 App 名字”路由，而是按请求风格识�
 
 - Web UI 的一键接管会更新 `~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL`
 - 如果既没有 `ANTHROPIC_API_KEY` 也没有 `ANTHROPIC_AUTH_TOKEN`，它会自动补一个占位 `ANTHROPIC_API_KEY = clipal`，确保 Claude Code 无需单独登录也能发起请求
-- 它也可能在 `~/.claude.json` 中写入 `hasCompletedOnboarding = true`，确保 Claude Code 会真正采用这个用户级覆盖
+- 预览与写入包含 `~/.claude.json` 中的 `hasCompletedOnboarding = true`；使用自定义 `CLAUDE_CONFIG_DIR` 时，该文件位于所选目录内部
 - 现有的 `ANTHROPIC_API_KEY` 和 `ANTHROPIC_AUTH_TOKEN` 不会被改写
 - 现在也可以直接在 Web UI 的 `CLI Takeover` 页面里一键 apply / rollback 这个用户级修改
 
@@ -49,7 +49,7 @@ wire_api = "responses"
 说明：
 
 - 现在也可以直接在 Web UI 的 `CLI Takeover` 页面里一键 apply / rollback 这个用户级修改
-- 如果你的环境里还有 workspace 级 Codex 配置，最终生效结果仍可能优先取 workspace 配置
+- Codex 忽略项目级 `.codex/config.toml` 中的 provider 设置，应使用用户目录。接管支持 `CODEX_HOME` 和显式选择的 `<profile>.config.toml`，选择后使用 `--profile <profile>` 启动；详见 [接管周期与配置位置](web-ui.md#cli-takeover)
 
 ## OpenCode
 
@@ -89,7 +89,7 @@ wire_api = "responses"
 
 在 **CLI 接管 → Antigravity CLI** 中操作。Clipal 在
 `~/.gemini/antigravity-cli/settings.json` 设置 `"modelProvider": "gemini"`，
-并在 `.zshrc`、`.bashrc` 或 `.profile` 中维护带标记的区块：
+并在适用的 shell 启动文件中维护带标记的区块：
 
 自动接管支持 macOS、Linux 上的 bash、zsh 和 POSIX sh。
 Windows 请手动设置以下环境变量，并在上述设置文件中配置 `"modelProvider": "gemini"`。
@@ -101,7 +101,7 @@ export GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'
 
 打开新终端（或 source 页面提示的配置文件）后运行 `agy`。
 占位 Key 满足 CLI 的非空 Key 检查，上游凭据仍由 Clipal 管理。
-预览涵盖两个文件，接管保留无关配置和 shell 内容，回滚恢复两者的原始内容。
+预览涵盖设置文件和全部适用的 shell 启动文件；接管保留无关配置，回滚恢复本周期各文件的原始内容。
 不需要删除已有的 Antigravity 登录会话。
 
 Antigravity CLI 不读取 `.env` 文件，配置协议见

@@ -27,6 +27,9 @@ func (m Manager) createBackup(product ProductID, targetPath string, additionalPa
 	if err == nil {
 		snap.TargetExisted = true
 		snap.Original = original
+		if info, e := os.Stat(targetPath); e == nil {
+			snap.Mode = info.Mode().Perm()
+		}
 	} else if !os.IsNotExist(err) {
 		return backupSnapshot{}, fmt.Errorf("read target for backup: %w", err)
 	}
@@ -101,11 +104,23 @@ func writeSnapshotFiles(root string, snap backupSnapshot) error {
 }
 
 func readBackupFile(path string) (backupFile, error) {
+	// Resolve existing symlinks so an atomic replacement updates their target
+	// rather than replacing the user's configuration link.
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		resolved, e := filepath.EvalSymlinks(path)
+		if e != nil {
+			return backupFile{}, e
+		}
+		path = resolved
+	}
 	file := backupFile{TargetPath: path}
 	raw, err := os.ReadFile(path)
 	if err == nil {
 		file.Existed = true
 		file.Original = raw
+		if info, e := os.Stat(path); e == nil {
+			file.Mode = info.Mode().Perm()
+		}
 	} else if !os.IsNotExist(err) {
 		return backupFile{}, fmt.Errorf("read %s: %w", path, err)
 	}
@@ -117,10 +132,14 @@ func restoreBackupFile(snap backupFile) error {
 		if err := os.MkdirAll(filepath.Dir(snap.TargetPath), 0o755); err != nil {
 			return fmt.Errorf("prepare rollback target: %w", err)
 		}
-		if err := os.WriteFile(snap.TargetPath, snap.Original, 0o600); err != nil {
+		mode := snap.Mode
+		if mode == 0 {
+			mode = 0600
+		}
+		if err := os.WriteFile(snap.TargetPath, snap.Original, mode); err != nil {
 			return fmt.Errorf("restore backup: %w", err)
 		}
-		return nil
+		return os.Chmod(snap.TargetPath, mode)
 	}
 	if err := os.Remove(snap.TargetPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove target during rollback: %w", err)

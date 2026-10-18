@@ -15,8 +15,9 @@ import (
 )
 
 type Manager struct {
-	configDir string
-	homeDir   string
+	configDir           string
+	homeDir             string
+	beforeTakeoverWrite func(int, string) error
 }
 
 func NewManager(configDir string) *Manager {
@@ -42,15 +43,18 @@ func (m Manager) backupProductRoot(product ProductID) string {
 }
 
 func (m Manager) Status(product ProductID, cfg *config.Config) (Status, error) {
+	takeoverMu.Lock()
+	defer takeoverMu.Unlock()
+	return m.status(product, cfg)
+}
+
+func (m Manager) status(product ProductID, cfg *config.Config) (Status, error) {
+	if unifiedProduct(product) {
+		return m.takeoverStatus(product, cfg)
+	}
 	switch product {
-	case ProductClaudeCode:
-		return m.claudeStatus(cfg)
-	case ProductCodexCLI:
-		return m.codexStatus(cfg)
 	case ProductOpenCode:
 		return m.opencodeStatus(cfg)
-	case ProductAntigravityCLI:
-		return m.antigravityStatus(cfg)
 	case ProductContinue:
 		return m.continueStatus(cfg)
 	case ProductAider:
@@ -63,15 +67,14 @@ func (m Manager) Status(product ProductID, cfg *config.Config) (Status, error) {
 }
 
 func (m Manager) Apply(product ProductID, cfg *config.Config) (Result, error) {
+	takeoverMu.Lock()
+	defer takeoverMu.Unlock()
+	if unifiedProduct(product) {
+		return m.applyTakeover(product, cfg)
+	}
 	switch product {
-	case ProductClaudeCode:
-		return m.applyClaude(cfg)
-	case ProductCodexCLI:
-		return m.applyCodex(cfg)
 	case ProductOpenCode:
 		return m.applyOpenCode(cfg)
-	case ProductAntigravityCLI:
-		return m.applyAntigravity(cfg)
 	case ProductContinue:
 		return m.applyContinue(cfg)
 	case ProductAider:
@@ -84,6 +87,8 @@ func (m Manager) Apply(product ProductID, cfg *config.Config) (Result, error) {
 }
 
 func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error) {
+	takeoverMu.Lock()
+	defer takeoverMu.Unlock()
 	backupContent, backupTargetExisted, err := m.latestBackupPreview(product)
 	if err != nil {
 		return Preview{}, err
@@ -91,14 +96,14 @@ func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error)
 
 	var preview Preview
 	switch product {
-	case ProductClaudeCode:
-		preview, err = m.previewClaude(cfg)
-	case ProductCodexCLI:
-		preview, err = m.previewCodex(cfg)
+	case ProductClaudeCode, ProductCodexCLI, ProductAntigravityCLI:
+		var files []takeoverFile
+		files, err = m.planTakeover(product, cfg)
+		if err == nil {
+			preview = previewTakeoverFiles(product, files)
+		}
 	case ProductOpenCode:
 		preview, err = m.previewOpenCode(cfg)
-	case ProductAntigravityCLI:
-		preview, err = m.previewAntigravity(cfg)
 	case ProductContinue:
 		preview, err = m.previewContinue(cfg)
 	case ProductAider:
@@ -117,8 +122,10 @@ func (m Manager) Preview(product ProductID, cfg *config.Config) (Preview, error)
 }
 
 func (m Manager) Rollback(product ProductID, cfg *config.Config) (Result, error) {
-	if product == ProductClaudeCode {
-		return m.rollbackClaude(cfg)
+	takeoverMu.Lock()
+	defer takeoverMu.Unlock()
+	if unifiedProduct(product) {
+		return m.rollbackTakeover(product, cfg)
 	}
 
 	snap, err := m.loadLatestBackup(product)
@@ -129,7 +136,7 @@ func (m Manager) Rollback(product ProductID, cfg *config.Config) (Result, error)
 		return Result{}, err
 	}
 
-	status, err := m.Status(product, cfg)
+	status, err := m.status(product, cfg)
 	if err != nil {
 		return Result{}, err
 	}
@@ -141,7 +148,13 @@ func (m Manager) Rollback(product ProductID, cfg *config.Config) (Result, error)
 }
 
 func (m Manager) latestBackupPreview(product ProductID) (string, bool, error) {
-	snap, err := m.loadLatestBackup(product)
+	var snap backupSnapshot
+	var err error
+	if unifiedProduct(product) {
+		snap, err = m.loadTakeoverBackup(product)
+	} else {
+		snap, err = m.loadLatestBackup(product)
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", false, nil
@@ -228,4 +241,11 @@ func marshalYAMLMap(body map[string]any) ([]byte, error) {
 		data = append(data, '\n')
 	}
 	return data, nil
+}
+
+// BackupAvailable remains true even when a malformed target cannot be inspected.
+func (m Manager) BackupAvailable(product ProductID) bool {
+	takeoverMu.Lock()
+	defer takeoverMu.Unlock()
+	return m.hasLatestBackup(product)
 }

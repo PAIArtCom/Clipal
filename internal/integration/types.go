@@ -1,6 +1,9 @@
 package integration
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 type ProductID string
 
@@ -15,9 +18,10 @@ const (
 )
 
 type backupFile struct {
-	TargetPath string `json:"target_path"`
-	Existed    bool   `json:"existed"`
-	Original   []byte `json:"original,omitempty"`
+	TargetPath string      `json:"target_path"`
+	Existed    bool        `json:"existed"`
+	Original   []byte      `json:"original,omitempty"`
+	Mode       os.FileMode `json:"mode,omitempty"`
 }
 
 type backupSnapshot struct {
@@ -27,6 +31,7 @@ type backupSnapshot struct {
 	CreatedAt       time.Time    `json:"created_at"`
 	BackupDir       string       `json:"backup_dir"`
 	Original        []byte       `json:"-"`
+	Mode            os.FileMode  `json:"mode,omitempty"`
 	AdditionalFiles []backupFile `json:"additional_files,omitempty"`
 }
 
@@ -39,11 +44,13 @@ const (
 )
 
 type Status struct {
-	Product         ProductID `json:"product"`
-	State           State     `json:"state"`
-	TargetPath      string    `json:"target_path"`
-	BackupAvailable bool      `json:"backup_available"`
-	Warning         string    `json:"warning,omitempty"`
+	Product         ProductID     `json:"product"`
+	State           State         `json:"state"`
+	TargetPath      string        `json:"target_path"`
+	BackupAvailable bool          `json:"backup_available"`
+	Warning         string        `json:"warning,omitempty"`
+	Verification    string        `json:"verification,omitempty"`
+	TargetOptions   TargetOptions `json:"target_options"`
 }
 
 type Result struct {

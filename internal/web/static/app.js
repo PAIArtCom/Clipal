@@ -18,8 +18,8 @@ function defaultOAuthAuthorizationState() {
     };
 }
 
-// Keep metric tooltips outside the inspector's scroll clipping boundary.
-// Alpine owns the teleported element and calls destroy when its provider changes.
+// Keep floating tooltips inside the viewport and outside scroll clipping boundaries.
+// Alpine owns each teleported element and removes its listeners on destroy.
 function floatingTooltip() {
     let onViewportChange;
     return {
@@ -511,14 +511,22 @@ function app() {
                     empty: 'No supported integrations detected.',
                     apply: 'Use Clipal',
                     rollback: 'Restore',
-                    stateConfigured: 'Configured',
+                    stateConfigured: 'Configuration written',
                     stateNeedsAttention: 'Needs attention',
                     stateNotConfigured: 'Not configured',
-                    alreadyUsing: 'Already using Clipal',
+                    alreadyUsing: 'Configuration already written',
                     noBackupYet: 'No backup yet. Apply once before restore becomes available.',
-                    restoreOnlyActive: 'Restore is only available while Clipal is active.',
                     dismissResult: 'Dismiss result',
                     fullFiles: 'Full files',
+                    targetOptions: 'Configuration location',
+                    configDir: 'Client configuration directory (optional)',
+                    codexProfile: 'Codex profile (optional)',
+                    shellDir: 'Shell startup directory (optional)',
+                    shellType: 'Shell (automatic when available)',
+                    saveTarget: 'Save location',
+                    targetSaved: 'Configuration location saved',
+                    runtimeUnverified: 'Runtime routing has not been verified.',
+                    runtimeBlocked: 'Routing conflict detected; inspect the warning.',
                     previewChanges: 'Preview changes',
                     changesSummary: 'Changes: +{added} / −{removed} lines',
                     changesNone: 'No changes to apply',
@@ -535,7 +543,7 @@ function app() {
                     resultUpdated: 'Updated',
                     resultError: 'Error',
                     resultNotice: 'Notice',
-                    resultUsingClipalTitle: 'Now using Clipal',
+                    resultUsingClipalTitle: 'Configuration written',
                     resultRestoredTitle: 'Restored from backup',
                     resultRestartMessage: 'Restart the client or open a new session to apply changes.',
                     resultApplyErrorTitle: 'Couldn’t update this client',
@@ -1013,14 +1021,22 @@ function app() {
                     empty: '未检测到受支持的集成。',
                     apply: '使用 Clipal',
                     rollback: '恢复',
-                    stateConfigured: '已配置',
+                    stateConfigured: '配置已写入',
                     stateNeedsAttention: '需要关注',
                     stateNotConfigured: '未配置',
-                    alreadyUsing: '已经在使用 Clipal',
+                    alreadyUsing: '配置已写入',
                     noBackupYet: '目前还没有备份。至少先使用一次 Clipal 后才能恢复。',
-                    restoreOnlyActive: '只有在当前由 Clipal 接管时才能恢复。',
                     dismissResult: '关闭结果',
                     fullFiles: '完整文件',
+                    targetOptions: '配置位置',
+                    configDir: '客户端配置目录（可选）',
+                    codexProfile: 'Codex profile（可选）',
+                    shellDir: 'Shell 启动文件目录（可选）',
+                    shellType: 'Shell（可自动检测时留空）',
+                    saveTarget: '保存位置',
+                    targetSaved: '配置位置已保存',
+                    runtimeUnverified: '运行时路由尚未验证。',
+                    runtimeBlocked: '检测到路由冲突，请查看警告。',
                     previewChanges: '预览变更',
                     changesSummary: '变更：+{added} / −{removed} 行',
                     changesNone: '没有需要应用的变更',
@@ -1037,7 +1053,7 @@ function app() {
                     resultUpdated: '已更新',
                     resultError: '错误',
                     resultNotice: '提示',
-                    resultUsingClipalTitle: '已开始使用 Clipal',
+                    resultUsingClipalTitle: '配置已写入',
                     resultRestoredTitle: '已从备份恢复',
                     resultRestartMessage: '请重启客户端或重新打开一个会话以应用改动。',
                     resultApplyErrorTitle: '更新此客户端失败',
@@ -2961,7 +2977,8 @@ function app() {
             }
         },
 
-        integrationStateLabel(state) {
+        integrationStateLabel(state, verification) {
+            if (verification === 'blocked') return this.t('integrations.stateNeedsAttention');
             switch (String(state || '').trim()) {
                 case 'configured':
                     return this.t('integrations.stateConfigured');
@@ -2972,7 +2989,8 @@ function app() {
             }
         },
 
-        integrationStateTone(state) {
+        integrationStateTone(state, verification) {
+            if (verification === 'blocked') return 'danger';
             switch (String(state || '').trim()) {
                 case 'configured':
                     return 'success';
@@ -3040,9 +3058,7 @@ function app() {
             if (!integration.backup_available) {
                 return this.t('integrations.noBackupYet');
             }
-            return integration.state !== 'configured'
-                ? this.t('integrations.restoreOnlyActive')
-                : '';
+            return '';
         },
 
         integrationPreviewValue(content, emptyLabel) {
@@ -3163,6 +3179,7 @@ function app() {
         normalizeIntegration(item) {
             return {
                 ...item,
+                target_options: {config_dir: '', profile: '', shell_dir: '', shell: '', ...((item && item.target_options) || {})},
                 changes: this.integrationChanges(String(item.current_content || ''), this.integrationSecondaryPreviewContent(item)),
                 name: this.integrationProductName(item.product) || item.name,
                 current_content: String((item && item.current_content) || ''),
@@ -3196,14 +3213,17 @@ function app() {
             this.integrationBusyProduct = name;
             try {
                 const response = await this.apiCall(`/api/integrations/${encodeURIComponent(name)}/${op}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    ...(op === 'target' ? { body: JSON.stringify((this.integrations.find(item => item.product === name) || {}).target_options || {}) } : {})
                 }, false, true);
                 this.integrations = (this.integrations || []).map(item =>
                     item && item.product === name
                         ? this.normalizeIntegration({ ...response.status, name: this.integrationProductName(name) || response.status.name })
                         : item
                 );
-                if (op === 'apply') {
+                if (op === 'target') {
+                    this.setIntegrationResult(name, 'success', this.t('integrations.targetSaved'), response.message);
+                } else if (op === 'apply') {
                     this.setIntegrationResult(
                         name,
                         'success',

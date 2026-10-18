@@ -651,14 +651,14 @@ func (a *API) HandleListIntegrations(w http.ResponseWriter, r *http.Request) {
 	for _, product := range integration.SupportedProducts() {
 		status, err := a.integrations.Status(product, cfg)
 		if err != nil {
-			writeError(w, fmt.Sprintf("failed to inspect %s: %v", product, err), http.StatusInternalServerError)
-			return
+			status = integration.Status{Product: product, State: integration.StateError, Warning: err.Error(), BackupAvailable: a.integrations.BackupAvailable(product)}
 		}
-		preview, err := a.integrations.Preview(product, cfg)
-		if err != nil {
-			writeError(w, fmt.Sprintf("failed to preview %s: %v", product, err), http.StatusInternalServerError)
-			return
+		preview, previewErr := a.integrations.Preview(product, cfg)
+		if previewErr != nil {
+			status.State = integration.StateError
+			status.Warning = previewErr.Error()
 		}
+
 		resp = append(resp, toIntegrationResponse(product, status, preview))
 	}
 	writeJSON(w, resp)
@@ -686,6 +686,22 @@ func (a *API) HandleIntegrationAction(w http.ResponseWriter, r *http.Request) {
 		err    error
 	)
 	switch action {
+	case "target":
+		var target integration.TargetOptions
+		if decodeErr := json.NewDecoder(r.Body).Decode(&target); decodeErr != nil {
+			writeError(w, "invalid target options", http.StatusBadRequest)
+			return
+		}
+		if err = a.integrations.SetTarget(product, target); err == nil {
+			result.Product = product
+			result.Status, err = a.integrations.Status(product, cfg)
+			if err != nil {
+				result.Status = integration.Status{Product: product, State: integration.StateError, Warning: err.Error(), TargetOptions: target}
+				err = nil
+			}
+			result.Message = "Target saved; preview the files before applying takeover."
+		}
+
 	case "apply":
 		result, err = a.integrations.Apply(product, cfg)
 	case "rollback":
@@ -699,10 +715,10 @@ func (a *API) HandleIntegrationAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	preview, err := a.integrations.Preview(result.Product, cfg)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
+	preview, previewErr := a.integrations.Preview(result.Product, cfg)
+	if previewErr != nil {
+		result.Status.Warning = previewErr.Error()
+		result.Status.State = integration.StateError
 	}
 
 	writeJSON(w, IntegrationActionResponse{
