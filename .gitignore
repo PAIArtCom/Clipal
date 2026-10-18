@@ -5,10 +5,6 @@
 *.dylib
 /clipal
 
-# Local-only tools (not part of the project)
-/cmd/import_paiart_ams/
-/import_paiart_ams
-
 # Build output
 build/
 
@@ -39,12 +35,6 @@ debug.log
 
 # local worktrees
 .worktrees/
-
-# Superpowers
-/docs/superpowers/
-
-# Frontend notes
-/docs/frontend/
 
 # Generated files
 .playwright-mcp/

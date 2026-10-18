@@ -967,7 +967,7 @@ func snapshotTestTree(t *testing.T, root string) map[string]testTreeEntry {
 func writeTestState(t *testing.T, dir, provider, key string) {
 	t.Helper()
 	cfg := &config.Config{Global: config.DefaultGlobalConfig(), Claude: config.ClientConfig{Mode: config.ClientModeAuto}, OpenAI: config.ClientConfig{Mode: config.ClientModeAuto, Providers: []config.Provider{{Name: provider, BaseURL: "https://example.com", APIKey: key, Priority: 1}}}, Google: config.ClientConfig{Mode: config.ClientModeAuto}}
-	if err := writeConfig(dir, cfg); err != nil {
+	if err := writeConfigWithHook(dir, cfg, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range config.WatchedConfigFilenames() {
@@ -1093,7 +1093,7 @@ func TestRelinkKeepsProvidersBoundToOtherAccounts(t *testing.T) {
 		}}},
 		Google: config.ClientConfig{Mode: config.ClientModeAuto},
 	}
-	if err := writeConfig(dir, cfg); err != nil {
+	if err := writeConfigWithHook(dir, cfg, nil); err != nil {
 		t.Fatal(err)
 	}
 	service, err := NewService(dir, "test", nil, nil)

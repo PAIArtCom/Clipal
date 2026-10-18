@@ -57,6 +57,9 @@ The pre-commit hook invokes these Make targets, using the same toolchain and
 
 These rules are enforced by [`.golangci.yml`](.golangci.yml).
 
+Web UI changes follow the [CSS guidelines](docs/web-ui-css-guidelines.md) for
+style ownership, shared controls, spacing, responsive layout, and visual review.
+
 ## Client Configuration Tests
 
 The integration and Web API test binaries share a `TestMain` environment setup

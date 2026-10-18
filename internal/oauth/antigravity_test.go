@@ -125,15 +125,15 @@ func TestAntigravityClientMetadataMatchesInstalledProtocol(t *testing.T) {
 	}
 }
 
-func TestExtractAntigravityTierIDDefaultsToFreeTier(t *testing.T) {
-	if got := extractAntigravityTierID(map[string]any{}); got != defaultAntigravityFreeTierID {
+func TestExtractAntigravityTierMetadataDefaultsToFreeTier(t *testing.T) {
+	if got := extractAntigravityTierMetadata(map[string]any{}).TierID; got != defaultAntigravityFreeTierID {
 		t.Fatalf("tier = %q, want %q", got, defaultAntigravityFreeTierID)
 	}
-	if got := extractAntigravityTierID(map[string]any{
+	if got := extractAntigravityTierMetadata(map[string]any{
 		"allowedTiers": []any{
 			map[string]any{"id": "standard-tier", "isDefault": true},
 		},
-	}); got != "standard-tier" {
+	}).TierID; got != "standard-tier" {
 		t.Fatalf("tier = %q, want standard-tier", got)
 	}
 }

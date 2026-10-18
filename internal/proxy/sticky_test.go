@@ -17,7 +17,7 @@ func TestExtractRequestStickyKey_OpenAIResponsesL1AndL2(t *testing.T) {
 		UpstreamPath: "/v1/responses",
 	}
 
-	l1 := extractRequestStickyKey(requestCtx, []byte(`{"previous_response_id":"resp_123","prompt_cache_key":"cache_ignored"}`))
+	l1 := newRequestPayload([]byte(`{"previous_response_id":"resp_123","prompt_cache_key":"cache_ignored"}`)).requestStickyKey(requestCtx)
 	if l1.Level != stickyKeyLevelL1 {
 		t.Fatalf("level: got %q want %q", l1.Level, stickyKeyLevelL1)
 	}
@@ -25,7 +25,7 @@ func TestExtractRequestStickyKey_OpenAIResponsesL1AndL2(t *testing.T) {
 		t.Fatalf("key: got %q want %q", l1.Key, "resp_123")
 	}
 
-	l2 := extractRequestStickyKey(requestCtx, []byte(`{"prompt_cache_key":"cache_123"}`))
+	l2 := newRequestPayload([]byte(`{"prompt_cache_key":"cache_123"}`)).requestStickyKey(requestCtx)
 	if l2.Level != stickyKeyLevelL2 {
 		t.Fatalf("level: got %q want %q", l2.Level, stickyKeyLevelL2)
 	}
@@ -43,7 +43,7 @@ func TestExtractRequestStickyKey_L3UsesSecondToLastHumanMessage(t *testing.T) {
 		Capability:   CapabilityOpenAIChatCompletions,
 		UpstreamPath: "/v1/chat/completions",
 	}
-	key := extractRequestStickyKey(openAI, []byte(`{"model":"gpt-4.1","messages":[{"role":"system","content":"sys"},{"role":"user","content":"Alpha first"},{"role":"assistant","content":"reply"},{"role":"user","content":"Beta second"}]}`))
+	key := newRequestPayload([]byte(`{"model":"gpt-4.1","messages":[{"role":"system","content":"sys"},{"role":"user","content":"Alpha first"},{"role":"assistant","content":"reply"},{"role":"user","content":"Beta second"}]}`)).requestStickyKey(openAI)
 	if key.Level != stickyKeyLevelL3 {
 		t.Fatalf("level: got %q want %q", key.Level, stickyKeyLevelL3)
 	}
@@ -60,7 +60,7 @@ func TestExtractRequestStickyKey_L3UsesSecondToLastHumanMessage(t *testing.T) {
 		Capability:   CapabilityClaudeMessages,
 		UpstreamPath: "/v1/messages",
 	}
-	key = extractRequestStickyKey(anthropic, []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":[{"type":"text","text":"Gamma one"}]},{"role":"assistant","content":[{"type":"text","text":"reply"}]},{"role":"user","content":[{"type":"text","text":"Delta two"}]}]}`))
+	key = newRequestPayload([]byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":[{"type":"text","text":"Gamma one"}]},{"role":"assistant","content":[{"type":"text","text":"reply"}]},{"role":"user","content":[{"type":"text","text":"Delta two"}]}]}`)).requestStickyKey(anthropic)
 	if got, want := key.Preview, "gamma one"; got != want {
 		t.Fatalf("anthropic preview: got %q want %q", got, want)
 	}
@@ -71,7 +71,7 @@ func TestExtractRequestStickyKey_L3UsesSecondToLastHumanMessage(t *testing.T) {
 		Capability:   CapabilityGeminiGenerateContent,
 		UpstreamPath: "/v1beta/models/gemini-2.5-pro:generateContent",
 	}
-	key = extractRequestStickyKey(gemini, []byte(`{"contents":[{"role":"user","parts":[{"text":"First prompt"}]},{"role":"model","parts":[{"text":"reply"}]},{"role":"user","parts":[{"text":"Second prompt"}]}]}`))
+	key = newRequestPayload([]byte(`{"contents":[{"role":"user","parts":[{"text":"First prompt"}]},{"role":"model","parts":[{"text":"reply"}]},{"role":"user","parts":[{"text":"Second prompt"}]}]}`)).requestStickyKey(gemini)
 	if got, want := key.Preview, "first prompt"; got != want {
 		t.Fatalf("gemini preview: got %q want %q", got, want)
 	}
@@ -87,7 +87,7 @@ func TestExtractRequestStickyKey_SingleHumanMessageDoesNotCreateL3(t *testing.T)
 		UpstreamPath: "/v1/chat/completions",
 	}
 
-	key := extractRequestStickyKey(requestCtx, []byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"Only once"}]}`))
+	key := newRequestPayload([]byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"Only once"}]}`)).requestStickyKey(requestCtx)
 	if key.Level != "" {
 		t.Fatalf("level: got %q want empty", key.Level)
 	}
@@ -103,7 +103,7 @@ func TestExtractResponseLearningStickyKey_UsesLastHumanMessageIncludingFirstTurn
 		UpstreamPath: "/v1/chat/completions",
 	}
 
-	firstTurn := extractResponseLearningStickyKey(requestCtx, []byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"First turn"}]}`))
+	firstTurn := newRequestPayload([]byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"First turn"}]}`)).responseLearningStickyKey(requestCtx)
 	if firstTurn.Level != stickyKeyLevelL3 {
 		t.Fatalf("firstTurn level: got %q want %q", firstTurn.Level, stickyKeyLevelL3)
 	}
@@ -111,7 +111,7 @@ func TestExtractResponseLearningStickyKey_UsesLastHumanMessageIncludingFirstTurn
 		t.Fatalf("firstTurn preview: got %q want %q", got, want)
 	}
 
-	multiTurn := extractResponseLearningStickyKey(requestCtx, []byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"Alpha first"},{"role":"assistant","content":"reply"},{"role":"user","content":"Beta second"}]}`))
+	multiTurn := newRequestPayload([]byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"Alpha first"},{"role":"assistant","content":"reply"},{"role":"user","content":"Beta second"}]}`)).responseLearningStickyKey(requestCtx)
 	if got, want := multiTurn.Preview, "beta second"; got != want {
 		t.Fatalf("multiTurn preview: got %q want %q", got, want)
 	}

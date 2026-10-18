@@ -740,10 +740,6 @@ func usageProviderCount(snapshot Usage) int {
 	return total
 }
 
-func writeConfig(dir string, cfg *config.Config) error {
-	return writeConfigWithHook(dir, cfg, nil)
-}
-
 func writeConfigWithHook(dir string, cfg *config.Config, beforeWrite func(index int, name string) error) error {
 	files := []struct {
 		name  string

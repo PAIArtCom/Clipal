@@ -37,7 +37,7 @@ func TestProductRegistryCapabilities(t *testing.T) {
 	}
 }
 
-func TestNewClientPathOverridesAndSelection(t *testing.T) {
+func TestClientDirectoryOverridesAndSelection(t *testing.T) {
 	for _, test := range []struct {
 		product  ProductID
 		variable string
@@ -73,31 +73,37 @@ func TestNewClientPathOverridesAndSelection(t *testing.T) {
 	}
 }
 
-func TestNewClientsRejectMalformedBeforeCreatingBackup(t *testing.T) {
-	for _, product := range SupportedProducts()[7:] {
+func TestClientsRejectMalformedBeforeCreatingBackup(t *testing.T) {
+	for _, product := range SupportedProducts() {
 		t.Run(string(product), func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, product)
-			malformed := []byte("null")
 			files, err := m.planTakeover(product, cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if files[0].Format == managedTOML {
-				malformed = []byte("[invalid")
-			}
+			malformedBodies := []string{"[invalid"}
 			if files[0].Format == managedBytes {
-				malformed = []byte("# >>> Clipal Copilot CLI >>>\n")
+				malformedBodies = []string{"# >>> Clipal Copilot CLI >>>\n"}
 			}
-			if err = os.WriteFile(originals[0].TargetPath, malformed, originals[0].Mode); err != nil {
-				t.Fatal(err)
+			// These client contracts require an object or sequence root;
+			// syntactically valid null must also fail before any write.
+			switch product {
+			case ProductPi, ProductQwenCode, ProductKiloCLI, ProductCodeBuddy,
+				ProductCrush, ProductIFlow, ProductTRAEAgent, ProductDeepSeekHarness:
+				malformedBodies = append(malformedBodies, "null")
 			}
-			originals[0].Original = malformed
-			if _, err = m.Apply(product, cfg); err == nil {
-				t.Fatal("accepted malformed config")
-			}
-			assertTakeoverFiles(t, originals)
-			if m.hasLatestBackup(product) {
-				t.Fatal("failed planning created baseline")
+			for _, malformed := range malformedBodies {
+				if err = os.WriteFile(originals[0].TargetPath, []byte(malformed), originals[0].Mode); err != nil {
+					t.Fatal(err)
+				}
+				originals[0].Original = []byte(malformed)
+				if _, err = m.Apply(product, cfg); err == nil {
+					t.Fatalf("accepted malformed config %q", malformed)
+				}
+				assertTakeoverFiles(t, originals)
+				if m.hasLatestBackup(product) {
+					t.Fatal("failed planning created baseline")
+				}
 			}
 		})
 	}

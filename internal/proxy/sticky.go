@@ -47,10 +47,6 @@ func stickyScopeKey(scope routingScope, key string) string {
 	return fmt.Sprintf("%s\x00%s", scope, strings.TrimSpace(key))
 }
 
-func extractRequestStickyKey(requestCtx RequestContext, body []byte) stickyKey {
-	return extractRequestStickyKeyFromRoot(requestCtx, decodeStickyRoot(body))
-}
-
 func extractRequestStickyKeyFromRoot(requestCtx RequestContext, root map[string]any) stickyKey {
 	if requestCtx.Capability == CapabilityOpenAIResponses {
 		if v := strings.TrimSpace(stringField(root, "previous_response_id")); v != "" {
@@ -73,10 +69,6 @@ func extractRequestStickyKeyFromRoot(requestCtx RequestContext, root map[string]
 		Source:  "dynamic_human_feature",
 		Preview: previewStickyFeature(text),
 	}
-}
-
-func extractResponseLearningStickyKey(requestCtx RequestContext, body []byte) stickyKey {
-	return extractResponseLearningStickyKeyFromRoot(requestCtx, decodeStickyRoot(body))
 }
 
 func extractResponseLearningStickyKeyFromRoot(requestCtx RequestContext, root map[string]any) stickyKey {

@@ -415,10 +415,6 @@ func (c *AntigravityClient) onboardUser(ctx context.Context, accessToken string,
 	return "", fmt.Errorf("project onboarding did not complete")
 }
 
-func extractAntigravityTierID(payload map[string]any) string {
-	return extractAntigravityTierMetadata(payload).TierID
-}
-
 func extractAntigravityTierMetadata(payload map[string]any) antigravityTierMetadata {
 	if payload == nil {
 		return antigravityTierMetadata{TierID: defaultAntigravityFreeTierID}

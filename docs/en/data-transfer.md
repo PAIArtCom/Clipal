@@ -10,7 +10,7 @@ Clipal uses one canonical plaintext JSON document for complete backups: `clipal.
 OAuth credentials include access tokens and refresh tokens when present. The
 plaintext export is a complete, operator-owned migration copy of the instance.
 The data API is `/api/data/export`; the former configuration-only
-`/api/config/export` endpoint is not part of this new contract.
+`/api/config/export` endpoint is not supported.
 
 The top-level contract is:
 
@@ -33,7 +33,7 @@ The top-level contract is:
 }
 ```
 
-This is a new contract. Older Web UI configuration-only JSON exports are intentionally not accepted.
+Configuration-only JSON exports from older Web UI versions are not supported.
 
 Exports use `google` in `data.clients` and usage keys. Imports accept legacy `gemini` keys and normalize them to `google`, preserving usage counters and costs. A backup with differing `google` and `gemini` channel configurations is rejected without applying changes.
 
@@ -55,7 +55,7 @@ clipal import --format clipal --mode merge --yes clipal-data.json
 
 Native imports default to `replace`. `merge` replaces global settings, merges providers by name, merges credentials by account identity, and adds usage counters.
 
-Schema version 1 defines exactly three client keys: `claude`, `openai`, and `gemini`. Unknown client keys and trailing JSON documents are rejected instead of being silently dropped. All integer usage and cost fields are transported as raw file text by the Web UI, so full signed 64-bit values remain exact.
+Schema version 1 exports three canonical client keys: `claude`, `openai`, and `google`. Imports also accept the legacy `gemini` alias and normalize it to `google`. Unknown client keys and trailing JSON documents are rejected instead of being silently dropped. All integer usage and cost fields are transported as raw file text by the Web UI, so full signed 64-bit values remain exact.
 
 The same import command accepts CLIProxyAPI single-account OAuth JSON, sub2api export JSON, and Codex `auth.json`. External formats are credentials-only and always use `merge`; Clipal links imported accounts to the appropriate client without replacing configuration or usage.
 

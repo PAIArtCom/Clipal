@@ -17,7 +17,12 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/PAIArtCom/Clipal/internal/logger"
 	oauthpkg "github.com/PAIArtCom/Clipal/internal/oauth"
+	"github.com/PAIArtCom/Clipal/internal/telemetry"
 )
+
+func newClientProxy(clientType ClientType, mode config.ClientMode, pinnedProvider string, providers []config.Provider, reactivateAfter time.Duration, upstreamIdle time.Duration, responseHeaderTimeout time.Duration, cbCfg circuitBreakerConfig, telemetryStore ...*telemetry.Store) *ClientProxy {
+	return newClientProxyWithGlobalProxy(clientType, mode, pinnedProvider, providers, reactivateAfter, upstreamIdle, responseHeaderTimeout, cbCfg, config.GlobalUpstreamProxyModeEnvironment, "", telemetryStore...)
+}
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 

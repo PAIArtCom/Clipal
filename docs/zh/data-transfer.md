@@ -8,7 +8,7 @@ Clipal 使用唯一的标准明文 JSON 文档完成完整备份：`clipal.data/
 - 用量计数和费用历史。
 
 OAuth 凭据会包含已有的 access token 和 refresh token。该明文导出是实例数据的完整迁移副本，归操作者所有。
-数据导出 API 为 `/api/data/export`；旧的仅配置 `/api/config/export` 端点不属于这份新契约。
+数据导出 API 为 `/api/data/export`；不再支持旧的仅配置 `/api/config/export` 端点。
 
 顶层契约如下：
 
@@ -31,7 +31,7 @@ OAuth 凭据会包含已有的 access token 和 refresh token。该明文导出�
 }
 ```
 
-这是全新的数据契约，旧版 Web UI 仅包含配置的 JSON 导出不会被兼容导入。
+不支持导入旧版 Web UI 仅包含配置的 JSON 导出。
 
 导出在 `data.clients` 和用量键中统一使用 `google`。导入接受旧的 `gemini` 键并规范化为 `google`，保留用量计数与花费；若同一备份中的 `google` 与 `gemini` 渠道配置不同，则拒绝导入且不应用变更。
 
@@ -53,7 +53,7 @@ clipal import --format clipal --mode merge --yes clipal-data.json
 
 Clipal 原生数据默认采用 `replace`。选择 `merge` 时，全局设置使用导入值，Provider 按名称合并，凭据按账号身份合并，用量计数累加。
 
-Schema v1 只定义 `claude`、`openai` 和 `gemini` 三个客户端键。未知客户端键和尾随的第二份 JSON 文档会直接被拒绝，不会被静默丢弃。Web UI 以原始文件文本传输所有整数用量与费用字段，因此完整的有符号 64 位整数不会发生精度损失。
+Schema v1 导出 `claude`、`openai` 和 `google` 三个标准客户端键；导入时也接受旧 `gemini` 别名，并归一化为 `google`。未知客户端键和尾随的第二份 JSON 文档会直接被拒绝，不会被静默丢弃。Web UI 以原始文件文本传输所有整数用量与费用字段，因此完整的有符号 64 位整数不会发生精度损失。
 
 同一条导入命令也支持 CLIProxyAPI 单账号 OAuth JSON、sub2api 导出 JSON 和 Codex `auth.json`。外部格式只导入凭据并且固定使用 `merge`；Clipal 会把账号关联到对应客户端，不会替换配置或用量。
 
