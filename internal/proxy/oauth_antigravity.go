@@ -40,6 +40,14 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 	if err != nil {
 		return nil, err
 	}
+	var originalRoot map[string]any
+	if payload != nil {
+		originalRoot = payload.jsonRoot()
+	}
+	rewrittenBody, err = cp.resolveAntigravityRequestModel(original, cred, providerIndex, cp.oauthHTTPClientForProvider(provider, providerIndex), path, rewrittenBody, originalRoot)
+	if err != nil {
+		return nil, err
+	}
 
 	targetURL, err := buildTargetURL(antigravityOAuthBaseURL(), targetPath, "")
 	if err != nil {

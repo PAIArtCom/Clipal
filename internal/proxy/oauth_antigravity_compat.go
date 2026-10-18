@@ -91,25 +91,40 @@ func buildAntigravityOAuthGenerateEnvelope(root map[string]any, modelName string
 		"project": strings.TrimSpace(projectID),
 		"request": cloneAntigravityOAuthRequestPayload(root),
 	}
-	if requestID, ok := antigravityOAuthStringField(root, "request_id", "requestId"); ok {
-		envelope["request_id"] = requestID
+	if requestID, ok := antigravityOAuthStringField(root, "requestId", "request_id"); ok {
+		envelope["requestId"] = requestID
 	}
-	if userPromptID, ok := antigravityOAuthStringField(root, "user_prompt_id", "userPromptId"); ok {
-		envelope["user_prompt_id"] = userPromptID
+	if userPromptID, ok := antigravityOAuthStringField(root, "userPromptId", "user_prompt_id"); ok {
+		envelope["userPromptId"] = userPromptID
 	}
-	if requestType, ok := antigravityOAuthField(root, "request_type", "requestType"); ok {
-		envelope["request_type"] = requestType
+	if requestType, ok := antigravityOAuthField(root, "requestType", "request_type"); ok {
+		envelope["requestType"] = requestType
 	}
-	if enabledCreditTypes, ok := antigravityOAuthField(root, "enabled_credit_types", "enabledCreditTypes"); ok {
-		envelope["enabled_credit_types"] = enabledCreditTypes
+	if enabledCreditTypes, ok := antigravityOAuthField(root, "enabledCreditTypes", "enabled_credit_types"); ok {
+		envelope["enabledCreditTypes"] = enabledCreditTypes
 	}
 	return envelope
 }
 
 func cloneAntigravityOAuthRequestPayload(root map[string]any) map[string]any {
-	request := make(map[string]any, len(root))
-	for key, value := range root {
-		request[key] = value
+	request := cloneStringAnyMap(root)
+	canonicalAntigravityField(request, "systemInstruction", "system_instruction")
+	canonicalAntigravityField(request, "generationConfig", "generation_config")
+	if generation, ok := request["generationConfig"].(map[string]any); ok {
+		generation = cloneStringAnyMap(generation)
+		request["generationConfig"] = generation
+		canonicalAntigravityField(generation, "thinkingConfig", "thinking_config")
+		canonicalAntigravityField(generation, "responseSchema", "responseJsonSchema", "response_json_schema")
+		if thinking, ok := generation["thinkingConfig"].(map[string]any); ok {
+			thinking = cloneStringAnyMap(thinking)
+			generation["thinkingConfig"] = thinking
+			canonicalAntigravityField(thinking, "thinkingLevel", "thinking_level")
+			canonicalAntigravityField(thinking, "thinkingBudget", "thinking_budget")
+			canonicalAntigravityField(thinking, "includeThoughts", "include_thoughts")
+			if level, ok := thinking["thinkingLevel"].(string); ok {
+				thinking["thinkingLevel"] = strings.ToLower(strings.TrimSpace(level))
+			}
+		}
 	}
 	delete(request, "model")
 	delete(request, "project")
@@ -122,6 +137,18 @@ func cloneAntigravityOAuthRequestPayload(root map[string]any) map[string]any {
 	delete(request, "enabled_credit_types")
 	delete(request, "enabledCreditTypes")
 	return request
+}
+
+// Canonical spelling wins if both Gemini SDK field spellings are present.
+func canonicalAntigravityField(fields map[string]any, canonical string, aliases ...string) {
+	for _, alias := range aliases {
+		if value, ok := fields[alias]; ok {
+			if _, exists := fields[canonical]; !exists {
+				fields[canonical] = value
+			}
+			delete(fields, alias)
+		}
+	}
 }
 
 func antigravityOAuthStringField(root map[string]any, keys ...string) (string, bool) {

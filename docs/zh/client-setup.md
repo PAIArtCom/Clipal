@@ -107,6 +107,13 @@ export GOOGLE_GEMINI_BASE_URL='http://127.0.0.1:3333/clipal'
 Antigravity CLI 不读取 `.env` 文件，配置协议见
 [官方 API Key 与自定义入口说明](https://www.antigravity.google/docs/install?tab=cli)。
 
+用 `agy models` 查看 CLI 可选的 ID。API Key 模式下，CLI 可能发送 Gemini API
+模型名和 thinking budget，而非选中的 OAuth 路由 ID。对于 Antigravity OAuth
+上游，Clipal 依据该账号的模型目录解析：精确 ID 优先；thinking level 或精确预算
+只匹配同一模型族中唯一对应的变体。`-preview` 别名仅在目录中存在对应项时解析。
+未知 ID 保持原样，有歧义则报错，不静默选择其他模型；显式思考量和可见性保持不变。
+目录缓存五分钟，按账号及出站路由隔离，不缓存读取失败。API Key 上游保持原始路径。
+
 ## Continue
 
 编辑 `~/.continue/config.yaml`：

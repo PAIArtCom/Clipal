@@ -363,13 +363,9 @@ func geminiUsageHasFractions(details *GeminiUsageDetails) bool {
 // Antigravity can expose quota only on its model catalog. Keep model IDs and
 // explicit fractions; a catalog entry without quotaInfo is not a full bucket.
 func (c *AntigravityClient) fetchModelUsage(ctx context.Context, accessToken, projectID string) (*GeminiUsageDetails, error) {
-	data, err := c.callCloudCode(ctx, accessToken, c.dailyCloudCodeURL(), "fetchAvailableModels", map[string]any{"project": projectID})
+	models, err := c.FetchModels(ctx, &Credential{AccessToken: accessToken, Metadata: map[string]string{"project_id": projectID}})
 	if err != nil {
 		return nil, fmt.Errorf("fetch antigravity model quotas: %w", err)
-	}
-	models, ok := data["models"].(map[string]any)
-	if data["models"] != nil && !ok {
-		return nil, fmt.Errorf("invalid antigravity model quota catalog")
 	}
 	ids := make([]string, 0, len(models))
 	for id := range models {

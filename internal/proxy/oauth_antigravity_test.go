@@ -147,17 +147,17 @@ func TestCreateProxyRequest_AntigravityOAuthRebuildsUpstreamContextAndWrapsGener
 	if got := root["project"]; got != "project-1" {
 		t.Fatalf("project = %v", got)
 	}
-	if got := root["request_id"]; got != "request-1" {
-		t.Fatalf("request_id = %v", got)
+	if got := root["requestId"]; got != "request-1" {
+		t.Fatalf("requestId = %v", got)
 	}
-	if got := root["user_prompt_id"]; got != "prompt-1" {
-		t.Fatalf("user_prompt_id = %v", got)
+	if got := root["userPromptId"]; got != "prompt-1" {
+		t.Fatalf("userPromptId = %v", got)
 	}
-	if got := root["request_type"]; got != "ANTIGRAVITY" {
-		t.Fatalf("request_type = %v", got)
+	if got := root["requestType"]; got != "ANTIGRAVITY" {
+		t.Fatalf("requestType = %v", got)
 	}
-	if got := root["enabled_credit_types"]; got == nil {
-		t.Fatalf("enabled_credit_types missing: %#v", root)
+	if got := root["enabledCreditTypes"]; got == nil {
+		t.Fatalf("enabledCreditTypes missing: %#v", root)
 	}
 	request, ok := root["request"].(map[string]any)
 	if !ok {

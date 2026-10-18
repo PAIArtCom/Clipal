@@ -109,6 +109,17 @@ signed-in Antigravity sessions do not need to be deleted.
 Antigravity CLI does not load `.env` files. See the
 [official API-key and custom-endpoint instructions](https://www.antigravity.google/docs/install?tab=cli).
 
+Use `agy models` to list the CLI's selectable IDs. In API-key mode the CLI can
+send a Gemini API model name and thinking budget instead of the selected OAuth
+route ID. For Antigravity OAuth backends, Clipal resolves these using that
+account's model catalog: exact IDs take precedence; thinking levels or exact
+budgets select only a unique matching variant in the same model family. A
+`-preview` alias resolves only when its counterpart is advertised. Unknown IDs
+remain unchanged, and ambiguous variants produce an error rather than silently
+selecting another model. Explicit thinking amounts and visibility are preserved.
+The catalog is cached for five minutes, isolated by account and outbound route;
+discovery failures are not cached. API-key upstreams retain their original paths.
+
 ## Continue
 
 Edit `~/.continue/config.yaml`:

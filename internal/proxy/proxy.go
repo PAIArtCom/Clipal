@@ -188,6 +188,7 @@ type ClientProxy struct {
 	lastRequest            RequestOutcomeEvent
 	telemetry              *telemetry.Store
 	oauth                  *oauthpkg.Service
+	antigravityCatalogs    map[string]*antigravityCatalogCall
 }
 
 // Close releases resources held by the ClientProxy.
