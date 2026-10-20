@@ -4,6 +4,44 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+test('first-paint theme agrees with runtime theme for saved and system preferences', () => {
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const bootstrap = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+    for (const theme of [null, 'system', 'light', 'dark']) {
+        for (const systemDark of [false, true]) {
+            let dark = false;
+            const classList = {
+                toggle(name, enabled) { dark = enabled; },
+                add() { dark = true; },
+                remove() { dark = false; }
+            };
+            const document = { documentElement: { classList } };
+            const window = { matchMedia: () => ({ matches: systemDark }) };
+            vm.runInNewContext(bootstrap, {
+                document, window,
+                localStorage: { getItem: key => key === 'theme' ? theme : null }
+            });
+            const expected = theme === 'dark' || ((theme === null || theme === 'system') && systemDark);
+            assert.equal(dark, expected, `first paint: ${theme}, system dark: ${systemDark}`);
+            const state = loadApp({ context: { document, window } });
+            state.applyTheme(theme || 'system');
+            assert.equal(dark, expected, `runtime: ${theme}, system dark: ${systemDark}`);
+        }
+    }
+});
+
+test('first-paint theme follows the system when storage is unavailable', () => {
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const bootstrap = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+    let dark = false;
+    vm.runInNewContext(bootstrap, {
+        document: { documentElement: { classList: { toggle(name, enabled) { dark = enabled; } } } },
+        window: { matchMedia: () => ({ matches: true }) },
+        localStorage: { getItem() { throw new Error('storage blocked'); } }
+    });
+    assert.equal(dark, true);
+});
+
 function createPopupWindow() {
     return {
         closed: false,
@@ -1077,6 +1115,7 @@ test('saveProvider starts OAuth authorization flow for oauth provider', async ()
     assert.deepEqual(calls[0].options, {
         client_type: 'openai',
         provider: 'codex',
+        theme: 'system',
         request_environment: { country: 'US', timezone: 'America/New_York', source: 'default' },
         proxy_mode: 'default'
     });
@@ -1274,6 +1313,7 @@ test('startOAuthProviderAuthorization opens the real auth URL in a new window an
         assert.deepEqual(JSON.parse(options.body), {
             client_type: 'openai',
             provider: 'codex',
+            theme: 'system',
             request_environment: { country: 'US', timezone: 'America/New_York', source: 'default' },
             proxy_mode: 'default'
         });
@@ -1331,6 +1371,7 @@ test('startOAuthProviderAuthorization opens the real auth URL in a new window an
 
 test('startOAuthProviderAuthorization sends chosen region and custom proxy settings', async () => {
     const state = loadApp();
+    state.theme = 'dark';
     state.selectedClient = 'openai';
     state.providerForm = {
         ...state.providerForm,
@@ -1347,6 +1388,7 @@ test('startOAuthProviderAuthorization sends chosen region and custom proxy setti
         assert.deepEqual(JSON.parse(options.body), {
             client_type: 'openai',
             provider: 'codex',
+            theme: 'dark',
             request_environment: { country: 'JP', timezone: 'Asia/Tokyo', source: 'user' },
             proxy_mode: 'custom',
             proxy_url: 'http://127.0.0.1:7890'
@@ -3224,6 +3266,121 @@ test('environment dropdowns localize countries and preserve stored country and t
 test('country dropdown keeps English fallback names without Intl.DisplayNames', () => {
     const state = loadApp({ context: { Intl: {} } });
     assert.match(state.environmentCountryOptions('JP').find(option => option.value === 'JP').label, /Japan/);
+});
+
+test('timezone labels show current offsets, including daylight saving and fractional hours', () => {
+    const state = loadApp();
+    const winter = new Date('2026-01-15T12:00:00Z');
+    const summer = new Date('2026-07-15T12:00:00Z');
+    assert.match(state.environmentTimezoneLabel('Asia/Shanghai', winter), /^UTC\+8 ·/);
+    assert.match(state.environmentTimezoneLabel('America/New_York', winter), /^UTC-5 ·/);
+    assert.match(state.environmentTimezoneLabel('America/New_York', summer), /^UTC-4 ·/);
+    assert.match(state.environmentTimezoneLabel('Asia/Kathmandu', winter), /^UTC\+5:45 ·/);
+    assert.match(state.environmentTimezoneLabel('Pacific/Chatham', winter), /^UTC\+13:45 ·/);
+    assert.match(state.environmentTimezoneLabel('UTC', winter), /^UTC\+0 ·/);
+    assert.equal(state.environmentTimezoneLabel('Unknown/SavedAlias', winter), 'Unknown/SavedAlias');
+    state.locale = 'zh-CN';
+    assert.match(state.environmentTimezoneLabel('Asia/Shanghai', winter), /中国/);
+});
+
+function loadChoicePicker(config) {
+    const state = loadApp();
+    const picker = state.__context.choicePicker(config);
+    picker.$nextTick = callback => callback();
+    picker.$refs = {};
+    picker.place = () => {};
+    return picker;
+}
+
+test('timezone search supports offsets, countries and identifiers while preserving saved aliases', () => {
+    const state = loadApp();
+    state.locale = 'zh-CN';
+    const choices = state.environmentTimezoneChoices('US/Eastern');
+    assert.equal(choices.filter(option => option.value === 'US/Eastern').length, 1);
+    const picker = loadChoicePicker({ get: () => 'US/Eastern', options: () => choices });
+    for (const query of ['+8', 'UTC+08', 'UTC+08:00', 'Shanghai', 'Asia/Shanghai', '中国', 'China', 'CN']) {
+        picker.search(query);
+        assert.ok(picker.matches.some(option => option.value === 'Asia/Shanghai'), query);
+    }
+    picker.search('GMT+08:00');
+    assert.ok(picker.matches.some(option => option.value === 'Asia/Shanghai'));
+    assert.ok(!picker.matches.some(option => option.value === 'Australia/Eucla'));
+    picker.search('+5:45');
+    assert.ok(picker.matches.some(option => option.value === 'Asia/Kathmandu'));
+    picker.search('US/Eastern');
+    assert.equal(picker.matches[0].value, 'US/Eastern');
+});
+
+test('country search accepts localized and English names, codes and accent-free text', () => {
+    const state = loadApp();
+    state.locale = 'zh-CN';
+    const picker = loadChoicePicker({ get: () => 'US', options: () => state.environmentCountryOptions() });
+    for (const query of ['JP', 'Japan', '日本']) {
+        picker.search(query);
+        assert.ok(picker.matches.some(option => option.value === 'JP'), query);
+    }
+    picker.search('reunion');
+    assert.ok(picker.matches.some(option => option.value === 'RE'));
+});
+
+test('choice picker navigates, selects only listed options, and discards unconfirmed search text', () => {
+    let value = 'b';
+    let disabled = false;
+    const choices = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }];
+    const picker = loadChoicePicker({ get: () => value, set: next => { value = next; }, options: () => choices, disabled: () => disabled });
+    picker.place = () => {};
+    picker.show();
+    assert.equal(picker.active, 1);
+    picker.move(1);
+    assert.equal(picker.active, 0);
+    picker.move(-1);
+    assert.equal(picker.active, 1);
+    picker.edge(false);
+    assert.equal(picker.active, 0);
+    picker.edge(true);
+    assert.equal(picker.active, 1);
+    picker.search('not-a-choice');
+    assert.equal(picker.active, -1);
+    picker.choose(0);
+    assert.equal(value, 'b');
+    picker.move(1);
+    assert.equal(picker.active, -1);
+    picker.close();
+    assert.equal(picker.selectedLabel, 'Beta');
+    picker.show();
+    picker.search('alpha');
+    disabled = true;
+    picker.choose(0);
+    assert.equal(value, 'b');
+    disabled = false;
+    picker.choose(0);
+    assert.equal(value, 'a');
+    assert.equal(picker.open, false);
+    assert.equal(picker.query, '');
+    picker.search('beta');
+    assert.equal(picker.open, true);
+    assert.equal(picker.matches[0].value, 'b');
+    assert.equal(value, 'a');
+});
+
+test('choosing an option never steals focus after the user tabs to another field', () => {
+    const state = loadApp();
+    const callbacks = [];
+    let selectedText = 0;
+    const input = { select() { selectedText++; } };
+    const picker = state.__context.choicePicker({
+        get: () => 'a', set() {}, options: () => [{ value: 'a', label: 'Alpha' }]
+    });
+    picker.$refs = { input };
+    picker.$nextTick = callback => callbacks.push(callback);
+    picker.choose(0);
+    state.__context.document.activeElement = {};
+    callbacks.shift()();
+    assert.equal(selectedText, 0);
+    picker.choose(0);
+    state.__context.document.activeElement = input;
+    callbacks.shift()();
+    assert.equal(selectedText, 1);
 });
 
 test('mode saves lock provider mutations until completion', async () => {

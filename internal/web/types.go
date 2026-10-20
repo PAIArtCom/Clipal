@@ -266,6 +266,7 @@ type ReorderRequest struct {
 }
 
 type OAuthStartRequest struct {
+	Theme              string               `json:"theme,omitempty"`
 	RequestEnvironment *oauth.RegionOptions `json:"request_environment,omitempty"`
 	ClientType         string               `json:"client_type"`
 	Provider           config.OAuthProvider `json:"provider"`

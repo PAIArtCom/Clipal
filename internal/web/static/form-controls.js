@@ -76,3 +76,101 @@ function unitField(config) {
         }
     };
 }
+
+function choiceSearchText(value) {
+    return String(value).normalize('NFD').replace(/\p{Diacritic}/gu, '')
+        .toLowerCase().replace(/\bgmt(?=[+-])/g, 'utc')
+        .replace(/([+-])0+(?=\d)/g, '$1').replace(/([+-]\d+):00\b/g, '$1');
+}
+
+// Search text is transient: only choosing an option changes the saved value.
+function choicePicker(config) {
+    let reposition;
+    return {
+        inputId: config.id,
+        labelKey: config.label,
+        open: false,
+        query: '',
+        active: -1,
+        position: {},
+        get disabled() { return config.disabled ? !!config.disabled() : false; },
+        get choices() { return config.options(); },
+        get selectedLabel() {
+            return this.choices.find(option => option.value === config.get())?.label || config.get() || '';
+        },
+        get matches() {
+            const terms = choiceSearchText(this.query).trim().split(/\s+/).filter(Boolean);
+            return this.choices.filter(option => {
+                const text = choiceSearchText(`${option.label} ${option.value} ${option.search || ''}`);
+                const offset = choiceSearchText(option.label).match(/\butc([+-]\d+(?::\d{2})?)/)?.[1];
+                return terms.every(term => /^(?:utc)?[+-]\d+(?::\d{2})?$/.test(term)
+                    ? offset === term.replace(/^utc/, '') : text.includes(term));
+            });
+        },
+        isSelected(value) { return value === config.get(); },
+        mount(element) {
+            element.appendChild(document.getElementById('choice-picker-template').content.cloneNode(true));
+            reposition = () => { if (this.open) this.place(); };
+            window.addEventListener('resize', reposition);
+            document.addEventListener('scroll', reposition, true);
+        },
+        destroy() {
+            window.removeEventListener('resize', reposition);
+            document.removeEventListener('scroll', reposition, true);
+        },
+        place() {
+            const rect = this.$refs.input.getBoundingClientRect();
+            const below = window.innerHeight - rect.bottom - 8;
+            const above = rect.top - 8;
+            const flip = below < 240 && above > below;
+            this.position = {
+                left: `${Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8))}px`,
+                width: `${Math.min(rect.width, window.innerWidth - 16)}px`,
+                maxHeight: `${Math.min(280, Math.max(80, flip ? above : below))}px`,
+                top: flip ? 'auto' : `${rect.bottom + 4}px`,
+                bottom: flip ? `${window.innerHeight - rect.top + 4}px` : 'auto'
+            };
+        },
+        show() {
+            if (this.disabled || this.open) return;
+            this.query = '';
+            this.open = true;
+            this.active = Math.max(0, this.matches.findIndex(option => this.isSelected(option.value)));
+            this.place();
+            this.revealActive();
+        },
+        close() { this.open = false; this.query = ''; },
+        search(value) {
+            if (!this.open) this.show();
+            this.query = value;
+            this.active = this.matches.length ? 0 : -1;
+            this.revealActive();
+        },
+        move(delta) {
+            if (!this.open) { this.show(); return; }
+            const count = this.matches.length;
+            this.active = count ? (this.active + delta + count) % count : -1;
+            this.revealActive();
+        },
+        edge(last) {
+            if (!this.open) return;
+            this.active = this.matches.length ? (last ? this.matches.length - 1 : 0) : -1;
+            this.revealActive();
+        },
+        revealActive() {
+            this.$nextTick(() => {
+                this.$refs.list?.querySelector(`[data-choice-index="${this.active}"]`)
+                    ?.scrollIntoView({ block: 'nearest' });
+            });
+        },
+        choose(index) {
+            const option = this.matches[index];
+            if (!option || this.disabled) return;
+            config.set(option.value);
+            this.close();
+            this.$nextTick(() => {
+                if (document.activeElement === this.$refs.input) this.$refs.input?.select();
+            });
+        }
+    };
+}

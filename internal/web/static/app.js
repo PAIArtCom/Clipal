@@ -75,6 +75,7 @@ function floatingTooltip() {
 function app() {
     let oauthAuthorizationPopup = null;
     const countryOptionsByLocale = new Map();
+    const timezoneChoicesByLocale = new Map();
 
     return {
         // State
@@ -144,7 +145,11 @@ function app() {
                     "reference": "Reference service only — target exit unverified",
                     "language": "Request language",
                     "locale": "Locale",
-                    "timezone": "Request timezone (IANA)",
+                    "timezone": "Request timezone",
+                    "searchCountry": "Search country or region…",
+                    "searchTimezone": "Search city, country or UTC offset…",
+                    "chooseHelp": "Type to search. Use arrow keys to navigate, Enter to select, and Escape to cancel. Only listed choices can be saved.",
+                    "noMatches": "No matching options. Try another name or UTC offset.",
                     "dns": "DNS resolution",
                     "automatic": "Automatic: use proxy resolution when configured; otherwise try DoH, then the system hostname route on connection failure",
                     "resolverChoice": "No explicit proxy: {resolver} DoH; otherwise proxy resolution",
@@ -659,7 +664,11 @@ function app() {
                     "reference": "仅为参考服务观测，目标出口未核验",
                     "language": "请求语言",
                     "locale": "地区格式",
-                    "timezone": "请求时区（IANA）",
+                    "timezone": "请求时区",
+                    "searchCountry": "搜索国家或地区…",
+                    "searchTimezone": "搜索城市、国家或 UTC 偏移…",
+                    "chooseHelp": "输入关键词搜索，用方向键定位，Enter 选择，Esc 取消。只能保存列表中的选项。",
+                    "noMatches": "没有匹配项，请尝试其他名称或 UTC 偏移。",
                     "dns": "DNS 解析",
                     "automatic": "自动：有代理时由代理解析；否则优先 DoH，解析或连接失败后回退系统域名通路",
                     "resolverChoice": "无显式代理时使用 {resolver} DoH；有代理时由代理解析",
@@ -2503,7 +2512,7 @@ function app() {
                 const names = typeof Intl.DisplayNames === 'function'
                     ? new Intl.DisplayNames([this.locale], { type: 'region' }) : null;
                 const options = Object.entries(requestEnvironmentChoices.countries).map(([value, fallback]) => ({
-                    value, label: `${names ? names.of(value) : fallback} (${value})`
+                    value, label: `${names ? names.of(value) : fallback} (${value})`, search: fallback
                 }));
                 options.sort((a, b) => a.label.localeCompare(b.label, this.locale));
                 countryOptionsByLocale.set(this.locale, options);
@@ -2516,6 +2525,49 @@ function app() {
             const options = requestEnvironmentChoices.timezones;
             // Keep saved aliases (for example US/Eastern) exactly as stored.
             return selected && !options.includes(selected) ? [selected, ...options] : options;
+        },
+        environmentTimezoneLabel(timezone, date = new Date()) {
+            try {
+                const offset = new Intl.DateTimeFormat('en', {
+                    timeZone: timezone, timeZoneName: 'shortOffset'
+                }).formatToParts(date).find(part => part.type === 'timeZoneName').value;
+                const name = new Intl.DateTimeFormat(this.locale, {
+                    timeZone: timezone, timeZoneName: 'longGeneric'
+                }).formatToParts(date).find(part => part.type === 'timeZoneName').value;
+                const utc = offset === 'GMT' ? 'UTC+0' : offset.replace(/^GMT/, 'UTC');
+                const city = timezone.split('/').pop().replace(/_/g, ' ');
+                return `${utc} · ${name} (${city})`;
+            } catch (_) {
+                // A saved alias may be newer than the browser's timezone data.
+                return timezone;
+            }
+        },
+        environmentTimezoneChoices(selected) {
+            // Cache the Intl work while typing; refresh offsets as time advances.
+            const key = `${this.locale}:${Math.floor(Date.now() / 60000)}`;
+            if (!timezoneChoicesByLocale.has(key)) {
+                timezoneChoicesByLocale.clear();
+                const countries = this.environmentCountryOptions();
+                const countrySearch = new Map();
+                for (const [country, zones] of Object.entries(requestEnvironmentChoices.countryTimezones)) {
+                    const option = countries.find(option => option.value === country);
+                    for (const zone of zones) {
+                        countrySearch.set(zone, `${countrySearch.get(zone) || ''} ${option?.label || country} ${option?.search || ''}`);
+                    }
+                }
+                timezoneChoicesByLocale.set(key, requestEnvironmentChoices.timezones.map(value => ({
+                    value, label: this.environmentTimezoneLabel(value), detail: value, search: countrySearch.get(value) || ''
+                })).sort((a, b) => {
+                    const offset = label => {
+                        const match = label.match(/^UTC([+-])(\d+)(?::(\d+))?/);
+                        return match ? (Number(match[2]) * 60 + Number(match[3] || 0)) * (match[1] === '-' ? -1 : 1) : 0;
+                    };
+                    return offset(a.label) - offset(b.label) || a.label.localeCompare(b.label, this.locale);
+                }));
+            }
+            const options = timezoneChoicesByLocale.get(key);
+            return selected && !options.some(option => option.value === selected)
+                ? [{ value: selected, label: this.environmentTimezoneLabel(selected), detail: selected }, ...options] : options;
         },
         async openEnvironment(provider) {
             if (this.providerMutationBusy || !this.providerUsesOAuth(provider)) return;
@@ -4726,6 +4778,7 @@ function app() {
             const payload = {
                 client_type: this.selectedClient,
                 provider,
+                theme: this.theme,
                 request_environment: { country: this.providerForm.request_country ?? 'US', timezone: this.providerForm.request_timezone ?? 'America/New_York', source: this.providerForm.request_environment_source || 'default' },
                 proxy_mode: proxyMode
             };

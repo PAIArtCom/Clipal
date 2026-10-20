@@ -8,6 +8,13 @@
 
     <script>
         (function () {
+            // Apply appearance before loading styles to avoid a light first paint.
+            var theme = 'system';
+            try {
+                theme = localStorage.getItem('theme') || 'system';
+            } catch (error) {}
+            document.documentElement.classList.toggle('dark', theme === 'dark' ||
+                (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
             try {
                 var stored = localStorage.getItem('clipal.locale');
                 var locale = stored === 'zh-CN' ? 'zh-CN' : 'en';
@@ -73,6 +80,7 @@
         <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
         <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
         <symbol id="i-display" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
         <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     </svg>
 
@@ -1271,19 +1279,11 @@
 
                     <label class="form-label" for="oauth-request-country" x-show="providerFormUsesOAuth() && !showEditProviderModal"><span x-text="t('requestEnv.country')"></span><span class="tooltip hint"><button type="button" class="hint__btn" :aria-label="t('requestEnv.hint')"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button><span class="tooltip-content" role="tooltip" x-text="t('requestEnv.hint')"></span></span></label>
                     <div class="form-control-wrap" x-show="providerFormUsesOAuth() && !showEditProviderModal">
-                        <select id="oauth-request-country" class="form-select" x-model="providerForm.request_country" @change="providerForm.request_environment_source = 'user'">
-                            <template x-for="option in environmentCountryOptions(providerForm.request_country)" :key="option.value">
-                                <option :value="option.value" :selected="option.value === providerForm.request_country" x-text="option.label"></option>
-                            </template>
-                        </select>
+                        <div class="choice-picker" x-data="choicePicker({ id: 'oauth-request-country', label: 'requestEnv.country', get: () => providerForm.request_country, set: value => { providerForm.request_country = value; providerForm.request_environment_source = 'user' }, options: () => environmentCountryOptions(providerForm.request_country), disabled: () => false })" x-init="mount($el)"></div>
                     </div>
                     <label class="form-label" for="oauth-request-timezone" x-show="providerFormUsesOAuth() && !showEditProviderModal" x-text="t('requestEnv.timezone')"></label>
                     <div class="form-control-wrap" x-show="providerFormUsesOAuth() && !showEditProviderModal">
-                        <select id="oauth-request-timezone" class="form-select" x-model="providerForm.request_timezone" @change="providerForm.request_environment_source = 'user'">
-                            <template x-for="option in environmentTimezoneOptions(providerForm.request_timezone)" :key="option">
-                                <option :value="option" :selected="option === providerForm.request_timezone" x-text="option"></option>
-                            </template>
-                        </select>
+                        <div class="choice-picker" x-data="choicePicker({ id: 'oauth-request-timezone', label: 'requestEnv.timezone', get: () => providerForm.request_timezone, set: value => { providerForm.request_timezone = value; providerForm.request_environment_source = 'user' }, options: () => environmentTimezoneChoices(providerForm.request_timezone), disabled: () => false })" x-init="mount($el)"></div>
                     </div>
 
                     <label class="form-label" for="provider-name" x-show="!providerFormUsesOAuth()"><span x-text="t('modal.provider.name')"></span><span class="tooltip hint"><button type="button" class="hint__btn" :aria-label="t('modal.provider.nameHint')"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button><span class="tooltip-content" role="tooltip" x-text="t('modal.provider.nameHint')"></span></span></label>
@@ -1447,6 +1447,39 @@
         </div>
     </div>
 
+    <template id="choice-picker-template">
+        <div x-id="['choice-list', 'choice-help']" @click.outside="close()">
+            <input x-ref="input" :id="inputId" type="text" class="form-select choice-picker__input"
+                role="combobox" aria-autocomplete="list" aria-haspopup="listbox" :aria-expanded="open"
+                :aria-controls="$id('choice-list')" :aria-activedescendant="open && active >= 0 ? $id('choice-list') + '-' + active : null"
+                :aria-describedby="$id('choice-help')"
+                :aria-label="t(labelKey)" :disabled="disabled" :value="open ? query : selectedLabel"
+                :placeholder="open ? t(labelKey === 'requestEnv.country' ? 'requestEnv.searchCountry' : 'requestEnv.searchTimezone') : ''" autocomplete="off" spellcheck="false"
+                @focus="show()" @click="show()" @blur="close()" @input="search($event.target.value)"
+                @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+                @keydown.home="if (open) { $event.preventDefault(); edge(false) }"
+                @keydown.end="if (open) { $event.preventDefault(); edge(true) }"
+                @keydown.enter="if (open && !$event.isComposing) { $event.preventDefault(); choose(active) }"
+                @keydown.escape="if (open) { $event.preventDefault(); $event.stopPropagation(); close() }"
+                @keydown.tab="close()" x-effect="if (disabled) close()">
+            <span class="sr-only" :id="$id('choice-help')" x-text="t('requestEnv.chooseHelp')"></span>
+            <div class="choice-picker__popup" :style="position" x-show="open" x-cloak @mousedown.prevent>
+                <div x-ref="list" :id="$id('choice-list')" role="listbox" :aria-label="t(labelKey)" class="choice-picker__list">
+                    <template x-for="(option, index) in matches" :key="option.value">
+                        <div role="option" :id="$id('choice-list') + '-' + index" :aria-selected="isSelected(option.value)"
+                            :data-choice-index="index" class="choice-picker__option" :class="{'is-active': active === index}"
+                            @mousemove="active = index" @click="choose(index)">
+                            <span class="choice-picker__label" x-text="option.label"></span>
+                            <span class="choice-picker__detail" x-show="option.detail" x-text="option.detail"></span>
+                            <svg class="ic choice-picker__check" x-show="isSelected(option.value)" aria-hidden="true"><use href="#i-check"/></svg>
+                        </div>
+                    </template>
+                </div>
+                <p class="choice-picker__empty" role="status" x-show="!matches.length" x-text="t('requestEnv.noMatches')"></p>
+            </div>
+        </div>
+    </template>
+
     <template id="unit-field-template">
         <input type="number" class="form-input" :id="inputId" :aria-label="t(labelKey)" :value="value"
             :required="!optional && !custom" :disabled="disabled" :placeholder="optional ? t('forms.defaultValue') : ''" min="0" step="any"
@@ -1478,19 +1511,11 @@
                 <div class="form-group"><span class="form-label" x-text="t('requestEnv.source')"></span><p x-text="environmentSourceLabel()"></p></div>
                 <div class="form-group">
                     <label class="form-label" for="account-country" x-text="t('requestEnv.country')"></label>
-                    <select id="account-country" class="form-select" x-model="environmentForm.country" :disabled="environmentBusy || !environmentIdentity">
-                        <template x-for="option in environmentCountryOptions(environmentForm.country)" :key="option.value">
-                            <option :value="option.value" :selected="option.value === environmentForm.country" x-text="option.label"></option>
-                        </template>
-                    </select>
+                    <div class="choice-picker" x-data="choicePicker({ id: 'account-country', label: 'requestEnv.country', get: () => environmentForm.country, set: value => { environmentForm.country = value }, options: () => environmentCountryOptions(environmentForm.country), disabled: () => environmentBusy || !environmentIdentity })" x-init="mount($el)"></div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="account-timezone" x-text="t('requestEnv.timezone')"></label>
-                    <select id="account-timezone" class="form-select" x-model="environmentForm.timezone" :disabled="environmentBusy || !environmentIdentity">
-                        <template x-for="option in environmentTimezoneOptions(environmentForm.timezone)" :key="option">
-                            <option :value="option" :selected="option === environmentForm.timezone" x-text="option"></option>
-                        </template>
-                    </select>
+                    <div class="choice-picker" x-data="choicePicker({ id: 'account-timezone', label: 'requestEnv.timezone', get: () => environmentForm.timezone, set: value => { environmentForm.timezone = value }, options: () => environmentTimezoneChoices(environmentForm.timezone), disabled: () => environmentBusy || !environmentIdentity })" x-init="mount($el)"></div>
                 </div>
                 <template x-for="field in ['language', 'locale']" :key="field"><div class="form-group"><span class="form-label" x-text="t('requestEnv.' + field)"></span><p x-text="environmentProfile[field] || t('requestEnv.waiting')"></p></div></template>
                 <div class="form-group" x-show="Object.keys(environmentUpstream).length"><span class="form-label" x-text="t('requestEnv.upstream')"></span><p x-text="[environmentUpstream.country_code || environmentUpstream.country, environmentUpstream.timezone].filter(Boolean).join(' · ')"></p></div>
