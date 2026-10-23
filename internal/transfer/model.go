@@ -119,6 +119,7 @@ type ProviderOverrides struct {
 	Model  *string          `json:"model,omitempty"`
 	OpenAI *OpenAIOverrides `json:"openai,omitempty"`
 	Claude *ClaudeOverrides `json:"claude,omitempty"`
+	Google *GoogleOverrides `json:"google,omitempty"`
 }
 
 type OpenAIOverrides struct {
@@ -126,8 +127,11 @@ type OpenAIOverrides struct {
 }
 
 type ClaudeOverrides struct {
-	ThinkingBudgetTokens *int    `json:"thinking_budget_tokens,omitempty"`
-	Effort               *string `json:"effort,omitempty"`
+	Effort *string `json:"effort,omitempty"`
+}
+
+type GoogleOverrides struct {
+	ThinkingLevel *string `json:"thinking_level,omitempty"`
 }
 
 type Credential struct {

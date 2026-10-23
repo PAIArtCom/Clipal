@@ -12,7 +12,7 @@ func hasProviderRequestOverrides(provider config.Provider) bool {
 	return provider.ModelOverride() != "" ||
 		provider.OpenAIReasoningEffort() != "" ||
 		provider.ClaudeEffort() != "" ||
-		provider.ClaudeThinkingBudgetTokens() > 0
+		provider.GoogleThinkingLevel() != ""
 }
 
 func isJSONRequest(req *http.Request) bool {
@@ -37,9 +37,38 @@ func applyProviderRequestOverridesToRoot(root map[string]any, requestCtx Request
 		return applyOpenAIProviderRequestOverrides(root, requestCtx, provider)
 	case ProtocolFamilyClaude:
 		return applyClaudeProviderRequestOverrides(root, requestCtx, provider)
+	case ProtocolFamilyGemini:
+		return applyGeminiProviderRequestOverrides(root, requestCtx, provider)
 	default:
 		return false
 	}
+}
+
+func applyGeminiProviderRequestOverrides(root map[string]any, requestCtx RequestContext, provider config.Provider) bool {
+	if requestCtx.Capability != CapabilityGeminiGenerateContent && requestCtx.Capability != CapabilityGeminiStreamGenerate {
+		return false
+	}
+	changed := false
+	if model := provider.ModelOverride(); model != "" {
+		root["model"] = model
+		changed = true
+	}
+	level := provider.GoogleThinkingLevel()
+	if level == "" {
+		return changed
+	}
+	generation, _ := root["generationConfig"].(map[string]any)
+	if generation == nil {
+		generation = make(map[string]any)
+	}
+	thinking, _ := generation["thinkingConfig"].(map[string]any)
+	if thinking == nil {
+		thinking = make(map[string]any)
+	}
+	thinking["thinkingLevel"] = level
+	generation["thinkingConfig"] = thinking
+	root["generationConfig"] = generation
+	return true
 }
 
 func applyOpenAIProviderRequestOverrides(root map[string]any, requestCtx RequestContext, provider config.Provider) bool {
@@ -99,21 +128,7 @@ func applyClaudeProviderRequestOverrides(root map[string]any, requestCtx Request
 		return true
 	}
 
-	if thinkingBudgetTokens := provider.ClaudeThinkingBudgetTokens(); thinkingBudgetTokens > 0 && !claudeModelUsesOutputConfigEffort(stringValue(root["model"])) {
-		root["thinking"] = map[string]any{
-			"type":          "enabled",
-			"budget_tokens": thinkingBudgetTokens,
-		}
-		changed = true
-	}
-
 	return changed
-}
-
-func claudeModelUsesOutputConfigEffort(model string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(model))
-	return strings.Contains(normalized, "claude-opus-4-7") ||
-		strings.Contains(normalized, "claude-opus-4-8")
 }
 
 func isOpenAIGenerationCapability(capability RequestCapability) bool {

@@ -129,6 +129,7 @@ type ProviderOverrides struct {
 	Model  *string          `yaml:"model,omitempty"`
 	OpenAI *OpenAIOverrides `yaml:"openai,omitempty"`
 	Claude *ClaudeOverrides `yaml:"claude,omitempty"`
+	Google *GoogleOverrides `yaml:"google,omitempty"`
 }
 
 type ProviderAuthType string
@@ -151,8 +152,11 @@ type OpenAIOverrides struct {
 }
 
 type ClaudeOverrides struct {
-	ThinkingBudgetTokens *int    `yaml:"thinking_budget_tokens,omitempty"`
-	Effort               *string `yaml:"effort,omitempty"`
+	Effort *string `yaml:"effort,omitempty"`
+}
+
+type GoogleOverrides struct {
+	ThinkingLevel *string `yaml:"thinking_level,omitempty"`
 }
 
 type GlobalUpstreamProxyMode string
@@ -182,22 +186,21 @@ type ProviderProxySettingsPatch struct {
 }
 
 type providerYAML struct {
-	Name                 string             `yaml:"name"`
-	BaseURL              string             `yaml:"base_url"`
-	APIKey               string             `yaml:"api_key,omitempty"`
-	APIKeys              []string           `yaml:"api_keys,omitempty"`
-	AuthType             ProviderAuthType   `yaml:"auth_type,omitempty"`
-	OAuthProvider        OAuthProvider      `yaml:"oauth_provider,omitempty"`
-	OAuthRef             string             `yaml:"oauth_ref,omitempty"`
-	OAuthIdentity        string             `yaml:"oauth_identity,omitempty"`
-	ProxyMode            ProviderProxyMode  `yaml:"proxy_mode,omitempty"`
-	ProxyURL             string             `yaml:"proxy_url,omitempty"`
-	Priority             int                `yaml:"priority"`
-	Enabled              *bool              `yaml:"enabled,omitempty"`
-	Overrides            *ProviderOverrides `yaml:"overrides,omitempty"`
-	Model                string             `yaml:"model,omitempty"`
-	ReasoningEffort      string             `yaml:"reasoning_effort,omitempty"`
-	ThinkingBudgetTokens int                `yaml:"thinking_budget_tokens,omitempty"`
+	Name            string             `yaml:"name"`
+	BaseURL         string             `yaml:"base_url"`
+	APIKey          string             `yaml:"api_key,omitempty"`
+	APIKeys         []string           `yaml:"api_keys,omitempty"`
+	AuthType        ProviderAuthType   `yaml:"auth_type,omitempty"`
+	OAuthProvider   OAuthProvider      `yaml:"oauth_provider,omitempty"`
+	OAuthRef        string             `yaml:"oauth_ref,omitempty"`
+	OAuthIdentity   string             `yaml:"oauth_identity,omitempty"`
+	ProxyMode       ProviderProxyMode  `yaml:"proxy_mode,omitempty"`
+	ProxyURL        string             `yaml:"proxy_url,omitempty"`
+	Priority        int                `yaml:"priority"`
+	Enabled         *bool              `yaml:"enabled,omitempty"`
+	Overrides       *ProviderOverrides `yaml:"overrides,omitempty"`
+	Model           string             `yaml:"model,omitempty"`
+	ReasoningEffort string             `yaml:"reasoning_effort,omitempty"`
 }
 
 // Provider represents an API provider configuration
@@ -235,14 +238,6 @@ func (p *Provider) UnmarshalYAML(value *yaml.Node) error {
 		}
 		if overrides.OpenAI.ReasoningEffort == nil {
 			overrides.OpenAI.ReasoningEffort = ptr(trimmed)
-		}
-	}
-	if raw.ThinkingBudgetTokens != 0 {
-		if overrides.Claude == nil {
-			overrides.Claude = &ClaudeOverrides{}
-		}
-		if overrides.Claude.ThinkingBudgetTokens == nil {
-			overrides.Claude.ThinkingBudgetTokens = ptr(raw.ThinkingBudgetTokens)
 		}
 	}
 	*p = Provider{
@@ -315,18 +310,18 @@ func (p Provider) OpenAIReasoningEffort() string {
 	return strings.TrimSpace(*p.Overrides.OpenAI.ReasoningEffort)
 }
 
-func (p Provider) ClaudeThinkingBudgetTokens() int {
-	if p.Overrides == nil || p.Overrides.Claude == nil || p.Overrides.Claude.ThinkingBudgetTokens == nil {
-		return 0
-	}
-	return *p.Overrides.Claude.ThinkingBudgetTokens
-}
-
 func (p Provider) ClaudeEffort() string {
 	if p.Overrides == nil || p.Overrides.Claude == nil || p.Overrides.Claude.Effort == nil {
 		return ""
 	}
 	return normalizeClaudeEffort(*p.Overrides.Claude.Effort)
+}
+
+func (p Provider) GoogleThinkingLevel() string {
+	if p.Overrides == nil || p.Overrides.Google == nil || p.Overrides.Google.ThinkingLevel == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(*p.Overrides.Google.ThinkingLevel))
 }
 
 func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides {
@@ -351,9 +346,6 @@ func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides
 	}
 	if overrides.Claude != nil {
 		var claude ClaudeOverrides
-		if overrides.Claude.ThinkingBudgetTokens != nil && *overrides.Claude.ThinkingBudgetTokens != 0 {
-			claude.ThinkingBudgetTokens = ptr(*overrides.Claude.ThinkingBudgetTokens)
-		}
 		if overrides.Claude.Effort != nil {
 			if trimmed := strings.TrimSpace(*overrides.Claude.Effort); trimmed != "" {
 				if effort := normalizeClaudeEffort(trimmed); effort != "" {
@@ -363,11 +355,16 @@ func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides
 				}
 			}
 		}
-		if claude.ThinkingBudgetTokens != nil || claude.Effort != nil {
+		if claude.Effort != nil {
 			normalized.Claude = &claude
 		}
 	}
-	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil {
+	if overrides.Google != nil && overrides.Google.ThinkingLevel != nil {
+		if level := strings.ToLower(strings.TrimSpace(*overrides.Google.ThinkingLevel)); level != "" {
+			normalized.Google = &GoogleOverrides{ThinkingLevel: ptr(level)}
+		}
+	}
+	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil && normalized.Google == nil {
 		return nil
 	}
 	return &normalized
@@ -375,9 +372,7 @@ func NormalizeProviderOverrides(overrides *ProviderOverrides) *ProviderOverrides
 
 func normalizeClaudeEffort(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "xhigh":
-		return "max"
-	case "low", "medium", "high", "max":
+	case "low", "medium", "high", "max", "xhigh":
 		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return ""
@@ -1292,9 +1287,6 @@ func validateProviders(clientName string, providers []Provider) error {
 		}
 		if !providerOverridesSupportedForClient(clientName, p.Overrides) {
 			return fmt.Errorf("%s provider %s: unsupported overrides for client", clientName, p.Name)
-		}
-		if p.ClaudeThinkingBudgetTokens() < 0 {
-			return fmt.Errorf("%s provider %s: thinking_budget_tokens must be >= 0", clientName, p.Name)
 		}
 		if p.Overrides != nil && p.Overrides.Claude != nil && p.Overrides.Claude.Effort != nil && p.ClaudeEffort() == "" {
 			return fmt.Errorf("%s provider %s: claude effort must be one of low, medium, high, max, xhigh", clientName, p.Name)

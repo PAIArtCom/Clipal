@@ -103,7 +103,7 @@ func (a *API) HandleStartOAuthProvider(w http.ResponseWriter, r *http.Request) {
 		ProxyMode:       proxySettings.Mode,
 		ProxyURL:        proxySettings.URL,
 	}
-	session, err := a.oauth.StartLoginWithEnvironment(provider, a.oauthHTTPClientForTarget(target, provider), req.RequestEnvironment)
+	session, err := a.oauth.StartLoginWithEnvironmentAndTheme(provider, a.oauthHTTPClientForTarget(target, provider), req.RequestEnvironment, req.Theme)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return

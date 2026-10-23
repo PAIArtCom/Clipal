@@ -1486,9 +1486,7 @@ func TestHandleAddProvider_RejectsUnsupportedOverrideFieldsForGemini(t *testing.
     "openai": {
       "reasoning_effort": "high"
     },
-    "claude": {
-      "thinking_budget_tokens": 4096
-    }
+    "claude": {"effort": "high"}
   },
   "priority": 1,
   "enabled": true
@@ -1774,7 +1772,7 @@ providers:
 	if !ok {
 		t.Fatalf("expected claude override support in response, got %#v", support)
 	}
-	if support["model"] != true || openAI["reasoning_effort"] != true || claude["thinking_budget_tokens"] != false {
+	if support["model"] != true || openAI["reasoning_effort"] != true || claude["effort"] != false {
 		t.Fatalf("override_support=%#v", support)
 	}
 }
@@ -1813,7 +1811,11 @@ providers:
 	if !ok {
 		t.Fatalf("expected claude override support in response, got %#v", support)
 	}
-	if support["model"] != false || openAI["reasoning_effort"] != false || claude["thinking_budget_tokens"] != false {
+	google, ok := support["google"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected google override support in response, got %#v", support)
+	}
+	if support["model"] != true || openAI["reasoning_effort"] != false || claude["effort"] != false || google["thinking_level"] != true {
 		t.Fatalf("override_support=%#v", support)
 	}
 }
@@ -2081,7 +2083,7 @@ providers:
     overrides:
       model: claude-sonnet-4-5
       claude:
-        thinking_budget_tokens: 4096
+        effort: high
     priority: 1
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -2092,7 +2094,7 @@ providers:
   "overrides":{
     "model":"",
     "claude":{
-      "thinking_budget_tokens":0
+      "effort":""
     }
   }
 }`)))
@@ -2109,8 +2111,8 @@ providers:
 	if got := cfg.Claude.Providers[0].ModelOverride(); got != "" {
 		t.Fatalf("model = %q, want empty", got)
 	}
-	if got := cfg.Claude.Providers[0].ClaudeThinkingBudgetTokens(); got != 0 {
-		t.Fatalf("thinking_budget_tokens = %d, want 0", got)
+	if got := cfg.Claude.Providers[0].ClaudeEffort(); got != "" {
+		t.Fatalf("effort = %q, want empty", got)
 	}
 	if cfg.Claude.Providers[0].Overrides != nil {
 		t.Fatalf("expected overrides to be pruned after clearing, got %#v", cfg.Claude.Providers[0].Overrides)
@@ -2138,7 +2140,7 @@ providers:
       "reasoning_effort":"high"
     },
     "claude":{
-      "thinking_budget_tokens":4096
+      "effort":"high"
     }
   }
 }`)))

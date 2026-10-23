@@ -1084,6 +1084,25 @@ func TestRefreshIfNeeded_SkipsUnreadableNeighborCredentialFiles(t *testing.T) {
 	}
 }
 
+func TestCallbackPageTheme(t *testing.T) {
+	for _, theme := range []string{"light", "dark", "system", "", `<script>alert(1)</script>`} {
+		t.Run(theme, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			writeCallbackPage(w, callbackPage{Theme: theme})
+			want := theme
+			if want != "light" && want != "dark" {
+				want = "system"
+			}
+			if !strings.Contains(w.Body.String(), `data-theme="`+want+`"`) {
+				t.Fatalf("callback did not use expected theme %q", want)
+			}
+			if strings.Contains(w.Body.String(), "alert(1)") {
+				t.Fatal("callback included unvalidated theme")
+			}
+		})
+	}
+}
+
 func TestStartCallbackServer_CallbackPageClosesWithoutOpenerDependency(t *testing.T) {
 	server, redirectURI, err := startCallbackServer("127.0.0.1", 0, "/auth/callback")
 	if err != nil {

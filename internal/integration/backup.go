@@ -106,7 +106,10 @@ func writeSnapshotFiles(root string, snap backupSnapshot) error {
 func readBackupFile(path string) (backupFile, error) {
 	// Resolve existing symlinks so an atomic replacement updates their target
 	// rather than replacing the user's configuration link.
-	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	// Config paths come from Clipal's trusted configuration, which may point
+	// outside the working directory. G703 is suppressed on these file accesses
+	// because restricting them to a repository root would break valid installs.
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 { //nolint:gosec // See trusted configured-path rationale above.
 		resolved, e := filepath.EvalSymlinks(path)
 		if e != nil {
 			return backupFile{}, e
@@ -114,11 +117,11 @@ func readBackupFile(path string) (backupFile, error) {
 		path = resolved
 	}
 	file := backupFile{TargetPath: path}
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // See trusted configured-path rationale above.
 	if err == nil {
 		file.Existed = true
 		file.Original = raw
-		if info, e := os.Stat(path); e == nil {
+		if info, e := os.Stat(path); e == nil { //nolint:gosec // See trusted configured-path rationale above.
 			file.Mode = info.Mode().Perm()
 		}
 	} else if !os.IsNotExist(err) {

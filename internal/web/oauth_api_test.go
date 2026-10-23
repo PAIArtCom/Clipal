@@ -26,7 +26,7 @@ import (
 func TestHandleStartOAuthProvider_ReturnsAuthURLAndSessionID(t *testing.T) {
 	api := newTestOAuthAPI(t)
 
-	body := []byte(`{"client_type":"openai","provider":"codex"}`)
+	body := []byte(`{"client_type":"openai","provider":"codex","theme":"dark"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/oauth/providers/start", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	api.HandleStartOAuthProvider(w, req)
@@ -51,6 +51,22 @@ func TestHandleStartOAuthProvider_ReturnsAuthURLAndSessionID(t *testing.T) {
 	}
 	if parsed.Query().Get("redirect_uri") == "" {
 		t.Fatalf("expected redirect_uri in auth_url, got %s", authURL)
+	}
+	// The callback has a separate origin; verify the UI preference survives the
+	// full API -> session -> callback path without depending on browser storage.
+	resp, err := http.Get(parsed.Query().Get("redirect_uri") + "?error=access_denied")
+	if err != nil {
+		t.Fatalf("callback: %v", err)
+	}
+	callbackBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read callback: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close callback body: %v", err)
+	}
+	if !strings.Contains(string(callbackBody), `data-theme="dark"`) {
+		t.Fatalf("callback did not preserve dark appearance: %s", callbackBody)
 	}
 }
 

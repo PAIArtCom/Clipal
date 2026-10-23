@@ -75,6 +75,7 @@ function floatingTooltip() {
 function app() {
     let oauthAuthorizationPopup = null;
     const countryOptionsByLocale = new Map();
+    const timezoneChoicesByLocale = new Map();
 
     return {
         // State
@@ -144,7 +145,11 @@ function app() {
                     "reference": "Reference service only — target exit unverified",
                     "language": "Request language",
                     "locale": "Locale",
-                    "timezone": "Request timezone (IANA)",
+                    "timezone": "Request timezone",
+                    "searchCountry": "Search country or region…",
+                    "searchTimezone": "Search city, country or UTC offset…",
+                    "chooseHelp": "Type to search. Use arrow keys to navigate, Enter to select, and Escape to cancel. Only listed choices can be saved.",
+                    "noMatches": "No matching options. Try another name or UTC offset.",
                     "dns": "DNS resolution",
                     "automatic": "Automatic: use proxy resolution when configured; otherwise try DoH, then the system hostname route on connection failure",
                     "resolverChoice": "No explicit proxy: {resolver} DoH; otherwise proxy resolution",
@@ -383,9 +388,11 @@ function app() {
                         model: 'Model',
                         modelHint: 'model-id',
                         reasoningEffort: 'Reasoning Effort',
-                        reasoningEffortHint: 'Choose a suggestion or enter a model-specific value. Leave empty to use the provider default.',
-                        thinkingBudgetTokens: 'Thinking Budget',
-                        thinkingBudgetTokensHint: 'Set 0 to clear the thinking budget override.',
+                        reasoningEffortHint: 'Leave empty to use the provider default. Availability depends on the selected model.',
+                        claudeEffort: 'Reasoning Effort',
+                        claudeEffortHint: 'Availability depends on the Claude model. Leave empty to use its default.',
+                        googleThinkingLevel: 'Thinking Level',
+                        googleThinkingLevelHint: 'Gemini supports different levels by model. Leave empty to use its default.',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: 'One API key per line',
@@ -659,7 +666,11 @@ function app() {
                     "reference": "仅为参考服务观测，目标出口未核验",
                     "language": "请求语言",
                     "locale": "地区格式",
-                    "timezone": "请求时区（IANA）",
+                    "timezone": "请求时区",
+                    "searchCountry": "搜索国家或地区…",
+                    "searchTimezone": "搜索城市、国家或 UTC 偏移…",
+                    "chooseHelp": "输入关键词搜索，用方向键定位，Enter 选择，Esc 取消。只能保存列表中的选项。",
+                    "noMatches": "没有匹配项，请尝试其他名称或 UTC 偏移。",
                     "dns": "DNS 解析",
                     "automatic": "自动：有代理时由代理解析；否则优先 DoH，解析或连接失败后回退系统域名通路",
                     "resolverChoice": "无显式代理时使用 {resolver} DoH；有代理时由代理解析",
@@ -898,9 +909,11 @@ function app() {
                         model: '模型',
                         modelHint: 'model-id',
                         reasoningEffort: '思考强度',
-                        reasoningEffortHint: '可选常用值，也可填写模型专属值。留空时使用上游默认值。',
-                        thinkingBudgetTokens: '思考预算',
-                        thinkingBudgetTokensHint: '设为 0 可取消思考预算覆盖。',
+                        reasoningEffortHint: '留空时使用上游默认值。可用档位取决于所选模型。',
+                        claudeEffort: '推理强度',
+                        claudeEffortHint: '可用档位取决于 Claude 模型。留空时使用模型默认值。',
+                        googleThinkingLevel: '思考级别',
+                        googleThinkingLevelHint: 'Gemini 的可用级别因模型而异。留空时使用模型默认值。',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: '每行一个 API Key',
@@ -1273,7 +1286,8 @@ function app() {
             proxy_url_hint: '',
             model: '',
             reasoning_effort: '',
-            thinking_budget_tokens: 0,
+            claude_effort: '',
+            google_thinking_level: '',
             api_keys_text: '',
             priority: 1,
             enabled: true
@@ -2503,7 +2517,7 @@ function app() {
                 const names = typeof Intl.DisplayNames === 'function'
                     ? new Intl.DisplayNames([this.locale], { type: 'region' }) : null;
                 const options = Object.entries(requestEnvironmentChoices.countries).map(([value, fallback]) => ({
-                    value, label: `${names ? names.of(value) : fallback} (${value})`
+                    value, label: `${names ? names.of(value) : fallback} (${value})`, search: fallback
                 }));
                 options.sort((a, b) => a.label.localeCompare(b.label, this.locale));
                 countryOptionsByLocale.set(this.locale, options);
@@ -2516,6 +2530,49 @@ function app() {
             const options = requestEnvironmentChoices.timezones;
             // Keep saved aliases (for example US/Eastern) exactly as stored.
             return selected && !options.includes(selected) ? [selected, ...options] : options;
+        },
+        environmentTimezoneLabel(timezone, date = new Date()) {
+            try {
+                const offset = new Intl.DateTimeFormat('en', {
+                    timeZone: timezone, timeZoneName: 'shortOffset'
+                }).formatToParts(date).find(part => part.type === 'timeZoneName').value;
+                const name = new Intl.DateTimeFormat(this.locale, {
+                    timeZone: timezone, timeZoneName: 'longGeneric'
+                }).formatToParts(date).find(part => part.type === 'timeZoneName').value;
+                const utc = offset === 'GMT' ? 'UTC+0' : offset.replace(/^GMT/, 'UTC');
+                const city = timezone.split('/').pop().replace(/_/g, ' ');
+                return `${utc} · ${name} (${city})`;
+            } catch (_) {
+                // A saved alias may be newer than the browser's timezone data.
+                return timezone;
+            }
+        },
+        environmentTimezoneChoices(selected) {
+            // Cache the Intl work while typing; refresh offsets as time advances.
+            const key = `${this.locale}:${Math.floor(Date.now() / 60000)}`;
+            if (!timezoneChoicesByLocale.has(key)) {
+                timezoneChoicesByLocale.clear();
+                const countries = this.environmentCountryOptions();
+                const countrySearch = new Map();
+                for (const [country, zones] of Object.entries(requestEnvironmentChoices.countryTimezones)) {
+                    const option = countries.find(option => option.value === country);
+                    for (const zone of zones) {
+                        countrySearch.set(zone, `${countrySearch.get(zone) || ''} ${option?.label || country} ${option?.search || ''}`);
+                    }
+                }
+                timezoneChoicesByLocale.set(key, requestEnvironmentChoices.timezones.map(value => ({
+                    value, label: this.environmentTimezoneLabel(value), detail: value, search: countrySearch.get(value) || ''
+                })).sort((a, b) => {
+                    const offset = label => {
+                        const match = label.match(/^UTC([+-])(\d+)(?::(\d+))?/);
+                        return match ? (Number(match[2]) * 60 + Number(match[3] || 0)) * (match[1] === '-' ? -1 : 1) : 0;
+                    };
+                    return offset(a.label) - offset(b.label) || a.label.localeCompare(b.label, this.locale);
+                }));
+            }
+            const options = timezoneChoicesByLocale.get(key);
+            return selected && !options.some(option => option.value === selected)
+                ? [{ value: selected, label: this.environmentTimezoneLabel(selected), detail: selected }, ...options] : options;
         },
         async openEnvironment(provider) {
             if (this.providerMutationBusy || !this.providerUsesOAuth(provider)) return;
@@ -4080,8 +4137,9 @@ function app() {
                     reasoning_effort: !!(support.openai && support.openai.reasoning_effort)
                 },
                 claude: {
-                    thinking_budget_tokens: !!(support.claude && support.claude.thinking_budget_tokens)
-                }
+                    effort: !!(support.claude && support.claude.effort)
+                },
+                google: { thinking_level: !!(support.google && support.google.thinking_level) }
             };
         },
 
@@ -4092,8 +4150,9 @@ function app() {
                     reasoning_effort: false
                 },
                 claude: {
-                    thinking_budget_tokens: false
-                }
+                    effort: false
+                },
+                google: { thinking_level: false }
             };
         },
 
@@ -4105,23 +4164,16 @@ function app() {
             return this.providerOverrideSupport().openai.reasoning_effort;
         },
 
-        providerSupportsThinkingBudget() {
-            return this.providerOverrideSupport().claude.thinking_budget_tokens;
-        },
+        providerSupportsClaudeEffort() { return this.providerOverrideSupport().claude.effort; },
+        providerSupportsGoogleThinkingLevel() { return this.providerOverrideSupport().google.thinking_level; },
 
         providerHasAnyOverrideSupport() {
             return this.providerSupportsModelOverride()
                 || this.providerSupportsReasoningEffort()
-                || this.providerSupportsThinkingBudget();
+                || this.providerSupportsClaudeEffort()
+                || this.providerSupportsGoogleThinkingLevel();
         },
 
-        normalizeThinkingBudgetTokens(value) {
-            const parsed = Number.parseInt(String(value ?? '').trim(), 10);
-            if (Number.isNaN(parsed) || parsed < 0) {
-                return 0;
-            }
-            return parsed;
-        },
 
         levelLabel(level) {
             const value = String(level || '').trim().toLowerCase();
@@ -4658,11 +4710,8 @@ function app() {
                         reasoning_effort: String(this.providerForm.reasoning_effort || '')
                     };
                 }
-                if (this.providerSupportsThinkingBudget()) {
-                    overrides.claude = {
-                        thinking_budget_tokens: this.normalizeThinkingBudgetTokens(this.providerForm.thinking_budget_tokens)
-                    };
-                }
+                if (this.providerSupportsClaudeEffort()) overrides.claude = { ...(overrides.claude || {}), effort: String(this.providerForm.claude_effort || '') };
+                if (this.providerSupportsGoogleThinkingLevel()) overrides.google = { thinking_level: String(this.providerForm.google_thinking_level || '') };
                 if (Object.keys(overrides).length > 0) {
                     payload.overrides = overrides;
                 }
@@ -4726,6 +4775,7 @@ function app() {
             const payload = {
                 client_type: this.selectedClient,
                 provider,
+                theme: this.theme,
                 request_environment: { country: this.providerForm.request_country ?? 'US', timezone: this.providerForm.request_timezone ?? 'America/New_York', source: this.providerForm.request_environment_source || 'default' },
                 proxy_mode: proxyMode
             };
@@ -4937,7 +4987,8 @@ function app() {
                 proxy_url_hint: String(provider.proxy_url_hint || ''),
                 model: String((provider.overrides && provider.overrides.model) || ''),
                 reasoning_effort: String((provider.overrides && provider.overrides.openai && provider.overrides.openai.reasoning_effort) || ''),
-                thinking_budget_tokens: Number((provider.overrides && provider.overrides.claude && provider.overrides.claude.thinking_budget_tokens) || 0),
+                claude_effort: String((provider.overrides && provider.overrides.claude && provider.overrides.claude.effort) || ''),
+                google_thinking_level: String((provider.overrides && provider.overrides.google && provider.overrides.google.thinking_level) || ''),
                 api_keys_text: '',
                 priority: provider.priority,
                 enabled: !!provider.enabled
@@ -5016,7 +5067,8 @@ function app() {
                 proxy_url_hint: '',
                 model: '',
                 reasoning_effort: '',
-                thinking_budget_tokens: 0,
+                claude_effort: '',
+                google_thinking_level: '',
                 api_keys_text: '',
                 priority: maxPriority + 1,
                 enabled: true
@@ -5374,7 +5426,6 @@ function app() {
                 proxy_url_hint: '',
                 model: '',
                 reasoning_effort: '',
-                thinking_budget_tokens: 0,
                 api_keys_text: '',
                 priority: 1,
                 enabled: true

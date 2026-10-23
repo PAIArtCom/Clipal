@@ -24,7 +24,7 @@ http://127.0.0.1:3333/
 - 录入单个 `api_key` 或多行 `api_keys`
 - 配置 provider 级代理模式和自定义代理 URL
 - 配置 provider 级模型覆盖
-- 配置 provider 级 OpenAI `reasoning_effort` 或 Claude `thinking_budget_tokens`
+- 配置 provider 级 OpenAI reasoning effort、Claude effort 或 Gemini thinking level
 - 对支持的客户端 / 服务组合发起 OAuth 授权
 - 在 Add Provider 对话框里导入 OAuth 授权文件。当前支持 Codex CLI 的 `auth.json`（`~/.codex/auth.json`）、CLIProxyAPI 单账号 OAuth JSON，以及 sub2api 导出的 JSON；Clipal 只会导入与当前所选服务匹配的账号。
 - 对 Claude 和 Codex OAuth 请求默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。
@@ -142,7 +142,7 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 
 ## OAuth 账号请求环境
 
-添加新 OAuth 账号时提供“**请求国家 / 地区**”和“**请求时区（IANA）**”下拉框，预填 **US / `America/New_York`**。它们是请求配置，不能证明账号注册地或账单国家。纽约的 IANA 时区自动处理夏令时，不保存固定 UTC−5 偏移。未修改的默认值保存 `source: default`，修改后的选择保存 `source: user`。新增 OAuth 与账号环境对话框共用国家和时区选项。国家名随界面语言显示，时区保留 IANA 标识。原生下拉框支持键盘导航和按名称定位。切换国家不会自动改写时区，已保存的时区别名仍可选择。
+添加新 OAuth 账号时提供可搜索的“**请求国家 / 地区**”和“**请求时区**”选择器，预填 **US / `America/New_York`**。它们是请求配置，不能证明账号注册地或账单国家。纽约的 IANA 时区自动处理夏令时，不保存固定 UTC−5 偏移。未修改的默认值保存 `source: default`，修改后的选择保存 `source: user`。新增 OAuth 与账号环境对话框共用国家和时区选项。国家和时区名称随界面语言显示。时区按当前 UTC 偏移排序，显示如 **UTC+8 · 中国标准时间 (Shanghai)** 的标签，并在选项下方保留 IANA 标识。支持通过本地化或英文国家名、国家代码、城市、IANA 标识及 `+8`、`UTC+08:00` 等偏移搜索；用方向键定位、Enter 选择、Esc 取消、Tab 移至下一项。未确认的搜索文字不会保存，只能选择列表中的值。显示的偏移考虑夏令时，实际仍保存 IANA 时区。切换国家不会自动改写时区，已保存的时区别名仍可选择。
 
 配置绑定 OAuth 账号，同一账号关联的 provider 共享设置。刷新、重新授权、重启和切换代理均保留已有配置。导入保留原值及来源，不应用新账号默认值。没有可信来源的旧值保留显示，并标记 `needs_confirmation: true`；它们可能来自出口估算，用户需要在账号地球按钮中检查、修改并明确保存。确认前，地区字段不应用到请求元数据。读取、导入预览和导出不会写回迁移。凭据中的上游地区属性单独记录和展示，不覆盖请求配置。
 

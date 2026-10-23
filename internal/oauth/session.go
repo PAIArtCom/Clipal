@@ -183,6 +183,12 @@ func (s *Service) StartLoginWithHTTPClient(provider config.OAuthProvider, httpCl
 }
 
 func (s *Service) StartLoginWithEnvironment(provider config.OAuthProvider, httpClient *http.Client, options *RegionOptions) (*LoginSession, error) {
+	return s.StartLoginWithEnvironmentAndTheme(provider, httpClient, options, "system")
+}
+
+// StartLoginWithEnvironmentAndTheme carries the Web UI appearance to the
+// callback page, which runs on a different origin and cannot read UI storage.
+func (s *Service) StartLoginWithEnvironmentAndTheme(provider config.OAuthProvider, httpClient *http.Client, options *RegionOptions, theme string) (*LoginSession, error) {
 	env, err := NewAccountEnvironment(&Credential{Provider: provider}, options)
 	if err != nil {
 		return nil, err
@@ -215,7 +221,9 @@ func (s *Service) StartLoginWithEnvironment(provider config.OAuthProvider, httpC
 	s.sessions[session.ID] = session
 	if session.callback != nil {
 		session.callback.SetHandler(func(result callbackResult) callbackPage {
-			return s.handleCallbackResult(session.ID, result)
+			page := s.handleCallbackResult(session.ID, result)
+			page.Theme = theme
+			return page
 		})
 	}
 	return session.Clone(), nil
@@ -981,6 +989,7 @@ func (r callbackResult) errorMessage() string {
 }
 
 type callbackPage struct {
+	Theme     string
 	Tone      string
 	Title     string
 	Message   string
@@ -1216,26 +1225,43 @@ func writeCallbackPage(w http.ResponseWriter, page callbackPage) {
 	if page.AutoClose {
 		autoCloseScript = "setTimeout(closeWindow, 1200);"
 	}
+	theme := page.Theme
+	if theme != "light" && theme != "dark" {
+		theme = "system"
+	}
 
 	body := fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="%s">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title>
+<script>
+(function(){
+  var theme = document.documentElement.dataset.theme;
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme(){
+    document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && media.matches));
+  }
+  applyTheme();
+  if (theme === 'system') media.addEventListener('change', applyTheme);
+})();
+</script>
 <style>
-body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fb;color:#0f172a}
+:root{color-scheme:light;--bg:#f5f7fb;--card:#fff;--border:#dbe4f0;--text:#0f172a;--muted:#475569;--secondary:#e2e8f0;--success-bg:#dcfce7;--success-text:#166534;--warning-bg:#fef3c7;--warning-text:#92400e;--error-bg:#fee2e2;--error-text:#b91c1c;--shadow:rgba(15,23,42,.08);--button-bg:#0f172a;--button-text:#fff}
+:root.dark{color-scheme:dark;--bg:#161618;--card:#232326;--border:#48484a;--text:#f5f5f7;--muted:#a1a1a6;--secondary:#3f3f43;--success-bg:#183b26;--success-text:#4cdc63;--warning-bg:#44351d;--warning-text:#ffb84d;--error-bg:#452526;--error-text:#ff6961;--shadow:rgba(0,0,0,.3);--button-bg:#2b8cff;--button-text:#fff}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
 .shell{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-.card{width:min(520px,100%%);background:#fff;border:1px solid #dbe4f0;border-radius:18px;box-shadow:0 18px 40px rgba(15,23,42,.08);padding:28px}
+.card{width:min(520px,100%%);background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:0 18px 40px var(--shadow);padding:28px}
 .badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;letter-spacing:.02em}
-.badge.success{background:#dcfce7;color:#166534}
-.badge.warning{background:#fef3c7;color:#92400e}
-.badge.error{background:#fee2e2;color:#b91c1c}
+.badge.success{background:var(--success-bg);color:var(--success-text)}
+.badge.warning{background:var(--warning-bg);color:var(--warning-text)}
+.badge.error{background:var(--error-bg);color:var(--error-text)}
 h1{margin:16px 0 12px;font-size:24px;line-height:1.2}
-p{margin:0;font-size:14px;line-height:1.65;color:#475569}
+p{margin:0;font-size:14px;line-height:1.65;color:var(--muted)}
 .actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
-button{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;background:#0f172a;color:#fff;cursor:pointer}
-button.secondary{background:#e2e8f0;color:#0f172a}
+button{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;background:var(--button-bg);color:var(--button-text);cursor:pointer}
+button.secondary{background:var(--secondary);color:var(--text)}
 </style>
 </head>
 <body>
@@ -1261,6 +1287,7 @@ button.secondary{background:#e2e8f0;color:#0f172a}
 </script>
 </body>
 </html>`,
+		theme,
 		html.EscapeString(title),
 		html.EscapeString(tone),
 		html.EscapeString(strings.ToUpper(tone[:1])+tone[1:]),

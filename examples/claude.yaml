@@ -13,7 +13,7 @@ providers:
     overrides:
       model: "claude-sonnet-4-5"
       claude:
-        thinking_budget_tokens: 4096
+        effort: high
     priority: 1
     enabled: true
 

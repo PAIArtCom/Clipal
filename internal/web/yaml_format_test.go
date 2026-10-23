@@ -14,8 +14,6 @@ func boolPtr(v bool) *bool { return &v }
 
 func stringPtr(v string) *string { return &v }
 
-func intPtr(v int) *int { return &v }
-
 func TestFormatClientConfigYAML_QuotesSpacingAndTiers(t *testing.T) {
 	cc := config.ClientConfig{
 		Providers: []config.Provider{
@@ -413,9 +411,7 @@ func TestFormatClientConfigYAML_IncludesProviderOverrides(t *testing.T) {
 					OpenAI: &config.OpenAIOverrides{
 						ReasoningEffort: stringPtr("high"),
 					},
-					Claude: &config.ClaudeOverrides{
-						ThinkingBudgetTokens: intPtr(1024),
-					},
+					Claude: &config.ClaudeOverrides{Effort: stringPtr("high")},
 				},
 			},
 		},
@@ -428,7 +424,7 @@ func TestFormatClientConfigYAML_IncludesProviderOverrides(t *testing.T) {
 		`openai:`,
 		`reasoning_effort: "high"`,
 		`claude:`,
-		`thinking_budget_tokens: 1024`,
+		`effort: "high"`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected output to contain %q\n%s", want, got)
@@ -448,8 +444,8 @@ func TestFormatClientConfigYAML_IncludesProviderOverrides(t *testing.T) {
 	if got := parsed.Providers[0].OpenAIReasoningEffort(); got != "high" {
 		t.Fatalf("reasoning_effort = %q", got)
 	}
-	if got := parsed.Providers[0].ClaudeThinkingBudgetTokens(); got != 1024 {
-		t.Fatalf("thinking_budget_tokens = %d", got)
+	if got := parsed.Providers[0].ClaudeEffort(); got != "high" {
+		t.Fatalf("effort = %q", got)
 	}
 }
 

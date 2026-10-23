@@ -286,6 +286,45 @@
     border-radius: 6px;
 }
 
+/* One background follows the committed selection. Until measured, the
+ * original active-button styles remain the progressive-enhancement fallback. */
+.sliding-selection {
+    position: relative;
+    isolation: isolate;
+    --selection-radius: 7px;
+}
+.segmented-group--sm.sliding-selection { --selection-radius: 6px; }
+.sliding-selection > .segment-btn,
+.sliding-selection > .tab {
+    position: relative;
+    z-index: 1;
+}
+.selection-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    visibility: hidden;
+    pointer-events: none;
+    border-radius: var(--selection-radius);
+    background: var(--selection-background, linear-gradient(180deg, var(--bg-raised), var(--bg-raised-bottom)));
+    box-shadow: inset 0 0.5px 0 var(--highlight), var(--shadow-thumb);
+}
+.sliding-selection[data-selection-ready] > .selection-indicator { visibility: visible; }
+.sliding-selection[data-selection-animate] > .selection-indicator {
+    transition: transform var(--dur) var(--ease-spring), width var(--dur) var(--ease-spring), height var(--dur) var(--ease-spring);
+}
+.sliding-selection[data-selection-ready] > .segment-btn.active,
+.sliding-selection[data-selection-ready] > .tab.active {
+    background: transparent;
+    box-shadow: none;
+}
+.sliding-selection[data-selection-ready] > .segment-btn:focus-visible,
+.sliding-selection[data-selection-ready] > .tab:focus-visible {
+    box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.sliding-selection:has(> .active:disabled) > .selection-indicator { opacity: 0.5; }
+
 /* ---------- Form fields ---------- */
 
 .form-group {
@@ -333,7 +372,7 @@
 .form-input:focus,
 .form-select:focus {
     outline: none;
-    box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-ring);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent-ring) 55%, transparent);
 }
 
 .form-input:disabled,
@@ -356,7 +395,45 @@
     background-repeat: no-repeat;
     background-position: right var(--space-md) center, 0 0;
     background-size: 10px 14px, 100% 100%;
+    /* Native popups cannot use the button's gradient as their background. */
+    background-color: var(--bg-raised);
 }
+
+.form-select option,
+.form-select optgroup {
+    background-color: var(--bg-raised);
+    color: var(--text-primary);
+}
+
+/* Searchable country/timezone choices. The popup stays within the dialog's
+ * focus boundary while positioning against the viewport to avoid scroll clips. */
+.choice-picker { min-width: 0; }
+.choice-picker__input { cursor: text; text-overflow: ellipsis; }
+.choice-picker__popup {
+    position: fixed;
+    z-index: 110;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: var(--space-xs);
+    border-radius: var(--radius-md);
+    background: var(--bg-content);
+    box-shadow: var(--shadow-popover);
+}
+.choice-picker__list { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.choice-picker__option {
+    position: relative;
+    padding: var(--space-sm) var(--space-2xl) var(--space-sm) var(--space-sm);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+}
+.choice-picker__option.is-active { background: var(--accent-soft-strong); }
+.choice-picker__label { display: block; overflow-wrap: anywhere; }
+.choice-picker__detail { display: block; color: var(--text-secondary); font-size: var(--text-xs); }
+.choice-picker__check { position: absolute; right: var(--space-sm); top: var(--space-sm); color: var(--accent); }
+.choice-picker__empty { padding: var(--space-md); color: var(--text-secondary); font-size: var(--text-sm); }
 
 .form-textarea {
     height: auto;
@@ -398,7 +475,7 @@
 
 .search-field:focus-within {
     background: var(--bg-inset);
-    box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-ring);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent-ring) 55%, transparent);
 }
 
 .search-field input {

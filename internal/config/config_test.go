@@ -583,37 +583,7 @@ func TestValidate_ProviderOAuthRejectsUnsupportedClient(t *testing.T) {
 	}
 }
 
-func TestValidate_ProviderThinkingBudgetRejectsNegative(t *testing.T) {
-	t.Parallel()
-
-	cfg := &Config{
-		Global: DefaultGlobalConfig(),
-		Claude: ClientConfig{
-			Mode: ClientModeAuto,
-			Providers: []Provider{
-				{
-					Name:     "p1",
-					BaseURL:  "https://example.com",
-					APIKey:   "key1",
-					Priority: 1,
-					Overrides: &ProviderOverrides{
-						Claude: &ClaudeOverrides{
-							ThinkingBudgetTokens: ptr(-1),
-						},
-					},
-				},
-			},
-		},
-		OpenAI: ClientConfig{Mode: ClientModeAuto},
-		Google: ClientConfig{Mode: ClientModeAuto},
-	}
-
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "thinking_budget_tokens") {
-		t.Fatalf("err = %v, want thinking_budget_tokens validation error", err)
-	}
-}
-
-func TestLoad_ProviderOverridesSupportNestedAndLegacyYAML(t *testing.T) {
+func TestLoad_ProviderOverridesSupportNestedYAML(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -634,7 +604,9 @@ providers:
     base_url: https://claude.example
     api_key: claude-key
     model: claude-sonnet-4-5
-    thinking_budget_tokens: 2048
+    overrides:
+      claude:
+        effort: high
     priority: 1
 `)
 
@@ -657,33 +629,8 @@ providers:
 	if got := cfg.Claude.Providers[0].ModelOverride(); got != "claude-sonnet-4-5" {
 		t.Fatalf("Claude model = %q", got)
 	}
-	if got := cfg.Claude.Providers[0].ClaudeThinkingBudgetTokens(); got != 2048 {
-		t.Fatalf("Claude thinking_budget_tokens = %d", got)
-	}
-}
-
-func TestLoad_InvalidNegativeThinkingBudgetSurfacesDuringValidation(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeClientConfigFile(t, dir, "claude.yaml", `
-providers:
-  - name: claude-primary
-    base_url: https://claude.example
-    api_key: claude-key
-    thinking_budget_tokens: -1
-    priority: 1
-`)
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if got := cfg.Claude.Providers[0].ClaudeThinkingBudgetTokens(); got != -1 {
-		t.Fatalf("ThinkingBudgetTokens = %d, want -1", got)
-	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "thinking_budget_tokens") {
-		t.Fatalf("Validate err = %v, want thinking_budget_tokens validation error", err)
+	if got := cfg.Claude.Providers[0].ClaudeEffort(); got != "high" {
+		t.Fatalf("Claude effort = %q", got)
 	}
 }
 

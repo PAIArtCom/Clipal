@@ -801,8 +801,8 @@ func TestApplySerializesLiveTelemetryWithoutLosingUsage(t *testing.T) {
 		recordDone <- usageStore.RecordUsage("openai", "provider", telemetry.UsageSnapshot{UsageDelta: telemetry.UsageDelta{TotalTokens: 1}}, time.Now())
 	}()
 	select {
-	case <-recordDone:
-		t.Fatal("live telemetry write should wait for import transaction")
+	case err := <-recordDone:
+		t.Fatalf("live telemetry write completed before import transaction released (err=%v)", err)
 	case <-time.After(20 * time.Millisecond):
 	}
 	close(release)

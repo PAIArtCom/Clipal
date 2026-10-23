@@ -38,7 +38,7 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 			Overrides: &config.ProviderOverrides{
 				Model: strPtr("claude-sonnet-4-5"),
 				Claude: &config.ClaudeOverrides{
-					ThinkingBudgetTokens: claudeTestIntPtr(2048),
+					Effort: strPtr("high"),
 				},
 			},
 		},
@@ -163,8 +163,12 @@ func TestCreateProxyRequest_ClaudeOAuthUsesBearerAuth(t *testing.T) {
 	if !ok {
 		t.Fatalf("thinking = %#v", root["thinking"])
 	}
-	if got := thinking["budget_tokens"]; got != float64(2048) {
-		t.Fatalf("thinking.budget_tokens = %v", got)
+	if thinking["type"] != "adaptive" {
+		t.Fatalf("thinking.type = %v, want adaptive", thinking["type"])
+	}
+	outputConfig, ok := root["output_config"].(map[string]any)
+	if !ok || outputConfig["effort"] != "high" {
+		t.Fatalf("output_config = %#v", root["output_config"])
 	}
 }
 
@@ -1394,10 +1398,6 @@ func TestForwardWithFailover_ClaudeOAuthUsesUsageResetForCooldown(t *testing.T) 
 	if remaining := time.Until(cp.deactivationUntil(0)); remaining < 4*time.Hour {
 		t.Fatalf("expected cooldown from usage reset, got %s", remaining)
 	}
-}
-
-func claudeTestIntPtr(v int) *int {
-	return &v
 }
 
 func claudeOAuthTestCCH(text string) string {
