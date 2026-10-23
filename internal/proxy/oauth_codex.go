@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func providerSupportsCapability(provider config.Provider, capability RequestCapa
 
 	switch provider.NormalizedOAuthProvider() {
 	case config.OAuthProviderCodex:
-		return capability == CapabilityOpenAIResponses
+		return capability == CapabilityOpenAIResponses || capability == CapabilityOpenAIModels
 	case config.OAuthProviderClaude:
 		return capability == CapabilityClaudeMessages || capability == CapabilityClaudeCountTokens
 	case config.OAuthProviderAntigravity:
@@ -92,7 +93,7 @@ func supportedCapabilitySummary(provider config.Provider) string {
 
 	switch provider.NormalizedOAuthProvider() {
 	case config.OAuthProviderCodex:
-		return "OpenAI Responses requests"
+		return "OpenAI Responses requests and model listing"
 	case config.OAuthProviderClaude:
 		return "Claude messages and count_tokens requests"
 	case config.OAuthProviderAntigravity:
@@ -131,8 +132,8 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	if !ok {
 		requestCtx = requestContextForClientPath(cp.clientType, path, false)
 	}
-	if requestCtx.Capability != CapabilityOpenAIResponses {
-		return nil, fmt.Errorf("codex oauth only supports OpenAI responses requests")
+	if requestCtx.Capability != CapabilityOpenAIResponses && requestCtx.Capability != CapabilityOpenAIModels {
+		return nil, fmt.Errorf("codex oauth only supports OpenAI responses and model listing requests")
 	}
 
 	cred, err := cp.oauth.RefreshIfNeededWithHTTPClient(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
@@ -145,6 +146,9 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	}
 	if accessToken == "" {
 		return nil, fmt.Errorf("oauth credential %q has no access token", provider.NormalizedOAuthRef())
+	}
+	if requestCtx.Capability == CapabilityOpenAIModels {
+		return cp.createCodexOAuthModelsRequest(original, cred, accessToken)
 	}
 
 	targetPath, stream, requestBody, err := payload.codexOAuthRequest(original, requestCtx, provider, path)
@@ -175,6 +179,38 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 	applyCodexOAuthHeaders(proxyReq, cred, stream, codexCtx, targetPath)
 	proxyReq.ContentLength = int64(len(requestBody))
 	proxyReq.Header.Del("Content-Length")
+	return applyOAuthEnvironment(proxyReq, cred)
+}
+
+// createCodexOAuthModelsRequest builds the upstream model-listing request.
+// Codex accounts expose model metadata through the ChatGPT backend rather than
+// the public OpenAI /v1/models endpoint, and require the client version query
+// parameter to be present.
+func (cp *ClientProxy) createCodexOAuthModelsRequest(original *http.Request, cred *oauthpkg.Credential, accessToken string) (*http.Request, error) {
+	// The Codex backend only accepts the client-version selector here. Do not
+	// forward arbitrary query parameters supplied to Clipal's public endpoint.
+	query := make(url.Values, 1)
+	clientVersion := strings.TrimSpace(original.URL.Query().Get("client_version"))
+	if clientVersion == "" {
+		clientVersion = codexOAuthVersion
+	}
+	query.Set("client_version", clientVersion)
+	targetURL, err := buildTargetURL(defaultCodexOAuthBaseURL, "/models", query.Encode())
+	if err != nil {
+		return nil, err
+	}
+
+	proxyReq, err := http.NewRequestWithContext(original.Context(), http.MethodGet, targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	copyCodexOAuthHeaders(proxyReq.Header, original.Header)
+	removeStaleCodexOAuthBetaHeader(proxyReq.Header)
+	addForwardedHeaders(proxyReq, original)
+	clearAuthCarriers(proxyReq)
+	proxyReq.Header.Set("Authorization", "Bearer "+accessToken)
+	applyCodexOAuthHeaders(proxyReq, cred, false, codexOAuthRequestContext{}, "/models")
+	proxyReq.Header.Del("Content-Type")
 	return applyOAuthEnvironment(proxyReq, cred)
 }
 

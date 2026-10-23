@@ -62,7 +62,7 @@ http://127.0.0.1:3333/
 
 OAuth 上游说明：
 
-- `OAuth -> Codex` 支持 OpenAI `Responses` 请求
+- `OAuth -> Codex` 支持 OpenAI `Responses` 请求和模型列表：OpenAI 兼容客户端使用 `/v1/models`；原生 Codex 客户端使用 `/models?client_version=...`
 - `OAuth -> Claude` 支持 Claude `messages` 和 `count_tokens`
 - `OAuth -> Antigravity` 支持 Gemini-compatible `generateContent`、`streamGenerateContent`、`countTokens`、模型列表，以及通过 `generateContent` 调用 Gemini 图片模型。Imagen/Veo `predict*` 端点请使用 Google AI Studio API key 或 Vertex provider。
 - Claude 和 Codex OAuth 对普通客户端默认使用 Agent SDK 兼容上游包装，并由 Clipal 处理必要传输字段。

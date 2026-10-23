@@ -292,6 +292,47 @@ func TestClipalBareModelsPathDefaultsToOpenAICompatibility(t *testing.T) {
 	}
 }
 
+func TestClipalBareModelsPathForwardsClientVersionQuery(t *testing.T) {
+	t.Parallel()
+
+	router := newUnifiedIngressTestRouter()
+
+	var calls int32
+	router.proxies[ClientOpenAI].httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/v1/models" {
+			return &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewReader([]byte("unexpected path: " + r.URL.Path))),
+			}, nil
+		}
+		if got := r.URL.Query().Get("client_version"); got != "0.160.0" {
+			return &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewReader([]byte("unexpected client_version: " + got))),
+			}, nil
+		}
+		atomic.AddInt32(&calls, 1)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(bytes.NewReader([]byte("models-ok"))),
+		}, nil
+	})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/models?client_version=0.160.0", nil)
+	router.handleRequest(rr, req)
+
+	if rr.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%s", rr.Result().StatusCode, http.StatusOK, rr.Body.String())
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("openai calls: got %d want 1", got)
+	}
+}
+
 func TestClipalBareGeminiModelMetadataPathUsesGeminiPool(t *testing.T) {
 	t.Parallel()
 

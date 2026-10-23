@@ -1976,7 +1976,7 @@ func TestForwardManual_CodexOAuthRejectsUnsupportedCapability(t *testing.T) {
 	if got := rr.Result().StatusCode; got != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body=%s", got, rr.Body.String())
 	}
-	if got := rr.Body.String(); got != "Pinned provider only supports OpenAI Responses requests.\n" {
+	if got := rr.Body.String(); got != "Pinned provider only supports OpenAI Responses requests and model listing.\n" {
 		t.Fatalf("body = %q", got)
 	}
 	if got := atomic.LoadInt32(&calls); got != 0 {
@@ -2380,4 +2380,289 @@ func containsStringValue(values []any, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestProviderSupportsCapability_CodexOAuthModels(t *testing.T) {
+	t.Parallel()
+
+	provider := config.Provider{
+		AuthType:      config.ProviderAuthTypeOAuth,
+		OAuthProvider: config.OAuthProviderCodex,
+	}
+	if !providerSupportsCapability(provider, CapabilityOpenAIModels) {
+		t.Fatal("codex oauth should support model listing")
+	}
+	if !providerSupportsCapability(provider, CapabilityOpenAIResponses) {
+		t.Fatal("codex oauth should support responses")
+	}
+	if providerSupportsCapability(provider, CapabilityOpenAIChatCompletions) {
+		t.Fatal("codex oauth should not support chat completions")
+	}
+}
+
+func TestCreateProxyRequest_CodexOAuthModelsUsesChatGPTBackend(t *testing.T) {
+	t.Parallel()
+
+	svc := oauthpkg.NewService(t.TempDir())
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccountID:   "acct_123",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+
+	original := httptest.NewRequest(http.MethodGet, "http://proxy/openai/v1/models?foo=bar", nil)
+	original = withRequestContext(original, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIModels,
+		UpstreamPath:   "/v1/models",
+		UnifiedIngress: true,
+	})
+
+	proxyReq, err := cp.createProxyRequest(original, cp.providers[0], "", "/v1/models", nil)
+	if err != nil {
+		t.Fatalf("createProxyRequest: %v", err)
+	}
+	if got := proxyReq.Method; got != http.MethodGet {
+		t.Fatalf("method = %q, want GET", got)
+	}
+	if got := proxyReq.URL.String(); got != "https://chatgpt.com/backend-api/codex/models?client_version="+codexOAuthVersion {
+		t.Fatalf("url = %q", got)
+	}
+	if got := proxyReq.Header.Get("Authorization"); got != "Bearer access-1" {
+		t.Fatalf("Authorization = %q", got)
+	}
+	if got := proxyReq.Header.Get("Accept"); got != "application/json" {
+		t.Fatalf("Accept = %q", got)
+	}
+	if got := proxyReq.Header.Get("Version"); got != codexOAuthVersion {
+		t.Fatalf("Version = %q", got)
+	}
+	if got := proxyReq.Header.Get("Chatgpt-Account-Id"); got != "acct_123" {
+		t.Fatalf("Chatgpt-Account-Id = %q", got)
+	}
+	if got := proxyReq.Header.Get("Content-Type"); got != "" {
+		t.Fatalf("Content-Type = %q, want empty", got)
+	}
+}
+
+func newCodexModelsTestProxy(t *testing.T, modelsBody string) *ClientProxy {
+	t.Helper()
+	return newCodexModelsTestProxyWithUpstreamCheck(t, modelsBody, func(t *testing.T, r *http.Request) {
+		if got := r.URL.Query().Get("client_version"); got != codexOAuthVersion {
+			t.Fatalf("client_version = %q", got)
+		}
+	})
+}
+
+func newCodexModelsTestProxyWithUpstreamCheck(t *testing.T, modelsBody string, check func(*testing.T, *http.Request)) *ClientProxy {
+	t.Helper()
+
+	svc := oauthpkg.NewService(t.TempDir())
+	if err := svc.Store().Save(&oauthpkg.Credential{
+		Ref:         "codex-sean-example-com",
+		Provider:    config.OAuthProviderCodex,
+		Email:       "sean@example.com",
+		AccountID:   "acct_123",
+		AccessToken: "access-1",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", []config.Provider{
+		{
+			Name:          "codex-oauth",
+			AuthType:      config.ProviderAuthTypeOAuth,
+			OAuthProvider: config.OAuthProviderCodex,
+			OAuthRef:      "codex-sean-example-com",
+			Priority:      1,
+		},
+	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+	cp.httpClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/backend-api/codex/models" {
+			t.Fatalf("upstream path = %q", r.URL.Path)
+		}
+		if check != nil {
+			check(t, r)
+		}
+		return newResponse(http.StatusOK, http.Header{"Content-Type": []string{"application/json"}}, modelsBody), nil
+	})
+	return cp
+}
+
+func TestIsCodexNativeClient(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		originator string
+		userAgent  string
+		want       bool
+	}{
+		{name: "cli originator", originator: "codex_cli_rs", want: true},
+		{name: "tui originator", originator: "codex-tui", want: true},
+		{name: "vscode originator", originator: "codex_vscode", want: true},
+		{name: "legacy display originator", originator: "Codex Something Else", want: true},
+		{name: "cli user agent", userAgent: "codex_cli_rs/0.156.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11", want: true},
+		{name: "google user agent", userAgent: "codex_vscode/0.156.0 (darwin; arm64)", want: true},
+		{name: "openai sdk", userAgent: "OpenAI/Python 1.0.0", want: false},
+		{name: "curl", userAgent: "curl/8.7.1", want: false},
+		{name: "generic originator", originator: "my-gateway", want: false},
+		{name: "empty", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://proxy/v1/models", nil)
+			if tc.originator != "" {
+				req.Header.Set("Originator", tc.originator)
+			}
+			if tc.userAgent != "" {
+				req.Header.Set("User-Agent", tc.userAgent)
+			}
+			if got := isCodexNativeClient(req); got != tc.want {
+				t.Fatalf("isCodexNativeClient() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestForwardWithFailover_CodexNativeClientGetsRawCatalog(t *testing.T) {
+	t.Parallel()
+
+	const rawCatalog = `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000}]}`
+	cp := newCodexModelsTestProxyWithUpstreamCheck(t, rawCatalog, func(t *testing.T, r *http.Request) {
+		t.Helper()
+		if got := r.URL.Query().Get("client_version"); got != "9.9.9" {
+			t.Fatalf("client_version = %q, want forwarded client version", got)
+		}
+		if got := r.URL.Query().Get("ignored"); got != "" {
+			t.Fatalf("unexpected forwarded query parameter ignored=%q", got)
+		}
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/models?client_version=9.9.9&ignored=true", nil)
+	req.Header.Set("Originator", "codex_cli_rs")
+	req.Header.Set("User-Agent", "codex_cli_rs/9.9.9 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
+	req = withRequestContext(req, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIModels,
+		UpstreamPath:   "/v1/models",
+		UnifiedIngress: true,
+	})
+
+	rr := httptest.NewRecorder()
+	cp.forwardWithFailover(rr, req, "/v1/models")
+
+	if got := rr.Result().StatusCode; got != http.StatusOK {
+		t.Fatalf("status = %d body=%s", got, rr.Body.String())
+	}
+	if got := rr.Body.String(); got != rawCatalog {
+		t.Fatalf("body = %s, want raw Codex catalog %s", got, rawCatalog)
+	}
+}
+
+func TestForwardWithFailover_CodexOAuthModelsReturnsOpenAIList(t *testing.T) {
+	t.Parallel()
+
+	cp := newCodexModelsTestProxy(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000},{"slug":"codex-auto-review","display_name":"Codex Auto Review"}]}`)
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy/openai/v1/models", nil)
+	req = withRequestContext(req, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIModels,
+		UpstreamPath:   "/v1/models",
+		UnifiedIngress: true,
+	})
+
+	rr := httptest.NewRecorder()
+	cp.forwardWithFailover(rr, req, "/v1/models")
+
+	if got := rr.Result().StatusCode; got != http.StatusOK {
+		t.Fatalf("status = %d body=%s", got, rr.Body.String())
+	}
+	var body struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID      string `json:"id"`
+			Object  string `json:"object"`
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v body=%s", err, rr.Body.String())
+	}
+	if body.Object != "list" {
+		t.Fatalf("object = %q", body.Object)
+	}
+	if len(body.Data) != 2 {
+		t.Fatalf("data = %#v", body.Data)
+	}
+	if body.Data[0].ID != "gpt-6-luna" || body.Data[0].Object != "model" || body.Data[0].OwnedBy != "codex" {
+		t.Fatalf("first model = %#v", body.Data[0])
+	}
+}
+
+func TestForwardWithFailover_CodexOAuthModelsSingleModel(t *testing.T) {
+	t.Parallel()
+
+	cp := newCodexModelsTestProxy(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna"}]}`)
+
+	for _, tc := range []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{name: "found", path: "/v1/models/gpt-6-luna", wantStatus: http.StatusOK},
+		{name: "missing", path: "/v1/models/unknown-model", wantStatus: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://proxy/openai"+tc.path, nil)
+			req = withRequestContext(req, RequestContext{
+				ClientType:     ClientOpenAI,
+				Family:         ProtocolFamilyOpenAI,
+				Capability:     CapabilityOpenAIModels,
+				UpstreamPath:   tc.path,
+				UnifiedIngress: true,
+			})
+
+			rr := httptest.NewRecorder()
+			cp.forwardWithFailover(rr, req, tc.path)
+
+			if got := rr.Result().StatusCode; got != tc.wantStatus {
+				t.Fatalf("status = %d body=%s", got, rr.Body.String())
+			}
+			var body map[string]any
+			if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode: %v body=%s", err, rr.Body.String())
+			}
+			if tc.wantStatus == http.StatusOK {
+				if got := body["id"]; got != "gpt-6-luna" {
+					t.Fatalf("id = %#v", got)
+				}
+				if got := body["object"]; got != "model" {
+					t.Fatalf("object = %#v", got)
+				}
+			} else if _, ok := body["error"]; !ok {
+				t.Fatalf("missing error payload: %#v", body)
+			}
+		})
+	}
 }

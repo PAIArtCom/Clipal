@@ -28,6 +28,8 @@ func prepareOAuthProviderResponse(original *http.Request, provider config.Provid
 	switch provider.NormalizedOAuthProvider() {
 	case config.OAuthProviderAntigravity:
 		return prepareAntigravityOAuthResponse(original, resp)
+	case config.OAuthProviderCodex:
+		return prepareCodexOAuthResponse(original, resp)
 	default:
 		return resp, nil
 	}
