@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -192,7 +191,6 @@ func providerOverrideCacheKey(requestCtx RequestContext, provider config.Provide
 		provider.ModelOverride(),
 		provider.OpenAIReasoningEffort(),
 		provider.ClaudeEffort(),
-		fmt.Sprintf("%d", provider.ClaudeThinkingBudgetTokens()),
 	}, "\x00")
 }
 

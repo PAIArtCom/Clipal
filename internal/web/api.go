@@ -1223,9 +1223,9 @@ type providerOverrideSupport struct {
 		ReasoningEffort bool
 	}
 	Claude struct {
-		ThinkingBudgetTokens bool
-		Effort               bool
+		Effort bool
 	}
+	Google struct{ ThinkingLevel bool }
 }
 
 func providerOverrideSupportForClient(clientType string) providerOverrideSupport {
@@ -1236,8 +1236,10 @@ func providerOverrideSupportForClient(clientType string) providerOverrideSupport
 		support.OpenAI.ReasoningEffort = true
 	case ok && canonical == "claude":
 		support.Model = true
-		support.Claude.ThinkingBudgetTokens = true
 		support.Claude.Effort = true
+	case ok && canonical == "google":
+		support.Model = true
+		support.Google.ThinkingLevel = true
 	}
 	return support
 }
@@ -1257,17 +1259,17 @@ func normalizeProviderOverrideRequest(overrides *ProviderOverridesRequest) *Prov
 	}
 	if overrides.Claude != nil {
 		var claude ClaudeProviderOverridesRequest
-		if overrides.Claude.ThinkingBudgetTokens != nil {
-			claude.ThinkingBudgetTokens = ptr(*overrides.Claude.ThinkingBudgetTokens)
-		}
 		if overrides.Claude.Effort != nil {
 			claude.Effort = trimStringPtr(overrides.Claude.Effort)
 		}
-		if claude.ThinkingBudgetTokens != nil || claude.Effort != nil {
+		if claude.Effort != nil {
 			normalized.Claude = &claude
 		}
 	}
-	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil {
+	if overrides.Google != nil && overrides.Google.ThinkingLevel != nil {
+		normalized.Google = &GoogleProviderOverridesRequest{ThinkingLevel: trimStringPtr(overrides.Google.ThinkingLevel)}
+	}
+	if normalized.Model == nil && normalized.OpenAI == nil && normalized.Claude == nil && normalized.Google == nil {
 		return nil
 	}
 	return normalized
@@ -1287,20 +1289,22 @@ func validateProviderOverrideRequest(clientType string, overrides *ProviderOverr
 	if overrides.OpenAI != nil && overrides.OpenAI.ReasoningEffort != nil && !support.OpenAI.ReasoningEffort {
 		return fmt.Errorf("overrides.openai.reasoning_effort is not supported for %s providers", clientType)
 	}
-	if overrides.Claude != nil && overrides.Claude.ThinkingBudgetTokens != nil {
-		if !support.Claude.ThinkingBudgetTokens {
-			return fmt.Errorf("overrides.claude.thinking_budget_tokens is not supported for %s providers", clientType)
-		}
-		if *overrides.Claude.ThinkingBudgetTokens < 0 {
-			return fmt.Errorf("thinking_budget_tokens must be >= 0")
-		}
-	}
 	if overrides.Claude != nil && overrides.Claude.Effort != nil {
 		if !support.Claude.Effort {
 			return fmt.Errorf("overrides.claude.effort is not supported for %s providers", clientType)
 		}
-		if !isValidClaudeEffort(*overrides.Claude.Effort) {
+		if strings.TrimSpace(*overrides.Claude.Effort) != "" && !isValidClaudeEffort(*overrides.Claude.Effort) {
 			return fmt.Errorf("claude effort must be one of low, medium, high, max, xhigh")
+		}
+	}
+	if overrides.Google != nil && overrides.Google.ThinkingLevel != nil {
+		if !support.Google.ThinkingLevel {
+			return fmt.Errorf("overrides.google.thinking_level is not supported for %s providers", clientType)
+		}
+		switch strings.ToLower(strings.TrimSpace(*overrides.Google.ThinkingLevel)) {
+		case "minimal", "low", "medium", "high":
+		default:
+			return fmt.Errorf("google thinking level must be one of minimal, low, medium, high")
 		}
 	}
 	return nil
@@ -1322,17 +1326,17 @@ func applyProviderOverrides(provider *config.Provider, req ProviderRequest) {
 		}
 		provider.Overrides.OpenAI.ReasoningEffort = ptr(strings.TrimSpace(*req.Overrides.OpenAI.ReasoningEffort))
 	}
-	if req.Overrides.Claude != nil && req.Overrides.Claude.ThinkingBudgetTokens != nil {
-		if provider.Overrides.Claude == nil {
-			provider.Overrides.Claude = &config.ClaudeOverrides{}
-		}
-		provider.Overrides.Claude.ThinkingBudgetTokens = ptr(*req.Overrides.Claude.ThinkingBudgetTokens)
-	}
 	if req.Overrides.Claude != nil && req.Overrides.Claude.Effort != nil {
 		if provider.Overrides.Claude == nil {
 			provider.Overrides.Claude = &config.ClaudeOverrides{}
 		}
 		provider.Overrides.Claude.Effort = ptr(strings.TrimSpace(*req.Overrides.Claude.Effort))
+	}
+	if req.Overrides.Google != nil && req.Overrides.Google.ThinkingLevel != nil {
+		if provider.Overrides.Google == nil {
+			provider.Overrides.Google = &config.GoogleOverrides{}
+		}
+		provider.Overrides.Google.ThinkingLevel = ptr(strings.ToLower(strings.TrimSpace(*req.Overrides.Google.ThinkingLevel)))
 	}
 	provider.Overrides = config.NormalizeProviderOverrides(provider.Overrides)
 }

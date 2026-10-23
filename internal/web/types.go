@@ -131,6 +131,7 @@ type ProviderOverrideSupport struct {
 	Model  bool                          `json:"model"`
 	OpenAI OpenAIProviderOverrideSupport `json:"openai"`
 	Claude ClaudeProviderOverrideSupport `json:"claude"`
+	Google GoogleProviderOverrideSupport `json:"google"`
 }
 
 type OpenAIProviderOverrideSupport struct {
@@ -138,14 +139,18 @@ type OpenAIProviderOverrideSupport struct {
 }
 
 type ClaudeProviderOverrideSupport struct {
-	ThinkingBudgetTokens bool `json:"thinking_budget_tokens"`
-	Effort               bool `json:"effort"`
+	Effort bool `json:"effort"`
+}
+
+type GoogleProviderOverrideSupport struct {
+	ThinkingLevel bool `json:"thinking_level"`
 }
 
 type ProviderOverridesRequest struct {
 	Model  *string                         `json:"model,omitempty"`
 	OpenAI *OpenAIProviderOverridesRequest `json:"openai,omitempty"`
 	Claude *ClaudeProviderOverridesRequest `json:"claude,omitempty"`
+	Google *GoogleProviderOverridesRequest `json:"google,omitempty"`
 }
 
 type OpenAIProviderOverridesRequest struct {
@@ -153,14 +158,18 @@ type OpenAIProviderOverridesRequest struct {
 }
 
 type ClaudeProviderOverridesRequest struct {
-	ThinkingBudgetTokens *int    `json:"thinking_budget_tokens,omitempty"`
-	Effort               *string `json:"effort,omitempty"`
+	Effort *string `json:"effort,omitempty"`
+}
+
+type GoogleProviderOverridesRequest struct {
+	ThinkingLevel *string `json:"thinking_level,omitempty"`
 }
 
 type ProviderOverridesResponse struct {
 	Model  string                           `json:"model,omitempty"`
 	OpenAI *OpenAIProviderOverridesResponse `json:"openai,omitempty"`
 	Claude *ClaudeProviderOverridesResponse `json:"claude,omitempty"`
+	Google *GoogleProviderOverridesResponse `json:"google,omitempty"`
 }
 
 type OpenAIProviderOverridesResponse struct {
@@ -168,8 +177,11 @@ type OpenAIProviderOverridesResponse struct {
 }
 
 type ClaudeProviderOverridesResponse struct {
-	ThinkingBudgetTokens int    `json:"thinking_budget_tokens,omitempty"`
-	Effort               string `json:"effort,omitempty"`
+	Effort string `json:"effort,omitempty"`
+}
+
+type GoogleProviderOverridesResponse struct {
+	ThinkingLevel string `json:"thinking_level,omitempty"`
 }
 
 // ProviderRequest represents a request to create or update a provider
@@ -518,10 +530,10 @@ func toGlobalConfigResponse(gc config.GlobalConfig) GlobalConfigResponse {
 func mapProviderOverridesResponse(p config.Provider) *ProviderOverridesResponse {
 	model := p.ModelOverride()
 	reasoning := p.OpenAIReasoningEffort()
-	thinking := p.ClaudeThinkingBudgetTokens()
 	claudeEffort := p.ClaudeEffort()
+	googleThinkingLevel := p.GoogleThinkingLevel()
 
-	if model == "" && reasoning == "" && thinking == 0 && claudeEffort == "" {
+	if model == "" && reasoning == "" && claudeEffort == "" && googleThinkingLevel == "" {
 		return nil
 	}
 
@@ -533,11 +545,11 @@ func mapProviderOverridesResponse(p config.Provider) *ProviderOverridesResponse 
 			ReasoningEffort: reasoning,
 		}
 	}
-	if thinking > 0 || claudeEffort != "" {
-		resp.Claude = &ClaudeProviderOverridesResponse{
-			ThinkingBudgetTokens: thinking,
-			Effort:               claudeEffort,
-		}
+	if claudeEffort != "" {
+		resp.Claude = &ClaudeProviderOverridesResponse{Effort: claudeEffort}
+	}
+	if googleThinkingLevel != "" {
+		resp.Google = &GoogleProviderOverridesResponse{ThinkingLevel: googleThinkingLevel}
 	}
 	return resp
 }
@@ -665,10 +677,8 @@ func toProviderOverrideSupport(s providerOverrideSupport) ProviderOverrideSuppor
 		OpenAI: OpenAIProviderOverrideSupport{
 			ReasoningEffort: s.OpenAI.ReasoningEffort,
 		},
-		Claude: ClaudeProviderOverrideSupport{
-			ThinkingBudgetTokens: s.Claude.ThinkingBudgetTokens,
-			Effort:               s.Claude.Effort,
-		},
+		Claude: ClaudeProviderOverrideSupport{Effort: s.Claude.Effort},
+		Google: GoogleProviderOverrideSupport{ThinkingLevel: s.Google.ThinkingLevel},
 	}
 }
 

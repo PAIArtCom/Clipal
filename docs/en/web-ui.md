@@ -24,7 +24,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Enter either a single `api_key` or multi-line `api_keys`
 - Configure provider-level proxy mode and custom proxy URL
 - Configure provider-level model overrides
-- Configure provider-level OpenAI `reasoning_effort` or Claude `thinking_budget_tokens`
+- Configure provider-level OpenAI reasoning effort, Claude effort, or Gemini thinking level
 - Start OAuth authorization for supported client/provider combinations
 - Import OAuth credential files from the Add Provider dialog. Supported files are Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles; Clipal imports only accounts matching the selected service.
 - Route Claude and Codex OAuth requests through Agent SDK-compatible upstream wrapping by default, with required transport fields handled by Clipal.

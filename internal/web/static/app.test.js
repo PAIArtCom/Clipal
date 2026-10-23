@@ -253,8 +253,10 @@ test('saveProvider includes OpenAI override fields in payload', async () => {
             reasoning_effort: true
         },
         claude: {
-            thinking_budget_tokens: false
-        }
+            thinking_budget_tokens: false,
+            effort: false
+        },
+        google: { thinking_level: false }
     };
     state.providerForm = {
         name: 'openai-primary',
@@ -295,7 +297,18 @@ test('saveProvider includes OpenAI override fields in payload', async () => {
     });
 });
 
-test('saveProvider includes Claude thinking budget override in payload', async () => {
+test('OpenAI reasoning effort is a re-openable option list', () => {
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const field = html.match(/<select id="providerForm-reasoning-effort"[\s\S]*?<\/select>/)?.[0];
+    assert.ok(field, 'reasoning effort should use a select control');
+    assert.match(field, /<option value=""/);
+    for (const level of ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']) {
+        assert.match(field, new RegExp(`<option value="${level}">`));
+    }
+    assert.doesNotMatch(html, /<input[^>]+id="providerForm-reasoning-effort"/);
+});
+
+test('saveProvider includes Claude effort override in payload', async () => {
     const state = loadApp();
     const calls = [];
     state.selectedClient = 'claude';
@@ -305,7 +318,7 @@ test('saveProvider includes Claude thinking budget override in payload', async (
             reasoning_effort: false
         },
         claude: {
-            thinking_budget_tokens: true
+            effort: true
         }
     };
     state.providerForm = {
@@ -313,7 +326,7 @@ test('saveProvider includes Claude thinking budget override in payload', async (
         base_url: 'https://example.com',
         model: 'claude-sonnet-4-5',
         reasoning_effort: '',
-        thinking_budget_tokens: 2048,
+        claude_effort: 'high',
         api_keys_text: 'key-1\nkey-2',
         priority: 2,
         enabled: false
@@ -340,11 +353,31 @@ test('saveProvider includes Claude thinking budget override in payload', async (
         overrides: {
             model: 'claude-sonnet-4-5',
             claude: {
-                thinking_budget_tokens: 2048
+                effort: 'high'
             }
         },
         api_keys: ['key-1', 'key-2']
     });
+});
+
+test('saveProvider includes Claude effort and Google thinking level overrides', async () => {
+    for (const [client, channel, formKey, value, support] of [
+        ['claude', 'claude', 'claude_effort', 'xhigh', { model: true, openai: {}, claude: { effort: true }, google: {} }],
+        ['google', 'google', 'google_thinking_level', 'minimal', { model: true, openai: {}, claude: {}, google: { thinking_level: true } }]
+    ]) {
+        const state = loadApp();
+        const calls = [];
+        state.selectedClient = client;
+        state.clientConfig.override_support = support;
+        state.providerForm = { name: `${client}-primary`, base_url: 'https://example.com', model: '', reasoning_effort: '', claude_effort: '', google_thinking_level: '', thinking_budget_tokens: 0, api_keys_text: 'key-1', priority: 1, enabled: true, [formKey]: value };
+        state.apiCall = async (url, options) => { calls.push(JSON.parse(options.body)); return {}; };
+        state.showAlert = () => {};
+        state.closeModals = () => {};
+        state.loadProviders = async () => {};
+        state.refreshStatus = async () => {};
+        await state.saveProvider();
+        assert.equal(calls[0].overrides[channel][channel === 'claude' ? 'effort' : 'thinking_level'], value);
+    }
 });
 
 test('providerOverrideSupport centralizes support matrix', () => {
@@ -357,8 +390,10 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: true
         },
         claude: {
-            thinking_budget_tokens: false
-        }
+            thinking_budget_tokens: false,
+            effort: false
+        },
+        google: { thinking_level: false }
     };
     assert.deepEqual(plain(state.providerOverrideSupport()), {
         model: true,
@@ -366,8 +401,9 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: true
         },
         claude: {
-            thinking_budget_tokens: false
-        }
+            effort: false
+        },
+        google: { thinking_level: false }
     });
 
     state.clientConfig.override_support = {
@@ -376,8 +412,10 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: false
         },
         claude: {
-            thinking_budget_tokens: true
-        }
+            thinking_budget_tokens: true,
+            effort: false
+        },
+        google: { thinking_level: false }
     };
     assert.deepEqual(plain(state.providerOverrideSupport()), {
         model: true,
@@ -385,8 +423,9 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: false
         },
         claude: {
-            thinking_budget_tokens: true
-        }
+            effort: false
+        },
+        google: { thinking_level: false }
     });
 
     state.clientConfig.override_support = {
@@ -395,8 +434,10 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: false
         },
         claude: {
-            thinking_budget_tokens: false
-        }
+            thinking_budget_tokens: false,
+            effort: false
+        },
+        google: { thinking_level: false }
     };
     assert.deepEqual(plain(state.providerOverrideSupport()), {
         model: false,
@@ -404,8 +445,9 @@ test('providerOverrideSupport centralizes support matrix', () => {
             reasoning_effort: false
         },
         claude: {
-            thinking_budget_tokens: false
-        }
+            effort: false
+        },
+        google: { thinking_level: false }
     });
 });
 
@@ -500,7 +542,6 @@ test('editProvider hydrates override fields directly into the form', () => {
     assert.equal(state.providerForm.proxy_url_hint, 'http://127.0.0.1:7890');
     assert.equal(state.providerForm.model, 'gpt-5.4');
     assert.equal(state.providerForm.reasoning_effort, 'high');
-    assert.equal(state.providerForm.thinking_budget_tokens, 0);
 });
 
 test('editProvider rejects oauth providers', () => {

@@ -197,8 +197,9 @@ providers:
 | `priority` | int | 否 | 数字越小优先级越高；省略或 `0` 时按 `1` 处理 |
 | `enabled` | bool | 否 | 是否启用，默认 `true` |
 | `model` | string | 否 | 对支持的 OpenAI / Claude 请求强制改写为这个上游模型名 |
-| `reasoning_effort` | string | 否 | 仅 OpenAI。对 `/v1/responses*` 写入 `reasoning.effort`；对 chat/completions 仅替换请求中已存在的 `reasoning_effort` |
-| `thinking_budget_tokens` | int | 否 | 仅 Claude。对支持的请求写入 `thinking = {type: "enabled", budget_tokens: ...}` |
+| `openai.reasoning_effort` | string | 否 | 仅 OpenAI。Responses 写入 `reasoning.effort`；Chat Completions 仅替换请求中已有的 `reasoning_effort`。可用档位因模型而异：`none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。 |
+| `claude.effort` | string | 否 | 仅 Claude。使用 adaptive thinking 写入 `output_config.effort`。可用档位因模型而异：`low`、`medium`、`high`、`xhigh`、`max`。 |
+| `google.thinking_level` | string | 否 | 仅 Gemini `generateContent`。写入 `generationConfig.thinkingConfig.thinkingLevel`。可用级别因模型而异：`minimal`、`low`、`medium`、`high`。 |
 
 ### OAuth Provider 说明
 
@@ -230,7 +231,7 @@ OAuth provider 仍然放在同一个 `providers[]` 列表里，和 API-key provi
 - 需要让某个 provider 绕过全局默认代理、环境代理和系统代理时，用 `proxy_mode: direct`
 - `environment` 按目标协议依次使用 HTTP_PROXY／HTTPS_PROXY（含小写形式）、ALL_PROXY 和系统设置；NO_PROXY 同时适用于环境与系统代理。macOS 原生构建通过 CFNetwork 支持 SOCKS、例外规则和 PAC；Windows 使用 WinHTTP；Linux 在可用时读取 GNOME 手动代理，否则沿用环境变量。macOS 非 CGO 构建通过 scutil 支持静态代理。GNOME PAC 明确报不支持，不绕过代理。显式 direct／custom 优先。每次请求只读取设置，不修改网络或探测代理软件。
 - 不同上游对同一模型族使用不同模型 ID 时，可为该 provider 配置 `model`
-- 只有在你希望 Clipal 按 provider 覆盖客户端默认思考参数时，才配置 `reasoning_effort` 或 `thinking_budget_tokens`
+- 只有在你希望 Clipal 按 provider 覆盖客户端默认推理／思考参数时，才配置对应渠道的档位；可用档位因模型而异
 - Google AI Studio / Gemini API key provider 使用 `https://generativelanguage.googleapis.com`。Clipal 会透传 Gemini 的 `generateContent`、流式生成、token 计数、embeddings、Imagen/Veo `predict*`、文件、cached contents、tuned models、`interactions`、batches、operations、file search stores、generated files、corpora、auth tokens、agents 和 webhooks，不改写请求体。Gemini Live API WebSocket 代理暂不支持。
 - Vertex Gemini REST provider 使用区域 base URL，例如 `https://us-central1-aiplatform.googleapis.com`。把短期 OAuth / service account access token 放在 `api_key` 或 `api_keys` 里；Clipal 对 Vertex host 会用 `Authorization: Bearer ...` 转发。
 - 常驻后台运行时，建议：

@@ -98,7 +98,10 @@ func providerFromConfig(in config.Provider) Provider {
 			out.Overrides.OpenAI = &OpenAIOverrides{ReasoningEffort: o.OpenAI.ReasoningEffort}
 		}
 		if o.Claude != nil {
-			out.Overrides.Claude = &ClaudeOverrides{ThinkingBudgetTokens: o.Claude.ThinkingBudgetTokens, Effort: o.Claude.Effort}
+			out.Overrides.Claude = &ClaudeOverrides{Effort: o.Claude.Effort}
+		}
+		if o.Google != nil {
+			out.Overrides.Google = &GoogleOverrides{ThinkingLevel: o.Google.ThinkingLevel}
 		}
 	}
 	return out
@@ -115,7 +118,10 @@ func (in Provider) toConfig() config.Provider {
 			out.Overrides.OpenAI = &config.OpenAIOverrides{ReasoningEffort: in.Overrides.OpenAI.ReasoningEffort}
 		}
 		if in.Overrides.Claude != nil {
-			out.Overrides.Claude = &config.ClaudeOverrides{ThinkingBudgetTokens: in.Overrides.Claude.ThinkingBudgetTokens, Effort: in.Overrides.Claude.Effort}
+			out.Overrides.Claude = &config.ClaudeOverrides{Effort: in.Overrides.Claude.Effort}
+		}
+		if in.Overrides.Google != nil {
+			out.Overrides.Google = &config.GoogleOverrides{ThinkingLevel: in.Overrides.Google.ThinkingLevel}
 		}
 	}
 	config.NormalizeProviderAuthSettings(&out)

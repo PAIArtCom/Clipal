@@ -3,6 +3,114 @@
 const durationScales = { ns: 0.000000001, us: 0.000001, 'µs': 0.000001, ms: 0.001, s: 1, m: 60, h: 3600 };
 const sizeScales = { B: 1, KiB: 1024, MiB: 1048576, GiB: 1073741824 };
 
+// Decoration only: business handlers remain the sole owners of selection.
+function slidingSelection(getValue) {
+    let root, indicator, resizeObserver, mutationObserver, nextTick;
+    let frame = null;
+    let queued = false;
+    let snapPending = false;
+    let destroyed = false;
+    let enabled = true;
+    let visible = false;
+    let previousValue;
+    let previousLayout = '';
+    let pendingValue;
+
+    const buttons = () => Array.from(root.children).filter(element => element.matches('.tab, .segment-btn'));
+    const hide = () => {
+        visible = false;
+        root.removeAttribute('data-selection-ready');
+        root.removeAttribute('data-selection-animate');
+    };
+    const measure = snap => {
+        const items = buttons();
+        const active = items.find(element => element.classList.contains('active'));
+        if (!enabled || !active || !root.getClientRects().length || !active.offsetWidth || !active.offsetHeight) {
+            hide();
+            return;
+        }
+        // Local layout coordinates are unaffected by the sheet's scale/translate
+        // entrance animation. Button widths need not be equal.
+        const layout = items.map(element => [element.offsetLeft, element.offsetTop, element.offsetWidth, element.offsetHeight].join(',')).join(';');
+        // Duplicate notifications must not interrupt a transition in progress.
+        if (visible && layout === previousLayout && pendingValue === previousValue) return;
+        const animate = visible && !snap && layout === previousLayout && pendingValue !== previousValue;
+        root.toggleAttribute('data-selection-animate', animate);
+        indicator.style.transform = `translate3d(${active.offsetLeft}px, ${active.offsetTop}px, 0)`;
+        indicator.style.width = `${active.offsetWidth}px`;
+        indicator.style.height = `${active.offsetHeight}px`;
+        root.setAttribute('data-selection-ready', '');
+        previousValue = pendingValue;
+        previousLayout = layout;
+        visible = true;
+    };
+    const schedule = (value, snap) => {
+        if (destroyed || !root) return;
+        pendingValue = value;
+        snapPending ||= snap;
+        if (queued) return;
+        queued = true;
+        // Wait for Alpine's :class, x-for and x-if updates before measuring.
+        nextTick(() => {
+            if (destroyed) return;
+            frame = requestAnimationFrame(() => {
+                frame = null;
+                queued = false;
+                const snap = snapPending;
+                snapPending = false;
+                measure(snap);
+            });
+        });
+    };
+    const relayout = () => schedule(getValue(), true);
+    const observeSizes = () => {
+        resizeObserver?.disconnect();
+        resizeObserver?.observe(root);
+        buttons().forEach(element => resizeObserver?.observe(element));
+    };
+    const component = {
+        mount(element) {
+            nextTick = callback => this.$nextTick(callback);
+            root = element;
+            root.classList.add('sliding-selection');
+            indicator = document.createElement('span');
+            indicator.className = 'selection-indicator';
+            indicator.setAttribute('aria-hidden', 'true');
+            root.appendChild(indicator);
+            if (typeof ResizeObserver === 'function') {
+                resizeObserver = new ResizeObserver(relayout);
+                observeSizes();
+            }
+            if (typeof MutationObserver === 'function') {
+                mutationObserver = new MutationObserver(() => {
+                    observeSizes();
+                    relayout();
+                });
+                mutationObserver.observe(root, { childList: true, subtree: true });
+            }
+            window.addEventListener('resize', relayout);
+            document.fonts?.ready.then(() => { if (!destroyed) relayout(); });
+            relayout();
+        },
+        // Visibility-only dialogs keep their layout while closed, so their
+        // owner explicitly suspends measurement until the next opening.
+        sync(shown = true) { enabled = shown; schedule(getValue(), false); },
+        destroy() {
+            destroyed = true;
+            if (frame !== null) cancelAnimationFrame(frame);
+            resizeObserver?.disconnect();
+            mutationObserver?.disconnect();
+            window.removeEventListener('resize', relayout);
+            if (root) {
+                hide();
+                root.classList.remove('sliding-selection');
+                indicator.remove();
+            }
+        }
+    };
+    return component;
+}
+
 function unitFieldParts(raw, kind) {
     if (raw === '' || raw == null) return { value: '', unit: kind === 'bytes' ? 'MiB' : 's' };
     if (kind === 'bytes') {

@@ -1,6 +1,6 @@
 module github.com/PAIArtCom/Clipal
 
-go 1.26.9
+go 1.27.3
 
 require (
 	github.com/gen2brain/beeep v0.11.2

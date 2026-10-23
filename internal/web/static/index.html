@@ -99,7 +99,7 @@
             </div>
 
             <div class="toolbar__actions">
-                <div class="segmented-group segmented-group--sm" role="radiogroup" :aria-label="t('locale.label')">
+                <div class="segmented-group segmented-group--sm" x-data="slidingSelection(() => locale)" x-init="mount($el)" x-effect="sync()" role="radiogroup" :aria-label="t('locale.label')">
                     <button type="button" class="segment-btn" role="radio" lang="en" x-ref="localeEn"
                         :class="{'active': locale === 'en'}" :aria-checked="locale === 'en'"
                         :aria-label="t('locale.english')" @click="setLocale('en')"
@@ -119,7 +119,7 @@
                 </button>
             </div>
         </div>
-        <nav class="tabbar" role="tablist" :aria-label="t('nav.sectionsLabel')"
+        <nav class="tabbar" x-data="slidingSelection(() => activeTab)" x-init="mount($el)" x-effect="sync()" role="tablist" :aria-label="t('nav.sectionsLabel')"
             @keydown.arrow-left.prevent="moveTab(-1)" @keydown.arrow-right.prevent="moveTab(1)"
             @keydown.home.prevent="moveTab('first')" @keydown.end.prevent="moveTab('last')">
                 <button id="tabbtn-providers" type="button" role="tab" class="tab tab--providers" :tabindex="activeTab === 'providers' ? 0 : -1"
@@ -205,7 +205,7 @@
             x-transition:enter-end="opacity-100 translate-y-0">
             <!-- Second level: one tab per client, attached to the panel that holds everything for that client. -->
             <div class="client-tabview">
-                <div class="segmented-group client-tabview__tabs" role="tablist" :aria-label="t('providers.clientTypeLabel')"
+                <div class="segmented-group client-tabview__tabs" x-data="slidingSelection(() => selectedClient)" x-init="mount($el)" x-effect="sync()" role="tablist" :aria-label="t('providers.clientTypeLabel')"
                     @keydown.arrow-left.prevent="moveClient(-1)" @keydown.arrow-right.prevent="moveClient(1)"
                     @keydown.home.prevent="moveClient('first')" @keydown.end.prevent="moveClient('last')">
                     <template x-for="client in clientOptions" :key="client.value">
@@ -220,7 +220,7 @@
                     <div class="providers-bar">
                         <div class="providers-bar__start">
                             <div class="providers-bar__routing" x-show="providers.length > 0">
-                                <div class="segmented-group segmented-group--sm" role="group" :aria-label="t('providers.modeLabel')">
+                                <div class="segmented-group segmented-group--sm" x-data="slidingSelection(() => clientConfig.mode)" x-init="mount($el)" x-effect="sync()" role="group" :aria-label="t('providers.modeLabel')">
                                     <button type="button" class="segment-btn" :class="{'active': clientConfig.mode !== 'manual'}"
                                         :aria-pressed="clientConfig.mode !== 'manual'" :disabled="!canMutateProviders"
                                         @click="clientConfig.mode === 'manual' && setClientMode('auto')" x-text="t('providers.modeAuto')"></button>
@@ -1244,7 +1244,7 @@
             <form @submit.prevent="saveProvider()">
                 <div class="modal-body form-horizontal-grid" x-show="!oauthAuthorizationActive()">
                     <div class="form-grid-full form-control-wrap" x-show="!showEditProviderModal">
-                        <div class="segmented-group" role="tablist" :aria-label="t('modal.provider.credentialSource')">
+                        <div class="segmented-group" x-data="slidingSelection(() => providerForm.auth_type)" x-init="mount($el)" x-effect="sync(showAddProviderModal || showEditProviderModal)" role="tablist" :aria-label="t('modal.provider.credentialSource')">
                             <button type="button" class="segment-btn" role="tab"
                                 :class="{'active': !providerFormUsesOAuth()}" :aria-selected="!providerFormUsesOAuth()"
                                 @click="setProviderAuthType('api_key')"
@@ -1353,21 +1353,27 @@
 
                             <div class="provider-overrides-field" x-show="providerSupportsReasoningEffort()">
                                 <label class="form-label" for="providerForm-reasoning-effort" x-text="t('modal.provider.reasoningEffort')"></label>
-                                <input id="providerForm-reasoning-effort" type="text" x-model="providerForm.reasoning_effort" class="form-input"
-                                    list="reasoning-effort-options" :placeholder="t('forms.inherit')">
-                                <datalist id="reasoning-effort-options">
-                                    <option value="none"></option><option value="minimal"></option>
-                                    <option value="low"></option><option value="medium"></option>
-                                    <option value="high"></option><option value="xhigh"></option>
-                                </datalist>
+                                <select id="providerForm-reasoning-effort" x-model="providerForm.reasoning_effort" class="form-input">
+                                    <option value="" x-text="t('forms.inherit')"></option><option value="none">none</option><option value="minimal">minimal</option>
+                                    <option value="low">low</option><option value="medium">medium</option>
+                                    <option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option>
+                                </select>
                                 <p class="form-hint" x-text="t('modal.provider.reasoningEffortHint')"></p>
                             </div>
 
-                            <div class="provider-overrides-field" x-show="providerSupportsThinkingBudget()">
-                                <label class="form-label" for="providerForm-thinking-budget-tokens" x-text="t('modal.provider.thinkingBudgetTokens')"></label>
-                                <input id="providerForm-thinking-budget-tokens" type="number" x-model.number="providerForm.thinking_budget_tokens"
-                                    class="form-input" min="0" placeholder="4096">
-                                <p class="form-hint" x-text="t('modal.provider.thinkingBudgetTokensHint')"></p>
+                            <div class="provider-overrides-field" x-show="providerSupportsClaudeEffort()">
+                                <label class="form-label" for="providerForm-claude-effort" x-text="t('modal.provider.claudeEffort')"></label>
+                                <select id="providerForm-claude-effort" x-model="providerForm.claude_effort" class="form-input">
+                                    <option value="" x-text="t('forms.inherit')"></option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option>
+                                </select>
+                                <p class="form-hint" x-text="t('modal.provider.claudeEffortHint')"></p>
+                            </div>
+                            <div class="provider-overrides-field" x-show="providerSupportsGoogleThinkingLevel()">
+                                <label class="form-label" for="providerForm-google-thinking-level" x-text="t('modal.provider.googleThinkingLevel')"></label>
+                                <select id="providerForm-google-thinking-level" x-model="providerForm.google_thinking_level" class="form-input">
+                                    <option value="" x-text="t('forms.inherit')"></option><option value="minimal">minimal</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+                                </select>
+                                <p class="form-hint" x-text="t('modal.provider.googleThinkingLevelHint')"></p>
                             </div>
                         </div>
                     </div>

@@ -197,8 +197,9 @@ providers:
 | `priority` | int | no | Lower number = higher priority; omitted or `0` is treated as `1` |
 | `enabled` | bool | no | Defaults to `true` |
 | `model` | string | no | Force this provider to use a specific upstream model name for supported OpenAI and Claude requests |
-| `reasoning_effort` | string | no | OpenAI only. For `/v1/responses*`, Clipal writes `reasoning.effort`; for chat/completions it only replaces an existing `reasoning_effort` field |
-| `thinking_budget_tokens` | int | no | Claude only. Clipal writes `thinking = {type: "enabled", budget_tokens: ...}` on supported requests |
+| `openai.reasoning_effort` | string | no | OpenAI only. Writes `reasoning.effort` for Responses or replaces `reasoning_effort` when present for Chat Completions. Supported values vary by model (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`). |
+| `claude.effort` | string | no | Claude only. Writes `output_config.effort` with adaptive thinking. Supported values vary by model (`low`, `medium`, `high`, `xhigh`, `max`). |
+| `google.thinking_level` | string | no | Gemini `generateContent` only. Writes `generationConfig.thinkingConfig.thinkingLevel`; supported levels vary by model (`minimal`, `low`, `medium`, `high`). |
 
 - OAuth request preferences are stored in credential `request_environment`. New-account defaults are US / `America/New_York`; source is `default` or `user`. Imports retain values and legacy regions require confirmation. Proxy selection uses provider/global/environment/system configuration and `NO_PROXY`, without controller discovery. Account DNS `auto` delegates resolution to any standard proxy; without one it tries Cloudflare → Google DoH and resolved-IP connections first, falling back to the system hostname route if lookup or connection establishment fails. Clipal adapts its own connections without changing user network settings. Saved `cloudflare`/`google` values select no-proxy DNS and optional diagnostic services; they do not enable strict proxy preflight. Optional proxy DoH reference checks are per-request diagnostics, not stored configuration. See [Web UI](web-ui.md#oauth-account-request-environment).
 
@@ -231,7 +232,7 @@ OAuth providers stay in the same `providers[]` list as API-key providers. They p
 - Use provider `proxy_mode: direct` to bypass the global default, environment and system proxy settings
 - `environment` uses HTTP_PROXY/HTTPS_PROXY (including lowercase forms), then ALL_PROXY, then OS settings for the target scheme. NO_PROXY applies to environment and system proxies. macOS native builds use CFNetwork, including SOCKS, exceptions and PAC; Windows uses WinHTTP; Linux reads manual GNOME settings when available, otherwise environment variables. macOS builds without CGO support static scutil settings only. GNOME PAC is reported unsupported rather than silently bypassed. Explicit direct/custom policies take precedence. OS settings are read per request without mutation or proxy software discovery.
 - Use `model` when different upstream providers expose the same family under different model IDs
-- Use `reasoning_effort` and `thinking_budget_tokens` only when you want Clipal to override the client-sent defaults for that provider
+- Use the provider-specific reasoning/thinking overrides only when you want Clipal to replace the client-sent defaults; available levels vary by model
 - Use `https://generativelanguage.googleapis.com` for Google AI Studio / Gemini API keys. Clipal forwards Gemini `generateContent`, streaming, token counting, embeddings, Imagen/Veo `predict*`, files, cached contents, tuned models, `interactions`, batches, operations, file search stores, generated files, corpora, auth tokens, agents, and webhooks without changing the request body. Gemini Live API WebSocket proxying is not supported yet.
 - Use a regional Vertex AI base URL such as `https://us-central1-aiplatform.googleapis.com` for Vertex Gemini REST requests. Put the short-lived OAuth/service-account access token in `api_key` or `api_keys`; Clipal sends it as `Authorization: Bearer ...` for Vertex hosts.
 - For long-running background setups, this is a good default:

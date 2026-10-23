@@ -388,9 +388,11 @@ function app() {
                         model: 'Model',
                         modelHint: 'model-id',
                         reasoningEffort: 'Reasoning Effort',
-                        reasoningEffortHint: 'Choose a suggestion or enter a model-specific value. Leave empty to use the provider default.',
-                        thinkingBudgetTokens: 'Thinking Budget',
-                        thinkingBudgetTokensHint: 'Set 0 to clear the thinking budget override.',
+                        reasoningEffortHint: 'Leave empty to use the provider default. Availability depends on the selected model.',
+                        claudeEffort: 'Reasoning Effort',
+                        claudeEffortHint: 'Availability depends on the Claude model. Leave empty to use its default.',
+                        googleThinkingLevel: 'Thinking Level',
+                        googleThinkingLevelHint: 'Gemini supports different levels by model. Leave empty to use its default.',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: 'One API key per line',
@@ -907,9 +909,11 @@ function app() {
                         model: '模型',
                         modelHint: 'model-id',
                         reasoningEffort: '思考强度',
-                        reasoningEffortHint: '可选常用值，也可填写模型专属值。留空时使用上游默认值。',
-                        thinkingBudgetTokens: '思考预算',
-                        thinkingBudgetTokensHint: '设为 0 可取消思考预算覆盖。',
+                        reasoningEffortHint: '留空时使用上游默认值。可用档位取决于所选模型。',
+                        claudeEffort: '推理强度',
+                        claudeEffortHint: '可用档位取决于 Claude 模型。留空时使用模型默认值。',
+                        googleThinkingLevel: '思考级别',
+                        googleThinkingLevelHint: 'Gemini 的可用级别因模型而异。留空时使用模型默认值。',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: '每行一个 API Key',
@@ -1282,7 +1286,8 @@ function app() {
             proxy_url_hint: '',
             model: '',
             reasoning_effort: '',
-            thinking_budget_tokens: 0,
+            claude_effort: '',
+            google_thinking_level: '',
             api_keys_text: '',
             priority: 1,
             enabled: true
@@ -4132,8 +4137,9 @@ function app() {
                     reasoning_effort: !!(support.openai && support.openai.reasoning_effort)
                 },
                 claude: {
-                    thinking_budget_tokens: !!(support.claude && support.claude.thinking_budget_tokens)
-                }
+                    effort: !!(support.claude && support.claude.effort)
+                },
+                google: { thinking_level: !!(support.google && support.google.thinking_level) }
             };
         },
 
@@ -4144,8 +4150,9 @@ function app() {
                     reasoning_effort: false
                 },
                 claude: {
-                    thinking_budget_tokens: false
-                }
+                    effort: false
+                },
+                google: { thinking_level: false }
             };
         },
 
@@ -4157,23 +4164,16 @@ function app() {
             return this.providerOverrideSupport().openai.reasoning_effort;
         },
 
-        providerSupportsThinkingBudget() {
-            return this.providerOverrideSupport().claude.thinking_budget_tokens;
-        },
+        providerSupportsClaudeEffort() { return this.providerOverrideSupport().claude.effort; },
+        providerSupportsGoogleThinkingLevel() { return this.providerOverrideSupport().google.thinking_level; },
 
         providerHasAnyOverrideSupport() {
             return this.providerSupportsModelOverride()
                 || this.providerSupportsReasoningEffort()
-                || this.providerSupportsThinkingBudget();
+                || this.providerSupportsClaudeEffort()
+                || this.providerSupportsGoogleThinkingLevel();
         },
 
-        normalizeThinkingBudgetTokens(value) {
-            const parsed = Number.parseInt(String(value ?? '').trim(), 10);
-            if (Number.isNaN(parsed) || parsed < 0) {
-                return 0;
-            }
-            return parsed;
-        },
 
         levelLabel(level) {
             const value = String(level || '').trim().toLowerCase();
@@ -4710,11 +4710,8 @@ function app() {
                         reasoning_effort: String(this.providerForm.reasoning_effort || '')
                     };
                 }
-                if (this.providerSupportsThinkingBudget()) {
-                    overrides.claude = {
-                        thinking_budget_tokens: this.normalizeThinkingBudgetTokens(this.providerForm.thinking_budget_tokens)
-                    };
-                }
+                if (this.providerSupportsClaudeEffort()) overrides.claude = { ...(overrides.claude || {}), effort: String(this.providerForm.claude_effort || '') };
+                if (this.providerSupportsGoogleThinkingLevel()) overrides.google = { thinking_level: String(this.providerForm.google_thinking_level || '') };
                 if (Object.keys(overrides).length > 0) {
                     payload.overrides = overrides;
                 }
@@ -4990,7 +4987,8 @@ function app() {
                 proxy_url_hint: String(provider.proxy_url_hint || ''),
                 model: String((provider.overrides && provider.overrides.model) || ''),
                 reasoning_effort: String((provider.overrides && provider.overrides.openai && provider.overrides.openai.reasoning_effort) || ''),
-                thinking_budget_tokens: Number((provider.overrides && provider.overrides.claude && provider.overrides.claude.thinking_budget_tokens) || 0),
+                claude_effort: String((provider.overrides && provider.overrides.claude && provider.overrides.claude.effort) || ''),
+                google_thinking_level: String((provider.overrides && provider.overrides.google && provider.overrides.google.thinking_level) || ''),
                 api_keys_text: '',
                 priority: provider.priority,
                 enabled: !!provider.enabled
@@ -5069,7 +5067,8 @@ function app() {
                 proxy_url_hint: '',
                 model: '',
                 reasoning_effort: '',
-                thinking_budget_tokens: 0,
+                claude_effort: '',
+                google_thinking_level: '',
                 api_keys_text: '',
                 priority: maxPriority + 1,
                 enabled: true
@@ -5427,7 +5426,6 @@ function app() {
                 proxy_url_hint: '',
                 model: '',
                 reasoning_effort: '',
-                thinking_budget_tokens: 0,
                 api_keys_text: '',
                 priority: 1,
                 enabled: true

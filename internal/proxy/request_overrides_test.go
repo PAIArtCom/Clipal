@@ -14,7 +14,28 @@ import (
 
 func strPtr(v string) *string { return &v }
 
-func intPtr(v int) *int { return &v }
+func TestApplyGeminiThinkingLevelOverride(t *testing.T) {
+	root := map[string]any{"generationConfig": map[string]any{"temperature": 0.4, "thinkingConfig": map[string]any{"includeThoughts": true}}}
+	provider := config.Provider{Overrides: &config.ProviderOverrides{Google: &config.GoogleOverrides{ThinkingLevel: strPtr("high")}}}
+	ctx := RequestContext{Family: ProtocolFamilyGemini, Capability: CapabilityGeminiGenerateContent}
+	if !applyProviderRequestOverridesToRoot(root, ctx, provider) {
+		t.Fatal("expected override to apply")
+	}
+	generation, ok := root["generationConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("generationConfig = %T", root["generationConfig"])
+	}
+	if generation["temperature"] != 0.4 {
+		t.Fatalf("generationConfig lost unrelated value: %#v", generation)
+	}
+	thinking, ok := generation["thinkingConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("thinkingConfig = %T", generation["thinkingConfig"])
+	}
+	if thinking["thinkingLevel"] != "high" || thinking["includeThoughts"] != true {
+		t.Fatalf("thinkingConfig = %#v", thinking)
+	}
+}
 
 func decodeRequestBodyMap(t *testing.T, req *http.Request) map[string]any {
 	t.Helper()
@@ -160,7 +181,7 @@ func TestCreateProxyRequest_DoesNotRewriteOpenAINonGenerationModel(t *testing.T)
 	}
 }
 
-func TestCreateProxyRequest_AppliesClaudeThinkingOverrides(t *testing.T) {
+func TestCreateProxyRequest_ClaudeModelOverridePreservesThinking(t *testing.T) {
 	t.Parallel()
 
 	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
@@ -171,9 +192,6 @@ func TestCreateProxyRequest_AppliesClaudeThinkingOverrides(t *testing.T) {
 			Priority: 1,
 			Overrides: &config.ProviderOverrides{
 				Model: strPtr("claude-sonnet-4-5"),
-				Claude: &config.ClaudeOverrides{
-					ThinkingBudgetTokens: intPtr(4096),
-				},
 			},
 		},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
@@ -201,15 +219,12 @@ func TestCreateProxyRequest_AppliesClaudeThinkingOverrides(t *testing.T) {
 	if !ok {
 		t.Fatalf("thinking = %T %#v", root["thinking"], root["thinking"])
 	}
-	if got := thinking["type"]; got != "enabled" {
-		t.Fatalf("thinking.type = %v", got)
-	}
-	if got := thinking["budget_tokens"]; got != float64(4096) {
-		t.Fatalf("thinking.budget_tokens = %v", got)
+	if got := thinking["type"]; got != "disabled" {
+		t.Fatalf("thinking.type = %v, want original client value", got)
 	}
 }
 
-func TestCreateProxyRequest_SkipsClaudeThinkingBudgetForEffortModels(t *testing.T) {
+func TestCreateProxyRequest_ClaudeModelOverrideDoesNotAddThinking(t *testing.T) {
 	t.Parallel()
 
 	cp := newClientProxy(ClientClaude, config.ClientModeAuto, "", []config.Provider{
@@ -220,9 +235,6 @@ func TestCreateProxyRequest_SkipsClaudeThinkingBudgetForEffortModels(t *testing.
 			Priority: 1,
 			Overrides: &config.ProviderOverrides{
 				Model: strPtr("claude-opus-4-8"),
-				Claude: &config.ClaudeOverrides{
-					ThinkingBudgetTokens: intPtr(4096),
-				},
 			},
 		},
 	}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
@@ -250,9 +262,6 @@ func TestCreateProxyRequest_SkipsClaudeThinkingBudgetForEffortModels(t *testing.
 	thinking, ok := root["thinking"].(map[string]any)
 	if !ok {
 		t.Fatalf("thinking = %T %#v", root["thinking"], root["thinking"])
-	}
-	if _, ok := thinking["budget_tokens"]; ok {
-		t.Fatalf("thinking.budget_tokens should not be injected for effort models: %#v", thinking)
 	}
 	if got := thinking["type"]; got != "disabled" {
 		t.Fatalf("thinking.type = %v", got)
@@ -298,8 +307,8 @@ func TestCreateProxyRequest_AppliesClaudeEffortOverride(t *testing.T) {
 	if !ok {
 		t.Fatalf("output_config = %T %#v", root["output_config"], root["output_config"])
 	}
-	if got := outputConfig["effort"]; got != "max" {
-		t.Fatalf("output_config.effort = %v, want max", got)
+	if got := outputConfig["effort"]; got != "xhigh" {
+		t.Fatalf("output_config.effort = %v, want xhigh", got)
 	}
 	if _, ok := outputConfig["format"]; !ok {
 		t.Fatalf("output_config.format was not preserved: %#v", outputConfig)

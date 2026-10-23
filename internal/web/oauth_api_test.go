@@ -58,10 +58,12 @@ func TestHandleStartOAuthProvider_ReturnsAuthURLAndSessionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("callback: %v", err)
 	}
-	defer resp.Body.Close()
 	callbackBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read callback: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close callback body: %v", err)
 	}
 	if !strings.Contains(string(callbackBody), `data-theme="dark"`) {
 		t.Fatalf("callback did not preserve dark appearance: %s", callbackBody)
