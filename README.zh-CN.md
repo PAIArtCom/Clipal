@@ -52,7 +52,18 @@ OAuth 账号请求配置在添加时默认 US / `America/New_York`，国家和 I
 
 用量费用会优先采用上游直接返回的值，否则使用离线内置的 [`PAIArtCom/model-specs`](https://github.com/PAIArtCom/model-specs) 快照。模型价格采用精确匹配，并支持缓存和长上下文阶梯；更新目录不会追溯修改已保存的历史费用。详见[用量费用计算](docs/zh/pricing.md)。
 
-![Clipal Web UI](assets/webUI.png)
+<div align="center">
+  <table width="100%">
+    <tr>
+      <td align="center"><img src="assets/providers.png" alt="Clipal 服务商管理界面" width="100%"><br><sub>服务商管理</sub></td>
+      <td align="center"><img src="assets/takeover.png" alt="Clipal CLI 接管界面" width="100%"><br><sub>CLI 接管</sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="assets/settings.png" alt="Clipal 设置界面" width="100%"><br><sub>设置</sub></td>
+      <td align="center"><img src="assets/status.png" alt="Clipal 状态面板" width="100%"><br><sub>状态面板</sub></td>
+    </tr>
+  </table>
+</div>
 
 ### ⚡ **无感知的后台守护服务**
 Clipal 编译为单文件二进制，跨平台支持 macOS、Linux 和 Windows。

@@ -52,7 +52,18 @@ Manage your AI workflows visually. Add, edit, enable, or disable providers, pin 
 
 Usage costs prefer upstream-reported values and otherwise use an offline, embedded snapshot of [`PAIArtCom/model-specs`](https://github.com/PAIArtCom/model-specs). Model prices are matched exactly, including cache and long-context tiers; catalog updates never retroactively reprice stored history. See [Usage Cost Calculation](docs/en/pricing.md).
 
-![Clipal Web UI](assets/webUI.png)
+<div align="center">
+  <table width="100%">
+    <tr>
+      <td align="center"><img src="assets/providers.png" alt="Clipal provider management" width="100%"><br><sub>Provider management</sub></td>
+      <td align="center"><img src="assets/takeover.png" alt="Clipal CLI takeover" width="100%"><br><sub>CLI takeover</sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="assets/settings.png" alt="Clipal settings" width="100%"><br><sub>Settings</sub></td>
+      <td align="center"><img src="assets/status.png" alt="Clipal status dashboard" width="100%"><br><sub>Status dashboard</sub></td>
+    </tr>
+  </table>
+</div>
 
 ### ⚡ **Frictionless Background Service**
 Clipal runs as a single, cross-platform binary on macOS, Linux, and Windows. 
