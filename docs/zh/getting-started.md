@@ -8,7 +8,11 @@
 npm install -g clipal
 ```
 
+`npm install -g` 的安装位置由 npm 的 prefix 决定。如果 prefix 是
+`/usr/local` 这类系统目录，更新已安装的二进制文件需要 `sudo`；如果希望无需密码更新，请使用用户目录的 npm prefix。
+
 你也可以从 [Releases](https://github.com/PAIArtCom/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
+在 Linux 上推荐放到 `$HOME/.local/bin`；安装到 `/usr/local/bin` 属于系统范围安装，需要使用 `sudo`。
 最新稳定版：[GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 平台细节：

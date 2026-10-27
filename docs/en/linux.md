@@ -15,7 +15,21 @@ Example:
 
 ```bash
 chmod +x ./clipal-linux-amd64
-sudo mv ./clipal-linux-amd64 /usr/local/bin/clipal
+mkdir -p "$HOME/.local/bin"
+install -m 0755 ./clipal-linux-amd64 "$HOME/.local/bin/clipal"
+clipal --version
+```
+
+Make sure `"$HOME/.local/bin"` is on your `PATH` (for example, add
+`export PATH="$HOME/.local/bin:$PATH"` to your shell profile). This user-local
+location is recommended because `clipal update` can replace the binary without
+administrator privileges.
+
+If you prefer a system-wide installation, `/usr/local/bin` is also supported,
+but writing there requires `sudo`:
+
+```bash
+sudo install -m 0755 ./clipal-linux-amd64 /usr/local/bin/clipal
 clipal --version
 ```
 
@@ -56,6 +70,9 @@ If you want to manage the unit file yourself, create:
 ~/.config/systemd/user/clipal.service
 ```
 
+The example below assumes the recommended user-local installation. If you
+installed Clipal under `/usr/local/bin`, change `ExecStart` to that path.
+
 Minimal example:
 
 ```ini
@@ -65,7 +82,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/clipal --config-dir %h/.clipal
+ExecStart=%h/.local/bin/clipal --config-dir %h/.clipal
 Restart=always
 RestartSec=2
 

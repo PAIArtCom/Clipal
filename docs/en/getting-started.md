@@ -8,7 +8,13 @@ The fastest path is npm:
 npm install -g clipal
 ```
 
+The location used by `npm install -g` depends on your npm prefix. With a
+system prefix such as `/usr/local`, updating the installed binary requires
+`sudo`; use a user-local npm prefix if you want passwordless updates.
+
 You can also download the right binary from [Releases](https://github.com/PAIArtCom/Clipal/releases) and place it on your `PATH`.
+On Linux, the recommended location is `$HOME/.local/bin`; installing to
+`/usr/local/bin` requires `sudo` and is a system-wide installation.
 Latest stable release: [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 Platform-specific notes:

@@ -15,7 +15,19 @@ English: [docs/en/linux.md](../en/linux.md) | 中文: [docs/zh/linux.md](linux.m
 
 ```bash
 chmod +x ./clipal-linux-amd64
-sudo mv ./clipal-linux-amd64 /usr/local/bin/clipal
+mkdir -p "$HOME/.local/bin"
+install -m 0755 ./clipal-linux-amd64 "$HOME/.local/bin/clipal"
+clipal --version
+```
+
+请确认 `"$HOME/.local/bin"` 已加入 `PATH`（例如将
+`export PATH="$HOME/.local/bin:$PATH"` 加入 shell 配置文件）。推荐使用这个
+用户目录，因为 `clipal update` 可以在不需要管理员权限的情况下替换二进制文件。
+
+如果需要系统范围安装，也可以使用 `/usr/local/bin`，但写入该目录需要 `sudo`：
+
+```bash
+sudo install -m 0755 ./clipal-linux-amd64 /usr/local/bin/clipal
 clipal --version
 ```
 
@@ -56,6 +68,9 @@ clipal service install --config-dir /path/to/config
 ~/.config/systemd/user/clipal.service
 ```
 
+下面的示例假设使用推荐的用户目录安装。如果安装到了 `/usr/local/bin`，请将
+`ExecStart` 改为对应路径。
+
 最小示例：
 
 ```ini
@@ -65,7 +80,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/clipal --config-dir %h/.clipal
+ExecStart=%h/.local/bin/clipal --config-dir %h/.clipal
 Restart=always
 RestartSec=2
 
