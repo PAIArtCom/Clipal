@@ -370,9 +370,18 @@ type ClientStatus struct {
 	CurrentProvider  string            `json:"current_provider"`
 	CurrentProviders map[string]string `json:"current_providers,omitempty"`
 
-	LastSwitch  *ProviderSwitchStatus `json:"last_switch,omitempty"`
-	LastRequest *RequestOutcomeStatus `json:"last_request,omitempty"`
-	Providers   []ProviderStatus      `json:"providers,omitempty"`
+	LastSwitch         *ProviderSwitchStatus `json:"last_switch,omitempty"`
+	LastRequest        *RequestOutcomeStatus `json:"last_request,omitempty"`
+	LastAccountAttempt *AccountAttemptStatus `json:"last_account_attempt,omitempty"`
+	Providers          []ProviderStatus      `json:"providers,omitempty"`
+}
+
+type AccountAttemptStatus struct {
+	At                     string `json:"at"`
+	Provider               string `json:"provider"`
+	OAuthRefHash           string `json:"oauth_ref_hash"`
+	AccountIdentityHash    string `json:"account_identity_hash"`
+	EnvironmentFingerprint string `json:"environment_fingerprint"`
 }
 
 type ProviderSwitchStatus struct {

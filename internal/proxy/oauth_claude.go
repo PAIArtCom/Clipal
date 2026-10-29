@@ -32,6 +32,7 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
 	cred := account.Credential
+	cp.recordAccountAttempt(account)
 	accessToken := ""
 	if cred != nil {
 		accessToken = strings.TrimSpace(cred.AccessToken)

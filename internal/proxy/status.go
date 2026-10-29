@@ -28,6 +28,7 @@ type ClientRuntimeSnapshot struct {
 	CurrentProviders         map[string]string
 	LastSwitch               *ProviderSwitchEvent
 	LastRequest              *RequestOutcomeEvent
+	LastAccountAttempt       *AccountAttemptObservation
 	StickyBindingCount       int
 	ResponseLookupCount      int
 	DynamicFeatureCacheCount int
@@ -106,6 +107,11 @@ func (cp *ClientProxy) runtimeSnapshot(now time.Time) ClientRuntimeSnapshot {
 		lr := cp.lastRequest
 		lastRequest = &lr
 	}
+	var lastAccountAttempt *AccountAttemptObservation
+	if !cp.lastAccountAttempt.At.IsZero() {
+		la := cp.lastAccountAttempt
+		lastAccountAttempt = &la
+	}
 
 	return ClientRuntimeSnapshot{
 		Mode:             string(cp.mode),
@@ -123,6 +129,7 @@ func (cp *ClientProxy) runtimeSnapshot(now time.Time) ClientRuntimeSnapshot {
 		}(),
 		LastSwitch:               lastSwitch,
 		LastRequest:              lastRequest,
+		LastAccountAttempt:       lastAccountAttempt,
 		StickyBindingCount:       len(cp.stickyBindings),
 		ResponseLookupCount:      len(cp.responseLookup),
 		DynamicFeatureCacheCount: len(cp.dynamicFeatureBindings),

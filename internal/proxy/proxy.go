@@ -63,6 +63,17 @@ type ProviderSwitchEvent struct {
 	Status int
 }
 
+// AccountAttemptObservation is a redacted runtime view of the last OAuth
+// account context used by a provider attempt. It never contains tokens or raw
+// account identifiers.
+type AccountAttemptObservation struct {
+	At                     time.Time
+	Provider               string
+	OAuthRefHash           string
+	AccountIdentityHash    string
+	EnvironmentFingerprint string
+}
+
 type authCarrier string
 
 const (
@@ -186,6 +197,7 @@ type ClientProxy struct {
 	breakers               []*circuitBreaker
 	lastSwitch             ProviderSwitchEvent
 	lastRequest            RequestOutcomeEvent
+	lastAccountAttempt     AccountAttemptObservation
 	telemetry              *telemetry.Store
 	oauth                  *oauthpkg.Service
 	antigravityCatalogs    map[string]*antigravityCatalogCall

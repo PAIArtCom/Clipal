@@ -51,6 +51,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - View config directory
 - View current mode, pinned provider, and preferred provider per client group
 - View the latest provider switch and latest request per client, with status color and relative time
+- View the last redacted OAuth account attempt per client; it exposes only provider and short hashes for the ref, account identity, and environment generation.
 - View provider runtime state, configured key count, and available key count
 
 ### Services

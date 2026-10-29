@@ -913,6 +913,16 @@ func buildClientStatus(cc config.ClientConfig, providers []config.Provider, rt p
 			Detail:     view.Detail,
 		}
 	}
+	var lastAccountAttempt *AccountAttemptStatus
+	if rt.LastAccountAttempt != nil && !rt.LastAccountAttempt.At.IsZero() {
+		lastAccountAttempt = &AccountAttemptStatus{
+			At:                     rt.LastAccountAttempt.At.Format(time.RFC3339),
+			Provider:               rt.LastAccountAttempt.Provider,
+			OAuthRefHash:           rt.LastAccountAttempt.OAuthRefHash,
+			AccountIdentityHash:    rt.LastAccountAttempt.AccountIdentityHash,
+			EnvironmentFingerprint: rt.LastAccountAttempt.EnvironmentFingerprint,
+		}
+	}
 
 	return ClientStatus{
 		Mode:           mode,
@@ -923,9 +933,10 @@ func buildClientStatus(cc config.ClientConfig, providers []config.Provider, rt p
 		CurrentProvider:  current,
 		CurrentProviders: currentProviders,
 
-		LastSwitch:  lastSwitch,
-		LastRequest: lastRequest,
-		Providers:   outProviders,
+		LastSwitch:         lastSwitch,
+		LastRequest:        lastRequest,
+		LastAccountAttempt: lastAccountAttempt,
+		Providers:          outProviders,
 	}
 }
 

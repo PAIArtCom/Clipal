@@ -3,10 +3,13 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
@@ -102,6 +105,27 @@ func applyOAuthRequestContext(req *http.Request, account *oauth.AccountRequestCo
 		credential: cred.Clone(),
 		request:    account.Clone(),
 	})), nil
+}
+
+func (cp *ClientProxy) recordAccountAttempt(account *oauth.AccountRequestContext) {
+	if cp == nil || account == nil || account.Credential == nil {
+		return
+	}
+	profile := account.Profile
+	cp.mu.Lock()
+	cp.lastAccountAttempt = AccountAttemptObservation{
+		At:                     time.Now(),
+		Provider:               string(profile.Identity.Provider),
+		OAuthRefHash:           redactedAttemptHash(account.Credential.Ref),
+		AccountIdentityHash:    redactedAttemptHash(profile.Identity.Key),
+		EnvironmentFingerprint: redactedAttemptHash(profile.Fingerprint()),
+	}
+	cp.mu.Unlock()
+}
+
+func redactedAttemptHash(value string) string {
+	sum := sha256.Sum256([]byte("clipal-account-attempt-v1\x00" + value))
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 func (cp *ClientProxy) accountHTTPClient(req *http.Request, index int) (*http.Client, error) {

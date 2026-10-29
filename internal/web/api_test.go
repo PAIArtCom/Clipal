@@ -2487,6 +2487,30 @@ func TestBuildClientStatus_IncludesLastRequestOutcome(t *testing.T) {
 	}
 }
 
+func TestBuildClientStatus_IncludesRedactedAccountAttempt(t *testing.T) {
+	cc := config.ClientConfig{Mode: config.ClientModeAuto, Providers: []config.Provider{{Name: "p1", Priority: 1}}}
+	now := time.Date(2026, 3, 18, 16, 32, 24, 0, time.UTC)
+	got := buildClientStatus(cc, cc.Providers, proxy.ClientRuntimeSnapshot{
+		CurrentProvider: "p1",
+		LastAccountAttempt: &proxy.AccountAttemptObservation{
+			At:                     now,
+			Provider:               "codex",
+			OAuthRefHash:           "0123456789abcdef",
+			AccountIdentityHash:    "fedcba9876543210",
+			EnvironmentFingerprint: "0011223344556677",
+		},
+	})
+	if got.LastAccountAttempt == nil {
+		t.Fatal("expected last_account_attempt to be populated")
+	}
+	if got.LastAccountAttempt.Provider != "codex" || got.LastAccountAttempt.OAuthRefHash != "0123456789abcdef" {
+		t.Fatalf("account attempt = %+v", got.LastAccountAttempt)
+	}
+	if got.LastAccountAttempt.At != now.Format(time.RFC3339) {
+		t.Fatalf("account attempt at = %q", got.LastAccountAttempt.At)
+	}
+}
+
 func TestBuildClientStatus_ReflectsLastRequestCapability(t *testing.T) {
 	cc := config.ClientConfig{
 		Mode: config.ClientModeAuto,

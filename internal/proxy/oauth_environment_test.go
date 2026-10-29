@@ -153,3 +153,21 @@ func TestAccountHTTPClientSeparatesEnvironmentGenerations(t *testing.T) {
 		t.Fatal("changed account environment reused the old client")
 	}
 }
+
+func TestAccountAttemptObservationRedactsOAuthIdentity(t *testing.T) {
+	cred := &oauth.Credential{Provider: config.OAuthProviderClaude, Ref: "secret-ref", AccountID: "secret-account", Environment: &oauth.RequestEnvironment{Country: "US", Language: "en-US", Locale: "en-US", Timezone: "America/New_York", DNS: "auto", Source: "user"}}
+	profile := cred.EnvironmentProfile()
+	cp := &ClientProxy{}
+	cp.recordAccountAttempt(&oauth.AccountRequestContext{Credential: cred, Profile: profile, Effective: profile.EffectiveRequest()})
+	snapshot := cp.runtimeSnapshot(time.Now())
+	if snapshot.LastAccountAttempt == nil {
+		t.Fatal("missing account attempt observation")
+	}
+	observation := snapshot.LastAccountAttempt
+	if observation.Provider != string(config.OAuthProviderClaude) || observation.OAuthRefHash == "secret-ref" || observation.AccountIdentityHash == "secret-account" {
+		t.Fatalf("observation leaked identity: %+v", observation)
+	}
+	if len(observation.OAuthRefHash) != 16 || len(observation.AccountIdentityHash) != 16 || len(observation.EnvironmentFingerprint) != 16 {
+		t.Fatalf("unexpected redaction lengths: %+v", observation)
+	}
+}
