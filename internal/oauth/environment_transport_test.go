@@ -44,4 +44,14 @@ func TestProviderClientWithEnvironmentDoesNotDoubleWrapMatchingAccountTransport(
 	if !ok || got.httpClient != accountClient {
 		t.Fatalf("provider client transport was wrapped again: %#v", configured)
 	}
+
+	raw := environment.Clone()
+	raw.NeedsConfirmation = true
+	rawClient, err := EnvironmentHTTPClient(base, raw, config.OAuthProviderAntigravity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !environmentHTTPClientMatches(rawClient, raw) {
+		t.Fatal("raw unconfirmed environment generation was not recognized")
+	}
 }

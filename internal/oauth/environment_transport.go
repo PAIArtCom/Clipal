@@ -119,7 +119,13 @@ func environmentHTTPClientMatches(client *http.Client, e *RequestEnvironment) bo
 	if wrapped.environment == nil || expected == nil {
 		return wrapped.environment == nil && expected == nil
 	}
-	return *wrapped.environment == *expected
+	if *wrapped.environment == *expected {
+		return true
+	}
+	// Callers that still hold a legacy/unconfirmed profile may have built the
+	// client from the raw environment. Treat that exact raw generation as the
+	// same transport; request headers will still use ForRequests at the edge.
+	return e != nil && *wrapped.environment == *e
 }
 
 func closeEnvironmentClient(client ProviderClient) {
