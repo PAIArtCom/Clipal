@@ -9,6 +9,59 @@ import (
 	"strings"
 )
 
+// codexOAuthPublicModelFields is the public capability subset of the Codex
+// ModelInfo schema. Keep this projection explicit: ModelInfo also contains
+// model prompts, approval policies, entitlement details, and internal control
+// flags that must not be exposed through the OpenAI-compatible endpoint.
+var codexOAuthPublicModelFields = []string{
+	"slug",
+	"display_name",
+	"description",
+	"default_reasoning_level",
+	"supported_reasoning_levels",
+	"shell_type",
+	"visibility",
+	"supported_in_api",
+	"priority",
+	"additional_speed_tiers",
+	"service_tiers",
+	"default_service_tier",
+	"availability_nux",
+	"upgrade",
+	"include_skills_usage_instructions",
+	"include_plugin_usage_instructions",
+	"include_apps_usage_instructions",
+	"supports_reasoning_summary_parameter",
+	"default_reasoning_summary",
+	"support_verbosity",
+	"default_verbosity",
+	"apply_patch_tool_type",
+	"web_search_tool_type",
+	"truncation_policy",
+	"supports_image_detail_original",
+	"context_window",
+	"max_context_window",
+	"auto_compact_token_limit",
+	"effective_context_window_percent",
+	"experimental_supported_tools",
+	"input_modalities",
+	"supports_search_tool",
+	"supports_experimental_context",
+	"use_responses_lite",
+	"supports_reasoning_effort_updates",
+	"model_specialty",
+	"tool_mode",
+	"multi_agent_version",
+	"multi_agent_reasoning_effort",
+}
+
+type codexOAuthDownstreamClient int
+
+const (
+	codexOAuthDownstreamOpenAI codexOAuthDownstreamClient = iota
+	codexOAuthDownstreamCLI
+)
+
 // prepareCodexOAuthResponse adapts Codex-specific upstream payloads to the
 // public OpenAI wire format. Codex OAuth accounts only expose model metadata
 // through /backend-api/codex/models, which uses the Codex catalog schema
@@ -16,25 +69,38 @@ import (
 //
 // Native Codex clients speak that schema themselves (GET <base_url>/models
 // returns {"models":[...]}), so their responses are passed through untouched.
-func prepareCodexOAuthResponse(original *http.Request, resp *http.Response) (*http.Response, error) {
-	requestCtx, ok := requestContextFromRequest(original)
+// OpenAI-compatible clients receive the standard list envelope, with the
+// public Codex ModelInfo capability fields retained.
+func prepareCodexOAuthResponse(downstreamReq *http.Request, upstreamResp *http.Response) (*http.Response, error) {
+	requestCtx, ok := requestContextFromRequest(downstreamReq)
 	if !ok || requestCtx.Capability != CapabilityOpenAIModels {
-		return resp, nil
+		return upstreamResp, nil
 	}
-	if isCodexNativeClient(original) {
-		return resp, nil
+	if codexOAuthDownstreamClientForRequest(downstreamReq) == codexOAuthDownstreamCLI {
+		return upstreamResp, nil
 	}
-	if resp == nil || resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return resp, nil
+	if upstreamResp == nil || upstreamResp.StatusCode < http.StatusOK || upstreamResp.StatusCode >= http.StatusMultipleChoices {
+		return upstreamResp, nil
 	}
-	if !codexOAuthResponseIsJSON(resp) {
-		return resp, nil
+	if !codexOAuthResponseIsJSON(upstreamResp) {
+		return upstreamResp, nil
 	}
-	return rewriteCodexOAuthModelsResponse(requestCtx, resp)
+	return rewriteCodexOAuthModelsResponse(requestCtx, upstreamResp)
 }
 
-// isCodexNativeClient reports whether the request comes from a first-party
-// Codex client. Those clients parse the Codex catalog schema
+// codexOAuthDownstreamClientForRequest classifies the client that will
+// receive the response. The request sent upstream has Codex CLI identity
+// headers added by Clipal, so response adaptation must never inspect that
+// rewritten request to choose the downstream schema.
+func codexOAuthDownstreamClientForRequest(downstreamReq *http.Request) codexOAuthDownstreamClient {
+	if isCodexNativeClient(downstreamReq) {
+		return codexOAuthDownstreamCLI
+	}
+	return codexOAuthDownstreamOpenAI
+}
+
+// isCodexNativeClient reports whether the downstream request comes from a
+// first-party Codex client. Those clients parse the Codex catalog schema
 // ({"models":[...]}) and must not receive the OpenAI list envelope.
 func isCodexNativeClient(req *http.Request) bool {
 	if req == nil {
@@ -142,17 +208,19 @@ func codexOAuthModelsFromPayload(body []byte) ([]any, bool) {
 		if id == "" {
 			continue
 		}
-		model := map[string]any{
-			"id":       id,
-			"object":   "model",
-			"created":  0,
-			"owned_by": "codex",
-		}
-		for _, key := range []string{"display_name", "description", "context_window", "max_context_window"} {
-			if value, ok := raw[key]; ok && value != nil {
+		// Preserve the public capability metadata from the official ModelInfo
+		// schema, including service tiers and reasoning options, without exposing
+		// prompts, approval policies, entitlements, or internal control fields.
+		model := make(map[string]any, len(codexOAuthPublicModelFields)+4)
+		for _, key := range codexOAuthPublicModelFields {
+			if value, ok := raw[key]; ok {
 				model[key] = value
 			}
 		}
+		model["id"] = id
+		model["object"] = "model"
+		model["created"] = 0
+		model["owned_by"] = "codex"
 		models = append(models, model)
 	}
 	return models, true

@@ -2542,10 +2542,26 @@ func TestIsCodexNativeClient(t *testing.T) {
 	}
 }
 
+func TestCodexOAuthDownstreamClientForRequestUsesDownstreamIdentity(t *testing.T) {
+	t.Parallel()
+
+	cliReq := httptest.NewRequest(http.MethodGet, "http://proxy/v1/models", nil)
+	cliReq.Header.Set("Originator", "codex_cli_rs")
+	if got := codexOAuthDownstreamClientForRequest(cliReq); got != codexOAuthDownstreamCLI {
+		t.Fatalf("CLI downstream client = %v, want CLI", got)
+	}
+
+	apiReq := httptest.NewRequest(http.MethodGet, "http://proxy/v1/models", nil)
+	apiReq.Header.Set("User-Agent", "OpenAI/Python 1.0.0")
+	if got := codexOAuthDownstreamClientForRequest(apiReq); got != codexOAuthDownstreamOpenAI {
+		t.Fatalf("OpenAI downstream client = %v, want OpenAI-compatible", got)
+	}
+}
+
 func TestForwardWithFailover_CodexNativeClientGetsRawCatalog(t *testing.T) {
 	t.Parallel()
 
-	const rawCatalog = `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000}]}`
+	const rawCatalog = `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000,"service_tiers":[{"id":"priority","name":"Fast","description":"2x speed, increased usage"}],"additional_speed_tiers":["fast"],"default_service_tier":"priority","model_messages":{"instructions_template":"official Codex catalog field"}}]}`
 	cp := newCodexModelsTestProxyWithUpstreamCheck(t, rawCatalog, func(t *testing.T, r *http.Request) {
 		t.Helper()
 		if got := r.URL.Query().Get("client_version"); got != "9.9.9" {
@@ -2581,7 +2597,14 @@ func TestForwardWithFailover_CodexNativeClientGetsRawCatalog(t *testing.T) {
 func TestForwardWithFailover_CodexOAuthModelsReturnsOpenAIList(t *testing.T) {
 	t.Parallel()
 
-	cp := newCodexModelsTestProxy(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000},{"slug":"codex-auto-review","display_name":"Codex Auto Review"}]}`)
+	cp := newCodexModelsTestProxyWithUpstreamCheck(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","context_window":272000,"supported_reasoning_levels":[{"effort":"low","description":"Low"}],"service_tiers":[{"id":"priority","name":"Fast","description":"2x speed, increased usage"}],"additional_speed_tiers":["fast"],"default_service_tier":"priority","model_messages":{"instructions_template":"do not expose this prompt"},"guardian":{"shell":"deny"},"future_internal_flag":true,"created":null,"owned_by":null},{"slug":"codex-auto-review","display_name":"Codex Auto Review"}]}`, func(t *testing.T, r *http.Request) {
+		if got := r.Header.Get("Originator"); got != codexOAuthOriginator {
+			t.Fatalf("upstream Originator = %q, want %q", got, codexOAuthOriginator)
+		}
+		if got := r.Header.Get("User-Agent"); got != codexOAuthUserAgent {
+			t.Fatalf("upstream User-Agent = %q, want %q", got, codexOAuthUserAgent)
+		}
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/openai/v1/models", nil)
 	req = withRequestContext(req, RequestContext{
@@ -2601,9 +2624,22 @@ func TestForwardWithFailover_CodexOAuthModelsReturnsOpenAIList(t *testing.T) {
 	var body struct {
 		Object string `json:"object"`
 		Data   []struct {
-			ID      string `json:"id"`
-			Object  string `json:"object"`
-			OwnedBy string `json:"owned_by"`
+			ID           string `json:"id"`
+			Object       string `json:"object"`
+			Created      int    `json:"created"`
+			OwnedBy      string `json:"owned_by"`
+			Slug         string `json:"slug"`
+			ServiceTiers []struct {
+				ID          string `json:"id"`
+				Name        string `json:"name"`
+				Description string `json:"description"`
+			} `json:"service_tiers"`
+			AdditionalSpeedTiers     []string `json:"additional_speed_tiers"`
+			DefaultServiceTier       string   `json:"default_service_tier"`
+			SupportedReasoningLevels []struct {
+				Effort      string `json:"effort"`
+				Description string `json:"description"`
+			} `json:"supported_reasoning_levels"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
@@ -2615,15 +2651,47 @@ func TestForwardWithFailover_CodexOAuthModelsReturnsOpenAIList(t *testing.T) {
 	if len(body.Data) != 2 {
 		t.Fatalf("data = %#v", body.Data)
 	}
-	if body.Data[0].ID != "gpt-6-luna" || body.Data[0].Object != "model" || body.Data[0].OwnedBy != "codex" {
+	if body.Data[0].ID != "gpt-6-luna" || body.Data[0].Object != "model" || body.Data[0].Created != 0 || body.Data[0].OwnedBy != "codex" {
 		t.Fatalf("first model = %#v", body.Data[0])
+	}
+	if body.Data[0].Slug != "gpt-6-luna" {
+		t.Fatalf("slug = %q, want upstream catalog slug", body.Data[0].Slug)
+	}
+	if len(body.Data[0].ServiceTiers) != 1 || body.Data[0].ServiceTiers[0].ID != "priority" || body.Data[0].ServiceTiers[0].Name != "Fast" {
+		t.Fatalf("service_tiers = %#v, want official Fast tier", body.Data[0].ServiceTiers)
+	}
+	if got := body.Data[0].AdditionalSpeedTiers; len(got) != 1 || got[0] != "fast" {
+		t.Fatalf("additional_speed_tiers = %#v, want legacy fast tier", got)
+	}
+	if body.Data[0].DefaultServiceTier != "priority" {
+		t.Fatalf("default_service_tier = %q, want priority", body.Data[0].DefaultServiceTier)
+	}
+	if len(body.Data[0].SupportedReasoningLevels) != 1 || body.Data[0].SupportedReasoningLevels[0].Effort != "low" {
+		t.Fatalf("supported_reasoning_levels = %#v, want upstream reasoning metadata", body.Data[0].SupportedReasoningLevels)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode envelope for projection checks: %v", err)
+	}
+	data, ok := envelope["data"].([]any)
+	if !ok || len(data) == 0 {
+		t.Fatalf("data projection = %#v", envelope["data"])
+	}
+	first, ok := data[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first model projection = %#v", data[0])
+	}
+	for _, key := range []string{"model_messages", "guardian", "future_internal_flag"} {
+		if _, ok := first[key]; ok {
+			t.Fatalf("sensitive or unknown field %q leaked into OpenAI model response", key)
+		}
 	}
 }
 
 func TestForwardWithFailover_CodexOAuthModelsSingleModel(t *testing.T) {
 	t.Parallel()
 
-	cp := newCodexModelsTestProxy(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna"}]}`)
+	cp := newCodexModelsTestProxy(t, `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","service_tiers":[{"id":"priority","name":"Fast","description":"2x speed, increased usage"}],"default_service_tier":"priority","model_messages":{"instructions_template":"do not expose"}}]}`)
 
 	for _, tc := range []struct {
 		name       string
@@ -2659,6 +2727,15 @@ func TestForwardWithFailover_CodexOAuthModelsSingleModel(t *testing.T) {
 				}
 				if got := body["object"]; got != "model" {
 					t.Fatalf("object = %#v", got)
+				}
+				if got := body["default_service_tier"]; got != "priority" {
+					t.Fatalf("default_service_tier = %#v, want priority", got)
+				}
+				if tiers, ok := body["service_tiers"].([]any); !ok || len(tiers) != 1 {
+					t.Fatalf("service_tiers = %#v, want Fast tier", body["service_tiers"])
+				}
+				if _, ok := body["model_messages"]; ok {
+					t.Fatal("model_messages leaked into single-model response")
 				}
 			} else if _, ok := body["error"]; !ok {
 				t.Fatalf("missing error payload: %#v", body)

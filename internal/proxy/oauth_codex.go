@@ -761,6 +761,9 @@ func (cp *ClientProxy) doProviderRequestWithPayload(original *http.Request, prov
 		if err != nil || resp == nil {
 			return resp, true, err
 		}
+		// Keep using original, which is the downstream client request. proxyReq
+		// carries Clipal's rewritten Codex CLI identity for the upstream call and
+		// must not decide which response schema the client receives.
 		resp, err = prepareOAuthProviderResponse(original, provider, resp)
 		return resp, true, err
 	}
@@ -782,6 +785,8 @@ func (cp *ClientProxy) doProviderRequestWithPayload(original *http.Request, prov
 	if err != nil || resp == nil {
 		return resp, true, err
 	}
+	// As above, classify the downstream client from original rather than the
+	// upstream request whose headers were rewritten by Clipal.
 	resp, err = prepareOAuthProviderResponse(original, provider, resp)
 	return resp, true, err
 }
