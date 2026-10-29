@@ -2420,10 +2420,10 @@ test('public DoH reference is optional per dialog and never saved as account con
     await state.openEnvironment({ name: 'owner', auth_type: 'oauth' });
     assert.equal(state.environmentCheckDoH, false);
     await state.diagnoseEnvironment();
-    assert.deepEqual(JSON.parse(requests[1].options.body), { check_doh: false });
+    assert.deepEqual(JSON.parse(requests[1].options.body), { check_doh: false, check_auth: false });
     state.environmentCheckDoH = true;
     await state.diagnoseEnvironment();
-    assert.deepEqual(JSON.parse(requests[2].options.body), { check_doh: true });
+    assert.deepEqual(JSON.parse(requests[2].options.body), { check_doh: true, check_auth: false });
     assert.equal(state.environmentBusy, false);
     assert.equal(state.environmentProfile.dns, 'auto');
     assert.equal(state.environmentProfile.device_id, 'stable');

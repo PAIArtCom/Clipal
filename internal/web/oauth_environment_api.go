@@ -44,6 +44,7 @@ type consistencyReport struct {
 	DoHResolver        string                          `json:"doh_reference_resolver,omitempty"`
 	DoHAddresses       int                             `json:"doh_reference_address_count,omitempty"`
 	Checks             []consistencyCheck              `json:"checks"`
+	authEvidence       []oauth.EnvironmentEvidence     `json:"-"`
 }
 
 func diagnosticEvidence(report *consistencyReport) {
@@ -56,6 +57,7 @@ func diagnosticEvidence(report *consistencyReport) {
 	if report.ExitIP != "" {
 		evidence = append(evidence, oauth.EnvironmentEvidence{State: oauth.EnvironmentEvidenceObserved, Scope: oauth.EnvironmentEvidenceScopeReferenceExit, CheckedAt: report.CheckedAt, Source: "clipal-diagnostic"})
 	}
+	evidence = append(evidence, report.authEvidence...)
 	profile := report.AccountEnvironment.Clone()
 	profile.Evidence = evidence
 	report.AccountEnvironment = profile
@@ -180,7 +182,8 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var options struct {
-		CheckDoH bool `json:"check_doh"`
+		CheckDoH  bool `json:"check_doh"`
+		CheckAuth bool `json:"check_auth"`
 	}
 	if err := decodeAccountEnvironmentJSON(r, &options, true); err != nil {
 		writeError(w, "invalid diagnostic options", http.StatusBadRequest)
@@ -280,6 +283,24 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 	}
 	check("network_exit", "pending", "The target exit is unverified; matching proxy entries do not prove matching egress.")
 	check("upstream_auth", "pending", "No token refresh or paid model request was sent by this diagnostic.")
+	if options.CheckAuth {
+		probeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+		probe, probeErr := a.oauth.ProbeOAuthAuth(probeCtx, cred.Provider, cred.Ref, base)
+		stop()
+		if probeErr != nil {
+			check("oauth_auth", "pending", "OAuth authentication probe could not be completed.")
+		} else {
+			status := "pending"
+			switch probe.State {
+			case oauth.EnvironmentEvidenceVerified:
+				status = "ok"
+			case oauth.EnvironmentEvidenceBlocked:
+				status = "mismatch"
+			}
+			check("oauth_auth", status, probe.Detail)
+			report.authEvidence = append(report.authEvidence, oauth.EnvironmentEvidence{State: probe.State, Scope: oauth.EnvironmentEvidenceScopeOAuthAuth, CheckedAt: report.CheckedAt, Source: "clipal-auth-probe"})
+		}
+	}
 	if resolvedProxy != nil && options.CheckDoH {
 		dns := cred.Environment.DNS
 		if dns == "" || dns == "system" {

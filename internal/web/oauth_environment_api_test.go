@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,10 +12,28 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
+
+type authProbeClaudeClient struct{}
+
+func (c *authProbeClaudeClient) Provider() config.OAuthProvider { return config.OAuthProviderClaude }
+func (c *authProbeClaudeClient) StartLogin(time.Time, time.Duration) (*oauth.LoginSession, error) {
+	return nil, nil
+}
+func (c *authProbeClaudeClient) ExchangeSessionCode(context.Context, *oauth.LoginSession, string) (*oauth.Credential, error) {
+	return nil, nil
+}
+func (c *authProbeClaudeClient) Refresh(context.Context, *oauth.Credential) (*oauth.Credential, error) {
+	return nil, nil
+}
+func (c *authProbeClaudeClient) WithHTTPClient(*http.Client) oauth.ProviderClient { return c }
+func (c *authProbeClaudeClient) FetchUsage(context.Context, *oauth.Credential) (*oauth.ClaudeUsageDetails, error) {
+	return &oauth.ClaudeUsageDetails{PlanType: "test"}, nil
+}
 
 func accountEnvironmentAPI(t *testing.T) (*Handler, *oauth.Credential) {
 	t.Helper()
@@ -127,6 +146,35 @@ func TestProxyDiagnosticsPublicDoHIsOptInAndNonBlocking(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestProviderDiagnosticsAuthProbeAddsScopedEvidence(t *testing.T) {
+	h, cred := accountEnvironmentAPI(t)
+	h.api.oauth = oauth.NewService(h.api.configDir, oauth.WithProviderClient(&authProbeClaudeClient{}))
+	if err := h.api.oauth.Store().Save(cred); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	oldTarget, oldExit := diagnosticTarget, diagnosticExitURLs
+	diagnosticTarget = func(config.OAuthProvider) string { return server.URL }
+	diagnosticExitURLs = nil
+	defer func() { diagnosticTarget, diagnosticExitURLs = oldTarget, oldExit }()
+
+	w := httptest.NewRecorder()
+	h.api.HandleProviderDiagnostics(w, httptest.NewRequest(http.MethodPost, "/api/providers/claude/account/oauth-diagnostics", strings.NewReader(`{"check_auth":true}`)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report consistencyReport
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceVerified, oauth.EnvironmentEvidenceScopeOAuthAuth) {
+		t.Fatalf("evidence=%+v", report.AccountEnvironment.Evidence)
 	}
 }
 

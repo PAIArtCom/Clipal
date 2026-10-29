@@ -107,6 +107,7 @@ function app() {
         environmentLoadError: '',
         environmentProvider: null,
         environmentCheckDoH: false,
+        environmentCheckAuth: false,
         environmentPath: '',
         environmentAccount: '',
         environmentIdentity: '',
@@ -161,6 +162,8 @@ function app() {
                     "resolverChoice": "No explicit proxy: {resolver} DoH; otherwise proxy resolution",
                     "checkDoH": "Include public DoH reference for proxy routes",
                     "checkDoHHint": "Optional when using a proxy. Failure does not block requests and results cannot verify the proxy's DNS or target exit.",
+                    "checkAuth": "Verify OAuth authentication",
+                    "checkAuthHint": "Optional provider metadata/usage probe; it does not send a model prompt.",
                     "waiting": "Not configured",
                     "direct": "No explicit proxy (system / TUN may apply)",
                     "systemDNS": "System / proxy resolver",
@@ -686,6 +689,8 @@ function app() {
                     "resolverChoice": "无显式代理时使用 {resolver} DoH；有代理时由代理解析",
                     "checkDoH": "代理下附加公共 DoH 参考诊断",
                     "checkDoHHint": "使用代理时可选。失败不阻断请求，结果不能核验代理实际 DNS 或目标出口。",
+                    "checkAuth": "验证 OAuth 认证",
+                    "checkAuthHint": "可选的 provider metadata/usage 探针，不发送模型 prompt。",
                     "waiting": "尚未配置",
                     "direct": "未指定代理（系统 / TUN 可能生效）",
                     "systemDNS": "系统 / 代理解析器",
@@ -2594,6 +2599,7 @@ function app() {
             this.environmentBusy = true;
             this.environmentDiagnostics = null;
             this.environmentCheckDoH = false;
+            this.environmentCheckAuth = false;
             this.environmentProfile = {};
             this.environmentState = '';
             this.environmentEvidence = null;
@@ -2714,7 +2720,7 @@ function app() {
             const generation = this.environmentGeneration;
             this.environmentBusy = true;
             try {
-                const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH }) }, true, true);
+                const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH, check_auth: !!this.environmentCheckAuth }) }, true, true);
                 if (generation !== this.environmentGeneration) return;
                 this.environmentDiagnostics = report;
                 this.applyEnvironmentResponse(report, false);

@@ -155,13 +155,13 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 
 业务请求复用账号 HTTP 客户端和连接池；仅在新建连接需要尚未缓存的地址时查询 DoH。成功结果从各条 DNS 响应收到时起按 TTL 计时，合并 A／AAAA 结果取最早到期时间，最长五分钟；同一账号、路由和域名的并发冷查询合并为一次查询流程。解析失败后退避五秒，到期重新尝试 DoH；auto 在退避期间可走系统域名通路，显式指定 DoH 时仍严格失败。完整五秒自动 DNS 解析预算耗尽也会建立退避；目标 TCP／TLS 连接错误不会成为 DNS 失败缓存。请求取消或调用方的较短期限不会建立退避，等待者可独立取消。成功与失败条目合计最多 256 个，优先淘汰最早到期的条目。缓存内容为 DNS 结果，不缓存模型响应。
 
-“**检查一致性**”报告所选代理入口、由谁解析目标域名，以及不携带凭据的目标 HTTP 连接是否完成。收到 HTTP 状态只能证明 HTTP 连通性，不能证明 OAuth 认证。IP 参考服务可能报告自己的出口 IP、国家和时区；即使代理入口相同，也不能证明模型目标使用相同出口，因此目标出口保持“**尚未核验**”。观测不会初始化或修改账号地区。诊断不发送账号凭据、token 刷新或付费模型请求。用量元数据的总时间预算为 30 秒，包含自动连接选择、刷新及上游请求。
+“**检查一致性**”报告所选代理入口、由谁解析目标域名，以及不携带凭据的目标 HTTP 连接是否完成。收到 HTTP 状态只能证明 HTTP 连通性，不能证明 OAuth 认证。IP 参考服务可能报告自己的出口 IP、国家和时区；即使代理入口相同，也不能证明模型目标使用相同出口，因此目标出口保持“**尚未核验**”。观测不会初始化或修改账号地区。除非勾选可选的“**验证 OAuth 认证**”探针，诊断不发送账号凭据、token 刷新或付费模型请求；认证探针只访问 provider metadata/usage 接口，不发送模型 prompt。用量元数据的总时间预算为 30 秒，包含自动连接选择、刷新及上游请求。
 
 “**代理下附加公共 DoH 参考诊断**”默认不勾选，仅对当前诊断请求生效。有标准代理时，在连通性检查之后，通过同一入口查询保存的 Cloudflare／Google 选择；`auto`／`system` 使用 Cloudflare → Google。结果不能证明代理实际 DNS 后端、目标 IP 或出口。失败单独显示为“**尚未核验**”，不阻断业务请求，不提供严格预检选项。参考查询最多占用 10 秒，受诊断总计 25 秒的期限约束，不携带账号凭据或环境请求头。
 
-管理接口为 `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` 和 `POST /api/providers/<client>/<name>/oauth-diagnostics`。POST 可使用空请求体或 `{ "check_doh": false }`；`{ "check_doh": true }` 开启代理参考查询。无显式代理时忽略此选项，常规检查使用账号实际 DNS 策略。GET 和诊断不改变配置；PUT 明确确认或修改国家及 IANA 时区，核验已加载账号身份，保留 DNS 和 token，沿用 localhost 管理访问与 CSRF 控制。
+管理接口为 `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` 和 `POST /api/providers/<client>/<name>/oauth-diagnostics`。POST 可使用空请求体或 `{ "check_doh": false, "check_auth": false }`；`check_doh` 开启代理参考查询，`check_auth` 开启 provider 专属认证 metadata/usage 探针。两者均不持久化；认证探针有时间限制且不发送模型 prompt。GET 和诊断不改变配置；PUT 明确确认或修改国家及 IANA 时区，核验已加载账号身份，保留 DNS 和 token，沿用 localhost 管理访问与 CSRF 控制。
 
-这些响应还包含 `account_environment`，将非秘密账号身份与请求配置状态组合展示。当前诊断返回带范围的 `target_connection` 和 `reference_exit` 条目；`oauth_auth` 保留给未来的 OAuth 认证范围探针。证据不会作为账号配置持久化；一次诊断可以同时返回多个边界的证据，参考出口观测成功不等于 OAuth 认证成功。
+这些响应还包含 `account_environment`，将非秘密账号身份与请求配置状态组合展示。诊断返回带范围的 `target_connection` 和 `reference_exit` 条目；勾选认证探针后会增加 `oauth_auth` 条目，并分类为已核验、已观测但受额度/频率限制、已阻断或未知。证据不会作为账号配置持久化；一次诊断可以同时返回多个边界的证据，参考出口观测成功不等于 OAuth 认证成功。
 
 
 ## Provider 列表

@@ -1526,6 +1526,7 @@
                 <div class="form-group" x-show="Object.keys(environmentUpstream).length"><span class="form-label" x-text="t('requestEnv.upstream')"></span><p x-text="[environmentUpstream.country_code || environmentUpstream.country, environmentUpstream.timezone].filter(Boolean).join(' · ')"></p></div>
                 <div class="form-group"><span class="form-label" x-text="t('requestEnv.dns')"></span><p x-text="environmentDNSLabel()"></p></div>
                 <div class="form-group"><label class="form-label"><input type="checkbox" x-model="environmentCheckDoH" :disabled="environmentBusy"> <span x-text="t('requestEnv.checkDoH')"></span></label><p class="form-hint" x-text="t('requestEnv.checkDoHHint')"></p></div>
+                <div class="form-group"><label class="form-label"><input type="checkbox" x-model="environmentCheckAuth" :disabled="environmentBusy"> <span x-text="t('requestEnv.checkAuth')"></span></label><p class="form-hint" x-text="t('requestEnv.checkAuthHint')"></p></div>
                 <div class="form-group"><span class="form-label" x-text="t('requestEnv.device')"></span><code class="code-inline" x-text="environmentProfile.device_id || '…'"></code></div>
                 <template x-if="environmentDiagnostics"><div>
                     <p class="form-hint" x-text="environmentDiagnostics.checked_at"></p>
