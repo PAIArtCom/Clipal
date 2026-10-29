@@ -18,6 +18,15 @@ C:\Users\<YOU>\bin\clipal.exe
 
 并把该目录加入用户 `PATH`。
 
+首次执行 `service install` 时，Clipal 会把程序复制到
+`%LOCALAPPDATA%\Clipal\clipal.exe`，然后让任务计划程序使用这个固定路径。
+之后可以移动或删除 Downloads 中的原始文件而不会影响已安装任务。下载新版程序后，
+执行 `service install --force` 即可替换固定目录中的副本。
+
+在 Windows 上，`service install` 会自动弹出系统 UAC 确认框请求提升权限。
+用户点击“是”后会自动继续安装，不需要手动打开管理员 PowerShell，也不需要把密码输入
+Clipal。`--dry-run` 不会弹出提权确认。
+
 确认：
 
 ```powershell
@@ -46,6 +55,11 @@ clipal.exe service install --dry-run
 
 安装后的任务会使用 `--detach-console` 在后台运行。
 
+Clipal 允许任务在电池供电时启动，并在切换到电池供电后继续运行。安装、
+`service start` 和 `service restart` 会自动应用这两项设置。旧版本用户升级后，
+执行一次 `clipal.exe service restart` 即可修复已有任务的电池限制，无需手动修改
+任务计划程序。这些命令使用 Windows PowerShell 及其内置的 ScheduledTasks 模块更新任务。
+
 ## 手动创建任务
 
 如果你想自己维护任务计划：
@@ -53,6 +67,7 @@ clipal.exe service install --dry-run
 - 程序：`C:\Users\<YOU>\bin\clipal.exe`
 - 参数：`--detach-console --config-dir C:\Users\<YOU>\.clipal`
 - 触发器：登录时
+- 条件：取消勾选“只有在计算机使用交流电源时才启动此任务”和“如果计算机改用电池电源则停止”
 
 ## 作为 Windows Service
 

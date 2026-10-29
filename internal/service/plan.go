@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -13,11 +14,19 @@ import (
 )
 
 type Plan struct {
-	Notes    []string
-	Mkdirs   []string
-	Writes   []FileWrite
-	Removes  []string
-	Commands []Command
+	Notes       []string
+	Mkdirs      []string
+	Writes      []FileWrite
+	Copies      []FileCopy
+	Removes     []string
+	PreCommands []Command
+	Commands    []Command
+}
+
+type FileCopy struct {
+	Source string
+	Dest   string
+	Perm   fs.FileMode
 }
 
 type FileWrite struct {
@@ -66,6 +75,57 @@ func ExecutePlan(ctx context.Context, plan *Plan, dryRun bool) (string, error) {
 		}
 		if err := os.WriteFile(w.Path, w.Content, perm); err != nil {
 			return out.String(), err
+		}
+	}
+
+	for _, c := range plan.PreCommands {
+		if dryRun {
+			fmt.Fprintf(&out, "%s %s\n", c.Path, joinArgs(c.Args))
+			continue
+		}
+		cmd := exec.CommandContext(ctx, c.Path, c.Args...)
+		if runtime.GOOS == "windows" {
+			cmd.Stdout, cmd.Stderr, cmd.Stdin = os.Stdout, os.Stderr, os.Stdin
+		} else {
+			cmd.Stdout, cmd.Stderr = &out, &out
+		}
+		if err := cmd.Run(); err != nil && !c.IgnoreError {
+			return out.String(), err
+		}
+	}
+
+	for _, c := range plan.Copies {
+		if dryRun {
+			fmt.Fprintf(&out, "cp %s %s\n", c.Source, c.Dest)
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(c.Dest), 0o755); err != nil {
+			return out.String(), err
+		}
+		in, err := os.Open(c.Source)
+		if err != nil {
+			return out.String(), err
+		}
+		perm := c.Perm
+		if perm == 0 {
+			perm = 0o700
+		}
+		outFile, err := os.OpenFile(c.Dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perm)
+		if err != nil {
+			_ = in.Close()
+			return out.String(), err
+		}
+		_, copyErr := io.Copy(outFile, in)
+		closeOutErr := outFile.Close()
+		closeInErr := in.Close()
+		if copyErr != nil {
+			return out.String(), copyErr
+		}
+		if closeOutErr != nil {
+			return out.String(), closeOutErr
+		}
+		if closeInErr != nil {
+			return out.String(), closeInErr
 		}
 	}
 

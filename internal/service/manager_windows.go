@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,7 +26,8 @@ func (windowsManager) Plan(action Action, opts Options) (*Plan, error) {
 		return nil, fmt.Errorf("config dir is required")
 	}
 
-	runLine := buildWindowsTaskRunLine(opts.BinaryPath, opts.ConfigDir)
+	installedBinary := windowsInstalledBinaryPath()
+	runLine := buildWindowsTaskRunLine(installedBinary, opts.ConfigDir)
 
 	plan := &Plan{}
 	switch action {
@@ -45,20 +47,35 @@ func (windowsManager) Plan(action Action, opts Options) (*Plan, error) {
 		}
 		plan.Commands = append(plan.Commands,
 			Command{Path: "schtasks.exe", Args: createArgs},
+			// Apply both battery conditions before the first /Run. Task Scheduler
+			// may refuse /Run while on battery when either default is enabled.
+			windowsBatterySettingsCommand(),
 			Command{Path: "schtasks.exe", Args: []string{"/Run", "/TN", windowsTaskName}},
 		)
+		if !sameWindowsPath(opts.BinaryPath, installedBinary) {
+			if opts.Force {
+				plan.PreCommands = append(plan.PreCommands, Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true})
+			}
+			plan.Mkdirs = append(plan.Mkdirs, filepath.Dir(installedBinary))
+			plan.Copies = append(plan.Copies, FileCopy{Source: opts.BinaryPath, Dest: installedBinary, Perm: 0o700})
+		}
 	case ActionUninstall:
 		plan.Commands = append(plan.Commands,
 			Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true},
 			Command{Path: "schtasks.exe", Args: []string{"/Delete", "/TN", windowsTaskName, "/F"}},
+			removeWindowsInstalledBinaryCommand(),
 		)
 	case ActionStart:
-		plan.Commands = append(plan.Commands, Command{Path: "schtasks.exe", Args: []string{"/Run", "/TN", windowsTaskName}})
+		plan.Commands = append(plan.Commands,
+			windowsBatterySettingsCommand(),
+			Command{Path: "schtasks.exe", Args: []string{"/Run", "/TN", windowsTaskName}},
+		)
 	case ActionStop:
 		plan.Commands = append(plan.Commands, Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true})
 	case ActionRestart:
 		plan.Commands = append(plan.Commands,
 			Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true},
+			windowsBatterySettingsCommand(),
 			Command{Path: "schtasks.exe", Args: []string{"/Run", "/TN", windowsTaskName}},
 		)
 	case ActionStatus:
@@ -68,6 +85,47 @@ func (windowsManager) Plan(action Action, opts Options) (*Plan, error) {
 	}
 
 	return plan, nil
+}
+
+func windowsBatterySettingsCommand() Command {
+	// schtasks /Create defaults to blocking startup on battery and stopping on
+	// transition to battery. Update the existing settings before /Run, including
+	// for tasks installed by older Clipal versions, without resetting other settings.
+	const script = `$ErrorActionPreference = 'Stop'; ` +
+		`$task = Get-ScheduledTask -TaskPath '\' -TaskName '` + windowsTaskName + `'; ` +
+		`$task.Settings.DisallowStartIfOnBatteries = $false; ` +
+		`$task.Settings.StopIfGoingOnBatteries = $false; ` +
+		`Set-ScheduledTask -InputObject $task | Out-Null`
+	return Command{
+		Path: "powershell.exe",
+		Args: []string{"-NoProfile", "-NonInteractive", "-Command", script},
+	}
+}
+
+func windowsInstalledBinaryPath() string {
+	root := strings.TrimSpace(os.Getenv("LOCALAPPDATA"))
+	if root == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			root = filepath.Join(home, "AppData", "Local")
+		}
+	}
+	if root == "" {
+		root = "."
+	}
+	return filepath.Join(root, "Clipal", "clipal.exe")
+}
+
+func sameWindowsPath(a, b string) bool {
+	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
+}
+
+func removeWindowsInstalledBinaryCommand() Command {
+	path := strings.ReplaceAll(windowsInstalledBinaryPath(), "'", "''")
+	return Command{
+		Path:        "powershell.exe",
+		Args:        []string{"-NoProfile", "-NonInteractive", "-Command", `Remove-Item -LiteralPath '` + path + `' -Force -ErrorAction SilentlyContinue`},
+		IgnoreError: true,
+	}
 }
 
 func currentWindowsUser() string {

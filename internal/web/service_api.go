@@ -164,11 +164,9 @@ func buildInstallGuidance(binaryPath, configDir string) (installCommand, install
 	}
 
 	if runtime.GOOS == "windows" {
-		// In some Windows environments, creating a scheduled task may require an
-		// elevated console. WebUI can't elevate a browser action, so provide a
-		// copy/paste command for an Administrator PowerShell.
+		// The CLI requests UAC elevation itself when the user clicks install.
 		installCommand = fmt.Sprintf(`"%s" service install --config-dir "%s"`, bin, cfg)
-		installHint = "Windows: if install is blocked by policy/UAC, run the command above in an Administrator PowerShell (or create the task manually in Task Scheduler)."
+		installHint = "Windows: click Install and confirm the Windows administrator prompt when it appears."
 		return installCommand, installHint
 	}
 

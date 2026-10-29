@@ -954,9 +954,7 @@
                     <p class="empty-state__title" x-text="t('services.autostartNotInstalled')"></p>
                     <p class="empty-state__hint" x-text="serviceStatus.os === 'windows' ? t('services.installWindows') : t('services.installOther')"></p>
                     <div class="empty-state__actions">
-                        <button type="button" class="btn btn-primary" x-show="serviceStatus.os === 'windows'"
-                            @click="copyServiceInstallCommand()" x-text="t('services.copyInstallCommand')"></button>
-                        <button type="button" class="btn btn-primary" x-show="serviceStatus.os !== 'windows'"
+                        <button type="button" class="btn btn-primary"
                             :disabled="!!serviceBusyAction" @click="serviceAction('install')" x-text="serviceActionIsBusy('install') ? t('common.working') : t('services.installService')"></button>
                         <button type="button" class="btn btn-secondary" @click="loadServiceStatus()"
                             x-text="t('common.refresh')"></button>

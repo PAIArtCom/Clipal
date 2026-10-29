@@ -62,6 +62,14 @@ func runService(args []string) {
 		os.Exit(2)
 	}
 
+	if handled, elevateErr := maybeElevateService(append([]string{actionArg}, flagArgs...), action); handled {
+		if elevateErr != nil {
+			fmt.Fprintf(os.Stderr, "clipal service %s: %v\n", action, elevateErr)
+			os.Exit(1)
+		}
+		return
+	}
+
 	cfgDir := *configDir
 	if cfgDir == "" {
 		cfgDir = config.GetConfigDir()

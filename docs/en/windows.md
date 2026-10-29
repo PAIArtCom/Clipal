@@ -18,6 +18,10 @@ C:\Users\<YOU>\bin\clipal.exe
 
 Then add that directory to your user `PATH`.
 
+The first `service install` copies the executable to `%LOCALAPPDATA%\Clipal\clipal.exe` and registers Task Scheduler against that stable path. This means the downloaded file can later be moved or removed without breaking the installed task. Re-run `service install --force` after downloading a new binary to replace the installed copy.
+
+On Windows, `service install` requests elevation through the standard UAC confirmation dialog. Confirming the dialog continues the installation automatically; no Administrator PowerShell window or password needs to be provided to Clipal. `--dry-run` does not request elevation.
+
 Verify:
 
 ```powershell
@@ -46,6 +50,12 @@ clipal.exe service install --dry-run
 
 The installed task uses `--detach-console` for background operation.
 
+Clipal allows the task to start and keep running on battery power. Installation,
+`service start`, and `service restart` apply these settings automatically. After
+upgrading an older installation, run `clipal.exe service restart` once to repair
+its battery settings; no manual Task Scheduler changes are needed. These commands
+use Windows PowerShell and the built-in ScheduledTasks module to update the task.
+
 ## Manual Task Setup
 
 If you want to manage Task Scheduler yourself:
@@ -53,6 +63,7 @@ If you want to manage Task Scheduler yourself:
 - Program: `C:\Users\<YOU>\bin\clipal.exe`
 - Arguments: `--detach-console --config-dir C:\Users\<YOU>\.clipal`
 - Trigger: at logon
+- Conditions: clear both “Start the task only if the computer is on AC power” and “Stop if the computer switches to battery power”
 
 ## Running As A Real Windows Service
 
