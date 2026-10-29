@@ -79,30 +79,26 @@ func (s *Service) GetClaudeUsageWithHTTPClient(ctx context.Context, ref string, 
 		ctx = context.Background()
 	}
 
-	cred, err := s.store.Load(config.OAuthProviderClaude, ref)
+	loaded, err := s.store.Load(config.OAuthProviderClaude, ref)
 	if err != nil {
 		return nil, err
 	}
 
 	details := &ClaudeUsageDetails{}
-	if strings.TrimSpace(cred.AccessToken) == "" {
+	if strings.TrimSpace(loaded.AccessToken) == "" {
 		return details, nil
 	}
 
-	refreshed, err := s.RefreshIfNeededWithHTTPClient(ctx, config.OAuthProviderClaude, ref, httpClient)
+	account, err := s.ResolveAccountRequestContext(ctx, config.OAuthProviderClaude, ref, httpClient)
 	if err != nil {
 		return details, err
 	}
-	if refreshed != nil {
-		cred = refreshed
-	}
-
+	cred := account.Credential
 	client, ok := s.providerClient(config.OAuthProviderClaude)
 	if !ok {
 		return details, fmt.Errorf("unsupported oauth provider %q", config.OAuthProviderClaude)
 	}
-	cred = s.PrepareEnvironment(cred)
-	client, err = providerClientWithEnvironment(client, httpClient, cred.Environment)
+	client, err = providerClientWithEnvironment(client, httpClient, account.Effective)
 	if err != nil {
 		return details, err
 	}

@@ -90,36 +90,33 @@ func (s *Service) GetCodexUsageWithHTTPClient(ctx context.Context, ref string, h
 		ctx = context.Background()
 	}
 
-	cred, err := s.store.Load(config.OAuthProviderCodex, ref)
+	loaded, err := s.store.Load(config.OAuthProviderCodex, ref)
 	if err != nil {
 		return nil, err
 	}
 
 	details := &CodexUsageDetails{
-		PlanType: codexCredentialPlanType(cred),
+		PlanType: codexCredentialPlanType(loaded),
 	}
 
-	if strings.TrimSpace(cred.AccessToken) == "" || strings.TrimSpace(cred.AccountID) == "" {
+	if strings.TrimSpace(loaded.AccessToken) == "" || strings.TrimSpace(loaded.AccountID) == "" {
 		return details, nil
 	}
 
-	refreshed, err := s.RefreshIfNeededWithHTTPClient(ctx, config.OAuthProviderCodex, ref, httpClient)
+	account, err := s.ResolveAccountRequestContext(ctx, config.OAuthProviderCodex, ref, httpClient)
 	if err != nil {
 		return details, err
 	}
-	if refreshed != nil {
-		cred = refreshed
-		if details.PlanType == "" {
-			details.PlanType = codexCredentialPlanType(cred)
-		}
+	cred := account.Credential
+	if details.PlanType == "" {
+		details.PlanType = codexCredentialPlanType(cred)
 	}
 
 	client, ok := s.providerClient(config.OAuthProviderCodex)
 	if !ok {
 		return details, fmt.Errorf("unsupported oauth provider %q", config.OAuthProviderCodex)
 	}
-	cred = s.PrepareEnvironment(cred)
-	client, err = providerClientWithEnvironment(client, httpClient, cred.Environment)
+	client, err = providerClientWithEnvironment(client, httpClient, account.Effective)
 	if err != nil {
 		return details, err
 	}

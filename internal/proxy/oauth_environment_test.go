@@ -71,6 +71,10 @@ func TestOAuthAttemptsUseAccountIdentityAndRegionWithoutMutatingInput(t *testing
 		if !bytes.Equal(data, retry) {
 			t.Fatal("replay body lost account environment")
 		}
+		attempt, ok := req.Context().Value(accountAttemptKey{}).(accountAttempt)
+		if !ok || attempt.request == nil || attempt.request.Credential == nil || attempt.request.Credential.Ref != credentials[i].Ref || attempt.request.Profile.Identity.Key == "" {
+			t.Fatalf("attempt %d did not retain the selected account context: %+v", i, attempt)
+		}
 	}
 	if !bytes.Equal(payload.Body(), raw) || original.Header.Get("Accept-Language") != "en-GB" {
 		t.Fatal("failover mutated the original request")
@@ -90,5 +94,62 @@ func TestUnknownAccountRegionDoesNotInheritChangingClientEnvironment(t *testing.
 	normalizeEnvironmentMetadata(meta, e)
 	if len(meta) != 1 || meta["session_id"] != "preserved" {
 		t.Fatal("unknown region metadata was not omitted")
+	}
+}
+
+func TestAccountHTTPClientSeparatesEnvironmentGenerations(t *testing.T) {
+	svc := oauth.NewService(t.TempDir())
+	provider := config.Provider{
+		Name:          "account",
+		AuthType:      config.ProviderAuthTypeOAuth,
+		OAuthProvider: config.OAuthProviderClaude,
+		OAuthRef:      "account",
+		Priority:      1,
+	}
+	cred := &oauth.Credential{
+		Provider:    config.OAuthProviderClaude,
+		Ref:         "account",
+		AccountID:   "account",
+		AccessToken: "secret",
+		Environment: &oauth.RequestEnvironment{Country: "JP", Timezone: "Asia/Tokyo", Source: "user"},
+	}
+	if err := svc.Store().Save(cred); err != nil {
+		t.Fatal(err)
+	}
+	cp := newClientProxy(ClientClaude, config.ClientModeManual, "account", []config.Provider{provider}, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+	defer cp.Close()
+
+	request := func(c *oauth.Credential) *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "http://local/", nil)
+		updated, err := applyOAuthEnvironment(req, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return updated
+	}
+	first, err := cp.accountHTTPClient(request(cred), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repeat, err := cp.accountHTTPClient(request(cred.Clone()), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != repeat {
+		t.Fatal("same account environment did not reuse the client")
+	}
+
+	changed := cred.Clone()
+	changed.Environment.Country = "DE"
+	changed.Environment.Language = "de-DE"
+	changed.Environment.Locale = "de-DE"
+	changed.Environment.Timezone = "Europe/Berlin"
+	second, err := cp.accountHTTPClient(request(changed), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("changed account environment reused the old client")
 	}
 }

@@ -11,7 +11,10 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
-type accountAttempt struct{ credential *oauth.Credential }
+type accountAttempt struct {
+	credential *oauth.Credential
+	request    *oauth.AccountRequestContext
+}
 type accountAttemptKey struct{}
 
 // This operates only on adapter-owned metadata, not prompts, messages, tools or
@@ -20,7 +23,26 @@ func applyOAuthEnvironment(req *http.Request, cred *oauth.Credential) (*http.Req
 	if cred == nil || cred.Environment == nil {
 		return req, nil
 	}
-	e := cred.Environment.ForRequests()
+	profile := cred.EnvironmentProfile()
+	return applyOAuthRequestContext(req, &oauth.AccountRequestContext{
+		Credential: cred.Clone(),
+		Profile:    profile,
+		Effective:  profile.EffectiveRequest().Clone(),
+	})
+}
+
+func applyOAuthRequestContext(req *http.Request, account *oauth.AccountRequestContext) (*http.Request, error) {
+	if account == nil || account.Credential == nil {
+		return req, nil
+	}
+	cred := account.Credential
+	e := account.Effective
+	if e == nil {
+		e = cred.EnvironmentProfile().EffectiveRequest()
+	}
+	if e == nil {
+		return req, nil
+	}
 	oauth.ApplyEnvironmentHeaders(req, e)
 	if cred.Provider == "codex" {
 		req.Header.Set("X-Codex-Installation-Id", e.DeviceID)
@@ -76,7 +98,10 @@ func applyOAuthEnvironment(req *http.Request, cred *oauth.Credential) (*http.Req
 		req.Body = io.NopCloser(bytes.NewReader(data))
 		req.ContentLength = int64(len(data))
 	}
-	return req.WithContext(context.WithValue(req.Context(), accountAttemptKey{}, accountAttempt{credential: cred.Clone()})), nil
+	return req.WithContext(context.WithValue(req.Context(), accountAttemptKey{}, accountAttempt{
+		credential: cred.Clone(),
+		request:    account.Clone(),
+	})), nil
 }
 
 func (cp *ClientProxy) accountHTTPClient(req *http.Request, index int) (*http.Client, error) {
@@ -85,23 +110,45 @@ func (cp *ClientProxy) accountHTTPClient(req *http.Request, index int) (*http.Cl
 	if !ok || attempt.credential == nil || attempt.credential.Environment == nil {
 		return base, nil
 	}
-	cred := attempt.credential
-	if cp.oauth != nil {
+	account := attempt.request
+	if account == nil {
+		profile := attempt.credential.EnvironmentProfile()
+		account = &oauth.AccountRequestContext{
+			Credential: attempt.credential.Clone(),
+			Profile:    profile,
+			Effective:  profile.EffectiveRequest().Clone(),
+		}
+	}
+	cred := account.Credential
+	if cp.oauth != nil && attempt.request == nil {
 		initialized := cp.oauth.PrepareEnvironment(cred)
 		if *initialized.Environment != *cred.Environment {
-			updated, err := applyOAuthEnvironment(req, initialized)
+			profile := initialized.EnvironmentProfile()
+			account = &oauth.AccountRequestContext{
+				Credential: initialized.Clone(),
+				Profile:    profile,
+				Effective:  profile.EffectiveRequest().Clone(),
+			}
+			updated, err := applyOAuthRequestContext(req, account)
 			if err != nil {
 				return nil, err
 			}
 			*req = *updated
 		}
-		cred = initialized
+		if account.Credential == nil {
+			account.Credential = initialized.Clone()
+		}
 	}
-	encoded, err := json.Marshal(cred.Environment)
-	if err != nil {
-		return nil, err
+	return cp.accountHTTPClientForContext(account, index)
+}
+
+func (cp *ClientProxy) accountHTTPClientForContext(account *oauth.AccountRequestContext, index int) (*http.Client, error) {
+	base := cp.upstreamHTTPClient(index)
+	if account == nil || account.Credential == nil || account.Effective == nil {
+		return base, nil
 	}
-	key := fmt.Sprintf("%d\x00%s\x00%s", index, cred.Provider, encoded)
+	cred := account.Credential
+	key := fmt.Sprintf("%d\x00%s\x00%s", index, cred.Provider, account.Profile.Fingerprint())
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 	if cp.accountHTTPClients == nil {
@@ -110,7 +157,7 @@ func (cp *ClientProxy) accountHTTPClient(req *http.Request, index int) (*http.Cl
 	if client := cp.accountHTTPClients[key]; client != nil {
 		return client, nil
 	}
-	client, err := oauth.EnvironmentHTTPClient(base, cred.Environment, cred.Provider)
+	client, err := oauth.EnvironmentHTTPClient(base, account.Effective, cred.Provider)
 	if err != nil {
 		return nil, err
 	}

@@ -141,11 +141,9 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		provider = config.OAuthProviderAntigravity
 	}
 
-	cred, err := s.store.Load(provider, ref)
-	if err != nil {
+	if _, err := s.store.Load(provider, ref); err != nil {
 		return nil, err
 	}
-
 	cacheKey := geminiUsageCacheKey(provider, ref)
 	if cached, ok := s.cachedGeminiUsage(cacheKey); ok {
 		return cached, nil
@@ -167,14 +165,12 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		return wait.details.Clone(), wait.err
 	}
 
-	refreshed, err := s.RefreshIfNeededWithHTTPClient(ctx, provider, ref, httpClient)
+	account, err := s.ResolveAccountRequestContext(ctx, provider, ref, httpClient)
 	if err != nil {
 		s.finishGeminiUsageFetch(cacheKey, nil, err, false)
 		return details, err
 	}
-	if refreshed != nil {
-		cred = refreshed
-	}
+	cred := account.Credential
 
 	client, ok := s.providerClient(provider)
 	if !ok {
@@ -182,8 +178,7 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		s.finishGeminiUsageFetch(cacheKey, nil, err, false)
 		return details, err
 	}
-	cred = s.PrepareEnvironment(cred)
-	client, err = providerClientWithEnvironment(client, httpClient, cred.Environment)
+	client, err = providerClientWithEnvironment(client, httpClient, account.Effective)
 	if err != nil {
 		s.finishGeminiUsageFetch(cacheKey, nil, err, false)
 		return details, err

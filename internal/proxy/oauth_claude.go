@@ -27,10 +27,11 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 		return nil, fmt.Errorf("claude oauth does not support %s requests", requestCtx.Capability)
 	}
 
-	cred, err := cp.oauth.RefreshIfNeededWithHTTPClient(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
+	account, err := cp.oauth.ResolveAccountRequestContext(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
 	if err != nil {
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
+	cred := account.Credential
 	accessToken := ""
 	if cred != nil {
 		accessToken = strings.TrimSpace(cred.AccessToken)
@@ -63,7 +64,7 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 	}
 	proxyReq.ContentLength = int64(len(body))
 	proxyReq.Header.Del("Content-Length")
-	return applyOAuthEnvironment(proxyReq, cred)
+	return applyOAuthRequestContext(proxyReq, account)
 }
 
 func copyHeaderAllowingApplicationAuth(dst http.Header, src http.Header) {

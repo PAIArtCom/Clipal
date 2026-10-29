@@ -22,10 +22,11 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 		requestCtx = requestContextForClientPath(cp.clientType, path, false)
 	}
 
-	cred, err := cp.oauth.RefreshIfNeededWithHTTPClient(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
+	account, err := cp.oauth.ResolveAccountRequestContext(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
 	if err != nil {
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
+	cred := account.Credential
 	accessToken := ""
 	projectID := ""
 	if cred != nil {
@@ -44,7 +45,11 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 	if payload != nil {
 		originalRoot = payload.jsonRoot()
 	}
-	rewrittenBody, err = cp.resolveAntigravityRequestModel(original, cred, providerIndex, cp.oauthHTTPClientForProvider(provider, providerIndex), path, rewrittenBody, originalRoot)
+	accountClient, err := cp.accountHTTPClientForContext(account, providerIndex)
+	if err != nil {
+		return nil, fmt.Errorf("prepare antigravity account transport: %w", err)
+	}
+	rewrittenBody, err = cp.resolveAntigravityRequestModel(original, cred, providerIndex, accountClient, path, rewrittenBody, originalRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +68,7 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 	applyAntigravityOAuthHeaderDefaults(proxyReq, requestCtx.Capability, accessToken)
 	proxyReq.ContentLength = int64(len(rewrittenBody))
 	proxyReq.Header.Del("Content-Length")
-	return applyOAuthEnvironment(proxyReq, cred)
+	return applyOAuthRequestContext(proxyReq, account)
 }
 
 func antigravityOAuthBaseURL() string {
