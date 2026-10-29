@@ -160,7 +160,7 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 
 管理接口为 `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` 和 `POST /api/providers/<client>/<name>/oauth-diagnostics`。POST 可使用空请求体或 `{ "check_doh": false }`；`{ "check_doh": true }` 开启代理参考查询。无显式代理时忽略此选项，常规检查使用账号实际 DNS 策略。GET 和诊断不改变配置；PUT 明确确认或修改国家及 IANA 时区，核验已加载账号身份，保留 DNS 和 token，沿用 localhost 管理访问与 CSRF 控制。
 
-这些响应还包含 `account_environment`，将非秘密账号身份与请求配置状态组合展示。诊断证据以带范围的条目返回（`target_connection`、`reference_exit` 或 `oauth_auth`），不会作为账号配置持久化；一次诊断可以同时返回多个边界的证据，参考出口观测成功不等于 OAuth 认证成功。
+这些响应还包含 `account_environment`，将非秘密账号身份与请求配置状态组合展示。当前诊断返回带范围的 `target_connection` 和 `reference_exit` 条目；`oauth_auth` 保留给未来的 OAuth 认证范围探针。证据不会作为账号配置持久化；一次诊断可以同时返回多个边界的证据，参考出口观测成功不等于 OAuth 认证成功。
 
 
 ## Provider 列表

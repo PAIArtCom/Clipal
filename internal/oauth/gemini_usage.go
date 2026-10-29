@@ -141,10 +141,11 @@ func (s *Service) GetGeminiUsageForProviderWithHTTPClient(ctx context.Context, p
 		provider = config.OAuthProviderAntigravity
 	}
 
-	if _, err := s.store.Load(provider, ref); err != nil {
+	loaded, err := s.store.Load(provider, ref)
+	if err != nil {
 		return nil, err
 	}
-	cacheKey := geminiUsageCacheKey(provider, ref)
+	cacheKey := geminiUsageCacheKey(provider, ref, loaded.EnvironmentProfile().Fingerprint())
 	if cached, ok := s.cachedGeminiUsage(cacheKey); ok {
 		return cached, nil
 	}
@@ -454,12 +455,12 @@ func mapAntigravityUsageSummaryBucket(payload antigravityUsageSummaryBucket) Gem
 	return out
 }
 
-func geminiUsageCacheKey(provider config.OAuthProvider, ref string) string {
+func geminiUsageCacheKey(provider config.OAuthProvider, ref, fingerprint string) string {
 	provider = config.OAuthProvider(strings.TrimSpace(string(provider)))
 	if provider == "" {
 		provider = config.OAuthProviderAntigravity
 	}
-	return string(provider) + ":" + strings.TrimSpace(ref)
+	return string(provider) + ":" + strings.TrimSpace(ref) + ":" + strings.TrimSpace(fingerprint)
 }
 
 func (s *Service) cachedGeminiUsage(key string) (*GeminiUsageDetails, bool) {
@@ -529,7 +530,12 @@ func (s *Service) invalidateGeminiUsageCache(ref string) {
 	}
 	s.mu.Lock()
 	for _, provider := range []config.OAuthProvider{config.OAuthProviderAntigravity} {
-		delete(s.geminiUsageCache, geminiUsageCacheKey(provider, ref))
+		prefix := string(provider) + ":" + strings.TrimSpace(ref) + ":"
+		for key := range s.geminiUsageCache {
+			if strings.HasPrefix(key, prefix) {
+				delete(s.geminiUsageCache, key)
+			}
+		}
 	}
 	s.mu.Unlock()
 }

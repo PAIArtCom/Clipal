@@ -160,7 +160,7 @@ The **Include public DoH reference for proxy routes** checkbox defaults off and 
 
 Management endpoints are `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` and `POST /api/providers/<client>/<name>/oauth-diagnostics`. The POST body may be empty or `{ "check_doh": false }`; `{ "check_doh": true }` opts into the proxy reference query. It is ignored when the target has no explicit proxy, where the normal checks use the account's actual DNS policy. GET and diagnosis do not change preferences. PUT explicitly confirms or edits country and IANA timezone, checks the loaded account identity, preserves DNS/tokens, and uses existing localhost management and CSRF controls.
 
-These responses also include an `account_environment` view that groups the non-secret account identity with the request profile state. Diagnostic evidence is returned as scoped entries (`target_connection`, `reference_exit`, or `oauth_auth`) and is not persisted as account configuration; one diagnostic may report more than one boundary. A successful reference observation therefore remains separate from OAuth authentication.
+These responses also include an `account_environment` view that groups the non-secret account identity with the request profile state. Current diagnostics return scoped `target_connection` and `reference_exit` entries; `oauth_auth` is reserved for an authentication-scoped probe. Evidence is not persisted as account configuration, and one diagnostic may report more than one boundary. A successful reference observation therefore remains separate from OAuth authentication.
 
 
 ## Provider list

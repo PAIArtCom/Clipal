@@ -97,11 +97,29 @@ func providerClientWithEnvironment(client ProviderClient, httpClient *http.Clien
 		}
 		return nil, fmt.Errorf("OAuth provider has no HTTP client")
 	}
+	if environmentHTTPClientMatches(httpClient, e) {
+		return providerClientWithHTTPClient(client, httpClient), nil
+	}
 	configured, err := EnvironmentHTTPClient(httpClient, e, client.Provider())
 	if err != nil {
 		return nil, err
 	}
 	return providerClientWithHTTPClient(client, configured), nil
+}
+
+func environmentHTTPClientMatches(client *http.Client, e *RequestEnvironment) bool {
+	if client == nil {
+		return false
+	}
+	wrapped, ok := client.Transport.(*environmentTransport)
+	if !ok {
+		return false
+	}
+	expected := e.ForRequests()
+	if wrapped.environment == nil || expected == nil {
+		return wrapped.environment == nil && expected == nil
+	}
+	return *wrapped.environment == *expected
 }
 
 func closeEnvironmentClient(client ProviderClient) {
