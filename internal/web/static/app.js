@@ -181,7 +181,8 @@ function app() {
                         "network_exit": "Network exit",
                         "connection": "Target connection",
                         "reference_exit": "Reference observation",
-                        "upstream_auth": "Upstream authentication"
+                        "upstream_auth": "Upstream authentication",
+                        "oauth_auth": "OAuth authentication probe"
                     },
                     "statuses": {
                         "ok": "Verified",
@@ -708,7 +709,8 @@ function app() {
                         "network_exit": "网络出口",
                         "connection": "目标连接",
                         "reference_exit": "参考观测",
-                        "upstream_auth": "上游认证"
+                        "upstream_auth": "上游认证",
+                        "oauth_auth": "OAuth 认证探针"
                     },
                     "statuses": {
                         "ok": "已核验",

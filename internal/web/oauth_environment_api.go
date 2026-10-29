@@ -282,8 +282,9 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 		check("reference_exit", "pending", "No reference service observation was available on the selected entry.")
 	}
 	check("network_exit", "pending", "The target exit is unverified; matching proxy entries do not prove matching egress.")
-	check("upstream_auth", "pending", "No token refresh or paid model request was sent by this diagnostic.")
-	if options.CheckAuth {
+	if !options.CheckAuth {
+		check("upstream_auth", "pending", "No token refresh or paid model request was sent by this diagnostic.")
+	} else {
 		probeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 		probe, probeErr := a.oauth.ProbeOAuthAuth(probeCtx, cred.Provider, cred.Ref, base)
 		stop()
