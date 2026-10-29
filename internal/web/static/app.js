@@ -113,6 +113,8 @@ function app() {
         environmentForm: { country: 'US', timezone: 'America/New_York' },
         environmentUpstream: {},
         environmentProfile: {},
+        environmentState: '',
+        environmentEvidence: null,
         environmentDiagnostics: null,
         environmentGeneration: 0,
         serviceBusyAction: '',
@@ -135,6 +137,10 @@ function app() {
                     "open": "Account environment",
                     "country": "Request country / region",
                     "source": "Configuration source",
+                    "profileState": "Request profile state",
+                    "states": { "configured": "Configured", "needs_confirmation": "Needs confirmation", "partial": "Partially configured", "unconfigured": "Not configured" },
+                    "evidenceStates": { "unknown": "Not observed", "observed": "Observed", "verified": "Verified", "blocked": "Blocked" },
+                    "evidenceScopes": { "request_profile": "request profile", "target_connection": "target connection", "reference_exit": "reference exit", "oauth_auth": "OAuth authentication" },
                     "pendingSource": "Unverified legacy values — confirmation required",
                     "sources": { "default": "Default request configuration", "user": "User configuration", "unknown": "Not configured" },
                     "confirmHint": "Legacy values may have been inferred from an exit. Review or change them, then save to confirm. Unconfirmed regions are not applied to requests.",
@@ -658,6 +664,10 @@ function app() {
                     "open": "账号环境",
                     "country": "请求国家 / 地区",
                     "source": "配置来源",
+                    "profileState": "请求配置状态",
+                    "states": { "configured": "已配置", "needs_confirmation": "需要确认", "partial": "部分配置", "unconfigured": "尚未配置" },
+                    "evidenceStates": { "unknown": "尚未观测", "observed": "已观测", "verified": "已核验", "blocked": "已阻断" },
+                    "evidenceScopes": { "request_profile": "请求配置", "target_connection": "目标连接", "reference_exit": "参考出口", "oauth_auth": "OAuth 认证" },
                     "pendingSource": "旧值来源未核验，需要确认",
                     "sources": { "default": "默认请求配置", "user": "用户配置", "unknown": "尚未配置" },
                     "confirmHint": "旧值可能来自出口推断，请检查或修改后保存确认。未确认的地区不应用到请求。",
@@ -2585,6 +2595,8 @@ function app() {
             this.environmentDiagnostics = null;
             this.environmentCheckDoH = false;
             this.environmentProfile = {};
+            this.environmentState = '';
+            this.environmentEvidence = null;
             this.environmentIdentity = '';
             this.environmentUpstream = {};
             this.environmentForm = { country: 'US', timezone: 'America/New_York' };
@@ -2593,12 +2605,7 @@ function app() {
             try {
                 const data = await this.apiCall(this.environmentPath + '/oauth-environment', {}, true, true);
                 if (generation !== this.environmentGeneration) return;
-                this.environmentProfile = { ...data.environment };
-                this.environmentAccount = data.account_id || this.t('requestEnv.fallbackIdentity');
-                this.environmentIdentity = data.account_identity || '';
-                this.environmentUpstream = data.upstream_region || {};
-                this.environmentForm = { country: data.environment.country || 'US', timezone: data.environment.timezone || 'America/New_York' };
-                this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
+                this.applyEnvironmentResponse(data, true);
             } catch (error) {
                 if (generation === this.environmentGeneration && this.environmentVisible) {
                     this.environmentLoadError = error.message || this.t('requestEnv.loadFailed');
@@ -2617,10 +2624,8 @@ function app() {
                     method: 'PUT', body: JSON.stringify({ country: this.environmentForm.country, timezone: this.environmentForm.timezone, account_identity: this.environmentIdentity })
                 }, true);
                 if (generation !== this.environmentGeneration) return;
-                this.environmentProfile = { ...data.environment };
+                this.applyEnvironmentResponse(data, true);
                 this.environmentDiagnostics = null;
-                this.environmentForm = { country: data.environment.country, timezone: data.environment.timezone };
-                this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
                 this.showAlert('success', this.t('requestEnv.saved'));
             } catch (_) {
                 // apiCall reports the error; preserve user input for correction.
@@ -2630,6 +2635,31 @@ function app() {
                     this.environmentSaving = false;
                 }
             }
+        },
+        applyEnvironmentResponse(data, updateForm = false) {
+            const account = data?.account_environment || {};
+            const request = account.request_environment || data?.environment || {};
+            this.environmentProfile = { ...request };
+            this.environmentState = account.state || (request.needs_confirmation ? 'needs_confirmation' : request.country && request.timezone ? 'configured' : 'unconfigured');
+            this.environmentEvidence = account.evidence || null;
+            this.environmentAccount = data?.account_id || account.identity?.account_id || account.identity?.email || this.environmentAccount || this.t('requestEnv.fallbackIdentity');
+            this.environmentIdentity = data?.account_identity || account.identity?.key || this.environmentIdentity || '';
+            this.environmentUpstream = data?.upstream_region || this.environmentUpstream || {};
+            if (updateForm) {
+                this.environmentForm = { country: request.country || 'US', timezone: request.timezone || 'America/New_York' };
+                this.environmentFormSnapshot = JSON.stringify(this.environmentForm);
+            }
+        },
+        environmentStateLabel() {
+            return `${this.t('requestEnv.profileState')}: ${this.t('requestEnv.states.' + (this.environmentState || 'unconfigured'))}`;
+        },
+        environmentEvidenceLabel() {
+            const evidence = Array.isArray(this.environmentEvidence) ? this.environmentEvidence : this.environmentEvidence ? [this.environmentEvidence] : [];
+            return evidence.map(item => {
+                const state = this.t('requestEnv.evidenceStates.' + (item.state || 'unknown'));
+                const scope = this.t('requestEnv.evidenceScopes.' + (item.scope || 'request_profile'));
+                return `${state} · ${scope}`;
+            }).join('；');
         },
         environmentDNSLabel() {
             const dns = this.environmentProfile.dns || 'auto';
@@ -2687,7 +2717,7 @@ function app() {
                 const report = await this.apiCall(this.environmentPath + '/oauth-diagnostics', { method: 'POST', body: JSON.stringify({ check_doh: !!this.environmentCheckDoH }) }, true, true);
                 if (generation !== this.environmentGeneration) return;
                 this.environmentDiagnostics = report;
-                this.environmentProfile = { ...report.environment };
+                this.applyEnvironmentResponse(report, false);
             } catch (error) {
                 if (generation === this.environmentGeneration && this.environmentVisible) this.showAlert('error', error.message);
             } finally {

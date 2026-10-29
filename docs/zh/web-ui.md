@@ -146,7 +146,7 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 
 配置绑定 OAuth 账号，同一账号关联的 provider 共享设置。刷新、重新授权、重启和切换代理均保留已有配置。导入保留原值及来源，不应用新账号默认值。没有可信来源的旧值保留显示，并标记 `needs_confirmation: true`；它们可能来自出口估算，用户需要在账号地球按钮中检查、修改并明确保存。确认前，地区字段不应用到请求元数据。读取、导入预览和导出不会写回迁移。凭据中的上游地区属性单独记录和展示，不覆盖请求配置。
 
-设备标识由版本命名空间、OAuth 服务及账号 ID 做 SHA-256 生成。缺少账号 ID 时使用稳定账号身份或 ref，诊断会说明。仅含 token 的旧账号也可通过该回退身份确认请求配置，不改变 provider 的账号关联身份。已确认的账号语言用于 `Accept-Language`，支持的环境头及适配器元数据使用账号配置；用户消息、工具和会话 ID 保持原有含义。Claude metadata 修改后重新签名 billing hash；故障切换采用当前所选账号的配置。
+设备标识由版本命名空间、OAuth 服务及账号 ID 做 SHA-256 生成。缺少账号 ID 时使用稳定账号身份或 ref，诊断会说明。仅含 token 的旧账号也可通过该回退身份确认请求配置，不改变 provider 的账号关联身份。已确认的账号语言用于 `Accept-Language`，支持的环境头及适配器元数据使用账号配置；用户消息、工具和会话 ID 保持原有含义。Claude metadata 修改后重新签名 billing hash。每次 provider attempt 都把刷新后的凭据、账号 Profile、有效环境和 transport 代次绑定在一起；故障切换会重新应用当前账号配置，不会沿用前一个 provider 的环境。
 
 代理来源遵循 provider 配置、继承的全局配置、环境策略及 `NO_PROXY`。Clipal 实现 HTTP CONNECT、HTTPS 代理和 SOCKS5，所有代理请求保留目标域名，由代理解析和分流。VMess/VLESS 等由代理软件处理。Clipal 不探测专用控制器，不自动发现或接管代理监听端口。TUN 对 Clipal 透明，未指定代理入口不能证明实际为物理直连。
 
@@ -159,6 +159,8 @@ python3 scripts/cli_takeover_smoke.py --binary /tmp/clipal-takeover --products c
 “**代理下附加公共 DoH 参考诊断**”默认不勾选，仅对当前诊断请求生效。有标准代理时，在连通性检查之后，通过同一入口查询保存的 Cloudflare／Google 选择；`auto`／`system` 使用 Cloudflare → Google。结果不能证明代理实际 DNS 后端、目标 IP 或出口。失败单独显示为“**尚未核验**”，不阻断业务请求，不提供严格预检选项。参考查询最多占用 10 秒，受诊断总计 25 秒的期限约束，不携带账号凭据或环境请求头。
 
 管理接口为 `GET` / `PUT /api/providers/<client>/<name>/oauth-environment` 和 `POST /api/providers/<client>/<name>/oauth-diagnostics`。POST 可使用空请求体或 `{ "check_doh": false }`；`{ "check_doh": true }` 开启代理参考查询。无显式代理时忽略此选项，常规检查使用账号实际 DNS 策略。GET 和诊断不改变配置；PUT 明确确认或修改国家及 IANA 时区，核验已加载账号身份，保留 DNS 和 token，沿用 localhost 管理访问与 CSRF 控制。
+
+这些响应还包含 `account_environment`，将非秘密账号身份与请求配置状态组合展示。诊断证据以带范围的条目返回（`target_connection`、`reference_exit` 或 `oauth_auth`），不会作为账号配置持久化；一次诊断可以同时返回多个边界的证据，参考出口观测成功不等于 OAuth 认证成功。
 
 
 ## Provider 列表

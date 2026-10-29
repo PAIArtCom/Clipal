@@ -2331,6 +2331,43 @@ test('OAuth environment separates configured preferences from diagnosis', async 
     assert.equal(typeof state.saveEnvironment, 'function');
 });
 
+test('OAuth environment consumes structured account profile and scoped evidence', async () => {
+    const state = loadApp();
+    state.selectedClient = 'claude';
+    state.apiCall = async (url, options = {}) => {
+        if (url.endsWith('/oauth-environment')) {
+            return {
+                account_identity: 'acct:owner',
+                account_environment: {
+                    identity: { key: 'acct:owner', account_id: 'owner' },
+                    request_environment: { device_id: 'stable', country: 'JP', timezone: 'Asia/Tokyo', dns: 'auto' },
+                    state: 'configured'
+                },
+                account_id: 'owner'
+            };
+        }
+        assert.equal(options.method, 'POST');
+        return {
+            environment: { device_id: 'stable', country: 'JP', timezone: 'Asia/Tokyo', dns: 'auto' },
+            account_environment: {
+                identity: { key: 'acct:owner', account_id: 'owner' },
+                request_environment: { device_id: 'stable', country: 'JP', timezone: 'Asia/Tokyo', dns: 'auto' },
+                state: 'configured',
+                evidence: [{ state: 'observed', scope: 'target_connection' }, { state: 'observed', scope: 'reference_exit' }]
+            },
+            checks: []
+        };
+    };
+    await state.openEnvironment({ name: 'owner', auth_type: 'oauth' });
+    assert.equal(state.environmentState, 'configured');
+    assert.equal(state.environmentIdentity, 'acct:owner');
+    assert.equal(state.environmentProfile.country, 'JP');
+    await state.diagnoseEnvironment();
+    assert.equal(state.environmentEvidence[0].state, 'observed');
+    assert.equal(state.environmentEvidence[0].scope, 'target_connection');
+    assert.match(state.environmentEvidenceLabel(), /Observed|已观测/);
+});
+
 test('OAuth environment ignores stale account responses and recovers from API errors', async () => {
     const state = loadApp();
     let completeFirst;

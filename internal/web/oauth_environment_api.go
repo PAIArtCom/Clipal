@@ -22,26 +22,43 @@ type consistencyCheck struct {
 	Detail string `json:"detail"`
 }
 type environmentResponse struct {
-	Environment     *oauth.RequestEnvironment `json:"environment"`
-	AccountID       string                    `json:"account_id,omitempty"`
-	IdentitySource  string                    `json:"identity_source"`
-	AccountIdentity string                    `json:"account_identity"`
-	UpstreamRegion  map[string]string         `json:"upstream_region,omitempty"`
+	Environment        *oauth.RequestEnvironment       `json:"environment"`
+	AccountEnvironment oauth.AccountEnvironmentProfile `json:"account_environment"`
+	AccountID          string                          `json:"account_id,omitempty"`
+	IdentitySource     string                          `json:"identity_source"`
+	AccountIdentity    string                          `json:"account_identity"`
+	UpstreamRegion     map[string]string               `json:"upstream_region,omitempty"`
 }
 type consistencyReport struct {
-	Environment       *oauth.RequestEnvironment `json:"environment"`
-	CheckedAt         time.Time                 `json:"checked_at"`
-	ProxyHint         string                    `json:"proxy_hint,omitempty"`
-	BootstrapDNS      string                    `json:"bootstrap_dns"`
-	ExitIP            string                    `json:"exit_ip,omitempty"`
-	ExitCountry       string                    `json:"exit_country,omitempty"`
-	ExitTimezone      string                    `json:"exit_timezone,omitempty"`
-	ObservationSource string                    `json:"observation_source,omitempty"`
-	TargetStatus      int                       `json:"target_http_status,omitempty"`
-	Routing           outbound.RoutingInfo      `json:"routing"`
-	DoHResolver       string                    `json:"doh_reference_resolver,omitempty"`
-	DoHAddresses      int                       `json:"doh_reference_address_count,omitempty"`
-	Checks            []consistencyCheck        `json:"checks"`
+	Environment        *oauth.RequestEnvironment       `json:"environment"`
+	AccountEnvironment oauth.AccountEnvironmentProfile `json:"account_environment"`
+	CheckedAt          time.Time                       `json:"checked_at"`
+	ProxyHint          string                          `json:"proxy_hint,omitempty"`
+	BootstrapDNS       string                          `json:"bootstrap_dns"`
+	ExitIP             string                          `json:"exit_ip,omitempty"`
+	ExitCountry        string                          `json:"exit_country,omitempty"`
+	ExitTimezone       string                          `json:"exit_timezone,omitempty"`
+	ObservationSource  string                          `json:"observation_source,omitempty"`
+	TargetStatus       int                             `json:"target_http_status,omitempty"`
+	Routing            outbound.RoutingInfo            `json:"routing"`
+	DoHResolver        string                          `json:"doh_reference_resolver,omitempty"`
+	DoHAddresses       int                             `json:"doh_reference_address_count,omitempty"`
+	Checks             []consistencyCheck              `json:"checks"`
+}
+
+func diagnosticEvidence(report *consistencyReport) {
+	evidence := make([]oauth.EnvironmentEvidence, 0, 2)
+	if report.TargetStatus != 0 {
+		evidence = append(evidence, oauth.EnvironmentEvidence{State: oauth.EnvironmentEvidenceObserved, Scope: oauth.EnvironmentEvidenceScopeTargetConnection, CheckedAt: report.CheckedAt, Source: "clipal-diagnostic"})
+	} else {
+		evidence = append(evidence, oauth.EnvironmentEvidence{State: oauth.EnvironmentEvidenceBlocked, Scope: oauth.EnvironmentEvidenceScopeTargetConnection, CheckedAt: report.CheckedAt, Source: "clipal-diagnostic"})
+	}
+	if report.ExitIP != "" {
+		evidence = append(evidence, oauth.EnvironmentEvidence{State: oauth.EnvironmentEvidenceObserved, Scope: oauth.EnvironmentEvidenceScopeReferenceExit, CheckedAt: report.CheckedAt, Source: "clipal-diagnostic"})
+	}
+	profile := report.AccountEnvironment.Clone()
+	profile.Evidence = evidence
+	report.AccountEnvironment = profile
 }
 
 // Both account management endpoints reject unknown fields and trailing JSON.
@@ -149,7 +166,8 @@ func (a *API) HandleProviderEnvironment(w http.ResponseWriter, r *http.Request) 
 			upstream[key] = value
 		}
 	}
-	writeJSON(w, environmentResponse{Environment: cred.Environment, AccountID: cred.AccountID, AccountIdentity: oauth.AccountEnvironmentIdentity(cred), IdentitySource: source, UpstreamRegion: upstream})
+	profile := cred.EnvironmentProfile()
+	writeJSON(w, environmentResponse{Environment: profile.Request, AccountEnvironment: profile, AccountID: cred.AccountID, AccountIdentity: profile.Identity.Key, IdentitySource: source, UpstreamRegion: upstream})
 }
 
 var diagnosticTarget = oauth.EnvironmentTarget
@@ -176,7 +194,7 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
-	report := consistencyReport{Environment: cred.Environment.Clone(), CheckedAt: time.Now().UTC()}
+	report := consistencyReport{Environment: cred.Environment.Clone(), AccountEnvironment: cred.EnvironmentProfile(), CheckedAt: time.Now().UTC()}
 	check := func(name, status, detail string) {
 		report.Checks = append(report.Checks, consistencyCheck{Name: name, Status: status, Detail: detail})
 	}
@@ -198,6 +216,7 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 	resolvedProxy, routeErr := outbound.ProxyFor(base, target)
 	if routeErr != nil {
 		check("network_exit", "mismatch", "Target proxy policy failed.")
+		diagnosticEvidence(&report)
 		writeJSON(w, report)
 		return
 	}
@@ -222,6 +241,7 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 	client, err := outbound.WithDNS(base, cred.Environment.DNS)
 	if err != nil {
 		check("dns", "mismatch", "Account DNS transport could not be created.")
+		diagnosticEvidence(&report)
 		writeJSON(w, report)
 		return
 	}
@@ -284,5 +304,6 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 			check("doh_reference", "pending", "Optional DoH reference lookup failed; proxy requests do not depend on it.")
 		}
 	}
+	diagnosticEvidence(&report)
 	writeJSON(w, report)
 }

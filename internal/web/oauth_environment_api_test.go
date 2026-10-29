@@ -174,6 +174,9 @@ func TestProviderEnvironmentRoutesValidatePersistAndRedact(t *testing.T) {
 	if result.Environment.DeviceID != cred.Environment.DeviceID || !result.Environment.NeedsConfirmation || result.Environment.Country != "" || result.UpstreamRegion["country_code"] != "JP" || result.Environment.DNS != "auto" {
 		t.Fatalf("environment=%+v", result.Environment)
 	}
+	if result.AccountEnvironment.Identity.Key != result.AccountIdentity || result.AccountEnvironment.State != oauth.EnvironmentStateNeedsConfirmation || result.AccountEnvironment.Request.DeviceID != result.Environment.DeviceID {
+		t.Fatalf("account environment=%+v", result.AccountEnvironment)
+	}
 	if bytes.Contains(w.Body.Bytes(), []byte("secret-access")) || bytes.Contains(w.Body.Bytes(), []byte("refresh_token")) {
 		t.Fatal("environment API exposed tokens")
 	}
@@ -288,6 +291,9 @@ func TestProviderDiagnosticsDoesNotInferTargetExitOrAccountRegion(t *testing.T) 
 	if !found || report.ExitIP != "203.0.113.2" || report.ObservationSource != server.URL || report.TargetStatus != 200 || report.BootstrapDNS != "DoH is not used" {
 		t.Fatalf("report=%+v", report)
 	}
+	if !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceObserved, oauth.EnvironmentEvidenceScopeTargetConnection) || !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceObserved, oauth.EnvironmentEvidenceScopeReferenceExit) {
+		t.Fatalf("diagnostic evidence=%+v", report.AccountEnvironment.Evidence)
+	}
 	stored, err := h.api.oauth.Load(cred.Provider, cred.Ref)
 	if err != nil {
 		t.Fatal(err)
@@ -295,4 +301,63 @@ func TestProviderDiagnosticsDoesNotInferTargetExitOrAccountRegion(t *testing.T) 
 	if stored.Environment.Country != "JP" {
 		t.Fatal("diagnostic rewrote account region")
 	}
+}
+
+func TestProviderDiagnosticsMarksBlockedTargetEvidence(t *testing.T) {
+	h, _ := accountEnvironmentAPI(t)
+	originalTarget, originalURLs := diagnosticTarget, diagnosticExitURLs
+	diagnosticTarget = func(config.OAuthProvider) string { return "http://127.0.0.1:1/" }
+	diagnosticExitURLs = []string{"http://127.0.0.1:1/"}
+	defer func() {
+		diagnosticTarget, diagnosticExitURLs = originalTarget, originalURLs
+	}()
+
+	w := httptest.NewRecorder()
+	h.api.HandleProviderDiagnostics(w, httptest.NewRequest(http.MethodPost, "/api/providers/claude/account/oauth-diagnostics", nil))
+	if w.Code != http.StatusOK {
+		t.Fatal(w.Body.String())
+	}
+	var report consistencyReport
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.TargetStatus != 0 || !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceBlocked, oauth.EnvironmentEvidenceScopeTargetConnection) {
+		t.Fatalf("blocked report=%+v", report)
+	}
+}
+
+func TestProviderDiagnosticsScopesReferenceEvidenceWhenTargetIsBlocked(t *testing.T) {
+	h, _ := accountEnvironmentAPI(t)
+	reference := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ip":"203.0.113.2","country_code":"US","timezone":{"id":"America/New_York"}}`))
+	}))
+	defer reference.Close()
+	originalTarget, originalURLs := diagnosticTarget, diagnosticExitURLs
+	diagnosticTarget = func(config.OAuthProvider) string { return "http://127.0.0.1:1/" }
+	diagnosticExitURLs = []string{reference.URL}
+	defer func() {
+		diagnosticTarget, diagnosticExitURLs = originalTarget, originalURLs
+	}()
+
+	w := httptest.NewRecorder()
+	h.api.HandleProviderDiagnostics(w, httptest.NewRequest(http.MethodPost, "/api/providers/claude/account/oauth-diagnostics", nil))
+	if w.Code != http.StatusOK {
+		t.Fatal(w.Body.String())
+	}
+	var report consistencyReport
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.TargetStatus != 0 || report.ExitIP != "203.0.113.2" || !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceObserved, oauth.EnvironmentEvidenceScopeReferenceExit) || !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceBlocked, oauth.EnvironmentEvidenceScopeTargetConnection) {
+		t.Fatalf("reference report=%+v", report)
+	}
+}
+
+func hasEnvironmentEvidence(evidence []oauth.EnvironmentEvidence, state oauth.EnvironmentEvidenceState, scope oauth.EnvironmentEvidenceScope) bool {
+	for _, item := range evidence {
+		if item.State == state && item.Scope == scope {
+			return true
+		}
+	}
+	return false
 }
