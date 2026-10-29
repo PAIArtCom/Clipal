@@ -92,3 +92,69 @@ func assertClaudeEnvironmentBody(t *testing.T, body []byte, country, timezone st
 		t.Fatalf("metadata = %#v, want country=%s timezone=%s", meta, country, timezone)
 	}
 }
+
+func TestForwardWithFailover_RebuildsCodexAccountEnvironmentPerProvider(t *testing.T) {
+	dir := t.TempDir()
+	svc := oauthpkg.NewService(dir)
+	accounts := []struct {
+		ref, account, token, country, timezone string
+	}{
+		{ref: "codex-a", account: "acct-a", token: "access-a", country: "JP", timezone: "Asia/Tokyo"},
+		{ref: "codex-b", account: "acct-b", token: "access-b", country: "DE", timezone: "Europe/Berlin"},
+	}
+	for _, account := range accounts {
+		if err := svc.Store().Save(&oauthpkg.Credential{
+			Ref:         account.ref,
+			Provider:    config.OAuthProviderCodex,
+			AccountID:   account.account,
+			AccessToken: account.token,
+			Environment: &oauthpkg.RequestEnvironment{Country: account.country, Timezone: account.timezone, Source: "user"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	providers := []config.Provider{
+		{Name: "codex-a", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderCodex, OAuthRef: "codex-a", Priority: 1},
+		{Name: "codex-b", AuthType: config.ProviderAuthTypeOAuth, OAuthProvider: config.OAuthProviderCodex, OAuthRef: "codex-b", Priority: 2},
+	}
+	cp := newClientProxy(ClientOpenAI, config.ClientModeAuto, "", providers, time.Hour, 0, testResponseHeaderTimeout, circuitBreakerConfig{})
+	cp.oauth = svc
+	defer cp.Close()
+
+	var firstLanguage, secondLanguage string
+	var firstInstall, secondInstall string
+	var firstCalls, secondCalls int32
+	first := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&firstCalls, 1)
+		firstLanguage = req.Header.Get("Accept-Language")
+		firstInstall = req.Header.Get("X-Codex-Installation-Id")
+		return newResponse(http.StatusServiceUnavailable, http.Header{"Content-Type": []string{"application/json"}}, `{"error":"account-a unavailable"}`), nil
+	})
+	second := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&secondCalls, 1)
+		secondLanguage = req.Header.Get("Accept-Language")
+		secondInstall = req.Header.Get("X-Codex-Installation-Id")
+		return newResponse(http.StatusOK, http.Header{"Content-Type": []string{"text/event-stream"}}, "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-b\",\"object\":\"response\",\"created_at\":1710000000,\"model\":\"gpt-5.2\",\"status\":\"completed\",\"output\":[{\"id\":\"msg-b\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":1,\"output_tokens\":1,\"total_tokens\":2}}}\n\n"), nil
+	})
+	cp.providerHTTPClients = []*http.Client{{Transport: first}, {Transport: second}}
+
+	body := []byte(`{"model":"gpt-5.2","stream":false,"input":"hello"}`)
+	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = withRequestContext(req, RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIResponses, UpstreamPath: "/v1/responses", UnifiedIngress: true})
+	rr := httptest.NewRecorder()
+	cp.forwardWithFailover(rr, req, "/v1/responses")
+
+	if rr.Code != http.StatusOK || !bytes.Contains(rr.Body.Bytes(), []byte(`"id":"resp-b"`)) {
+		t.Fatalf("response = %d %q", rr.Code, rr.Body.String())
+	}
+	if atomic.LoadInt32(&firstCalls) != 1 || atomic.LoadInt32(&secondCalls) != 1 {
+		t.Fatalf("calls = first:%d second:%d", firstCalls, secondCalls)
+	}
+	if firstLanguage != "ja-JP" || secondLanguage != "de-DE" {
+		t.Fatalf("Accept-Language = first:%q second:%q", firstLanguage, secondLanguage)
+	}
+	if firstInstall == "" || secondInstall == "" || firstInstall == secondInstall {
+		t.Fatalf("installation IDs = first:%q second:%q", firstInstall, secondInstall)
+	}
+}
