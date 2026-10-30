@@ -1312,6 +1312,9 @@ func (cp *ClientProxy) createProxyRequestWithPayloadForProvider(original *http.R
 
 	// Add standard proxy headers
 	addForwardedHeaders(proxyReq, original)
+	if requestCtx.Capability == CapabilityOpenAIModels && isCodexNativeClient(original) {
+		applyCodexNativeModelsHeaders(proxyReq)
+	}
 
 	if apiKey != "" {
 		applyProviderAPIKeyForProvider(proxyReq, original, provider, apiKey)

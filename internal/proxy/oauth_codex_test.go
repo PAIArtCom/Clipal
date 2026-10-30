@@ -2522,13 +2522,18 @@ func TestIsCodexNativeClient(t *testing.T) {
 		{name: "cli user agent", userAgent: "codex_cli_rs/0.156.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11", want: true},
 		{name: "google user agent", userAgent: "codex_vscode/0.156.0 (darwin; arm64)", want: true},
 		{name: "openai sdk", userAgent: "OpenAI/Python 1.0.0", want: false},
+		{name: "native models endpoint", want: true},
 		{name: "curl", userAgent: "curl/8.7.1", want: false},
 		{name: "generic originator", originator: "my-gateway", want: false},
 		{name: "empty", want: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "http://proxy/v1/models", nil)
+			path := "http://proxy/v1/models"
+			if tc.name == "native models endpoint" {
+				path = "http://proxy/clipal/models?client_version=0.160.0"
+			}
+			req := httptest.NewRequest(http.MethodGet, path, nil)
 			if tc.originator != "" {
 				req.Header.Set("Originator", tc.originator)
 			}
@@ -2575,6 +2580,32 @@ func TestForwardWithFailover_CodexNativeClientGetsRawCatalog(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/models?client_version=9.9.9&ignored=true", nil)
 	req.Header.Set("Originator", "codex_cli_rs")
 	req.Header.Set("User-Agent", "codex_cli_rs/9.9.9 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
+	req = withRequestContext(req, RequestContext{
+		ClientType:     ClientOpenAI,
+		Family:         ProtocolFamilyOpenAI,
+		Capability:     CapabilityOpenAIModels,
+		UpstreamPath:   "/v1/models",
+		UnifiedIngress: true,
+	})
+
+	rr := httptest.NewRecorder()
+	cp.forwardWithFailover(rr, req, "/v1/models")
+
+	if got := rr.Result().StatusCode; got != http.StatusOK {
+		t.Fatalf("status = %d body=%s", got, rr.Body.String())
+	}
+	if got := rr.Body.String(); got != rawCatalog {
+		t.Fatalf("body = %s, want raw Codex catalog %s", got, rawCatalog)
+	}
+}
+
+func TestForwardWithFailover_CodexNativeModelsPathGetsRawCatalog(t *testing.T) {
+	t.Parallel()
+
+	const rawCatalog = `{"models":[{"slug":"gpt-6-luna","display_name":"GPT-6-Luna","service_tiers":[{"id":"priority","name":"Fast","description":"2x speed, increased usage"}],"additional_speed_tiers":["fast"],"default_service_tier":"priority"}]}`
+	cp := newCodexModelsTestProxy(t, rawCatalog)
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy/clipal/models?client_version="+codexOAuthVersion, nil)
 	req = withRequestContext(req, RequestContext{
 		ClientType:     ClientOpenAI,
 		Family:         ProtocolFamilyOpenAI,

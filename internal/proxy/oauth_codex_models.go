@@ -106,6 +106,9 @@ func isCodexNativeClient(req *http.Request) bool {
 	if req == nil {
 		return false
 	}
+	if isCodexNativeModelsRequest(req) {
+		return true
+	}
 	if isCodexOriginator(req.Header.Get("Originator")) {
 		return true
 	}
@@ -116,6 +119,39 @@ func isCodexNativeClient(req *http.Request) bool {
 		}
 	}
 	return false
+}
+
+// isCodexNativeModelsRequest recognizes the endpoint shape used by the
+// official Codex ModelsClient. The path is intentionally checked on the
+// downstream request because the router stores only the canonical /v1/models
+// path in RequestContext, while the original URL still tells us whether the
+// client requested /models?client_version=....
+func isCodexNativeModelsRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil || req.Method != http.MethodGet {
+		return false
+	}
+	path := strings.TrimRight(strings.TrimSpace(req.URL.Path), "/")
+	if path == "" || !strings.HasSuffix(path, "/models") {
+		return false
+	}
+	if strings.HasSuffix(path, "/v1/models") || strings.HasSuffix(path, "/v1beta/models") {
+		return false
+	}
+	return strings.TrimSpace(req.URL.Query().Get("client_version")) != ""
+}
+
+// applyCodexNativeModelsHeaders asks compatible API-key gateways such as
+// Orbit for the official Codex catalog when the downstream client requested
+// the native /models endpoint. Authentication remains owned by the provider;
+// these headers only select the catalog representation.
+func applyCodexNativeModelsHeaders(req *http.Request) {
+	if req == nil {
+		return
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Originator", codexOAuthOriginator)
+	req.Header.Set("User-Agent", codexOAuthUserAgent)
+	req.Header.Set("Version", codexOAuthVersion)
 }
 
 func isCodexOriginator(value string) bool {

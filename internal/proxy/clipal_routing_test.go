@@ -306,6 +306,20 @@ func TestClipalBareModelsPathForwardsClientVersionQuery(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewReader([]byte("unexpected path: " + r.URL.Path))),
 			}, nil
 		}
+		if got := r.Header.Get("Originator"); got != codexOAuthOriginator {
+			return &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewReader([]byte("unexpected Originator: " + got))),
+			}, nil
+		}
+		if got := r.Header.Get("User-Agent"); got != codexOAuthUserAgent {
+			return &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewReader([]byte("unexpected User-Agent: " + got))),
+			}, nil
+		}
 		if got := r.URL.Query().Get("client_version"); got != "0.160.0" {
 			return &http.Response{
 				StatusCode: http.StatusBadGateway,
