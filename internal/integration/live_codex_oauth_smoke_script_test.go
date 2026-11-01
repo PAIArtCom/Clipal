@@ -17,7 +17,7 @@ func TestLiveCodexOAuthSmokeScriptUsesTemporaryCredentialCopyAndRefreshProbe(t *
 	script := string(body)
 	for _, want := range []string{
 		`--email EMAIL`,
-		`default: gpt-5.4`,
+		`default: gpt-6-sol`,
 		`CLIPAL_LIVE_OAUTH_EMAIL`,
 		`CLIPAL_LIVE_VERBOSE`,
 		`list_credentials "$creds_json" "$OAUTH_EMAIL" "$OAUTH_REF" "$OAUTH_FILE"`,

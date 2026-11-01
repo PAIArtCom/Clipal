@@ -19,11 +19,11 @@ import (
 )
 
 func TestCodexOAuthMetadataMatchesInstalledRelease(t *testing.T) {
-	if codexOAuthVersion != "0.156.0" {
-		t.Fatalf("codexOAuthVersion = %q, want 0.156.0", codexOAuthVersion)
+	if codexOAuthVersion != "0.166.0" {
+		t.Fatalf("codexOAuthVersion = %q, want 0.166.0", codexOAuthVersion)
 	}
-	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.156.0 ") {
-		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.156.0 identity", codexOAuthUserAgent)
+	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.166.0 ") {
+		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.166.0 identity", codexOAuthUserAgent)
 	}
 }
 
@@ -1224,7 +1224,7 @@ func TestCreateProxyRequest_CodexOAuthOfficialLookingReadyBodyStillNormalizes(t 
 	}`)
 	original := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/responses", bytes.NewReader(body))
 	original.Header.Set("Content-Type", "application/json")
-	original.Header.Set("User-Agent", "codex_cli_rs/0.156.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
+	original.Header.Set("User-Agent", "codex_cli_rs/0.166.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11")
 	original.Header.Set("Originator", "codex_cli_rs")
 	original = withRequestContext(original, RequestContext{
 		ClientType:     ClientOpenAI,
@@ -2519,8 +2519,8 @@ func TestIsCodexNativeClient(t *testing.T) {
 		{name: "tui originator", originator: "codex-tui", want: true},
 		{name: "vscode originator", originator: "codex_vscode", want: true},
 		{name: "legacy display originator", originator: "Codex Something Else", want: true},
-		{name: "cli user agent", userAgent: "codex_cli_rs/0.156.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11", want: true},
-		{name: "google user agent", userAgent: "codex_vscode/0.156.0 (darwin; arm64)", want: true},
+		{name: "cli user agent", userAgent: "codex_cli_rs/0.166.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11", want: true},
+		{name: "google user agent", userAgent: "codex_vscode/0.166.0 (darwin; arm64)", want: true},
 		{name: "openai sdk", userAgent: "OpenAI/Python 1.0.0", want: false},
 		{name: "native models endpoint", want: true},
 		{name: "curl", userAgent: "curl/8.7.1", want: false},

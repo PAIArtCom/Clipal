@@ -32,7 +32,7 @@ Options:
   --email EMAIL             Select OAuth credential by email
   --oauth-ref REF           Specific OAuth ref to test
   --oauth-file FILE         Specific credential file to copy into the temporary config
-  --model MODEL             Model name for the smoke requests (default: gpt-5.4)
+  --model MODEL             Model name for the smoke requests (default: gpt-6-sol)
   --skip-stream             Skip the streaming /v1/responses smoke
   --skip-refresh-retry      Skip the forced 401 -> refresh -> retry smoke
   --keep-temp               Keep the temporary config dir and logs after success
@@ -56,7 +56,7 @@ CONFIG_DIR="${CLIPAL_LIVE_CONFIG_DIR:-$HOME/.clipal}"
 OAUTH_EMAIL="${CLIPAL_LIVE_OAUTH_EMAIL:-}"
 OAUTH_REF="${CLIPAL_LIVE_OAUTH_REF:-}"
 OAUTH_FILE="${CLIPAL_LIVE_OAUTH_FILE:-}"
-MODEL="${CLIPAL_LIVE_MODEL:-gpt-5.4}"
+MODEL="${CLIPAL_LIVE_MODEL:-gpt-6-sol}"
 SKIP_STREAM="${CLIPAL_LIVE_SKIP_STREAM:-0}"
 SKIP_REFRESH_RETRY="${CLIPAL_LIVE_SKIP_REFRESH_RETRY:-0}"
 KEEP_TEMP="${CLIPAL_LIVE_KEEP_TEMP:-0}"
