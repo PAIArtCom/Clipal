@@ -3,7 +3,6 @@
 package service
 
 import (
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,7 +18,7 @@ func TestWindowsManagerBatterySettingsBeforeRun(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantCount := 3
+			wantCount := 4
 			if action == ActionStart {
 				wantCount = 2
 			}
@@ -76,8 +75,7 @@ func TestWindowsManagerNonStartingActionsDoNotChangeBatterySettings(t *testing.T
 	}
 }
 
-func TestWindowsManagerInstallCopiesBinaryToStablePath(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", `C:\Users\example\AppData\Local`)
+func TestWindowsManagerInstallUsesBinaryAndUpdatesUserPath(t *testing.T) {
 	plan, err := (windowsManager{}).Plan(ActionInstall, Options{
 		BinaryPath: `C:\Users\example\Downloads\clipal.exe`,
 		ConfigDir:  `C:\Users\example\.clipal`,
@@ -85,15 +83,15 @@ func TestWindowsManagerInstallCopiesBinaryToStablePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Copies) != 1 {
+	if len(plan.Copies) != 0 {
 		t.Fatalf("copies = %#v", plan.Copies)
 	}
-	copy := plan.Copies[0]
-	if copy.Source != `C:\Users\example\Downloads\clipal.exe` || !strings.HasSuffix(copy.Dest, `Clipal`+string(filepath.Separator)+`clipal.exe`) {
-		t.Fatalf("copy = %#v", copy)
-	}
 	create := plan.Commands[0]
-	if create.Path != "schtasks.exe" || !strings.Contains(create.Args[4], `Clipal`+string(filepath.Separator)+`clipal.exe`) {
-		t.Fatalf("task command should use stable binary: %#v", create)
+	if create.Path != "schtasks.exe" || !strings.Contains(create.Args[4], `C:\Users\example\Downloads\clipal.exe`) {
+		t.Fatalf("task command should use source binary: %#v", create)
+	}
+	pathCommand := plan.Commands[1]
+	if pathCommand.Path != "powershell.exe" || !strings.Contains(pathCommand.Args[3], "SetEnvironmentVariable('Path'") {
+		t.Fatalf("install should update user PATH: %#v", pathCommand)
 	}
 }

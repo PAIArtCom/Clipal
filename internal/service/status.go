@@ -117,11 +117,13 @@ func parseSystemdShowStatus(st Status, raw string) Status {
 func parseWindowsTaskStatus(st Status, raw string) Status {
 	st.Loaded = true
 
-	re := regexp.MustCompile(`(?mi)^\s*Status:\s*(.+?)\s*$`)
+	// schtasks localizes the field name and value (for example, Chinese
+	// Windows reports "模式: 运行中"), so accept the common localized form.
+	re := regexp.MustCompile(`(?mi)^\s*(?:Status|模式):\s*(.+?)\s*$`)
 	if m := re.FindStringSubmatch(raw); len(m) == 2 {
 		status := strings.TrimSpace(m[1])
 		st.Detail = "status=" + status
-		if strings.EqualFold(status, "Running") {
+		if strings.EqualFold(status, "Running") || status == "运行中" || status == "正在运行" {
 			st.Running = true
 		}
 	}

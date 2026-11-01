@@ -143,6 +143,35 @@ func runService(args []string) {
 	if out != "" {
 		fmt.Fprint(os.Stdout, out)
 	}
+
+	// Installation/start commands are expected to leave a usable background
+	// process behind. Do not report success while the manager has already
+	// stopped it (for example because config validation or port binding failed).
+	if !opts.DryRun && (action == service.ActionInstall || action == service.ActionStart || action == service.ActionRestart) {
+		if err := waitForServiceRunning(ctx, opts); err != nil {
+			fmt.Fprintf(os.Stderr, "clipal service %s failed: %v\n", action, err)
+			os.Exit(1)
+		}
+	}
+}
+
+func waitForServiceRunning(ctx context.Context, opts service.Options) error {
+	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	for {
+		st, _, err := service.GetStatus(checkCtx, opts)
+		if err != nil {
+			return fmt.Errorf("could not verify that the service is running: %w", err)
+		}
+		if st.Running {
+			return nil
+		}
+		select {
+		case <-checkCtx.Done():
+			return fmt.Errorf("service was started but is not running; check: clipal service status --raw")
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 func printServiceUsage(w io.Writer) {

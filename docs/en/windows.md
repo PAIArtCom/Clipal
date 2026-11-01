@@ -16,16 +16,22 @@ Rename it to `clipal.exe` and place it somewhere like:
 C:\Users\<YOU>\bin\clipal.exe
 ```
 
-Then add that directory to your user `PATH`.
-
-The first `service install` copies the executable to `%LOCALAPPDATA%\Clipal\clipal.exe` and registers Task Scheduler against that stable path. This means the downloaded file can later be moved or removed without breaking the installed task. Re-run `service install --force` after downloading a new binary to replace the installed copy.
+The first `service install` adds this directory to the current user's `PATH` and registers Task Scheduler to run this executable directly. Re-open PowerShell after installation so the new `PATH` is visible. After replacing the executable with a new release, run `service install --force` to reload the task.
 
 On Windows, `service install` requests elevation through the standard UAC confirmation dialog. Confirming the dialog continues the installation automatically; no Administrator PowerShell window or password needs to be provided to Clipal. `--dry-run` does not request elevation.
+
+For the first install, run the executable from its directory:
+
+```powershell
+.\clipal.exe service install
+```
+
+Re-open PowerShell after installation; subsequent commands can use `clipal` directly.
 
 Verify:
 
 ```powershell
-clipal.exe --version
+clipal --version
 ```
 
 ## Background Operation: Task Scheduler
@@ -48,7 +54,9 @@ clipal.exe service install --config-dir C:\path\to\config
 clipal.exe service install --dry-run
 ```
 
-The installed task uses `--detach-console` for background operation.
+The installed task uses `--detach-console` for background operation and starts when the
+current user logs in. It runs in the interactive user session so it can access the user's
+configuration and local network ports; it is not a pre-login Windows system service.
 
 Clipal allows the task to start and keep running on battery power. Installation,
 `service start`, and `service restart` apply these settings automatically. After

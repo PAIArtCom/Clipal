@@ -148,6 +148,16 @@ func TestParseWindowsTaskStatus(t *testing.T) {
 	}
 }
 
+func TestParseWindowsTaskStatus_LocalizedChinese(t *testing.T) {
+	st := parseWindowsTaskStatus(Status{Manager: "schtasks"}, "任务名: \\Clipal\n模式: 运行中\n")
+	if !st.Loaded || !st.Running {
+		t.Fatalf("status = %#v", st)
+	}
+	if st.Detail != "status=运行中" {
+		t.Fatalf("detail = %q", st.Detail)
+	}
+}
+
 func TestParseWindowsTaskStatus_ToleratesMissingStatus(t *testing.T) {
 	st := parseWindowsTaskStatus(Status{Manager: "schtasks"}, "TaskName: \\Clipal\nNext Run Time: N/A\n")
 	if !st.Loaded {

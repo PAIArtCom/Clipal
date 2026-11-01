@@ -26,8 +26,9 @@ func (windowsManager) Plan(action Action, opts Options) (*Plan, error) {
 		return nil, fmt.Errorf("config dir is required")
 	}
 
-	installedBinary := windowsInstalledBinaryPath()
-	runLine := buildWindowsTaskRunLine(installedBinary, opts.ConfigDir)
+	// Run the binary the user installed directly. Keeping a second copy makes
+	// upgrades and diagnostics ambiguous.
+	runLine := buildWindowsTaskRunLine(opts.BinaryPath, opts.ConfigDir)
 
 	plan := &Plan{}
 	switch action {
@@ -47,23 +48,17 @@ func (windowsManager) Plan(action Action, opts Options) (*Plan, error) {
 		}
 		plan.Commands = append(plan.Commands,
 			Command{Path: "schtasks.exe", Args: createArgs},
+			windowsUserPathCommand(filepath.Dir(opts.BinaryPath)),
 			// Apply both battery conditions before the first /Run. Task Scheduler
 			// may refuse /Run while on battery when either default is enabled.
 			windowsBatterySettingsCommand(),
 			Command{Path: "schtasks.exe", Args: []string{"/Run", "/TN", windowsTaskName}},
 		)
-		if !sameWindowsPath(opts.BinaryPath, installedBinary) {
-			if opts.Force {
-				plan.PreCommands = append(plan.PreCommands, Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true})
-			}
-			plan.Mkdirs = append(plan.Mkdirs, filepath.Dir(installedBinary))
-			plan.Copies = append(plan.Copies, FileCopy{Source: opts.BinaryPath, Dest: installedBinary, Perm: 0o700})
-		}
 	case ActionUninstall:
 		plan.Commands = append(plan.Commands,
 			Command{Path: "schtasks.exe", Args: []string{"/End", "/TN", windowsTaskName}, IgnoreError: true},
 			Command{Path: "schtasks.exe", Args: []string{"/Delete", "/TN", windowsTaskName, "/F"}},
-			removeWindowsInstalledBinaryCommand(),
+			removeLegacyWindowsBinaryCommand(),
 		)
 	case ActionStart:
 		plan.Commands = append(plan.Commands,
@@ -102,25 +97,28 @@ func windowsBatterySettingsCommand() Command {
 	}
 }
 
-func windowsInstalledBinaryPath() string {
+func windowsUserPathCommand(binaryDir string) Command {
+	dir := strings.ReplaceAll(filepath.Clean(binaryDir), "'", "''")
+	script := `$ErrorActionPreference = 'Stop'; ` +
+		`$dir = '` + dir + `'; ` +
+		`$current = [Environment]::GetEnvironmentVariable('Path', 'User'); ` +
+		`$parts = @(); if ($current) { $parts = $current -split ';' | Where-Object { $_ -and $_.Trim() }; }; ` +
+		`if (-not ($parts | Where-Object { $_.TrimEnd('\') -ieq $dir.TrimEnd('\') })) { ` +
+		`[Environment]::SetEnvironmentVariable('Path', (($parts + $dir) -join ';'), 'User') }`
+	return Command{
+		Path: "powershell.exe",
+		Args: []string{"-NoProfile", "-NonInteractive", "-Command", script},
+	}
+}
+
+func removeLegacyWindowsBinaryCommand() Command {
 	root := strings.TrimSpace(os.Getenv("LOCALAPPDATA"))
 	if root == "" {
 		if home, err := os.UserHomeDir(); err == nil {
 			root = filepath.Join(home, "AppData", "Local")
 		}
 	}
-	if root == "" {
-		root = "."
-	}
-	return filepath.Join(root, "Clipal", "clipal.exe")
-}
-
-func sameWindowsPath(a, b string) bool {
-	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
-}
-
-func removeWindowsInstalledBinaryCommand() Command {
-	path := strings.ReplaceAll(windowsInstalledBinaryPath(), "'", "''")
+	path := strings.ReplaceAll(filepath.Join(root, "Clipal", "clipal.exe"), "'", "''")
 	return Command{
 		Path:        "powershell.exe",
 		Args:        []string{"-NoProfile", "-NonInteractive", "-Command", `Remove-Item -LiteralPath '` + path + `' -Force -ErrorAction SilentlyContinue`},

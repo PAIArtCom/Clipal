@@ -16,21 +16,26 @@ English: [docs/en/windows.md](../en/windows.md) | 中文: [docs/zh/windows.md](w
 C:\Users\<YOU>\bin\clipal.exe
 ```
 
-并把该目录加入用户 `PATH`。
-
-首次执行 `service install` 时，Clipal 会把程序复制到
-`%LOCALAPPDATA%\Clipal\clipal.exe`，然后让任务计划程序使用这个固定路径。
-之后可以移动或删除 Downloads 中的原始文件而不会影响已安装任务。下载新版程序后，
-执行 `service install --force` 即可替换固定目录中的副本。
+首次执行 `service install` 时，Clipal 会自动把这个目录加入当前用户的 `PATH`，并让
+任务计划程序直接使用这个文件。安装完成后请重新打开 PowerShell，使新的 `PATH` 生效。
+下载新版程序覆盖这个文件后，执行 `service install --force` 重新加载任务。
 
 在 Windows 上，`service install` 会自动弹出系统 UAC 确认框请求提升权限。
 用户点击“是”后会自动继续安装，不需要手动打开管理员 PowerShell，也不需要把密码输入
 Clipal。`--dry-run` 不会弹出提权确认。
 
+首次安装时请在二进制所在目录执行：
+
+```powershell
+.\clipal.exe service install
+```
+
+安装完成后重新打开 PowerShell，之后即可直接使用 `clipal` 命令。
+
 确认：
 
 ```powershell
-clipal.exe --version
+clipal --version
 ```
 
 ## 后台运行：任务计划程序
@@ -53,7 +58,9 @@ clipal.exe service install --config-dir C:\path\to\config
 clipal.exe service install --dry-run
 ```
 
-安装后的任务会使用 `--detach-console` 在后台运行。
+安装后的任务会使用 `--detach-console` 在后台运行，并在当前用户登录时启动。它使用
+交互式用户会话，这是访问用户配置目录和本机网络端口所必需的；它不是“未登录也运行”
+的 Windows 系统服务。
 
 Clipal 允许任务在电池供电时启动，并在切换到电池供电后继续运行。安装、
 `service start` 和 `service restart` 会自动应用这两项设置。旧版本用户升级后，
