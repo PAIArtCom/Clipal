@@ -63,6 +63,34 @@ func diagnosticEvidence(report *consistencyReport) {
 	report.AccountEnvironment = profile
 }
 
+func setAccountEnvironmentChecks(report *consistencyReport, cred *oauth.Credential) {
+	if report == nil || cred == nil || cred.Environment == nil {
+		return
+	}
+	checks := make([]consistencyCheck, 0, len(report.Checks)+3)
+	for _, check := range report.Checks {
+		switch check.Name {
+		case "account_identity", "identity_source", "region":
+			continue
+		default:
+			checks = append(checks, check)
+		}
+	}
+	accountChecks := make([]consistencyCheck, 0, 3)
+	if cred.Environment.DeviceID == oauth.AccountDeviceID(cred) {
+		accountChecks = append(accountChecks, consistencyCheck{Name: "account_identity", Status: "ok", Detail: "Persistent device ID matches this OAuth account."})
+	}
+	if cred.AccountID == "" {
+		accountChecks = append(accountChecks, consistencyCheck{Name: "identity_source", Status: "pending", Detail: "Account ID is unavailable; device ID uses the stable account identity fallback."})
+	}
+	if cred.Environment.NeedsConfirmation || !cred.Environment.Complete() {
+		accountChecks = append(accountChecks, consistencyCheck{Name: "region", Status: "pending", Detail: "Request region requires user confirmation; it is not inferred from network exits."})
+	} else {
+		accountChecks = append(accountChecks, consistencyCheck{Name: "region", Status: "ok", Detail: "Request preferences are stored on the account; they do not prove registration or billing country."})
+	}
+	report.Checks = append(accountChecks, checks...)
+}
+
 // Both account management endpoints reject unknown fields and trailing JSON.
 // Diagnostics alone allow an empty body, which selects the default checks.
 func decodeAccountEnvironmentJSON(r *http.Request, value any, allowEmpty bool) error {
@@ -201,17 +229,7 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 	check := func(name, status, detail string) {
 		report.Checks = append(report.Checks, consistencyCheck{Name: name, Status: status, Detail: detail})
 	}
-	if cred.Environment.DeviceID == oauth.AccountDeviceID(cred) {
-		check("account_identity", "ok", "Persistent device ID matches this OAuth account.")
-	}
-	if cred.AccountID == "" {
-		check("identity_source", "pending", "Account ID is unavailable; device ID uses the stable account identity fallback.")
-	}
-	if cred.Environment.NeedsConfirmation || !cred.Environment.Complete() {
-		check("region", "pending", "Request region requires user confirmation; it is not inferred from network exits.")
-	} else {
-		check("region", "ok", "Request preferences are stored on the account; they do not prove registration or billing country.")
-	}
+	setAccountEnvironmentChecks(&report, cred)
 	base := proxy.NewOAuthHTTPClientForProvider(p, cfg.Global)
 	base.Timeout = 10 * time.Second
 	base.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -300,6 +318,15 @@ func (a *API) HandleProviderDiagnostics(w http.ResponseWriter, r *http.Request) 
 			}
 			check("oauth_auth", status, probe.Detail)
 			report.authEvidence = append(report.authEvidence, oauth.EnvironmentEvidence{State: probe.State, Scope: oauth.EnvironmentEvidenceScopeOAuthAuth, CheckedAt: report.CheckedAt, Source: "clipal-auth-probe"})
+		}
+		// The probe may refresh a legacy credential or repair provider metadata.
+		// Re-read the non-secret account view so evidence is attached to the
+		// credential state that actually completed the probe.
+		if refreshed, loadErr := a.oauth.Load(cred.Provider, cred.Ref); loadErr == nil {
+			cred = refreshed
+			report.Environment = cred.Environment.Clone()
+			report.AccountEnvironment = cred.EnvironmentProfile()
+			setAccountEnvironmentChecks(&report, cred)
 		}
 	}
 	if resolvedProxy != nil && options.CheckDoH {

@@ -25,6 +25,10 @@ var authProbeHTTPStatus = regexp.MustCompile(`\bstatus\s+(\d{3})\b`)
 // request. Codex and Claude use their usage/metadata endpoints; Antigravity
 // uses its quota endpoint through the same account-aware transport.
 func (s *Service) ProbeOAuthAuth(ctx context.Context, provider config.OAuthProvider, ref string, httpClient *http.Client) (AuthProbeResult, error) {
+	provider = normalizeProvider(provider)
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	account, err := s.ResolveAccountRequestContext(ctx, provider, ref, httpClient)
 	if err != nil {
 		return classifyAuthProbeError(err), nil

@@ -18,7 +18,9 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/oauth"
 )
 
-type authProbeClaudeClient struct{}
+type authProbeClaudeClient struct {
+	refreshedAccountID string
+}
 
 func (c *authProbeClaudeClient) Provider() config.OAuthProvider { return config.OAuthProviderClaude }
 func (c *authProbeClaudeClient) StartLogin(time.Time, time.Duration) (*oauth.LoginSession, error) {
@@ -27,8 +29,16 @@ func (c *authProbeClaudeClient) StartLogin(time.Time, time.Duration) (*oauth.Log
 func (c *authProbeClaudeClient) ExchangeSessionCode(context.Context, *oauth.LoginSession, string) (*oauth.Credential, error) {
 	return nil, nil
 }
-func (c *authProbeClaudeClient) Refresh(context.Context, *oauth.Credential) (*oauth.Credential, error) {
-	return nil, nil
+func (c *authProbeClaudeClient) Refresh(_ context.Context, cred *oauth.Credential) (*oauth.Credential, error) {
+	if c.refreshedAccountID == "" {
+		return nil, nil
+	}
+	refreshed := cred.Clone()
+	refreshed.AccountID = c.refreshedAccountID
+	refreshed.AccessToken = "refreshed-access"
+	refreshed.ExpiresAt = time.Now().Add(time.Hour)
+	refreshed.LastRefresh = time.Now()
+	return refreshed, nil
 }
 func (c *authProbeClaudeClient) WithHTTPClient(*http.Client) oauth.ProviderClient { return c }
 func (c *authProbeClaudeClient) FetchUsage(context.Context, *oauth.Credential) (*oauth.ClaudeUsageDetails, error) {
@@ -172,6 +182,62 @@ func TestProviderDiagnosticsAuthProbeAddsScopedEvidence(t *testing.T) {
 	var report consistencyReport
 	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
 		t.Fatal(err)
+	}
+	if !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceVerified, oauth.EnvironmentEvidenceScopeOAuthAuth) {
+		t.Fatalf("evidence=%+v", report.AccountEnvironment.Evidence)
+	}
+}
+
+func TestProviderDiagnosticsAuthProbeReportsRefreshedAccountEnvironment(t *testing.T) {
+	h, original := accountEnvironmentAPI(t)
+	if err := h.api.oauth.Store().Delete(original.Provider, original.Ref); err != nil {
+		t.Fatal(err)
+	}
+	legacy := &oauth.Credential{
+		Provider:     config.OAuthProviderClaude,
+		Ref:          original.Ref,
+		AccessToken:  "legacy-access",
+		RefreshToken: "legacy-refresh",
+		ExpiresAt:    time.Now().Add(-time.Hour),
+	}
+	if err := h.api.oauth.Store().Save(legacy); err != nil {
+		t.Fatal(err)
+	}
+	h.api.oauth = oauth.NewService(h.api.configDir, oauth.WithProviderClient(&authProbeClaudeClient{refreshedAccountID: "refreshed-account"}))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/exit" {
+			_, _ = w.Write([]byte(`{"ip":"203.0.113.10","country_code":"US","timezone":{"id":"America/New_York"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	oldTarget, oldExit := diagnosticTarget, diagnosticExitURLs
+	diagnosticTarget = func(config.OAuthProvider) string { return server.URL + "/target" }
+	diagnosticExitURLs = []string{server.URL + "/exit"}
+	defer func() { diagnosticTarget, diagnosticExitURLs = oldTarget, oldExit }()
+
+	w := httptest.NewRecorder()
+	h.api.HandleProviderDiagnostics(w, httptest.NewRequest(http.MethodPost, "/api/providers/claude/account/oauth-diagnostics", strings.NewReader(`{"check_auth":true}`)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report consistencyReport
+	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := h.api.oauth.Load(config.OAuthProviderClaude, original.Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.AccountEnvironment.Identity.Key != saved.AccountIdentity().Key || report.Environment.DeviceID != saved.Environment.DeviceID {
+		t.Fatalf("report environment=%+v saved identity=%+v environment=%+v", report.AccountEnvironment, saved.AccountIdentity(), saved.Environment)
+	}
+	for _, check := range report.Checks {
+		if check.Name == "identity_source" {
+			t.Fatalf("stale identity source check after refresh: %+v", report.Checks)
+		}
 	}
 	if !hasEnvironmentEvidence(report.AccountEnvironment.Evidence, oauth.EnvironmentEvidenceVerified, oauth.EnvironmentEvidenceScopeOAuthAuth) {
 		t.Fatalf("evidence=%+v", report.AccountEnvironment.Evidence)

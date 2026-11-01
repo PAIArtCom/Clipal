@@ -41,6 +41,18 @@ func TestProbeOAuthAuthUsesAccountProviderClientWithoutGeneration(t *testing.T) 
 	}
 }
 
+func TestProbeOAuthAuthNormalizesProvider(t *testing.T) {
+	svc := NewService(t.TempDir(), WithProviderClient(&authProbeCodexClient{}))
+	cred := &Credential{Provider: config.OAuthProviderCodex, Ref: "account", AccountID: "acct", AccessToken: "token", ExpiresAt: time.Now().Add(time.Hour), Environment: &RequestEnvironment{Country: "US", Timezone: "America/New_York", Source: "user"}}
+	if err := svc.Store().Save(cred); err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.ProbeOAuthAuth(context.Background(), config.OAuthProvider("  CODEX  "), cred.Ref, nil)
+	if err != nil || result.State != EnvironmentEvidenceVerified {
+		t.Fatalf("probe = %+v err=%v", result, err)
+	}
+}
+
 func TestClassifyAuthProbeErrorSeparatesAuthQuotaAndUnknown(t *testing.T) {
 	tests := []struct {
 		name   string
