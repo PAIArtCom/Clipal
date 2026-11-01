@@ -49,6 +49,12 @@ Background service style by OS:
 - Linux: `systemd --user`
 - Windows: Task Scheduler
 
+`service install`, `service start`, and `service restart` validate the selected
+configuration before changing the service and wait for the health endpoint
+before reporting success. A successful command means the background process is
+running and accepting local health checks, not merely that a manager definition
+was written.
+
 OS-specific details:
 
 - [macOS](macos.md)

@@ -49,6 +49,10 @@ clipal service status --json
 - Linux：`systemd --user`
 - Windows：任务计划程序
 
+`service install`、`service start` 和 `service restart` 会在修改后台服务前先校验配置，
+并等待健康检查接口可用后才报告成功。因此命令成功表示后台进程已经运行并能响应本机
+健康检查，而不只是写入了服务管理器配置。
+
 按系统细节见：
 
 - [macOS](macos.md)

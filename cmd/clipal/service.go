@@ -74,6 +74,12 @@ func runService(args []string) {
 	if cfgDir == "" {
 		cfgDir = config.GetConfigDir()
 	}
+	if action == service.ActionInstall || action == service.ActionStart || action == service.ActionRestart {
+		if err := validateServiceConfig(cfgDir); err != nil {
+			fmt.Fprintf(os.Stderr, "clipal service %s failed: %v\n", action, err)
+			os.Exit(1)
+		}
+	}
 
 	bin := *binaryPath
 	if bin == "" {
@@ -148,27 +154,45 @@ func runService(args []string) {
 	// process behind. Do not report success while the manager has already
 	// stopped it (for example because config validation or port binding failed).
 	if !opts.DryRun && (action == service.ActionInstall || action == service.ActionStart || action == service.ActionRestart) {
-		if err := waitForServiceRunning(ctx, opts); err != nil {
+		if err := waitForServiceReady(ctx, opts); err != nil {
 			fmt.Fprintf(os.Stderr, "clipal service %s failed: %v\n", action, err)
 			os.Exit(1)
 		}
 	}
 }
 
-func waitForServiceRunning(ctx context.Context, opts service.Options) error {
+func validateServiceConfig(configDir string) error {
+	cfg, err := config.Load(configDir)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+	return nil
+}
+
+func waitForServiceReady(ctx context.Context, opts service.Options) error {
 	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	cfg, err := config.Load(opts.ConfigDir)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
 	for {
 		st, _, err := service.GetStatus(checkCtx, opts)
 		if err != nil {
 			return fmt.Errorf("could not verify that the service is running: %w", err)
 		}
 		if st.Running {
-			return nil
+			health := checkHealth(checkCtx, healthCandidateURLs(cfg.Global.ListenAddr, cfg.Global.Port))
+			if health.OK {
+				return nil
+			}
 		}
 		select {
 		case <-checkCtx.Done():
-			return fmt.Errorf("service was started but is not running; check: clipal service status --raw")
+			return fmt.Errorf("service was started but is not healthy; check clipal status and the service logs")
 		case <-time.After(250 * time.Millisecond):
 		}
 	}
