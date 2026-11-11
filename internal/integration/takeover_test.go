@@ -538,7 +538,7 @@ func TestTakeoverPreservesContinueAndGooseOptions(t *testing.T) {
 			var raw []byte
 			if product == ProductContinue {
 				path, _ = m.continueTargetPath()
-				raw = []byte("name: User\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Other\n    provider: openai\n    model: old\n  - name: Clipal\n    provider: openai\n    model: chosen\n    apiBase: http://old\n    apiKey: user\n    useResponsesApi: false\n    capabilities: [tool_use]\n    roles: [chat]\n")
+				raw = []byte("name: User\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Other\n    provider: openai\n    model: old\n  - name: Clipal\n    provider: openai\n    model: chosen\n    apiBase: http://127.0.0.1:3333/clipal\n    apiKey: user\n    useResponsesApi: false\n    capabilities: [tool_use]\n    roles: [chat]\n")
 			} else {
 				path, _ = m.gooseTargetPath()
 				raw = []byte(`{"name":"clipal","engine":"openai","base_url":"http://old","models":[{"name":"chosen","context_limit":32768}],"headers":{"X-Team":"keep"},"requires_auth":false,"supports_streaming":false}`)
@@ -636,6 +636,7 @@ func TestLegacyOpenCodeTakeoverRequiresExactGatewayPath(t *testing.T) {
 		{name: "openai route", url: "http://127.0.0.1:3333/clipal/v1", want: true},
 		{name: "trailing slash", url: "http://127.0.0.1:3333/clipal/", want: true},
 		{name: "trailing slash openai route", url: "http://127.0.0.1:3333/clipal/v1/", want: true},
+		{name: "completion route", url: "http://127.0.0.1:3333/clipal/v1/chat/completions", want: false},
 		{name: "similar path", url: "https://example.test/clipal-proxy", want: false},
 		{name: "query only", url: "https://example.test/api?next=/clipal", want: false},
 		{name: "missing host", url: "/clipal", want: false},
@@ -645,6 +646,12 @@ func TestLegacyOpenCodeTakeoverRequiresExactGatewayPath(t *testing.T) {
 				t.Fatalf("isClipalGatewayBaseURL(%q) = %t, want %t", test.url, got, test.want)
 			}
 		})
+	}
+	if isClipalGatewayCompletionURL("http://127.0.0.1:3333/clipal/v1/chat/completions") != true {
+		t.Fatal("did not recognize the exact Goose completion route")
+	}
+	if isClipalGatewayCompletionURL("http://127.0.0.1:3333/notclipal/v1/chat/completions") {
+		t.Fatal("recognized a non-Clipal Goose route")
 	}
 }
 
