@@ -22,7 +22,83 @@ func (m Manager) advertisedOpenCodeBaseURL(cfg *config.Config) string {
 }
 
 func (m Manager) planOpenCode(cfg *config.Config) ([]takeoverFile, error) {
-	return m.planOpenCodeCompatible(ProductOpenCode, cfg)
+	return m.planOpenCodeV2(cfg)
+}
+
+// OpenCode takeover redirects only the protocol providers that Clipal can
+// currently serve. Model inventory and model selection remain OpenCode's
+// responsibility, so existing models.dev catalogs and session selections work.
+func (m Manager) planOpenCodeV2(cfg *config.Config) ([]takeoverFile, error) {
+	targetPath, err := m.openCodeCompatiblePath(ProductOpenCode)
+	if err != nil {
+		return nil, err
+	}
+	state, err := m.readOpenCodeCompatibleConfig(ProductOpenCode, targetPath)
+	if err != nil {
+		return nil, err
+	}
+	baseURL := m.advertisedOpenCodeBaseURL(cfg)
+	routes := []openCodeV2Route{
+		{provider: "openai", baseURL: baseURL + "/v1"},
+		{provider: "anthropic", baseURL: baseURL},
+		{provider: "google", baseURL: baseURL},
+	}
+	protocols := map[string]bool{
+		"openai":    len(config.GetEnabledProviders(cfg.OpenAI)) > 0,
+		"anthropic": len(config.GetEnabledProviders(cfg.Claude)) > 0,
+		"google":    len(config.GetEnabledProviders(cfg.Google)) > 0,
+	}
+	active := make([]openCodeV2Route, 0, len(routes))
+	for _, route := range routes {
+		if protocols[route.provider] {
+			active = append(active, route)
+		}
+	}
+	if len(active) == 0 {
+		return nil, &openCodeConflictError{path: targetPath, reason: "Configure and enable at least one OpenAI, Anthropic, or Google provider in Clipal before applying OpenCode takeover."}
+	}
+	if reason := openCodeV2Restriction(state, active); reason != "" {
+		return nil, &openCodeConflictError{path: targetPath, reason: reason}
+	}
+
+	doc := map[string]any{}
+	if state.target.Existed {
+		doc, err = parseJSONCMap(state.target.Original)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if _, ok := doc["$schema"]; !ok {
+		doc["$schema"] = openCodeSchemaURL
+	}
+	providers, err := objectField(doc, "providers")
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range active {
+		provider, err := objectField(providers, route.provider)
+		if err != nil {
+			return nil, err
+		}
+		settings, err := objectField(provider, "settings")
+		if err != nil {
+			return nil, err
+		}
+		settings["baseURL"] = route.baseURL
+		settings["apiKey"] = openCodeProviderAPIKey
+		provider["settings"] = settings
+		providers[route.provider] = provider
+	}
+	doc["providers"] = providers
+
+	plannedBytes, err := marshalJSONMap(doc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal OpenCode preview: %w", err)
+	}
+	if openCodeV2RouteShadow(doc, state.effective(doc), active) {
+		return nil, &openCodeConflictError{path: targetPath, reason: "A later known configuration layer overrides a Clipal-managed provider endpoint; select the higher-priority file or resolve that override."}
+	}
+	return []takeoverFile{{backupFile: state.target, Planned: plannedBytes, Dependencies: state.dependencies}}, nil
 }
 
 func (m Manager) planOpenCodeCompatible(product ProductID, cfg *config.Config) ([]takeoverFile, error) {

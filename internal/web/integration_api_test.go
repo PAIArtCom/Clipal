@@ -408,6 +408,10 @@ func TestIntegrationListAndRollbackRecoverMalformedClient(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+			if product == integration.ProductOpenCode {
+				cfg.OpenAI.Providers = []config.Provider{{Name: "fixture-openai", BaseURL: "https://gateway.example/v1", APIKey: "fixture-key"}}
+				writeConfigFixture(t, api.configDir, cfg)
+			}
 			before, err := api.integrations.Status(product, cfg)
 			if err != nil {
 				t.Fatal(err)

@@ -66,7 +66,7 @@ func productDefinitions() []productDefinition {
 	return []productDefinition{
 		{ID: ProductClaudeCode, Name: "Claude Code", Plan: Manager.planClaude, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true}, DefaultDir: homeDirectory(".claude", "CLAUDE_CONFIG_DIR")},
 		{ID: ProductCodexCLI, Name: "Codex CLI", Plan: Manager.planCodex, Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Profile: true}, DefaultDir: homeDirectory(".codex", "CODEX_HOME")},
-		{ID: ProductOpenCode, Name: "OpenCode", Plan: Manager.planOpenCode, Format: managedJSONC, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: xdgDirectory("opencode", "OPENCODE_CONFIG_DIR"), FileEnv: "OPENCODE_CONFIG", PreferJSONC: true},
+		{ID: ProductOpenCode, Name: "OpenCode", Plan: Manager.planOpenCode, Format: managedJSONC, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true}, DefaultDir: xdgDirectory("opencode", "OPENCODE_CONFIG_DIR"), FileEnv: "OPENCODE_CONFIG", PreferJSONC: true, Warning: "Clipal redirects OpenCode's OpenAI, Anthropic, and Google providers when those protocol providers are enabled in Clipal. Choose models in OpenCode; project, managed, and session settings may still override routing."},
 		{ID: ProductAntigravityCLI, Name: "Antigravity CLI", Plan: Manager.planAntigravity, Format: managedJSONC, Targets: TargetCapabilities{Shell: true, ShellDir: true}, DefaultDir: homeDirectory(".gemini/antigravity-cli", "")},
 		{ID: ProductContinue, Name: "Continue", Plan: func(m Manager, c *config.Config) ([]takeoverFile, error) {
 			p, e := m.continueTargetPath()

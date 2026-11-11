@@ -16,6 +16,9 @@ func takeoverFixture(t *testing.T, product ProductID) (Manager, *config.Config, 
 	t.Helper()
 	m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
 	cfg := &config.Config{Global: config.DefaultGlobalConfig()}
+	if product == ProductOpenCode {
+		cfg.OpenAI.Providers = []config.Provider{{Name: "fixture-openai", BaseURL: "https://gateway.example/v1", APIKey: "fixture-key"}}
+	}
 	target := TargetOptions{}
 	if ProductTargetCapabilities(product).Shell {
 		target.Shell = "sh"
@@ -499,7 +502,7 @@ func TestTakeoverMissingFilesRestoreAbsence(t *testing.T) {
 }
 
 func TestTakeoverRequiresExplicitModelWithoutExistingSelection(t *testing.T) {
-	for _, product := range []ProductID{ProductOpenCode, ProductContinue, ProductAider, ProductGoose} {
+	for _, product := range []ProductID{ProductContinue, ProductAider, ProductGoose} {
 		t.Run(string(product), func(t *testing.T) {
 			m := Manager{homeDir: t.TempDir(), configDir: t.TempDir()}
 			cfg := &config.Config{Global: config.DefaultGlobalConfig()}
@@ -598,10 +601,13 @@ func TestTakeoverPreservesContinueAndGooseOptions(t *testing.T) {
 }
 
 func TestOpenCodeRestrictionsBlockWithoutChangingFiles(t *testing.T) {
-	for _, restriction := range []string{`"disabled_providers":["clipal"]`, `"enabled_providers":["other"]`, `"enabled_providers":[]`} {
-		t.Run(restriction, func(t *testing.T) {
+	for _, policy := range []string{
+		`{"action":"provider.use","resource":"openai","effect":"deny"}`,
+		`{"action":"provider.use","resource":"*","effect":"deny"}`,
+	} {
+		t.Run(policy, func(t *testing.T) {
 			m, cfg, originals := takeoverFixture(t, ProductOpenCode)
-			raw := []byte("{" + restriction + ` ,"model":"openai/test"}`)
+			raw := []byte(`{"policies":[` + policy + `]}`)
 			if err := os.WriteFile(originals[0].TargetPath, raw, 0640); err != nil {
 				t.Fatal(err)
 			}
@@ -615,6 +621,28 @@ func TestOpenCodeRestrictionsBlockWithoutChangingFiles(t *testing.T) {
 			got, err := os.ReadFile(originals[0].TargetPath)
 			if err != nil || !bytes.Equal(got, raw) {
 				t.Fatal("changed restricted configuration")
+			}
+		})
+	}
+}
+
+func TestLegacyOpenCodeTakeoverRequiresExactGatewayPath(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		url  string
+		want bool
+	}{
+		{name: "exact", url: "http://127.0.0.1:3333/clipal", want: true},
+		{name: "openai route", url: "http://127.0.0.1:3333/clipal/v1", want: true},
+		{name: "trailing slash", url: "http://127.0.0.1:3333/clipal/", want: true},
+		{name: "trailing slash openai route", url: "http://127.0.0.1:3333/clipal/v1/", want: true},
+		{name: "similar path", url: "https://example.test/clipal-proxy", want: false},
+		{name: "query only", url: "https://example.test/api?next=/clipal", want: false},
+		{name: "missing host", url: "/clipal", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isClipalGatewayBaseURL(test.url); got != test.want {
+				t.Fatalf("isClipalGatewayBaseURL(%q) = %t, want %t", test.url, got, test.want)
 			}
 		})
 	}
@@ -659,7 +687,11 @@ func TestOtherClientPathsFollowClientContracts(t *testing.T) {
 	}
 	for _, product := range []ProductID{ProductOpenCode, ProductContinue, ProductAider} {
 		chosen := filepath.Join(t.TempDir(), "explicit.conf")
-		if err = m.SetTarget(product, TargetOptions{ConfigFile: chosen, Model: "chosen"}); err != nil {
+		target := TargetOptions{ConfigFile: chosen}
+		if product != ProductOpenCode {
+			target.Model = "chosen"
+		}
+		if err = m.SetTarget(product, target); err != nil {
 			t.Fatal(err)
 		}
 		status, e := m.Status(product, &config.Config{Global: config.DefaultGlobalConfig()})

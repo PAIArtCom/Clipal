@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 )
 
@@ -178,6 +179,110 @@ func openCodeRouteShadow(planned, effective map[string]any) bool {
 				if wire, ok := wanted["id"]; ok && !reflect.DeepEqual(wire, got["id"]) {
 					return true
 				}
+			}
+		}
+	}
+	return false
+}
+
+type openCodeV2Route struct {
+	provider string
+	baseURL  string
+}
+
+func openCodeV2Restriction(state openCodeConfig, routes []openCodeV2Route) string {
+	for _, route := range routes {
+		decision := "allow"
+		// OpenCode reverses configuration documents for policy evaluation;
+		// layers here are collected from broadest to closest global layer.
+		for i := len(state.layers) - 1; i >= 0; i-- {
+			for _, raw := range openCodePolicyEntries(state.layers[i].body) {
+				policy, _ := raw.(map[string]any)
+				action, _ := policy["action"].(string)
+				effect, _ := policy["effect"].(string)
+				resource, _ := policy["resource"].(string)
+				if action != "provider.use" || (effect != "allow" && effect != "deny") {
+					continue
+				}
+				if openCodeWildcardMatch(route.provider, resource) {
+					decision = effect
+				}
+			}
+		}
+		if decision == "deny" {
+			return fmt.Sprintf("OpenCode policy denies use of the %s provider", route.provider)
+		}
+	}
+	return ""
+}
+
+// openCodeWildcardMatch mirrors OpenCode's Wildcard.match. Provider policy
+// resources use '*' and '?' over the complete provider ID; unlike
+// path.Match, '*' is not restricted by path separators. OpenCode also makes
+// matching case-insensitive on Windows and treats a trailing " *" as an
+// optional suffix.
+func openCodeWildcardMatch(value, pattern string) bool {
+	value = strings.ReplaceAll(value, "\\", "/")
+	pattern = strings.ReplaceAll(pattern, "\\", "/")
+	if runtime.GOOS == "windows" {
+		value = strings.ToLower(value)
+		pattern = strings.ToLower(pattern)
+	}
+	if strings.HasSuffix(pattern, " *") && openCodeWildcardMatchCore(value, strings.TrimSuffix(pattern, " *")) {
+		return true
+	}
+	return openCodeWildcardMatchCore(value, pattern)
+}
+
+func openCodeWildcardMatchCore(value, pattern string) bool {
+	valueRunes := []rune(value)
+	patternRunes := []rune(pattern)
+	valueIndex, patternIndex := 0, 0
+	starIndex, starValueIndex := -1, -1
+
+	for valueIndex < len(valueRunes) {
+		if patternIndex < len(patternRunes) &&
+			(patternRunes[patternIndex] == '?' || patternRunes[patternIndex] == valueRunes[valueIndex]) {
+			valueIndex++
+			patternIndex++
+			continue
+		}
+		if patternIndex < len(patternRunes) && patternRunes[patternIndex] == '*' {
+			starIndex = patternIndex
+			starValueIndex = valueIndex
+			patternIndex++
+			continue
+		}
+		if starIndex < 0 {
+			return false
+		}
+		patternIndex = starIndex + 1
+		starValueIndex++
+		valueIndex = starValueIndex
+	}
+
+	for patternIndex < len(patternRunes) && patternRunes[patternIndex] == '*' {
+		patternIndex++
+	}
+	return patternIndex == len(patternRunes)
+}
+
+func openCodePolicyEntries(body map[string]any) []any {
+	policies, _ := body["policies"].([]any)
+	return policies
+}
+
+func openCodeV2RouteShadow(planned, effective map[string]any, routes []openCodeV2Route) bool {
+	expectedProviders, _ := planned["providers"].(map[string]any)
+	actualProviders, _ := effective["providers"].(map[string]any)
+	for _, route := range routes {
+		expected, _ := expectedProviders[route.provider].(map[string]any)
+		actual, _ := actualProviders[route.provider].(map[string]any)
+		expectedSettings, _ := expected["settings"].(map[string]any)
+		actualSettings, _ := actual["settings"].(map[string]any)
+		for _, key := range []string{"baseURL", "apiKey"} {
+			if !reflect.DeepEqual(expectedSettings[key], actualSettings[key]) {
+				return true
 			}
 		}
 	}
