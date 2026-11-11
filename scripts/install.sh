@@ -8,14 +8,16 @@
 # Environment:
 #   CLIPAL_VERSION       Release version to install (default: latest)
 #   CLIPAL_INSTALL_DIR   Directory for the clipal binary (default: ~/.local/bin)
-#   CLIPAL_DOWNLOAD_BASE Override the release download base URL (testing)
+#   CLIPAL_DOWNLOAD_BASE_URL Override the release download base URL (mirror)
+#   CLIPAL_DRY_RUN        Set to 1 to print the install plan without changes
 
 set -eu
 
 REPO="PAIArtCom/Clipal"
-DOWNLOAD_BASE="${CLIPAL_DOWNLOAD_BASE:-https://github.com/${REPO}/releases/download}"
+DOWNLOAD_BASE="${CLIPAL_DOWNLOAD_BASE_URL:-${CLIPAL_DOWNLOAD_BASE:-https://github.com/${REPO}/releases/download}}"
 VERSION="${CLIPAL_VERSION:-}"
 INSTALL_DIR="${CLIPAL_INSTALL_DIR:-}"
+DRY_RUN="${CLIPAL_DRY_RUN:-0}"
 
 usage() {
   cat <<'EOF'
@@ -27,10 +29,11 @@ Usage:
 Options:
   --version <tag>   Release version to install, for example v0.31.0 (default: latest)
   --dir <path>      Directory for the clipal binary (default: ~/.local/bin)
+  --dry-run         Print the install plan without downloading or changing files
   -h, --help        Show this help
 
 Environment variables:
-  CLIPAL_VERSION, CLIPAL_INSTALL_DIR, CLIPAL_DOWNLOAD_BASE
+  CLIPAL_VERSION, CLIPAL_INSTALL_DIR, CLIPAL_DOWNLOAD_BASE_URL, CLIPAL_DRY_RUN
 EOF
 }
 
@@ -65,6 +68,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --dir=*)
       INSTALL_DIR="${1#*=}"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
       shift
       ;;
     -h|--help)
@@ -157,6 +164,12 @@ TAG="v${VERSION}"
 os="$(detect_os)"
 arch="$(detect_arch)"
 ASSET="clipal-${os}-${arch}"
+
+if [ "$DRY_RUN" = "1" ]; then
+  info "Dry run: would download ${DOWNLOAD_BASE}/${TAG}/${ASSET}"
+  info "Would verify ${DOWNLOAD_BASE}/${TAG}/checksums.txt and install to ${INSTALL_DIR}/clipal"
+  exit 0
+fi
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/clipal-install.XXXXXX")" ||
   error "unable to create a temporary directory"

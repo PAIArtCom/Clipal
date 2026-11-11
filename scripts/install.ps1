@@ -6,13 +6,16 @@
 # Environment:
 #   CLIPAL_VERSION       Release version to install (default: latest)
 #   CLIPAL_INSTALL_DIR   Directory for clipal.exe (default: %LOCALAPPDATA%\Programs\clipal)
-#   CLIPAL_DOWNLOAD_BASE Override the release download base URL (testing)
+#   CLIPAL_DOWNLOAD_BASE_URL Override the release download base URL (mirror)
+#   CLIPAL_DRY_RUN        Set to 1 to print the install plan without changes
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 $Repo = "PAIArtCom/Clipal"
-$DownloadBase = if ($env:CLIPAL_DOWNLOAD_BASE) {
+$DownloadBase = if ($env:CLIPAL_DOWNLOAD_BASE_URL) {
+    $env:CLIPAL_DOWNLOAD_BASE_URL
+} elseif ($env:CLIPAL_DOWNLOAD_BASE) {
     $env:CLIPAL_DOWNLOAD_BASE
 } else {
     "https://github.com/$Repo/releases/download"
@@ -88,6 +91,12 @@ $Tag = "v$Version"
 
 $arch = Get-ClipalArch
 $asset = "clipal-windows-$arch.exe"
+
+if ($env:CLIPAL_DRY_RUN -eq "1") {
+    Write-Host "Dry run: would download $DownloadBase/$Tag/$asset"
+    Write-Host "Would verify $DownloadBase/$Tag/checksums.txt and install to $(Join-Path $InstallDir 'clipal.exe')"
+    exit 0
+}
 
 $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ("clipal-install-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null

@@ -16,6 +16,11 @@ trap cleanup EXIT
 
 bash -n "$repo_root/scripts/install.sh"
 
+dry_run_output="$(CLIPAL_VERSION=v9.9.9 CLIPAL_INSTALL_DIR="$tmp_dir/dry-run" \
+  CLIPAL_OS=linux CLIPAL_ARCH=amd64 sh "$repo_root/scripts/install.sh" --dry-run)"
+grep -q 'Dry run: would download' <<< "$dry_run_output"
+[[ ! -e "$tmp_dir/dry-run" ]]
+
 if command -v pwsh >/dev/null 2>&1; then
   cat > "$tmp_dir/parse-install-ps1.ps1" <<'PS1'
 param([Parameter(Mandatory = $true)][string]$Path)
@@ -89,7 +94,7 @@ fi
 base_url="http://127.0.0.1:${port}"
 install_dir="$tmp_dir/bin"
 
-CLIPAL_DOWNLOAD_BASE="$base_url" \
+CLIPAL_DOWNLOAD_BASE_URL="$base_url" \
 CLIPAL_VERSION="v${version}" \
 CLIPAL_INSTALL_DIR="$install_dir" \
 CLIPAL_OS=linux \
@@ -109,7 +114,7 @@ awk -v bad="0000000000000000000000000000000000000000000000000000000000000000" \
   "$release_dir/checksums.txt" > "$tmp_dir/checksums.bad"
 mv "$tmp_dir/checksums.bad" "$release_dir/checksums.txt"
 
-if CLIPAL_DOWNLOAD_BASE="$base_url" \
+if CLIPAL_DOWNLOAD_BASE_URL="$base_url" \
    CLIPAL_VERSION="v${version}" \
    CLIPAL_INSTALL_DIR="$tmp_dir/bad-bin" \
    CLIPAL_OS=linux \
@@ -121,7 +126,7 @@ fi
 grep -q "checksum mismatch" "$tmp_dir/bad-checksum.log"
 cp "$tmp_dir/checksums.good" "$release_dir/checksums.txt"
 
-if CLIPAL_DOWNLOAD_BASE="$base_url" \
+if CLIPAL_DOWNLOAD_BASE_URL="$base_url" \
    CLIPAL_VERSION="v${version}" \
    CLIPAL_INSTALL_DIR="$tmp_dir/unsupported" \
    CLIPAL_OS=linux \
@@ -134,7 +139,15 @@ grep -q "unsupported CPU architecture" "$tmp_dir/unsupported.log"
 
 if command -v pwsh >/dev/null 2>&1; then
   ps_install_dir="$tmp_dir/ps-bin"
-  CLIPAL_DOWNLOAD_BASE="$base_url" \
+  ps_dry_run_dir="$tmp_dir/ps-dry-run"
+  ps_dry_run_output="$(CLIPAL_VERSION="v${version}" \
+    CLIPAL_INSTALL_DIR="$ps_dry_run_dir" \
+    CLIPAL_DRY_RUN=1 \
+    pwsh -NoProfile -NonInteractive -File "$repo_root/scripts/install.ps1")"
+  grep -q 'Dry run: would download' <<< "$ps_dry_run_output"
+  [[ ! -e "$ps_dry_run_dir" ]]
+
+  CLIPAL_DOWNLOAD_BASE_URL="$base_url" \
   CLIPAL_VERSION="v${version}" \
   CLIPAL_INSTALL_DIR="$ps_install_dir" \
     pwsh -NoProfile -NonInteractive -File "$repo_root/scripts/install.ps1" >"$tmp_dir/ps-install.log" 2>&1

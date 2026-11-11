@@ -128,6 +128,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1
 
 The installer detects your platform, downloads the matching release asset, verifies it against `checksums.txt`, and installs to `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\clipal`). Set `CLIPAL_INSTALL_DIR` to choose another directory, or `CLIPAL_VERSION` to pin a release.
 
+For a mirror, set `CLIPAL_DOWNLOAD_BASE_URL`; preview the Unix install with `--dry-run` before downloading.
+
 You can also download the right build from [Releases](https://github.com/PAIArtCom/Clipal/releases) and put it on your `PATH`.
 Latest stable release: [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 

@@ -128,6 +128,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1
 
 安装脚本会自动识别平台，下载对应的 release 文件，用 `checksums.txt` 校验后安装到 `~/.local/bin`（Windows 为 `%LOCALAPPDATA%\Programs\clipal`）。可以通过 `CLIPAL_INSTALL_DIR` 指定其他目录，或用 `CLIPAL_VERSION` 固定版本。
 
+需要使用镜像时可设置 `CLIPAL_DOWNLOAD_BASE_URL`；Unix 安装脚本支持先用 `--dry-run` 预览操作。
+
 你也可以前往 [Releases](https://github.com/PAIArtCom/Clipal/releases) 页面下载对应系统的文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)。
 
 ```bash
