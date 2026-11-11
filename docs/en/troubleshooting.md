@@ -2,7 +2,15 @@
 
 ## npm 12 Blocks The Clipal Binary Download
 
-Symptoms:
+> Current Clipal npm packages use platform optional dependencies and do not run install scripts. npm 12 and newer install them without `--allow-scripts`. The legacy commands below are only for older versions that used a `postinstall` download.
+
+If a current package reports `bundled binary is missing`, optional dependencies may have been skipped:
+
+```bash
+npm install -g clipal --include=optional
+```
+
+Older versions that used `postinstall` show these symptoms:
 
 - `npm install -g clipal` reports `install scripts blocked because they are not covered by allowScripts`
 - `clipal` reports `bundled binary is missing`

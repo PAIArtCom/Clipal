@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-oauth-authorize update-model-specs lint lint-fix vuln fmt install-hooks ci
+.PHONY: build test test-unit test-smoke test-data-transfer test-live-oauth test-live-codex-oauth test-live-claude-oauth test-oauth-authorize test-npm-packaging update-model-specs lint lint-fix vuln fmt install-hooks ci
 
 GO ?= go
 # Match CI and keep analysis tools compatible with compiler export data.
@@ -16,6 +16,9 @@ test: test-unit
 test-unit:
 	$(GO) test ./...
 	$(PYTHON) -m unittest discover -s scripts -p 'test_cli_takeover_smoke.py'
+
+test-npm-packaging:
+	./scripts/test_npm_packaging.sh
 
 test-smoke:
 	./scripts/smoke_test.sh

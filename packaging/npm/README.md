@@ -7,32 +7,17 @@ npm install -g clipal
 clipal --version
 ```
 
-## npm 12 and newer
+This package installs the platform-specific Clipal binary through npm optional dependencies. It does **not** use install scripts, so npm 12 and newer install it without `--allow-scripts`.
 
-npm 12 blocks dependency install scripts by default. Allow Clipal's downloader before installing (recommended, so future `npm update -g clipal` keeps working):
-
-```bash
-npm config set allow-scripts=clipal --location=user
-npm install -g clipal
-```
-
-For a one-off install:
+If your npm configuration skips optional dependencies, reinstall with them enabled:
 
 ```bash
-npm install -g clipal --allow-scripts=clipal
+npm install -g clipal --include=optional
 ```
 
-If an earlier install was blocked, rerun with the flag or rebuild:
+The wrapper also keeps a fallback: if the platform package is missing, it downloads the matching binary from the official GitHub Releases and verifies `checksums.txt`.
 
-```bash
-npm install -g clipal --allow-scripts=clipal
-# or
-npm rebuild -g clipal --allow-scripts=clipal
-```
-
-> npm's own suggestion, `npm install -g --allow-scripts=clipal`, is missing the package name and fails outside a project. Use the commands above instead.
-
-This npm package installs the platform-specific Clipal binary from the official GitHub Releases for the matching version.
+> Older Clipal npm versions used a `postinstall` download. If you are installing one of those versions with npm 12+, use `npm install -g clipal --allow-scripts=clipal`.
 
 Project documentation:
 

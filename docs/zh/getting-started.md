@@ -8,28 +8,9 @@
 npm install -g clipal
 ```
 
-如果你使用 npm 12 或更高版本，npm 默认会拦截依赖的安装脚本。建议先允许 Clipal 的下载脚本（这样之后执行 `npm update -g clipal` 也不会再被拦截）：
+如果你使用 npm 12 或更高版本，不需要额外参数：当前 Clipal npm 包使用平台可选依赖，不再依赖安装脚本。
 
-```bash
-npm config set allow-scripts=clipal --location=user
-npm install -g clipal
-```
-
-如果只想允许这一次：
-
-```bash
-npm install -g clipal --allow-scripts=clipal
-```
-
-如果之前安装时二进制文件被拦截，可以重新安装或 rebuild：
-
-```bash
-npm install -g clipal --allow-scripts=clipal
-# 或者
-npm rebuild -g clipal --allow-scripts=clipal
-```
-
-> npm 自己提示的 `npm install -g --allow-scripts=clipal` 缺少包名，在非项目目录执行会直接报错。请使用上面的命令。
+> 旧版 Clipal npm 包使用 `postinstall` 下载二进制。如果你安装的是这些旧版本并且使用 npm 12+，请执行 `npm install -g clipal --allow-scripts=clipal`。
 
 `npm install -g` 的安装位置由 npm 的 prefix 决定。如果 prefix 是
 `/usr/local` 这类系统目录，更新已安装的二进制文件需要 `sudo`；如果希望无需密码更新，请使用用户目录的 npm prefix。
