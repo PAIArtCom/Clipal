@@ -16,6 +16,25 @@ The location used by `npm install -g` depends on your npm prefix. With a
 system prefix such as `/usr/local`, updating the installed binary requires
 `sudo`; use a user-local npm prefix if you want passwordless updates.
 
+### Standalone installer
+
+If you do not want to use npm, install the standalone binary with the official script:
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+```
+
+The installer detects the OS and CPU, downloads the matching asset from the latest
+release, verifies it against `checksums.txt`, and installs to `$HOME/.local/bin`
+(Windows: `%LOCALAPPDATA%\Programs\clipal`). Use `CLIPAL_INSTALL_DIR` to choose a
+different directory and `CLIPAL_VERSION` (for example `v0.30.3`) to pin a release.
+
 You can also download the right binary from [Releases](https://github.com/PAIArtCom/Clipal/releases) and place it on your `PATH`.
 On Linux, the recommended location is `$HOME/.local/bin`; installing to
 `/usr/local/bin` requires `sudo` and is a system-wide installation.

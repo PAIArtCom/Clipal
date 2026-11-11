@@ -817,6 +817,15 @@
               </svg>
               <span>手动安装</span>
             </button>
+            <button class="itab" role="tab" aria-selected="false" aria-controls="panel-script" id="tab-script"
+              data-tab="script">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                aria-hidden="true">
+                <path d="M4 17l6-6-6-6" />
+                <path d="M12 19h8" />
+              </svg>
+              <span>一行命令安装</span>
+            </button>
           </div>
 
           <!-- AI Install Panel -->
@@ -837,7 +846,7 @@
               </div>
               <pre class="prompt-text" id="ai-prompt-content">请帮我安装并启动 Clipal。项目地址：https://github.com/PAIArtCom/Clipal
 
-请优先使用推荐的 npm 安装方式：npm install -g clipal。当前 Clipal npm 包使用平台可选依赖，在 npm 12+ 上不需要 --allow-scripts。如果安装时跳过了可选依赖，请用 npm install -g clipal --include=optional 重新安装。如果当前环境不能使用 npm，再回退到 GitHub Releases 的独立二进制。随后启动 Clipal，并确认我能成功打开 Web UI。需要时请使用以下官方链接：
+请优先使用推荐的 npm 安装方式：npm install -g clipal。当前 Clipal npm 包使用平台可选依赖，在 npm 12+ 上不需要 --allow-scripts。如果安装时跳过了可选依赖，请用 npm install -g clipal --include=optional 重新安装。如果当前环境不能使用 npm，请使用一行安装脚本：macOS/Linux 执行 curl -fsSL https://clipal.paiart.com/install.sh | sh，Windows 执行 powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"。也可以回退到 GitHub Releases 的独立二进制。随后启动 Clipal，并确认我能成功打开 Web UI。需要时请使用以下官方链接：
 - npm 包：https://www.npmjs.com/package/clipal
 - GitHub 仓库：https://github.com/PAIArtCom/Clipal
 - Releases 备用下载：https://github.com/PAIArtCom/Clipal/releases
@@ -895,6 +904,45 @@
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          <!-- One-line Install Panel -->
+          <div class="itab-panel" id="panel-script" role="tabpanel" aria-labelledby="tab-script">
+            <div class="manual-steps">
+              <div class="mstep">
+                <div class="mstep-num">1</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">macOS &amp; Linux</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
+                  </div>
+                  <p class="mstep-desc" style="margin-top:10px">自动下载对应平台的 release 文件，用
+                    <code>checksums.txt</code> 校验后安装到 <code>~/.local/bin</code>。</p>
+                </div>
+              </div>
+              <div class="mstep">
+                <div class="mstep-num">2</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">Windows</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</span>
+                  </div>
+                  <p class="mstep-desc" style="margin-top:10px">安装到 <code>%LOCALAPPDATA%\Programs\clipal</code>，
+                    并加入当前用户的 <code>PATH</code>。</p>
+                </div>
+              </div>
+              <div class="mstep">
+                <div class="mstep-num">3</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">启动 Clipal</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">clipal service install</span><br>
+                    <span class="t-cmd">clipal service start</span><br>
+                    <span class="t-ok">✓ 成功启动 http://127.0.0.1:3333</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -983,6 +1031,14 @@
               <code>--allow-scripts</code> 即可安装。如果你安装的是仍使用 <code>postinstall</code> 下载的旧版本，请执行
               <code>npm install -g clipal --allow-scripts=clipal</code>。</p>
           </div>
+
+          <div class="faq-item glass-card">
+            <h4 class="faq-q">可以不用 npm 安装 Clipal 吗？</h4>
+            <p class="faq-a">可以。macOS/Linux 执行
+              <code>curl -fsSL https://clipal.paiart.com/install.sh | sh</code>；Windows 执行
+              <code>powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code>。
+              安装脚本会下载对应平台的 release 文件，并用 <code>checksums.txt</code> 校验后再安装。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -1009,6 +1065,10 @@
               <p class="install-label" style="margin-top:10px">当前 npm 包不需要安装脚本。
                 如果安装时跳过了可选依赖，请执行
                 <code>npm install -g clipal --include=optional</code>。</p>
+              <div class="install-label" style="margin-top:16px">一行命令安装：</div>
+              <div class="code-block" style="margin-top:12px">
+                <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
+              </div>
               <div class="install-label" style="margin-top:16px">更偏好独立二进制？</div>
               <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">

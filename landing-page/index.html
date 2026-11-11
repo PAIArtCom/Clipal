@@ -833,6 +833,15 @@
               </svg>
               <span>Manual Install</span>
             </button>
+            <button class="itab" role="tab" aria-selected="false" aria-controls="panel-script" id="tab-script"
+              data-tab="script">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                aria-hidden="true">
+                <path d="M4 17l6-6-6-6" />
+                <path d="M12 19h8" />
+              </svg>
+              <span>One-line Install</span>
+            </button>
           </div>
 
           <!-- AI Install Panel -->
@@ -854,7 +863,7 @@
               </div>
               <pre class="prompt-text" id="ai-prompt-content">Please help me install and start Clipal. Project: https://github.com/PAIArtCom/Clipal
 
-Please use the recommended npm installation first: npm install -g clipal. Current Clipal npm packages use platform optional dependencies and do not need --allow-scripts on npm 12+. If optional dependencies are skipped, reinstall with npm install -g clipal --include=optional. If npm is unavailable, fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
+Please use the recommended npm installation first: npm install -g clipal. Current Clipal npm packages use platform optional dependencies and do not need --allow-scripts on npm 12+. If optional dependencies are skipped, reinstall with npm install -g clipal --include=optional. If npm is unavailable, use the one-line installer: curl -fsSL https://clipal.paiart.com/install.sh | sh on macOS/Linux, or powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex" on Windows. You can also fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
 - npm package: https://www.npmjs.com/package/clipal
 - GitHub repository: https://github.com/PAIArtCom/Clipal
 - Releases fallback: https://github.com/PAIArtCom/Clipal/releases
@@ -913,6 +922,45 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          <!-- One-line Install Panel -->
+          <div class="itab-panel" id="panel-script" role="tabpanel" aria-labelledby="tab-script">
+            <div class="manual-steps">
+              <div class="mstep">
+                <div class="mstep-num">1</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">macOS &amp; Linux</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
+                  </div>
+                  <p class="mstep-desc" style="margin-top:10px">Downloads the matching release asset, verifies
+                    <code>checksums.txt</code>, and installs to <code>~/.local/bin</code>.</p>
+                </div>
+              </div>
+              <div class="mstep">
+                <div class="mstep-num">2</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">Windows</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</span>
+                  </div>
+                  <p class="mstep-desc" style="margin-top:10px">Installs to <code>%LOCALAPPDATA%\Programs\clipal</code>
+                    and adds it to your user <code>PATH</code>.</p>
+                </div>
+              </div>
+              <div class="mstep">
+                <div class="mstep-num">3</div>
+                <div class="mstep-body">
+                  <h4 class="mstep-title">Start Clipal</h4>
+                  <div class="code-block" style="margin-top:12px">
+                    <span class="t-cmd">clipal service install</span><br>
+                    <span class="t-cmd">clipal service start</span><br>
+                    <span class="t-ok">✓ Running on http://127.0.0.1:3333</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1014,6 +1062,15 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               install an older version that used a <code>postinstall</code> download, use
               <code>npm install -g clipal --allow-scripts=clipal</code>.</p>
           </div>
+
+          <div class="faq-item glass-card">
+            <h4 class="faq-q">Can I install Clipal without npm?</h4>
+            <p class="faq-a">Yes. Run <code>curl -fsSL https://clipal.paiart.com/install.sh | sh</code> on macOS or
+              Linux, or
+              <code>powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code>
+              on Windows. The installer downloads the matching release and verifies it against
+              <code>checksums.txt</code> before installing.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -1040,6 +1097,10 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               <p class="install-label" style="margin-top:10px">Current npm packages need no install scripts.
                 If optional dependencies were skipped, run
                 <code>npm install -g clipal --include=optional</code>.</p>
+              <div class="install-label" style="margin-top:16px">One-line install:</div>
+              <div class="code-block" style="margin-top:12px">
+                <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
+              </div>
               <div class="install-label" style="margin-top:16px">Prefer a standalone binary?</div>
               <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">

@@ -15,6 +15,24 @@ npm install -g clipal
 `npm install -g` 的安装位置由 npm 的 prefix 决定。如果 prefix 是
 `/usr/local` 这类系统目录，更新已安装的二进制文件需要 `sudo`；如果希望无需密码更新，请使用用户目录的 npm prefix。
 
+### 独立安装脚本
+
+如果你不想使用 npm，可以用官方脚本安装独立二进制：
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+Windows（PowerShell）：
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+```
+
+安装脚本会自动识别系统和 CPU，下载最新 release 中对应的文件，用 `checksums.txt`
+校验后安装到 `$HOME/.local/bin`（Windows 为 `%LOCALAPPDATA%\Programs\clipal`）。
+可以用 `CLIPAL_INSTALL_DIR` 指定其他目录，或用 `CLIPAL_VERSION`（例如 `v0.30.3`）固定版本。
+
 你也可以从 [Releases](https://github.com/PAIArtCom/Clipal/releases) 下载对应平台的二进制，并放到你的 `PATH` 中。
 在 Linux 上推荐放到 `$HOME/.local/bin`；安装到 `/usr/local/bin` 属于系统范围安装，需要使用 `sudo`。
 最新稳定版：[GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)

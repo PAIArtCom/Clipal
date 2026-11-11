@@ -6,6 +6,15 @@ English: [docs/en/macos.md](../en/macos.md) | 中文: [docs/zh/macos.md](macos.m
 
 ## 安装二进制
 
+一行命令安装：
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+脚本会下载对应平台的 release 文件，用 `checksums.txt` 校验后安装到
+`$HOME/.local/bin`。可以通过 `CLIPAL_INSTALL_DIR` 指定其他目录。
+
 Apple Silicon:
 
 - `clipal-darwin-arm64`
