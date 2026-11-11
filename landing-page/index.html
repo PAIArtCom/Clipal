@@ -854,7 +854,7 @@
               </div>
               <pre class="prompt-text" id="ai-prompt-content">Please help me install and start Clipal. Project: https://github.com/PAIArtCom/Clipal
 
-Please use the recommended npm installation first: npm install -g clipal. If npm is unavailable, fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
+Please use the recommended npm installation first: npm install -g clipal. If npm is version 12 or newer, use npm install -g clipal --allow-scripts=clipal instead, because npm 12 blocks dependency install scripts by default. If npm is unavailable, fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
 - npm package: https://www.npmjs.com/package/clipal
 - GitHub repository: https://github.com/PAIArtCom/Clipal
 - Releases fallback: https://github.com/PAIArtCom/Clipal/releases
@@ -876,6 +876,9 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
                   <div class="code-block" style="margin-top:12px">
                     <span class="t-cmd">npm install -g clipal</span>
                   </div>
+                  <p class="mstep-desc" style="margin-top:10px">npm 12+ blocks install scripts by default.
+                    Use <code>npm install -g clipal --allow-scripts=clipal</code>, or run
+                    <code>npm config set allow-scripts=clipal --location=user</code> first.</p>
                   <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                     class="btn-secondary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1003,6 +1006,13 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               request flow, response times, and error codes in one click. If a request fails, we'll tell you exactly if
               it was a network timeout or an invalid key.</p>
           </div>
+
+          <div class="faq-item glass-card">
+            <h4 class="faq-q">npm 12 says install scripts were blocked. What should I do?</h4>
+            <p class="faq-a">npm 12 blocks dependency install scripts by default, and its suggested one-off command is
+              missing the package name. Use <code>npm install -g clipal --allow-scripts=clipal</code>, or persist the
+              approval with <code>npm config set allow-scripts=clipal --location=user</code> before installing.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -1026,6 +1036,9 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
               <div class="code-block" style="margin-top:12px">
                 <span class="t-cmd">npm install -g clipal</span>
               </div>
+              <p class="install-label" style="margin-top:10px">npm 12+ users: add
+                <code>--allow-scripts=clipal</code>, or run
+                <code>npm config set allow-scripts=clipal --location=user</code> first.</p>
               <div class="install-label" style="margin-top:16px">Prefer a standalone binary?</div>
               <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">

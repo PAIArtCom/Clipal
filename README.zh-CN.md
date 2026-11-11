@@ -110,6 +110,29 @@ npm install -g clipal
 clipal --version
 ```
 
+如果你使用 npm 12 或更高版本，npm 默认会拦截依赖的安装脚本。建议先允许 Clipal 的下载脚本（这样之后执行 `npm update -g clipal` 也不会再被拦截）：
+
+```bash
+npm config set allow-scripts=clipal --location=user
+npm install -g clipal
+```
+
+如果只想允许这一次：
+
+```bash
+npm install -g clipal --allow-scripts=clipal
+```
+
+如果之前安装时二进制文件被拦截，可以重新安装或 rebuild：
+
+```bash
+npm install -g clipal --allow-scripts=clipal
+# 或者
+npm rebuild -g clipal --allow-scripts=clipal
+```
+
+> npm 自己提示的 `npm install -g --allow-scripts=clipal` 缺少包名，在非项目目录执行会直接报错。请使用上面的命令。
+
 如果你更偏好独立二进制，也可以前往 [Releases](https://github.com/PAIArtCom/Clipal/releases) 页面下载对应系统的文件，并放入环境变量 `PATH` 中。最新稳定版可直接使用 [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)。
 
 ```bash
