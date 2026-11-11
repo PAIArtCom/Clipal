@@ -1,5 +1,35 @@
 # 排障与 FAQ
 
+## npm 12 拦截了 Clipal 的二进制下载
+
+表现：
+
+- `npm install -g clipal` 提示 `install scripts blocked because they are not covered by allowScripts`
+- 运行 `clipal` 提示 `bundled binary is missing`
+- 执行 `npm install -g --allow-scripts=clipal` 报 `ENOENT ... package.json`
+
+npm 12 默认会拦截依赖的安装脚本。npm 提示的一次性命令缺少包名，在非项目目录执行不会生效。请改用：
+
+```bash
+# npm 用户推荐：持久允许，之后更新也不会再被拦截
+npm config set allow-scripts=clipal --location=user
+npm install -g clipal
+
+# 只允许这一次
+npm install -g clipal --allow-scripts=clipal
+
+# 修复已经安装但二进制被拦截的情况
+npm rebuild -g clipal --allow-scripts=clipal
+```
+
+如果使用 `@paiart/clipal`，请把命令中的 `clipal` 换成 `@paiart/clipal`。
+
+验证：
+
+```bash
+clipal --version
+```
+
 ## `clipal status` 显示 Not running
 
 先检查：

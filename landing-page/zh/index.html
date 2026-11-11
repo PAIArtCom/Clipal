@@ -837,7 +837,7 @@
               </div>
               <pre class="prompt-text" id="ai-prompt-content">请帮我安装并启动 Clipal。项目地址：https://github.com/PAIArtCom/Clipal
 
-请优先使用推荐的 npm 安装方式：npm install -g clipal。如果当前环境不能使用 npm，再回退到 GitHub Releases 的独立二进制。随后启动 Clipal，并确认我能成功打开 Web UI。需要时请使用以下官方链接：
+请优先使用推荐的 npm 安装方式：npm install -g clipal。如果 npm 是 12 或更高版本，请改用 npm install -g clipal --allow-scripts=clipal，因为 npm 12 默认会拦截依赖的安装脚本。如果当前环境不能使用 npm，再回退到 GitHub Releases 的独立二进制。随后启动 Clipal，并确认我能成功打开 Web UI。需要时请使用以下官方链接：
 - npm 包：https://www.npmjs.com/package/clipal
 - GitHub 仓库：https://github.com/PAIArtCom/Clipal
 - Releases 备用下载：https://github.com/PAIArtCom/Clipal/releases
@@ -859,6 +859,9 @@
                   <div class="code-block" style="margin-top:12px">
                     <span class="t-cmd">npm install -g clipal</span>
                   </div>
+                  <p class="mstep-desc" style="margin-top:10px">npm 12+ 默认会拦截安装脚本。
+                    请使用 <code>npm install -g clipal --allow-scripts=clipal</code>，或先执行
+                    <code>npm config set allow-scripts=clipal --location=user</code>。</p>
                   <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                     class="btn-secondary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -974,6 +977,13 @@
             <p class="faq-a">Clipal
               提供<strong>实时观测面板</strong>。点击即可查看完整的请求流、响应时间和错误代码。如果请求失败，我们会告知是网络超时还是 API Key 无效。</p>
           </div>
+
+          <div class="faq-item glass-card">
+            <h4 class="faq-q">npm 12 提示安装脚本被拦截，怎么办？</h4>
+            <p class="faq-a">npm 12 默认会拦截依赖的安装脚本，而且它提示的一次性命令缺少包名。请使用
+              <code>npm install -g clipal --allow-scripts=clipal</code>，或先执行
+              <code>npm config set allow-scripts=clipal --location=user</code> 再安装。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -997,6 +1007,9 @@
               <div class="code-block" style="margin-top:12px">
                 <span class="t-cmd">npm install -g clipal</span>
               </div>
+              <p class="install-label" style="margin-top:10px">npm 12+ 用户请加上
+                <code>--allow-scripts=clipal</code>，或先执行
+                <code>npm config set allow-scripts=clipal --location=user</code>。</p>
               <div class="install-label" style="margin-top:16px">更偏好独立二进制？</div>
               <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
                 class="btn-primary download-btn" id="download-direct-btn">

@@ -1,5 +1,35 @@
 # Troubleshooting
 
+## npm 12 Blocks The Clipal Binary Download
+
+Symptoms:
+
+- `npm install -g clipal` reports `install scripts blocked because they are not covered by allowScripts`
+- `clipal` reports `bundled binary is missing`
+- `npm install -g --allow-scripts=clipal` fails with `ENOENT ... package.json`
+
+npm 12 blocks dependency install scripts by default. npm's suggested one-off command is missing the package name, so it does not work outside a project. Use one of these instead:
+
+```bash
+# Recommended for npm users: persist the approval for future updates too
+npm config set allow-scripts=clipal --location=user
+npm install -g clipal
+
+# One-off install
+npm install -g clipal --allow-scripts=clipal
+
+# Repair an existing install
+npm rebuild -g clipal --allow-scripts=clipal
+```
+
+If you use `@paiart/clipal`, replace `clipal` with `@paiart/clipal` in these commands.
+
+Verify with:
+
+```bash
+clipal --version
+```
+
 ## `clipal status` Says Not Running
 
 Check:
