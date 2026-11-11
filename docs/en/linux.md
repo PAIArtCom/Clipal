@@ -6,7 +6,18 @@ This page only covers Linux-specific differences. For the shared setup flow, see
 
 ## Install The Binary
 
-Download from Releases:
+One-line install:
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+The script downloads the matching release asset, verifies it against
+`checksums.txt`, and installs to `$HOME/.local/bin`. Use
+`CLIPAL_INSTALL_DIR=/usr/local/bin` for a system-wide install, but the script
+does not use `sudo`, so run it from a writable location or install manually.
+
+Or download from Releases:
 
 - `clipal-linux-amd64`
 - `clipal-linux-arm64`

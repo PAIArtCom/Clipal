@@ -6,7 +6,17 @@ English: [docs/en/windows.md](../en/windows.md) | 中文: [docs/zh/windows.md](w
 
 ## 安装二进制
 
-从 Releases 下载：
+在 PowerShell 中一行命令安装：
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+```
+
+脚本会下载对应平台的 release 文件，用 `checksums.txt` 校验后安装到
+`%LOCALAPPDATA%\Programs\clipal`，并把这个目录加入当前用户的 `PATH`。
+可以通过 `CLIPAL_INSTALL_DIR` 指定其他目录。
+
+也可以从 Releases 下载：
 
 - `clipal-windows-amd64.exe`
 

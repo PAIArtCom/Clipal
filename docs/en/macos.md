@@ -6,6 +6,16 @@ This page only covers macOS-specific differences. For shared setup flow, see [Ge
 
 ## Install The Binary
 
+One-line install:
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+The script downloads the matching release asset, verifies it against
+`checksums.txt`, and installs to `$HOME/.local/bin`. Set `CLIPAL_INSTALL_DIR`
+to choose another directory.
+
 Apple Silicon:
 
 - `clipal-darwin-arm64`

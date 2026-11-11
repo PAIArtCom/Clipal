@@ -114,7 +114,23 @@ If you use npm 12 or newer, no extra flags are needed: current Clipal npm packag
 
 > Older Clipal npm versions used a `postinstall` download. If you are installing one of those versions with npm 12+, use `npm install -g clipal --allow-scripts=clipal`.
 
-Prefer a standalone binary? Download the right build from [Releases](https://github.com/PAIArtCom/Clipal/releases) and put it on your `PATH`.
+Prefer not to use npm? Install the standalone binary with the official script:
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+```
+
+The installer detects your platform, downloads the matching release asset, verifies it against `checksums.txt`, and installs to `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\clipal`). Set `CLIPAL_INSTALL_DIR` to choose another directory, or `CLIPAL_VERSION` to pin a release.
+
+For a mirror, set `CLIPAL_DOWNLOAD_BASE_URL`; preview the Unix install with `--dry-run` before downloading.
+
+You can also download the right build from [Releases](https://github.com/PAIArtCom/Clipal/releases) and put it on your `PATH`.
 Latest stable release: [GitHub Releases latest](https://github.com/PAIArtCom/Clipal/releases/latest)
 
 ```bash

@@ -70,7 +70,10 @@ jobs:
           cp build/windows-amd64/clipal.exe build/release/clipal-windows-amd64.exe
           cp build/windows-arm64/clipal.exe build/release/clipal-windows-arm64.exe
 
-          chmod +x build/release/clipal-darwin-amd64 build/release/clipal-darwin-arm64 build/release/clipal-linux-amd64 build/release/clipal-linux-arm64
+          cp scripts/install.sh build/release/install.sh
+          cp scripts/install.ps1 build/release/install.ps1
+
+          chmod +x build/release/clipal-darwin-amd64 build/release/clipal-darwin-arm64 build/release/clipal-linux-amd64 build/release/clipal-linux-arm64 build/release/install.sh
 
       - name: Generate checksums
         shell: bash

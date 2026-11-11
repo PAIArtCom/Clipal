@@ -6,7 +6,18 @@ This page only covers Windows-specific differences. For the shared setup flow, s
 
 ## Install The Binary
 
-Download from Releases:
+One-line install in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+```
+
+The script downloads the matching release asset, verifies it against
+`checksums.txt`, installs to `%LOCALAPPDATA%\Programs\clipal`, and adds that
+directory to your user `PATH`. Set `CLIPAL_INSTALL_DIR` to choose another
+directory.
+
+Or download from Releases:
 
 - `clipal-windows-amd64.exe`
 

@@ -6,7 +6,18 @@ English: [docs/en/linux.md](../en/linux.md) | 中文: [docs/zh/linux.md](linux.m
 
 ## 安装二进制
 
-从 Releases 下载：
+一行命令安装：
+
+```bash
+curl -fsSL https://clipal.paiart.com/install.sh | sh
+```
+
+脚本会下载对应平台的 release 文件，用 `checksums.txt` 校验后安装到
+`$HOME/.local/bin`。如果需要系统范围安装，可以设置
+`CLIPAL_INSTALL_DIR=/usr/local/bin`，但脚本不会调用 `sudo`，请确保目录可写，
+或按下面的方式手动安装。
+
+也可以从 Releases 下载：
 
 - `clipal-linux-amd64`
 - `clipal-linux-arm64`

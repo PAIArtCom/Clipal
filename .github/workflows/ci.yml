@@ -67,3 +67,12 @@ jobs:
           node-version: "24"
       - name: npm packaging checks
         run: ./scripts/test_npm_packaging.sh
+
+  installers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Installer checks
+        run: ./scripts/test_installers.sh
