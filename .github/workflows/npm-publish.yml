@@ -52,21 +52,12 @@ jobs:
       ref: ${{ needs.resolve.outputs.sha }}
 
   publish:
-    name: Publish ${{ matrix.package_name }}
+    name: Publish npm packages
     needs: [resolve, ci, security]
     permissions:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - package_dir: packaging/npm
-            package_name: clipal
-          - package_dir: packaging/npm-paiart
-            package_name: "@paiart/clipal"
-
     steps:
       - name: Checkout checked commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,19 +70,23 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org/"
 
-      - name: Publish package
-        working-directory: ${{ matrix.package_dir }}
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/release
+          mkdir -p build/release
+          gh release download "${RELEASE_TAG}" --dir build/release --pattern 'clipal-*'
+
+      - name: Publish npm packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PACKAGE_NAME: ${{ matrix.package_name }}
           RELEASE_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${RELEASE_TAG#v}"
-          npm pkg set version="${VERSION}"
-          if npm view "${PACKAGE_NAME}@${VERSION}" version >/dev/null 2>&1; then
-            echo "${PACKAGE_NAME}@${VERSION} already exists on npm; skipping publish"
-            exit 0
-          fi
-          npm publish --provenance --access public
+          ./scripts/publish_npm_release.sh "$VERSION" build/release build/npm-platform

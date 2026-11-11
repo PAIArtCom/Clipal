@@ -48,8 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          npm pkg set version="$VERSION" --prefix packaging/npm
-          npm pkg set version="$VERSION" --prefix packaging/npm-paiart
+          node scripts/set_npm_version.js "$VERSION"
 
       - name: Build binaries
         shell: bash
@@ -80,6 +79,16 @@ jobs:
           ./scripts/gen_checksums.sh build/release > build/release/checksums.txt
           cat build/release/checksums.txt
 
+      - name: Prepare npm platform packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          node scripts/build_npm_platform_packages.js \
+            --artifacts build/release \
+            --out build/npm-platform \
+            --version "$VERSION"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,30 +109,12 @@ jobs:
 
           gh release create "${release_args[@]}"
 
-      - name: Publish npm package clipal
-        working-directory: packaging/npm
+      - name: Publish npm packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          if npm view "clipal@${VERSION}" version >/dev/null 2>&1; then
-            echo "clipal@${VERSION} already exists on npm; skipping publish"
-            exit 0
-          fi
-          npm publish --provenance
-
-      - name: Publish npm package @paiart/clipal
-        working-directory: packaging/npm-paiart
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          if npm view "@paiart/clipal@${VERSION}" version >/dev/null 2>&1; then
-            echo "@paiart/clipal@${VERSION} already exists on npm; skipping publish"
-            exit 0
-          fi
-          npm publish --provenance --access public
+          VERSION="${RELEASE_TAG#v}"
+          ./scripts/publish_npm_release.sh "$VERSION" build/release build/npm-platform

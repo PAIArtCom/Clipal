@@ -2,7 +2,15 @@
 
 ## npm 12 拦截了 Clipal 的二进制下载
 
-表现：
+> 当前 Clipal npm 包使用平台可选依赖，不再依赖安装脚本。npm 12 及以上版本无需 `--allow-scripts` 即可正常安装。下面的旧版命令仅适用于仍然使用 `postinstall` 下载的旧版本。
+
+如果当前版本提示 `bundled binary is missing`，可能是安装时跳过了可选依赖：
+
+```bash
+npm install -g clipal --include=optional
+```
+
+使用 `postinstall` 的旧版本会出现以下表现：
 
 - `npm install -g clipal` 提示 `install scripts blocked because they are not covered by allowScripts`
 - 运行 `clipal` 提示 `bundled binary is missing`

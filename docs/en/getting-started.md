@@ -8,28 +8,9 @@ The fastest path is npm:
 npm install -g clipal
 ```
 
-If you use npm 12 or newer, npm blocks dependency install scripts by default. Allow Clipal's downloader before installing (recommended, so future `npm update -g clipal` keeps working):
+If you use npm 12 or newer, no extra flags are needed: current Clipal npm packages use platform-specific optional dependencies instead of install scripts.
 
-```bash
-npm config set allow-scripts=clipal --location=user
-npm install -g clipal
-```
-
-For a one-off install:
-
-```bash
-npm install -g clipal --allow-scripts=clipal
-```
-
-If an earlier install was blocked, rerun with the flag or rebuild:
-
-```bash
-npm install -g clipal --allow-scripts=clipal
-# or
-npm rebuild -g clipal --allow-scripts=clipal
-```
-
-> npm's own suggestion, `npm install -g --allow-scripts=clipal`, is missing the package name and fails outside a project. Use the commands above instead.
+> Older Clipal npm versions used a `postinstall` download. If you are installing one of those versions with npm 12+, use `npm install -g clipal --allow-scripts=clipal`.
 
 The location used by `npm install -g` depends on your npm prefix. With a
 system prefix such as `/usr/local`, updating the installed binary requires

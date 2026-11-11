@@ -6,6 +6,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pkg_dir="$repo_root/packaging/npm"
 out_dir="$repo_root/build/artifacts/npm"
 
+"$repo_root/scripts/sync_npm_packages.sh"
+
 mkdir -p "$out_dir"
 rm -f "$out_dir"/clipal-*.tgz
 
