@@ -99,7 +99,7 @@ func productDefinitions() []productDefinition {
 		{ID: ProductTRAEAgent, Plan: Manager.planTRAE, Name: "TRAE Agent", Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: func(Manager, string) (string, error) {
 			return "", fmt.Errorf("select an absolute TRAE config_file or config_dir and launch with --config-file")
 		}, Warning: "Launch TRAE Agent with --config-file pointing to this selected file. Auxiliary models and provider environment overrides are preserved."},
-		{ID: ProductGrokBuild, Plan: Manager.planGrok, Name: "Grok Build", Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".grok", "GROK_HOME"), Warning: "This configures model inference, not Grok session services. Enterprise, project, environment and helper overrides require runtime verification."},
+		{ID: ProductGrokBuild, Plan: Manager.planGrok, Name: "Grok Build", Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".grok", "GROK_HOME"), Warning: "This configures model inference, not Grok session services. GROK_CONFIG/GROK_CONFIG_PATH overlays, CLI model flags, environment variables and enterprise requirements can override the selected route; project config does not override model routing."},
 		{ID: ProductDeepSeekHarness, Plan: Manager.planDeepSeekHarness, Name: "DeepSeek Harness", Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".dsh", "DSH_HOME"), Warning: "Launch with the selected DSH_HOME. Profiles, plugins, CLI flags and auxiliary models may use other routes."},
 	}
 
