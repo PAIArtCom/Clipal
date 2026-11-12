@@ -59,11 +59,16 @@ func (m Manager) previewCodex(cfg *config.Config) (Preview, error) {
 	if modelProviders == nil {
 		modelProviders = map[string]any{}
 	}
-	modelProviders["clipal"] = map[string]any{
-		"name":     "clipal",
-		"base_url": m.advertisedBaseURL(cfg),
-		"wire_api": "responses",
+	clipalProvider, _ := modelProviders["clipal"].(map[string]any)
+	if clipalProvider == nil {
+		clipalProvider = map[string]any{}
 	}
+	// Preserve user-managed provider options and only update the fields owned
+	// by Clipal's takeover route.
+	clipalProvider["name"] = "clipal"
+	clipalProvider["base_url"] = m.advertisedBaseURL(cfg)
+	clipalProvider["wire_api"] = "responses"
+	modelProviders["clipal"] = clipalProvider
 	doc["model_providers"] = modelProviders
 
 	plannedBytes, err := marshalTOMLMap(doc)
