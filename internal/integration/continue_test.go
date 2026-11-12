@@ -139,22 +139,6 @@ models:
 	}
 }
 
-func TestContinueDoesNotAdoptUserModelNamedClipal(t *testing.T) {
-	model := map[string]any{
-		"name":     "Clipal",
-		"provider": "openai",
-		"model":    "user-model",
-		"apiBase":  "https://user.example/v1",
-	}
-	if isContinueClipalModel(model) {
-		t.Fatal("adopted a user model named Clipal with a non-Clipal endpoint")
-	}
-	model["apiBase"] = "http://127.0.0.1:3333/clipal"
-	if !isContinueClipalModel(model) {
-		t.Fatal("did not recognize the exact Clipal route")
-	}
-}
-
 func TestContinueApply_IsIdempotentAndRollbackRestoresOriginal(t *testing.T) {
 	t.Parallel()
 

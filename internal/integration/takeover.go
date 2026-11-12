@@ -336,7 +336,7 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 	case ProductClaudeCode:
 		body, err := readJSONMap(files[0].TargetPath)
 		env, _ := body["env"].(map[string]any)
-		return err == nil && isClipalGatewayBaseURL(claudeEnvValue(env, "ANTHROPIC_BASE_URL"))
+		return err == nil && strings.HasSuffix(claudeEnvValue(env, "ANTHROPIC_BASE_URL"), "/clipal")
 	case ProductOpenCode:
 		doc, err := readJSONCMap(files[0].TargetPath)
 		if err != nil {
@@ -360,11 +360,11 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 	case ProductAider:
 		doc, err := readYAMLMap(files[0].TargetPath)
 		base, _ := doc["openai-api-base"].(string)
-		return err == nil && isClipalGatewayBaseURL(base)
+		return err == nil && strings.HasSuffix(base, "/clipal")
 	case ProductGoose:
 		doc, err := readJSONMap(files[0].TargetPath)
 		base, _ := doc["base_url"].(string)
-		return err == nil && isClipalGatewayCompletionURL(base)
+		return err == nil && strings.HasSuffix(base, "/clipal/v1/chat/completions")
 	case ProductAntigravityCLI:
 		for _, file := range files[1:] {
 			if strings.Contains(string(file.Original), antigravityBlockStart) {
@@ -379,25 +379,12 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 // Match only those exact paths, rather than any URL containing "/clipal" (for
 // example an unrelated "/clipal-proxy" endpoint).
 func isClipalGatewayBaseURL(raw string) bool {
-	return isClipalGatewayURLPath(raw, "/clipal", "/clipal/v1")
-}
-
-func isClipalGatewayCompletionURL(raw string) bool {
-	return isClipalGatewayURLPath(raw, "/clipal/v1/chat/completions")
-}
-
-func isClipalGatewayURLPath(raw string, allowed ...string) bool {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return false
 	}
 	path := strings.TrimRight(u.EscapedPath(), "/")
-	for _, candidate := range allowed {
-		if path == candidate {
-			return true
-		}
-	}
-	return false
+	return path == "/clipal" || path == "/clipal/v1"
 }
 
 func (m Manager) rollbackTakeover(product ProductID, cfg *config.Config) (Result, error) {

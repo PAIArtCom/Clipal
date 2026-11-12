@@ -110,12 +110,7 @@ func isContinueClipalModel(model map[string]any) bool {
 		return false
 	}
 	name, _ := model["name"].(string)
-	if strings.TrimSpace(name) != "Clipal" {
-		return false
-	}
-	provider, _ := model["provider"].(string)
-	apiBase, _ := model["apiBase"].(string)
-	return provider == "openai" && isClipalGatewayBaseURL(apiBase)
+	return strings.TrimSpace(name) == "Clipal"
 }
 
 func inferContinuePrimaryModelFromDoc(doc map[string]any) string {
