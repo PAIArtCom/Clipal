@@ -66,7 +66,7 @@ func productDefinitions() []productDefinition {
 	return []productDefinition{
 		{ID: ProductClaudeCode, Name: "Claude Code", Plan: Manager.planClaude, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true}, DefaultDir: homeDirectory(".claude", "CLAUDE_CONFIG_DIR")},
 		{ID: ProductCodexCLI, Name: "Codex CLI", Plan: Manager.planCodex, Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Profile: true}, DefaultDir: homeDirectory(".codex", "CODEX_HOME")},
-		{ID: ProductOpenCode, Name: "OpenCode", Plan: Manager.planOpenCode, Format: managedJSONC, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: xdgDirectory("opencode", "OPENCODE_CONFIG_DIR"), FileEnv: "OPENCODE_CONFIG", PreferJSONC: true},
+		{ID: ProductOpenCode, Name: "OpenCode", Plan: Manager.planOpenCode, Format: managedJSONC, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true}, DefaultDir: xdgDirectory("opencode", "OPENCODE_CONFIG_DIR"), FileEnv: "OPENCODE_CONFIG", PreferJSONC: true, Warning: "Clipal redirects OpenCode's OpenAI, Anthropic, and Google providers when those protocol providers are enabled in Clipal. Choose models in OpenCode; project, managed, and session settings may still override routing."},
 		{ID: ProductAntigravityCLI, Name: "Antigravity CLI", Plan: Manager.planAntigravity, Format: managedJSONC, Targets: TargetCapabilities{Shell: true, ShellDir: true}, DefaultDir: homeDirectory(".gemini/antigravity-cli", "")},
 		{ID: ProductContinue, Name: "Continue", Plan: func(m Manager, c *config.Config) ([]takeoverFile, error) {
 			p, e := m.continueTargetPath()
@@ -82,13 +82,7 @@ func productDefinitions() []productDefinition {
 			}
 			return planSingleFile(p, func() (Preview, error) { return m.previewAider(c) })
 		}, Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: homeDirectory("", "")},
-		{ID: ProductGoose, Name: "Goose", Plan: func(m Manager, c *config.Config) ([]takeoverFile, error) {
-			p, e := m.gooseTargetPath()
-			if e != nil {
-				return nil, e
-			}
-			return planSingleFile(p, func() (Preview, error) { return m.previewGoose(c) })
-		}, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: func(_ Manager, home string) (string, error) {
+		{ID: ProductGoose, Name: "Goose", Plan: Manager.planGoose, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true, Model: true}, Warning: "GOOSE_PROVIDER and GOOSE_MODEL environment variables override the selected provider and model; unset them before launching Goose takeover.", DefaultDir: func(_ Manager, home string) (string, error) {
 			if root := os.Getenv("GOOSE_PATH_ROOT"); root != "" {
 				return filepath.Join(root, "config"), nil
 			}
@@ -105,7 +99,7 @@ func productDefinitions() []productDefinition {
 		{ID: ProductTRAEAgent, Plan: Manager.planTRAE, Name: "TRAE Agent", Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: func(Manager, string) (string, error) {
 			return "", fmt.Errorf("select an absolute TRAE config_file or config_dir and launch with --config-file")
 		}, Warning: "Launch TRAE Agent with --config-file pointing to this selected file. Auxiliary models and provider environment overrides are preserved."},
-		{ID: ProductGrokBuild, Plan: Manager.planGrok, Name: "Grok Build", Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".grok", "GROK_HOME"), Warning: "This configures model inference, not Grok session services. Enterprise, project, environment and helper overrides require runtime verification."},
+		{ID: ProductGrokBuild, Plan: Manager.planGrok, Name: "Grok Build", Format: managedTOML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".grok", "GROK_HOME"), Warning: "This configures model inference, not Grok session services. GROK_CONFIG/GROK_CONFIG_PATH overlays, CLI model flags, environment variables and enterprise requirements can override the selected route; project config does not override model routing."},
 		{ID: ProductDeepSeekHarness, Plan: Manager.planDeepSeekHarness, Name: "DeepSeek Harness", Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: homeDirectory(".dsh", "DSH_HOME"), Warning: "Launch with the selected DSH_HOME. Profiles, plugins, CLI flags and auxiliary models may use other routes."},
 	}
 

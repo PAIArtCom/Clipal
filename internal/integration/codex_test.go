@@ -158,6 +158,45 @@ base_url = "https://api.openai.example/v1"
 	}
 }
 
+func TestCodexApplyPreservesExistingClipalProviderOptions(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	codexDir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(codexDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(codexDir, "config.toml")
+	original := `model_provider = "clipal"
+
+[model_providers.clipal]
+name = "personal name"
+base_url = "https://old.example/v1"
+wire_api = "chat"
+requires_openai_auth = false
+`
+	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if _, err := m.Apply(ProductCodexCLI, &config.Config{Global: config.DefaultGlobalConfig()}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := readTOMLMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers := requireConfigValue[map[string]any](t, doc["model_providers"])
+	provider := requireConfigValue[map[string]any](t, providers["clipal"])
+	if provider["requires_openai_auth"] != false {
+		t.Fatalf("lost user provider option: %#v", provider)
+	}
+	if provider["name"] != "clipal" || provider["wire_api"] != "responses" {
+		t.Fatalf("Clipal route fields = %#v", provider)
+	}
+}
+
 func TestCodexApply_IsIdempotentAndRollbackRestoresOriginal(t *testing.T) {
 	t.Parallel()
 

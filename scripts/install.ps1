@@ -71,11 +71,55 @@ function Get-ClipalFile {
 }
 
 function Resolve-ClipalTag {
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $Headers
-    if (-not $release.tag_name) {
+    $latestUri = "https://github.com/$Repo/releases/latest"
+    $response = $null
+
+    try {
+        $response = Invoke-WebRequest `
+            -UseBasicParsing `
+            -Uri $latestUri `
+            -Method Head `
+            -MaximumRedirection 0 `
+            -Headers $Headers `
+            -ErrorAction Stop
+    } catch {
+        $response = $_.Exception.Response
+    }
+
+    if (-not $response) {
         throw "unable to resolve the latest Clipal release"
     }
-    return $release.tag_name
+
+    $location = $null
+    if ($response.Headers.Location) {
+        $location = [string]$response.Headers.Location
+    } else {
+        $locationValues = $response.Headers["Location"]
+        if ($locationValues -is [array]) {
+            $location = [string]$locationValues[0]
+        } else {
+            $location = [string]$locationValues
+        }
+    }
+    if (-not $location) {
+        throw "GitHub did not provide a redirect for the latest Clipal release"
+    }
+
+    try {
+        if ([Uri]::IsWellFormedUriString($location, [UriKind]::Absolute)) {
+            $redirectUri = [Uri]$location
+        } else {
+            $redirectUri = [Uri]::new([Uri]$latestUri, $location)
+        }
+        $tag = $redirectUri.Segments[-1].TrimEnd('/')
+    } catch {
+        throw "GitHub returned an invalid latest-release redirect"
+    }
+
+    if (-not $tag -or $tag -eq "latest") {
+        throw "unable to determine the latest Clipal release tag"
+    }
+    return $tag
 }
 
 if (-not $Version -or $Version -eq "latest") {

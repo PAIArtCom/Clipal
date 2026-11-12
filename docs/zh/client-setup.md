@@ -178,9 +178,9 @@ openai-api-key: clipal
 
 说明：
 
-- Web UI 的一键接管会管理一个独立的 Goose custom provider 文件，而不是重写内建 provider
+- Web UI 的一键接管会管理独立的 Goose custom provider 文件，并同步更新同一目录下 `config.yaml` 的 `active_provider: clipal` 和 `providers.clipal.model`，让 Goose 下次启动时实际选择 Clipal
 - 支持 `GOOSE_PATH_ROOT/config` 或显式配置目录，保留已有 headers、认证、流式及模型元数据；新建 provider 不填造默认模型或上下文长度。
-- 你可能仍需要在 Goose 内手动选择 Clipal provider 或对应模型
+- 如果设置了 `GOOSE_PROVIDER` 或 `GOOSE_MODEL` 环境变量，它们会覆盖 `config.yaml`；应用接管前请先取消这些变量
 - Apply / Rollback 后建议重启 Goose 或新开一个会话，让它重新加载 provider 配置
 
 ## 通用 OpenAI 兼容客户端

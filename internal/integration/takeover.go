@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -217,7 +218,7 @@ func (m Manager) applyTakeover(product ProductID, cfg *config.Config) (Result, e
 		return Result{}, err
 	}
 	if product == ProductOpenCode && status.Verification == "blocked" {
-		return Result{}, fmt.Errorf("resolve the OpenCode provider restriction before applying: %s", status.Warning)
+		return Result{}, fmt.Errorf("resolve the OpenCode takeover blocker before applying: %s", status.Warning)
 	}
 	if status.State == StateConfigured {
 		return Result{Product: product, Status: status, Message: "already configured"}, nil
@@ -341,8 +342,18 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 		if err != nil {
 			return false
 		}
-		model, _ := doc["model"].(string)
-		return strings.HasPrefix(model, "clipal/")
+		// Adopt only native v2 provider routing; OpenCode no longer uses a
+		// Clipal-specific model selection.
+		providers, _ := doc["providers"].(map[string]any)
+		for _, protocol := range []string{"openai", "anthropic", "google"} {
+			provider, _ := providers[protocol].(map[string]any)
+			settings, _ := provider["settings"].(map[string]any)
+			baseURL, _ := settings["baseURL"].(string)
+			if isClipalGatewayBaseURL(baseURL) {
+				return true
+			}
+		}
+		return false
 	case ProductContinue:
 		doc, err := readYAMLMap(files[0].TargetPath)
 		return err == nil && findContinueClipalModel(doc) != nil
@@ -362,6 +373,18 @@ func (m Manager) legacyTakeoverManaged(product ProductID, files []takeoverFile) 
 		}
 	}
 	return false
+}
+
+// Legacy OpenCode takeover used one of the gateway paths directly as baseURL.
+// Match only those exact paths, rather than any URL containing "/clipal" (for
+// example an unrelated "/clipal-proxy" endpoint).
+func isClipalGatewayBaseURL(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	path := strings.TrimRight(u.EscapedPath(), "/")
+	return path == "/clipal" || path == "/clipal/v1"
 }
 
 func (m Manager) rollbackTakeover(product ProductID, cfg *config.Config) (Result, error) {
