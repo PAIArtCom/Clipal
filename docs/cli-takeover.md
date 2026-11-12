@@ -12,7 +12,7 @@ Clipal supports user-level configuration takeover for 18 clients. All clients us
 | Antigravity CLI | [setup](en/client-setup.md#antigravity-cli-agy) | Settings and shell startup blocks; automatic takeover requires macOS/Linux and a supported shell. |
 | Continue | [setup](en/client-setup.md#continue) | Dedicated user-level Clipal model; preserve unrelated models and capabilities. |
 | Aider | [setup](en/client-setup.md#aider) | User YAML; project and launch overrides require runtime verification. |
-| Goose | [setup](en/client-setup.md#goose) | Dedicated custom provider; preserve authentication, headers and model metadata. |
+| Goose | [setup](en/client-setup.md#goose) | Dedicated custom provider plus global active-provider selection; preserve authentication, headers and model metadata. |
 | Pi | [earendil-works/pi](https://github.com/earendil-works/pi) | user models and settings JSON; preserve model metadata and authentication. |
 | Qwen Code | [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) | JSONC modelProviders catalog and OpenAI auth selection; project catalogs can replace user definitions. |
 | Kimi Code CLI | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | current kimi-code TOML. Requires positive existing or explicitly supplied context metadata; archived kimi-cli is a different product. |

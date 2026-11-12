@@ -82,13 +82,7 @@ func productDefinitions() []productDefinition {
 			}
 			return planSingleFile(p, func() (Preview, error) { return m.previewAider(c) })
 		}, Format: managedYAML, Targets: TargetCapabilities{ConfigDir: true, ConfigFile: true, Model: true}, DefaultDir: homeDirectory("", "")},
-		{ID: ProductGoose, Name: "Goose", Plan: func(m Manager, c *config.Config) ([]takeoverFile, error) {
-			p, e := m.gooseTargetPath()
-			if e != nil {
-				return nil, e
-			}
-			return planSingleFile(p, func() (Preview, error) { return m.previewGoose(c) })
-		}, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true, Model: true}, DefaultDir: func(_ Manager, home string) (string, error) {
+		{ID: ProductGoose, Name: "Goose", Plan: Manager.planGoose, Format: managedJSON, Targets: TargetCapabilities{ConfigDir: true, Model: true}, Warning: "GOOSE_PROVIDER and GOOSE_MODEL environment variables override the selected provider and model; unset them before launching Goose takeover.", DefaultDir: func(_ Manager, home string) (string, error) {
 			if root := os.Getenv("GOOSE_PATH_ROOT"); root != "" {
 				return filepath.Join(root, "config"), nil
 			}

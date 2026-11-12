@@ -185,8 +185,9 @@ Edit `~/.config/goose/custom_providers/clipal.json`:
 
 Notes:
 
-- The Web UI takeover manages a dedicated Goose custom provider file rather than rewriting built-in provider config
+- The Web UI takeover manages the dedicated Goose custom provider file and updates the same global `config.yaml` with `active_provider: clipal` and `providers.clipal.model`, so Goose selects the managed provider on the next start
 - Takeover supports `GOOSE_PATH_ROOT/config` or an explicit configuration directory and preserves headers, authentication, streaming settings, and model metadata. New providers require a model choice and do not invent a context length.
+- `GOOSE_PROVIDER` and `GOOSE_MODEL` environment variables override `config.yaml`; unset them before launching Goose if they are present.
 - You may still need to select the Clipal provider or model inside Goose
 - Restart Goose or open a new session after apply or rollback so it reloads provider config
 

@@ -1,14 +1,93 @@
 package integration
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/PAIArtCom/Clipal/internal/config"
 )
 
 func (m Manager) gooseTargetPath() (string, error) {
 	return m.customClientPath(ProductGoose, "custom_providers/clipal.json")
+}
+
+func (m Manager) gooseConfigPath() (string, error) {
+	dir, err := m.clientConfigDir(ProductGoose)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.yaml"), nil
+}
+
+func (m Manager) planGoose(cfg *config.Config) ([]takeoverFile, error) {
+	providerPath, err := m.gooseTargetPath()
+	if err != nil {
+		return nil, err
+	}
+	provider, err := planSingleFile(providerPath, func() (Preview, error) { return m.previewGoose(cfg) })
+	if err != nil {
+		return nil, err
+	}
+
+	configPath, err := m.gooseConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	configFile, err := readBackupFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	configDoc := map[string]any{}
+	if configFile.Existed {
+		configDoc, err = readYAMLMap(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("read Goose config: %w", err)
+		}
+	}
+
+	// Goose resolves these environment variables before config.yaml. A file
+	// takeover cannot win while they are exported by the launching process.
+	if os.Getenv("GOOSE_PROVIDER") != "" || os.Getenv("GOOSE_MODEL") != "" {
+		return nil, fmt.Errorf("GOOSE_PROVIDER and GOOSE_MODEL override config.yaml; unset them before applying Goose takeover")
+	}
+
+	providerDoc := map[string]any{}
+	if err := json.Unmarshal(provider[0].Planned, &providerDoc); err != nil {
+		return nil, fmt.Errorf("read planned Goose provider: %w", err)
+	}
+	models, _ := providerDoc["models"].([]any)
+	if len(models) == 0 {
+		return nil, fmt.Errorf("planned Goose provider has no model")
+	}
+	modelEntry, _ := models[0].(map[string]any)
+	model, _ := modelEntry["name"].(string)
+	if model == "" {
+		return nil, fmt.Errorf("planned Goose provider model has no name")
+	}
+
+	providers, err := objectField(configDoc, "providers")
+	if err != nil {
+		return nil, fmt.Errorf("read Goose providers: %w", err)
+	}
+	active, err := objectField(providers, "clipal")
+	if err != nil {
+		return nil, fmt.Errorf("read Goose Clipal provider state: %w", err)
+	}
+	active["enabled"] = true
+	active["model"] = model
+	active["configured"] = true
+	providers["clipal"] = active
+	configDoc["providers"] = providers
+	configDoc["active_provider"] = "clipal"
+	configBytes, err := marshalYAMLMap(configDoc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal Goose config: %w", err)
+	}
+
+	provider[0].Format = managedJSON
+	return append(provider, takeoverFile{backupFile: configFile, Planned: configBytes, Format: managedYAML}), nil
 }
 
 func (m Manager) advertisedGooseBaseURL(cfg *config.Config) string {

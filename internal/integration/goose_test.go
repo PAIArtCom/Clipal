@@ -80,6 +80,22 @@ func TestGooseApply_CreatesManagedCustomProviderFile(t *testing.T) {
 	if got, _ := model["name"].(string); got != "test-model" {
 		t.Fatalf("model name = %q", got)
 	}
+	configPath := filepath.Join(home, ".config", "goose", "config.yaml")
+	configDoc, err := readYAMLMap(configPath)
+	if err != nil {
+		t.Fatalf("read Goose config: %v", err)
+	}
+	if got, _ := configDoc["active_provider"].(string); got != "clipal" {
+		t.Fatalf("active_provider = %q", got)
+	}
+	providers, ok := configDoc["providers"].(map[string]any)
+	if !ok {
+		t.Fatalf("providers = %#v", configDoc["providers"])
+	}
+	active, ok := providers["clipal"].(map[string]any)
+	if !ok || active["enabled"] != true || active["configured"] != true || active["model"] != "test-model" {
+		t.Fatalf("active Clipal provider = %#v", providers["clipal"])
+	}
 }
 
 func TestGooseApply_IsIdempotentAndRollbackRemovesManagedFile(t *testing.T) {
@@ -117,5 +133,21 @@ func TestGooseApply_IsIdempotentAndRollbackRemovesManagedFile(t *testing.T) {
 	}
 	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
 		t.Fatalf("managed Goose provider file should be removed, stat err = %v", err)
+	}
+}
+
+func TestGooseApplyRejectsEnvironmentSelectionOverride(t *testing.T) {
+	home := t.TempDir()
+	m := Manager{configDir: filepath.Join(home, ".clipal"), homeDir: home}
+	if err := m.SetTarget(ProductGoose, TargetOptions{Model: "test-model"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOOSE_PROVIDER", "anthropic")
+	if _, err := m.Apply(ProductGoose, &config.Config{Global: config.DefaultGlobalConfig()}); err == nil {
+		t.Fatal("applied while GOOSE_PROVIDER overrides config.yaml")
+	}
+	path := filepath.Join(home, ".config", "goose", "custom_providers", "clipal.json")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("created provider while takeover was blocked: %v", err)
 	}
 }
