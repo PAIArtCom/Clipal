@@ -134,6 +134,10 @@ func TestGooseApply_IsIdempotentAndRollbackRemovesManagedFile(t *testing.T) {
 	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
 		t.Fatalf("managed Goose provider file should be removed, stat err = %v", err)
 	}
+	configPath := filepath.Join(home, ".config", "goose", "config.yaml")
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		t.Fatalf("managed Goose config should be removed, stat err = %v", err)
+	}
 }
 
 func TestGooseApplyRejectsEnvironmentSelectionOverride(t *testing.T) {
