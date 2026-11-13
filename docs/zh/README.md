@@ -31,5 +31,7 @@ English: [docs/en/README.md](../en/README.md) | 中文: [docs/zh/README.md](READ
 
 ## 其他
 
+- [设计系统规范 (Kinetic Structuralism)](design-system.md)
+- [Web UI CSS 规范](../web-ui-css-guidelines.md)
 - [项目首页 README](../../README.zh-CN.md)
 - [Release Notes](../../release-notes/)

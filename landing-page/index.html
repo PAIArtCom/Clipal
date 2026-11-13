@@ -4,69 +4,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipal — LLM API Gateway for Claude Code, Codex & Antigravity CLI</title>
+  <title>Clipal — The Local LLM Gateway & Control Plane for Coding Agents | 18-CLI Takeover</title>
   <meta name="description"
-    content="Clipal is a free, local LLM API gateway. Install with npm to manage multi-key pools, OAuth upstreams including Antigravity Google OAuth, Agent SDK-compatible Claude/Codex wrapping, and Claude Code, Codex & Antigravity CLI traffic. No Docker, no Python.">
+    content="Clipal is the high-performance local LLM API gateway and mission control for coding agents. Lossless AST takeover for 18 CLI tools including Claude Code and Codex, unified protocol multiplexing, multi-key failover, native Claude/Codex/Google OAuth, and offline micro-USD precision pricing. 100% private, zero Docker, zero Python.">
   <meta name="keywords"
-    content="claude code proxy, llm api gateway, openrouter proxy, 429 rate limit bypass, antigravity cli proxy, codex cli proxy, anthropic bedrock proxy, vertex ai claude code, clipal">
-  <link rel="canonical" href="https://clipal.paiart.com">
-  <link rel="alternate" hreflang="en" href="https://clipal.paiart.com">
+    content="Clipal, LLM API gateway, Claude Code proxy, Codex CLI takeover, Antigravity CLI, OpenCode, 429 rate limit failover, local LLM router, coding agent mission control, offline token pricing, OAuth refresh proxy">
+  <link rel="canonical" href="https://clipal.paiart.com/">
+  <link rel="alternate" hreflang="en" href="https://clipal.paiart.com/">
   <link rel="alternate" hreflang="zh-Hans" href="https://clipal.paiart.com/zh/">
-  <link rel="alternate" hreflang="x-default" href="https://clipal.paiart.com">
+  <link rel="alternate" hreflang="x-default" href="https://clipal.paiart.com/">
 
   <!-- Favicon -->
   <link rel="icon" href="assets/icons/favicon.ico" sizes="any">
   <link rel="icon" type="image/svg+xml" href="assets/icons/clipal-icon.svg">
 
-  <!-- Fonts -->
+  <!-- Typography: Outfit, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
     rel="stylesheet">
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/style.css?v=copy-command">
+  <!-- Core Design System -->
+  <link rel="stylesheet" href="css/style.css?v=quantum-v0.31">
 
   <!-- OpenGraph -->
-  <meta property="og:title" content="Clipal — LLM API Gateway for Claude Code, Codex & Antigravity CLI">
+  <meta property="og:title" content="Clipal — The Local LLM Gateway & Control Plane for Coding Agents">
   <meta property="og:description"
-    content="Free local binary. Manage multi-key pools, OAuth upstreams including Antigravity Google OAuth, and Agent SDK-compatible Claude/Codex proxying. No Docker required.">
+    content="Lossless AST takeover for 18 CLI tools, unified 3-protocol multiplexing, multi-key failover, native OAuth hub, and offline micro-USD precision pricing.">
   <meta property="og:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
-  <meta property="og:url" content="https://clipal.paiart.com">
+  <meta property="og:url" content="https://clipal.paiart.com/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Clipal">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Clipal — LLM API Gateway for Claude Code, Codex & Antigravity CLI">
-  <meta name="twitter:description"
-    content="Free local binary. OAuth upstreams including Antigravity Google OAuth, Agent SDK-compatible Claude/Codex proxying, and CLI takeover. No Docker.">
+  <meta name="twitter:title" content="Clipal — Local LLM Gateway for Coding Agents">
+  <meta name="twitter:description" content="18 CLI tools takeover, native OAuth, sub-millisecond 429 failover, and offline micro-USD pricing.">
   <meta name="twitter:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
 
-  <!-- Structured Data -->
+  <!-- Structured Data: SoftwareApplication -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Clipal",
-    "description": "Free local LLM API gateway with bulletproof failover, OAuth upstreams including Antigravity Google OAuth, Agent SDK-compatible Claude/Codex proxying, multi-key rotation, and one-click CLI takeover for Claude Code, Codex, and Antigravity CLI.",
+    "description": "The local LLM gateway and mission control for coding agents. Lossless AST takeover for 18 CLI tools, protocol multiplexing, Claude/Codex/Google OAuth, sub-millisecond 429 failover, and micro-USD offline pricing.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
-    "dateModified": "2026-06-30",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
-    "url": "https://clipal.paiart.com",
+    "url": "https://clipal.paiart.com/",
     "downloadUrl": "https://www.npmjs.com/package/clipal",
-    "screenshot": "https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg",
-    "releaseNotes": "https://github.com/PAIArtCom/Clipal/releases",
-    "author": {
-      "@type": "Organization",
-      "name": "PAIART",
-      "url": "https://paiart.com"
-    }
+    "softwareVersion": "0.31.1"
   }
   </script>
 
-  <!-- FAQ Structured Data (for SERP Rich Snippets) -->
+  <!-- Structured Data: FAQPage -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -74,82 +66,26 @@
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "Is Clipal a local SaaS or cloud proxy?",
+        "name": "Are my API keys and OAuth tokens sent to any cloud server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Neither. Clipal is a standalone local binary. Your API keys are stored in an encrypted config.json on your own machine. Zero cloud storage, zero data leakage."
+          "text": "Never. Clipal is 100% a standalone local binary. All keys, OAuth credentials, and session configs are encrypted on your local machine in config.json. Zero external telemetry. Open source on GitHub."
         }
       },
       {
         "@type": "Question",
-        "name": "Can I use Clipal with OpenRouter, new-api, or sub2api for both Claude Code and OpenAI-based tools?",
+        "name": "How does Clipal guarantee non-destructive configuration takeover?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Clipal natively supports OpenAI-compatible, Anthropic Claude, and Google Gemini protocols. You can route your Claude Code terminal, OpenAI-powered Codex, and Antigravity CLI traffic through any third-party provider or local endpoint effortlessly."
+          "text": "Unlike scripts that overwrite entire config files, Clipal parses and merges AST syntax trees for JSON, YAML, and TOML. It injects only the required Base URL and preserves all your existing plugins, options, and variables. An immutable baseline snapshot is captured before applying, enabling 1-click byte-exact rollback at any time."
         }
       },
       {
         "@type": "Question",
-        "name": "How does Clipal solve the '429 Too Many Requests' error for aggregate APIs?",
+        "name": "What is the unified /clipal route?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Clipal provides a multi-dimensional reliability layer. Beyond single-provider multi-key rotation, it supports multi-provider concurrency and intelligent sticky sessions. If your primary OpenRouter key hits a rate limit, Clipal instantly diverts to another key or provider while ensuring your session context remains consistent."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Does using Clipal for Codex affect my chat history or session stability?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "In fact, it makes it more stable. For Codex/OpenCode, Clipal uses a standardized model_provider = 'clipal' configuration. Unlike other proxies that force provider changes (which resets history), Clipal keeps the provider constant while swapping the underlying endpoints in the background, preserving all your context and history."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How is Clipal different from cc-switch?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "While cc-switch manages multiple configs, Clipal is a high-performance gateway that supports complex multi-key token pools, deep config injection for settings.json, and real-time observability."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Does Clipal solve 'Invalid API Key' errors for Bedrock?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes. Most proxies break when talking to Bedrock/Vertex via Claude Code due to header strictness. Clipal provides native protocol emulation to fix these issues at the socket level."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Is there any performance overhead when using Clipal?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Negligible. Written in Go, Clipal processes requests in microseconds. It consumes less than 50MB of RAM, far more efficient than Node.js or Python-based proxies."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How does Clipal protect my existing configuration?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Unlike other tools that overwrite your settings, Clipal uses a non-destructive AST-merging strategy to patch settings.json. We only update necessary fields and preserve your enabledPlugins, custom environment variables, and manual tweaks."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Can Clipal fix the 'Login Loop' issue in Claude Code?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes. Most Login Loops are caused by incorrect header handling when proxying. Clipal's protocol emulation layer ensures headers are properly scrubbed and injected, keeping your session stable without repeated authentication prompts."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How do I know if the proxy is actually working?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Clipal provides a real-time observability dashboard. You can see the full request flow, response times, and error codes in one click. If a request fails, we will tell you exactly if it was a network timeout or an invalid key."
+          "text": "Clipal intelligently multiplexes incoming requests. You simply route your clients to http://127.0.0.1:3333/clipal, and the gateway automatically detects Anthropic, OpenAI, or Gemini wire protocols and forwards them accordingly."
         }
       }
     ]
@@ -157,372 +93,504 @@
   </script>
 </head>
 
-<body class="is-loading">
+<body>
 
   <!-- ===================== NAVIGATION ===================== -->
   <header id="site-header">
-    <nav class="nav-container" role="navigation" aria-label="Main navigation">
-      <a href="/" class="nav-logo" aria-label="Clipal Home">
-        <img src="assets/icons/clipal-icon.svg" alt="" width="28" height="28" class="nav-logo-icon" aria-hidden="true">
-        <span class="nav-logo-text">Clipal</span>
-      </a>
-
-      <div class="nav-links">
-        <a href="#features" class="nav-link">Features</a>
-        <a href="#install" class="nav-link">Quick Start</a>
-        <a href="#how-it-works" class="nav-link">How It Works</a>
-        <a href="https://github.com/PAIArtCom/Clipal/tree/main/docs/en" target="_blank" rel="noopener noreferrer"
-          class="nav-link">Docs</a>
+    <div class="container nav-container">
+      <div class="nav-left">
+        <a href="/" class="nav-logo" aria-label="Clipal Home">
+          <img src="assets/icons/clipal-icon.svg" alt="" width="28" height="28" class="nav-logo-icon" aria-hidden="true">
+          <span>CLIPAL</span>
+        </a>
+        <div class="nav-telemetry">
+          <span class="status-dot"></span>
+          <span>GATEWAY 3333 // ACTIVE</span>
+        </div>
       </div>
+
+      <nav class="nav-links" role="navigation" aria-label="Main Navigation">
+        <a href="#matrix" class="nav-link">18-CLI Matrix</a>
+        <a href="#pillars" class="nav-link">Core Pillars</a>
+        <a href="#tour" class="nav-link">Console Tour</a>
+        <a href="#comparison" class="nav-link">Architecture</a>
+        <a href="#install" class="nav-link">Get Started</a>
+        <a href="#faq" class="nav-link">Zero-Trust FAQ</a>
+      </nav>
 
       <div class="nav-actions">
-        <a href="/zh/" class="lang-toggle" id="lang-toggle" aria-label="Switch to Chinese">
-          <span class="lang-label lang-en active">EN</span>
-          <span class="lang-sep">/</span>
-          <span class="lang-label lang-zh">中文</span>
+        <a href="/zh/" class="lang-toggle" aria-label="Switch to Chinese">
+          <span class="lang-label active">EN</span>
+          <span>/</span>
+          <span class="lang-label">中文</span>
         </a>
-        <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer" class="btn-ghost"
-          id="nav-github">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path
-              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+        <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="padding:0.45rem 0.9rem; font-size:0.8rem">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
           </svg>
-          <span>GitHub</span>
+          <span>Star</span>
         </a>
       </div>
-    </nav>
+    </div>
   </header>
 
   <main>
-    <!-- ===================== HERO ===================== -->
-    <section id="hero" aria-labelledby="hero-heading">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <div class="container hero-container">
-
-        <div class="hero-copy">
-          <div class="eyebrow reveal">
-            <span class="eyebrow-pulse" aria-hidden="true"></span>
-            <span>Reliable API Infrastructure for Your Coding Agents</span>
+    <!-- ===================== HERO SECTION ===================== -->
+    <section id="hero">
+      <div class="container hero-grid">
+        <div class="hero-content">
+          <div class="hero-eyebrow">
+            <span class="tag-badge">
+              <span class="status-dot text-signal-green"></span>
+              <span>LOCAL CONTROL PLANE · V0.31.1</span>
+            </span>
           </div>
 
-          <h1 id="hero-heading" class="hero-h1 reveal">
-            <span>One Binary LLM API Gateway.</span><br>
-            <span class="text-gradient">Claude Code, Codex & Antigravity CLI. Zero Rate Limits.</span>
+          <h1 class="hero-title">
+            The Mission Control for<br>
+            <span class="hero-title-gradient">Coding Agents &amp; Local LLMs</span>
           </h1>
 
-          <p class="hero-sub reveal">
-            Native support for OpenRouter, new-api, OAuth accounts, and any provider. Automatically patches
-            ~/.claude/settings.json and standard configs while using Agent SDK-compatible Claude/Codex OAuth wrapping and
-            Antigravity Google OAuth for Gemini text and image models.
+          <p class="hero-lead">
+            Eliminate configuration headaches, environment variable pollution, and 429 rate limit interruptions. Clipal runs an industrial-grade stabilizing gateway on your local machine: lossless AST takeover for 18 CLI tools, unified 3-protocol multiplexing, multi-key failover, native Claude/Codex/Google OAuth, and offline micro-USD precision pricing.
           </p>
 
-          <div class="cta-group">
-            <button type="button" id="cta-primary" class="btn-primary" data-copy-command="npm i -g clipal"
-              aria-label="Copy npm install command">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                aria-hidden="true">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
+          <div class="hero-actions">
+            <button type="button" class="btn-cmd" data-copy="npm install -g clipal" aria-label="Copy npm install command">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
               </svg>
-              <span id="cta-primary-text"><code>npm i -g clipal</code></span>
+              <span><code>npm i -g clipal</code></span>
+              <span class="tag-badge" style="padding:0.15rem 0.4rem; font-size:0.65rem">Copy</span>
             </button>
-            <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
-              class="btn-secondary" id="cta-github">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path
-                  d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+
+            <a href="#matrix" class="btn-secondary">
+              <span>Explore 18-CLI Matrix</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
-              <span>Star on GitHub</span>
             </a>
           </div>
-        </div>
 
-        <div class="hero-visual">
-          <div class="terminal" id="hero-terminal">
-            <div class="terminal-titlebar" aria-hidden="true">
-              <div class="terminal-dots">
-                <span class="dot dot-red"></span>
-                <span class="dot dot-yellow"></span>
-                <span class="dot dot-green"></span>
-              </div>
-              <span class="terminal-title">clipal — zsh</span>
-            </div>
-            <div class="terminal-body" id="terminal-output" role="log" aria-label="Terminal demo output"
-              aria-live="polite"></div>
+          <div class="hero-pills">
+            <div class="hero-pill-item">✓ 18 CLI Clients Managed</div>
+            <div class="hero-pill-item">✓ Zero Docker / Zero Python</div>
+            <div class="hero-pill-item">✓ Single Binary &lt;50MB / &lt;1ms Latency</div>
+            <div class="hero-pill-item">✓ 100% Local &amp; Private</div>
           </div>
         </div>
 
+        <!-- 3D Kinetic Console Viewport -->
+        <div class="hero-console-viewport" aria-hidden="true">
+          <div class="hero-3d-stage">
+            <!-- Satellite 1: Top Right -->
+            <div class="satellite-card sat-top-right">
+              <div class="satellite-label">AST Config Guard</div>
+              <div class="satellite-val">
+                <span class="status-dot text-signal-green"></span>
+                <span>~/.claude/settings.json · MERGED</span>
+              </div>
+            </div>
+
+            <!-- Satellite 2: Bottom Left -->
+            <div class="satellite-card sat-bot-left">
+              <div class="satellite-label">Failover Dynamic Pivot</div>
+              <div class="satellite-val">
+                <span class="status-dot text-signal-amber"></span>
+                <span>429 Sensed → Backup_02 (41ms)</span>
+              </div>
+            </div>
+
+            <!-- Chassis -->
+            <div class="console-chassis">
+              <div class="console-header">
+                <div class="console-dots">
+                  <div class="console-dot console-dot-r"></div>
+                  <div class="console-dot console-dot-y"></div>
+                  <div class="console-dot console-dot-g"></div>
+                </div>
+                <span>clipal-core // 127.0.0.1:3333</span>
+                <span class="text-signal-green">STABLE</span>
+              </div>
+              <div class="console-body" id="hero-console-stream">
+                <div class="terminal-line dim">[$] clipal service start --unified-route=/clipal</div>
+                <div class="terminal-line success">✓ Clipal Gateway listening on http://127.0.0.1:3333/clipal</div>
+                <div class="terminal-line success">✓ 18 CLI configuration adapters ready with AST safety baseline</div>
+                <div class="terminal-line accent">✓ Protocol Normalizer: Anthropic | OpenAI | Gemini multiplexed</div>
+                <div class="terminal-line route">→ [claude-code] POST /clipal → claude-3-7-sonnet ✓ 241ms</div>
+                <div class="terminal-line warn">→ [codex] POST /clipal → gpt-4.1 [429 LIMIT] ✗ 18ms</div>
+                <div class="terminal-line accent">&nbsp;&nbsp;&nbsp;&nbsp;FAILOVER PIVOT → Azure_Backup [KEY_2] ✓ 389ms</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- ===================== ECOSYSTEM ===================== -->
-    <section id="ecosystem" aria-labelledby="ecosystem-heading">
+    <!-- ===================== SECTION 2: 18-CLI ORBITAL MATRIX ===================== -->
+    <section id="matrix" class="section">
       <div class="container">
-        <div class="section-header reveal">
-          <h2 class="section-title">Native Support for Claude Code, Codex & Antigravity CLI</h2>
-          <p class="section-sub">
-            Directly patches ~/.claude/settings.json & ~/.codex/config.toml.<br>
-            Clipal also serves as a unified proxy for Coding Agents such as Claude code, Codex, Antigravity CLI, Aider,
-            Continue ...,<br>
-            and AI Apps such as Jan, Cherry Studio, Chatbox, and any app supporting custom API endpoints or OAuth
-            upstreams (OpenRouter, new-api, sub2api, Claude OAuth, Codex OAuth, Antigravity Google OAuth).
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-cyan"></span>
+            <span>ECOSYSTEM INTEROP MATRIX</span>
+          </div>
+          <h2 class="section-title">The 18-CLI Orbital Matrix: Lossless AST Takeover</h2>
+          <p class="section-desc">
+            Never manually search for hidden configs again. Clipal parses AST syntax trees for JSON, YAML, and TOML with atomic backups and 1-click byte-exact rollback. Click any card to inspect the takeover contract.
           </p>
         </div>
-        <div class="ecosystem-track-container reveal">
 
-          <!-- Track 1: CORE PROTOCOLS (Static & Centered) -->
-          <div class="ecosystem-block">
-            <p class="ecosystem-label">Supported Protocols</p>
-            <div class="logo-row-static">
-              <div class="logo-item brand-light" title="OpenAI"><img src="assets/logos/openai.svg" alt="OpenAI"></div>
-              <div class="logo-item brand-light" title="Anthropic"><img src="assets/logos/anthropic.svg"
-                  alt="Anthropic"></div>
-              <div class="logo-item brand-light" title="Google"><img src="assets/logos/google.svg"
-                  alt="Google"></div>
-            </div>
-          </div>
-
-          <div class="ecosystem-divider" aria-hidden="true"></div>
-
-          <!-- Track 2: EXTENDED ECOSYSTEM (Unified High-Density Marquee) -->
-          <div class="ecosystem-block">
-            <p class="ecosystem-label">CLI Tools & AI LLM Applications</p>
-            <div class="marquee-row row-cli">
-              <div class="marquee-content">
-                <!-- Original Set (Mini Icons) -->
-                <div class="logo-item logo-eco brand-light" title="DeepSeek"><img src="assets/logos/deepseek.svg"
-                    alt="DeepSeek"></div>
-                <div class="logo-item logo-eco brand-light" title="Groq"><img src="assets/logos/groq.svg" alt="Groq">
-                </div>
-                <div class="logo-item logo-eco" title="Claude Code"><img src="assets/logos/claude-code.svg"
-                    alt="Claude Code"></div>
-                <div class="logo-item logo-eco brand-light" title="Codex CLI"><img src="assets/logos/codex-cli.svg"
-                    alt="Codex CLI"></div>
-                <div class="logo-item logo-eco brand-light" title="Antigravity CLI"><img src="assets/logos/google.svg"
-                    alt="Antigravity CLI"></div>
-                <div class="logo-item logo-eco brand-light" title="OpenCode"><img src="assets/logos/opencode.svg"
-                    alt="OpenCode"></div>
-                <div class="logo-item logo-eco brand-light" title="Cline"><img src="assets/logos/cline.svg" alt="Cline">
-                </div>
-                <div class="logo-item logo-eco" title="Aider"><img src="assets/logos/aider.svg" alt="Aider"></div>
-                <div class="logo-item logo-eco" title="Goose"><img src="assets/logos/goose.svg" alt="Goose"></div>
-                <div class="logo-item logo-eco" title="Continue"><img src="assets/logos/continue.svg" alt="Continue">
-                </div>
-                <div class="logo-item logo-eco" title="Cherry Studio"><img src="assets/logos/cherry-studio.svg"
-                    alt="Cherry Studio"></div>
-                <div class="logo-item logo-eco" title="OpenClaw"><img src="assets/logos/openclaw.svg" alt="OpenClaw">
-                </div>
-                <div class="logo-item logo-eco" title="LobeChat"><img src="assets/logos/lobehub.svg" alt="LobeChat">
-                </div>
-                <div class="logo-item logo-eco" title="Ollama"><img src="assets/logos/ollama.svg" alt="Ollama"></div>
-                <div class="logo-item logo-eco" title="Chatbox"><img src="assets/logos/chatbox.png" alt="Chatbox"></div>
-                <div class="logo-item logo-eco brand-light" title="Jan"><img src="assets/logos/jan.svg" alt="Jan"></div>
-                <div class="logo-item logo-eco brand-light" title="AnythingLLM"><img src="assets/logos/anythingllm.svg"
-                    alt="AnythingLLM"></div>
-
-                <!-- Duplicate Set (Mini Icons) -->
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/deepseek.svg"
-                    alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/groq.svg" alt="">
-                </div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/claude-code.svg" alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/codex-cli.svg"
-                    alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/google.svg"
-                    alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/opencode.svg"
-                    alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/cline.svg" alt="">
-                </div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/aider.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/goose.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/continue.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/cherry-studio.svg" alt="">
-                </div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/openclaw.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/lobehub.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/ollama.svg" alt=""></div>
-                <div class="logo-item logo-eco" aria-hidden="true"><img src="assets/logos/chatbox.png" alt=""></div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/jan.svg" alt="">
-                </div>
-                <div class="logo-item logo-eco brand-light" aria-hidden="true"><img src="assets/logos/anythingllm.svg"
-                    alt=""></div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== FEATURES ===================== -->
-    <section id="features" aria-labelledby="features-heading">
-      <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">Core Advantages</div>
-          <h2 id="features-heading" class="section-title">Advanced LLM Proxy Features. Built for Developer Workflows.
-          </h2>
-          <p class="section-sub">Three things that make Clipal the only LLM proxy worth
-            running.</p>
+        <div class="matrix-tabs" role="tablist" aria-label="CLI Category Filter">
+          <button type="button" class="matrix-tab-btn active" data-filter="all" role="tab">All Clients (18)</button>
+          <button type="button" class="matrix-tab-btn" data-filter="core" role="tab">Core Agents (4)</button>
+          <button type="button" class="matrix-tab-btn" data-filter="pairing" role="tab">Pairing Assistants (5)</button>
+          <button type="button" class="matrix-tab-btn" data-filter="enterprise" role="tab">Enterprise &amp; OSS (9)</button>
         </div>
 
-        <div class="fstrips">
+        <div class="matrix-grid" id="matrix-cards">
 
-          <!-- 01 One-Click CLI Takeover -->
-          <article class="fstrip reveal" id="feature-takeover">
-            <span class="fstrip-num" aria-hidden="true">01</span>
-            <div class="fstrip-content">
-              <div class="fstrip-text">
-                <div class="fstrip-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <polyline points="4 17 10 11 4 5" />
-                    <line x1="12" y1="19" x2="20" y2="19" />
-                  </svg>
-                </div>
-                <h3 class="fstrip-title">Universal LLM CLI Takeover</h3>
-                <p class="fstrip-desc">Stop hunting for hidden config files. Clipal
-                  natively patches <code>~/.claude/settings.json</code> and standard configuration files, transforming
-                  into a zero-configuration local reverse proxy for Claude Code, AI CLI tools, and Desktop apps without
-                  env-var pollution.
-                </p>
-                <div class="fstrip-tags" aria-label="Supported tools">
-                  <span class="ftag">Claude Code</span>
-                  <span class="ftag">Codex CLI</span>
-                  <span class="ftag">Antigravity CLI</span>
-                  <span class="ftag">Aider</span>
-                  <span class="ftag">Continue</span>
-                  <span class="ftag">Goose</span>
-                </div>
+          <!-- 01: Claude Code -->
+          <article class="cli-card" data-category="core" data-name="Claude Code" data-target="~/.claude/settings.json" data-details="Merges ANTHROPIC_BASE_URL into settings.json while preserving enabledPlugins. Scrubs Bedrock/Vertex headers and simulates Agent SDK transport." data-diff="  {&#10;    &quot;theme&quot;: &quot;dark&quot;,&#10;    &quot;enabledPlugins&quot;: [&quot;git-tools&quot;],&#10;+   &quot;env&quot;: {&#10;+     &quot;ANTHROPIC_BASE_URL&quot;: &quot;http://127.0.0.1:3333/clipal&quot;&#10;+   }&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/claude-code.svg" alt="Claude Code" width="28" height="28" loading="lazy">
               </div>
-              <div class="fstrip-visual">
-                <div class="fstrip-screenshot-frame">
-                  <img src="assets/screenshots/webui-cli-takeover.png"
-                    alt="Clipal Web UI interface showing universal one-click CLI takeover for Claude Code, Codex, and Antigravity CLI with automated setting.json patching"
-                    width="600" height="400" loading="lazy">
-                </div>
-              </div>
+              <span class="cli-tag">Core Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Claude Code</h3>
+              <span class="cli-target-path">~/.claude/settings.json</span>
+              <p class="cli-desc">Injects ANTHROPIC_BASE_URL with Agent SDK emulation, ending infinite /login loops.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> AST Verified</span>
+              <span>Inspect Contract →</span>
             </div>
           </article>
 
-          <div class="fstrip-sep" aria-hidden="true"></div>
-
-          <!-- 02 Bulletproof Failover -->
-          <article class="fstrip fstrip-rev reveal" id="feature-failover">
-            <span class="fstrip-num" aria-hidden="true">02</span>
-            <div class="fstrip-content">
-              <div class="fstrip-visual">
-                <div class="fv-diagram" aria-hidden="true">
-                  <!-- Animated SVG Diagram -->
-                  <div style="width: 100%; max-width: 600px; margin: 0 auto; padding-bottom: 20px;">
-                    <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg"
-                      style="font-family: var(--font-mono, monospace); width: 100%; height: auto; display: block;">
-                      <defs>
-                        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                          <polygon points="0 0, 8 4, 0 8" fill="rgba(255,255,255,0.2)" />
-                        </marker>
-                      </defs>
-
-                      <!-- App Req -->
-                      <rect class="svg-bg" x="20" y="52" width="80" height="30" />
-                      <text class="svg-text" x="60" y="68">App Req</text>
-
-                      <!-- Provider A Boundary -->
-                      <rect class="svg-bg" x="130" y="20" width="160" height="150" stroke-dasharray="4"
-                        fill="rgba(255,255,255,0.01)" />
-                      <text class="svg-label" x="140" y="40">PROVIDER A</text>
-
-                      <!-- Keys in Prov A -->
-                      <rect class="svg-key anim-key1" x="160" y="50" width="100" height="35" />
-                      <text class="svg-text" x="210" y="63">Key 1</text>
-                      <text class="svg-err-text anim-err1" x="210" y="78">429 Limit</text>
-
-                      <rect class="svg-key anim-key2" x="160" y="110" width="100" height="35" />
-                      <text class="svg-text" x="210" y="123">Key 2</text>
-                      <text class="svg-err-text anim-err2" x="210" y="138">429 Limit</text>
-
-                      <!-- Provider B Boundary -->
-                      <rect class="svg-bg" x="390" y="40" width="170" height="110" stroke-dasharray="4"
-                        fill="rgba(255,255,255,0.01)" />
-                      <text class="svg-label" x="400" y="60">PROVIDER B (Fallback)</text>
-
-                      <!-- Keys in Prov B -->
-                      <rect class="svg-key anim-key3" x="420" y="80" width="120" height="35" />
-                      <text class="svg-text" x="480" y="93">Key 1</text>
-                      <text class="svg-ok-text anim-ok" x="480" y="108">OK (Sticky)</text>
-
-                      <!-- Connections -->
-                      <path class="svg-arrow" d="M 100 67 L 155 67" marker-end="url(#arrowhead)" />
-                      <path class="svg-arrow" d="M 210 85 L 210 105" marker-end="url(#arrowhead)" />
-                      <path class="svg-arrow" d="M 260 127 L 330 127 L 330 97 L 415 97" marker-end="url(#arrowhead)" />
-
-                      <!-- The Traveling Packets -->
-                      <circle class="dot anim-dot1" cx="0" cy="0" r="3.5" />
-                      <circle class="dot anim-dot2" cx="0" cy="0" r="3.5" />
-                      <circle class="dot anim-dot3" cx="0" cy="0" r="3.5" />
-                    </svg>
-                  </div>
-                  <div class="fv-stats">
-                    <div class="fv-stat"><b>0</b><span>Dropped Requests</span></div>
-                    <div class="fv-stat"><b>∞</b><span>Keys per Provider</span>
-                    </div>
-                    <div class="fv-stat"><b>Auto</b><span>Failover</span></div>
-                  </div>
-                </div>
+          <!-- 02: Codex CLI -->
+          <article class="cli-card" data-category="core" data-name="Codex CLI" data-target="~/.codex/config.toml" data-details="Manages model_providers.clipal in TOML while preserving all user options and profiles to keep session history continuous." data-diff="  [model_providers.clipal]&#10;+ base_url = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ wire_protocol = &quot;chat_completions&quot;&#10;  temperature = 0.2">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/codex-cli.svg" alt="Codex CLI" width="28" height="28" loading="lazy">
               </div>
-              <div class="fstrip-text">
-                <div class="fstrip-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <polyline points="9 12 11 14 15 10" />
-                  </svg>
-                </div>
-                <h3 class="fstrip-title">Smart 429 Bypass & Failover Routing</h3>
-                <p class="fstrip-desc">Conquer strict 3rd-party API rate limits.
-                  Clipal manages shared token pools, instantly detecting 429 errors to gracefully rotate keys or
-                  failover to backup providers—all while preserving your contextual session state.</p>
-              </div>
+              <span class="cli-tag">Core Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Codex CLI</h3>
+              <span class="cli-target-path">~/.codex/config.toml</span>
+              <p class="cli-desc">Injects clipal provider section, preserving customized parameters and session context.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> TOML Preserved</span>
+              <span>Inspect Contract →</span>
             </div>
           </article>
 
-          <div class="fstrip-sep" aria-hidden="true"></div>
+          <!-- 03: OpenCode v2 -->
+          <article class="cli-card" data-category="core" data-name="OpenCode v2" data-target="opencode.json / config layers" data-details="Fully aligned with OpenCode v2 schema, redirecting base protocols while honoring wildcard policies and models.dev." data-diff="  {&#10;+   &quot;endpoint&quot;: &quot;http://127.0.0.1:3333/clipal&quot;,&#10;    &quot;model&quot;: &quot;clipal-routed-default&quot;&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/opencode.svg" alt="OpenCode" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Core Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>OpenCode v2</h3>
+              <span class="cli-target-path">opencode.json</span>
+              <p class="cli-desc">Realigns with v2 specs, routes protocol endpoints, and checks wildcard provider policies.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> v2 Aligned</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
 
-          <!-- 03 No Docker, No Python -->
-          <article class="fstrip reveal" id="feature-simple">
-            <span class="fstrip-num" aria-hidden="true">03</span>
-            <div class="fstrip-content">
-              <div class="fstrip-text">
-                <div class="fstrip-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path
-                      d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  </svg>
-                </div>
-                <h3 class="fstrip-title">Lightweight npm-first LLM Gateway</h3>
-                <p class="fstrip-desc">Unlike heavy Python proxies (like LiteLLM) or
-                  complex Docker deployments, Clipal installs with <code>npm install -g clipal</code> and runs as a
-                  high-performance Go gateway for macOS, Linux, and Windows. Standalone binaries remain available from
-                  GitHub Releases.</p>
+          <!-- 04: Antigravity CLI -->
+          <article class="cli-card" data-category="core" data-name="Antigravity CLI" data-target="Shell login files + Config Dir" data-details="Manages Bash/Zsh/sh login blocks, supporting full Gemini streaming and generateContent image generation." data-diff="  # === CLIPAL MANAGED BLOCK ===&#10;+ export ANTIGRAVITY_BASE_URL=&quot;http://127.0.0.1:3333/clipal&quot;&#10;  # === END CLIPAL MANAGED BLOCK ===">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/google.svg" alt="Antigravity CLI" width="28" height="28" loading="lazy">
               </div>
-              <div class="fstrip-visual">
-                <div class="cmp-viz" aria-hidden="true">
-                  <div class="cmp-block cmp-bad">
-                    <div class="cmp-label">❌ Other Solutions</div>
-                    <div class="cmp-code">pip install litellm
-                      docker-compose up -d
-                      <span class="t-cmt"># configure ports, env vars...</span>
-                      <span class="t-cmt"># 20+ minutes later...</span>
-                    </div>
-                  </div>
-                  <div class="cmp-vs">vs</div>
-                  <div class="cmp-block cmp-ok">
-                    <div class="cmp-label">✓ Clipal</div>
-                    <div class="cmp-code"><span class="t-cmd">chmod +x</span> clipal
-                      <span class="t-cmd">clipal service start</span>
-                      <span class="t-ok">✓ Running in 10 seconds</span>
-                    </div>
-                  </div>
-                </div>
+              <span class="cli-tag">Core Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Antigravity CLI</h3>
+              <span class="cli-target-path">.zshrc / .bashrc</span>
+              <p class="cli-desc">Isolated shell startup environment management with native Gemini vision and text support.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Shell Isolated</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 05: Goose -->
+          <article class="cli-card" data-category="pairing" data-name="Goose" data-target="config.yaml + custom_providers" data-details="Generates custom_providers/clipal.json and synchronizes global active_provider with environment pre-flight checks." data-diff="  active_provider: clipal&#10;  providers:&#10;+   clipal:&#10;+     base_url: &quot;http://127.0.0.1:3333/clipal&quot;">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/goose.svg" alt="Goose" width="28" height="28" loading="lazy">
               </div>
+              <span class="cli-tag">Pairing Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Goose</h3>
+              <span class="cli-target-path">~/.config/goose/config.yaml</span>
+              <p class="cli-desc">Activates clipal as global provider with built-in environment variable override prevention.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Dual-Sync</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 06: Aider -->
+          <article class="cli-card" data-category="pairing" data-name="Aider" data-target=".aider.conf.yml" data-details="Injects local OpenAI-compatible endpoint, preserving repository context and git commit mapping." data-diff="  openai-api-base: http://127.0.0.1:3333/clipal/v1&#10;  model: openai/clipal-auto">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/aider.svg" alt="Aider" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Pairing Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Aider</h3>
+              <span class="cli-target-path">~/.aider.conf.yml</span>
+              <p class="cli-desc">Seamlessly integrates with terminal Git pairing, routing requests with zero dropped contexts.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> YAML Intact</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 07: Pi -->
+          <article class="cli-card" data-category="pairing" data-name="Pi" data-target="~/.pi/agent/settings.json" data-details="Configures models.json providers.clipal with chat completions, keeping model metadata and auth untouched." data-diff="  &quot;providers&quot;: {&#10;+   &quot;clipal&quot;: { &quot;baseUrl&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/pi.svg" alt="Pi" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Pairing Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Pi</h3>
+              <span class="cli-target-path">~/.pi/agent/settings.json</span>
+              <p class="cli-desc">Configures dedicated completions endpoints while preserving authentication tokens.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Auto-Complete</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 08: Continue -->
+          <article class="cli-card" data-category="pairing" data-name="Continue" data-target="~/.continue/config.json" data-details="Injects dedicated Clipal model entries without interfering with existing models and extensions." data-diff="  &quot;models&quot;: [&#10;+   { &quot;title&quot;: &quot;Clipal&quot;, &quot;apiBase&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  ]">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/continue.svg" alt="Continue" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Pairing Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Continue</h3>
+              <span class="cli-target-path">~/.continue/config.json</span>
+              <p class="cli-desc">Appends dedicated model routing without altering existing provider catalogues.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Incremental</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 09: Crush -->
+          <article class="cli-card" data-category="pairing" data-name="Crush" data-target="crush.json" data-details="Manages standard JSON model provider entries and prevents conflicts with executable sibling scripts." data-diff="  {&#10;+   &quot;provider&quot;: &quot;clipal&quot;,&#10;+   &quot;base_url&quot;: &quot;http://127.0.0.1:3333/clipal&quot;&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/crush.svg" alt="Crush" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Pairing Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Crush</h3>
+              <span class="cli-target-path">crush.json</span>
+              <p class="cli-desc">Manages JSON provider routing while actively defending against machine-state conflicts.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Safe Injection</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 10: Qwen Code -->
+          <article class="cli-card" data-category="enterprise" data-name="Qwen Code" data-target="~/.qwen/settings.json" data-details="Normalizes modelProviders array and OpenAI auth selection across multiple config layers." data-diff="  &quot;modelProviders&quot;: [&#10;+   { &quot;id&quot;: &quot;clipal&quot;, &quot;url&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  ]">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/qwen.svg" alt="Qwen Code" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Open-Source</span>
+            </div>
+            <div class="cli-info">
+              <h3>Qwen Code</h3>
+              <span class="cli-target-path">~/.qwen/settings.json</span>
+              <p class="cli-desc">Adapts Qwen CLI model providers arrays and authentication selectors cleanly.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Array Merged</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 11: Kimi Code CLI -->
+          <article class="cli-card" data-category="enterprise" data-name="Kimi Code CLI" data-target="config.toml" data-details="Configures target provider with positive context window metadata, strictly separated from legacy kimi-cli." data-diff="  [provider.clipal]&#10;+ endpoint = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ context_window = 131072">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/kimi.svg" alt="Kimi Code" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Enterprise</span>
+            </div>
+            <div class="cli-info">
+              <h3>Kimi Code CLI</h3>
+              <span class="cli-target-path">config.toml</span>
+              <p class="cli-desc">Injects long-context metadata bindings, strictly isolating current kimi-code schemas.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Context Bound</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 12: Copilot CLI -->
+          <article class="cli-card" data-category="enterprise" data-name="Copilot CLI" data-target="Shell BYOK Environment" data-details="Follows official BYOK contract, unsetting conflicting commands while preserving credentials." data-diff="  # === CLIPAL COPILOT BYOK ===&#10;+ export COPILOT_MODEL_PROVIDER_URL=&quot;http://127.0.0.1:3333/clipal&quot;">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/copilot.svg" alt="Copilot CLI" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Official BYOK</span>
+            </div>
+            <div class="cli-info">
+              <h3>Copilot CLI</h3>
+              <span class="cli-target-path">BYOK Shell Environment</span>
+              <p class="cli-desc">Adheres to official BYOK contract without polluting or overriding credential vaults.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> BYOK Spec</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 13: Kilo CLI -->
+          <article class="cli-card" data-category="enterprise" data-name="Kilo CLI" data-target="kilo.json / opencode.json" data-details="Detects config precedence (kilo.json → kilo.jsonc → opencode.json) and rejects route shadowing." data-diff="  {&#10;+   &quot;provider&quot;: { &quot;clipal&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/kilo.svg" alt="Kilo CLI" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Geek Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Kilo CLI</h3>
+              <span class="cli-target-path">kilo.json</span>
+              <p class="cli-desc">Detects multi-layer config precedence and catches shadowing endpoint collisions.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Layer Probes</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 14: CodeBuddy -->
+          <article class="cli-card" data-category="enterprise" data-name="CodeBuddy" data-target="settings.json + models.json" data-details="Supplies full chat completions URL while preserving availableModels and authenticated vaults." data-diff="  {&#10;+   &quot;endpoint&quot;: &quot;http://127.0.0.1:3333/clipal/v1/chat/completions&quot;&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/codebuddy.svg" alt="CodeBuddy" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Companion</span>
+            </div>
+            <div class="cli-info">
+              <h3>CodeBuddy</h3>
+              <span class="cli-target-path">~/.codebuddy/settings.json</span>
+              <p class="cli-desc">Automatically completes full completions endpoints while preserving native registries.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Full URI Path</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 15: iFlow CLI -->
+          <article class="cli-card" data-category="enterprise" data-name="iFlow CLI" data-target="settings.json" data-details="Maps OpenAI-compatible base URL with strict case-variant environment priority handling." data-diff="  {&#10;+   &quot;baseUrl&quot;: &quot;http://127.0.0.1:3333/clipal&quot;,&#10;+   &quot;authType&quot;: &quot;bearer&quot;&#10;  }">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/iflow.svg" alt="iFlow CLI" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Flow Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>iFlow CLI</h3>
+              <span class="cli-target-path">~/.iflow/settings.json</span>
+              <p class="cli-desc">Injects OpenAI-compatible base URL and handles case-variant environment precedence.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Var Normalized</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 16: TRAE Agent -->
+          <article class="cli-card" data-category="enterprise" data-name="TRAE Agent" data-target="trae_config.yaml" data-details="Requires explicit absolute YAML target without inventing fake global directories, preserving auxiliary channels." data-diff="  model_providers:&#10;+   - name: clipal&#10;+     base_url: http://127.0.0.1:3333/clipal">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/trae.svg" alt="TRAE Agent" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Enterprise</span>
+            </div>
+            <div class="cli-info">
+              <h3>TRAE Agent</h3>
+              <span class="cli-target-path">trae_config.yaml</span>
+              <p class="cli-desc">Explicit absolute YAML takeover without invented paths, protecting auxiliary providers.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Path Protected</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 17: Grok Build -->
+          <article class="cli-card" data-category="enterprise" data-name="Grok Build" data-target="~/.grok/config.toml" data-details="Populates [model.clipal] for chat completions, obeying official xAI layer override rules." data-diff="  [model.clipal]&#10;+ url = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ protocol = &quot;openai&quot;">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/grok.svg" alt="Grok Build" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">xAI Agent</span>
+            </div>
+            <div class="cli-info">
+              <h3>Grok Build</h3>
+              <span class="cli-target-path">~/.grok/config.toml</span>
+              <p class="cli-desc">Configures custom model entries obeying official xAI multi-layer overlay restrictions.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> TOML Model</span>
+              <span>Inspect Contract →</span>
+            </div>
+          </article>
+
+          <!-- 18: DeepSeek Harness -->
+          <article class="cli-card" data-category="enterprise" data-name="DeepSeek Harness" data-target="cordis.patch.yml" data-details="Patches root sequence llm-pi-ai provider adapter, preserving plugins and preventing model overrides." data-diff="  - patch: llm-pi-ai&#10;+   endpoint: http://127.0.0.1:3333/clipal&#10;    default_model: deepseek-chat">
+            <div class="cli-card-top">
+              <div class="cli-icon-wrap">
+                <img src="assets/logos/deepseek.svg" alt="DeepSeek" width="28" height="28" loading="lazy">
+              </div>
+              <span class="cli-tag">Inference Suite</span>
+            </div>
+            <div class="cli-info">
+              <h3>DeepSeek Harness</h3>
+              <span class="cli-target-path">cordis.patch.yml</span>
+              <p class="cli-desc">Patches Cordis root sequence without corrupting plugins or credential mappings.</p>
+            </div>
+            <div class="cli-card-bottom">
+              <span class="cli-status-indicator"><span class="status-dot"></span> Cordis Patch</span>
+              <span>Inspect Contract →</span>
             </div>
           </article>
 
@@ -530,620 +598,413 @@
       </div>
     </section>
 
-    <!-- ===================== HOW IT WORKS / BLUEPRINT ===================== -->
-    <section id="how-it-works" aria-labelledby="hiw-heading">
+    <!-- ===================== SECTION 3: 4 DIMENSIONAL PILLARS ===================== -->
+    <section id="pillars" class="section">
       <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">Behind the Magic</div>
-          <h2 id="hiw-heading" class="section-title">The Clipal Blueprint</h2>
-          <p class="section-sub">How we engineer stability: zero config loss, zero auth loops, and
-            unified token pools.</p>
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-green"></span>
+            <span>HARDCORE ARCHITECTURE PILLARS</span>
+          </div>
+          <h2 class="section-title">The Four Pillars: Built for Demanding Developers</h2>
+          <p class="section-desc">No marketing fluff. From AST syntax parsing to offline micro-USD billing, every single line of code serves uninterrupted developer productivity.</p>
         </div>
 
-        <div class="blueprint-container reveal">
+        <div class="pillars-bento">
 
-          <!-- Animation Path Lines -->
-          <div class="bp-flow" aria-hidden="true">
-            <div class="bp-fline left">
-              <div class="bp-dot"></div>
+          <!-- Pillar 1 (col-7): AST Lossless Merge -->
+          <div class="bento-card col-7 hud-bracket">
+            <div>
+              <div class="bento-badge">PILLAR // 01 · LOSSLESS AST MERGE</div>
+              <h3 class="bento-title">Lossless AST Merging · Zero Configuration Pollution</h3>
+              <p class="bento-text">
+                Shoddy scripts wipe out your entire settings.json, erasing custom plugins, environment variables, and user flags. Clipal parses AST syntax trees for JSON, YAML, and TOML to surgically merge only required Base URLs. An immutable baseline snapshot is captured before applying, enabling byte-exact rollback in seconds.
+              </p>
             </div>
-            <div class="bp-fline right">
-              <div class="bp-dot"></div>
+            <div class="diff-viewer">
+              <div class="diff-line"><span class="diff-num">01</span><span>{</span></div>
+              <div class="diff-line"><span class="diff-num">02</span><span class="diff-keep">&nbsp;&nbsp;"theme": "dracula",</span></div>
+              <div class="diff-line"><span class="diff-num">03</span><span class="diff-keep">&nbsp;&nbsp;"enabledPlugins": ["git-guard@2.1", "rust-analyzer"],</span></div>
+              <div class="diff-line diff-add"><span class="diff-num">04</span><span>+ "env": { "ANTHROPIC_BASE_URL": "http://127.0.0.1:3333/clipal" }</span></div>
+              <div class="diff-line"><span class="diff-num">05</span><span>}</span></div>
             </div>
           </div>
 
-          <!-- Left: Inputs -->
-          <div class="bp-col">
-            <div class="bp-item">
-              <div class="bp-title">AI CLI Tools</div>
-              <div class="bp-desc">Claude Code / Codex / Antigravity CLI. Fragile local config
-                files securely patched.</div>
+          <!-- Pillar 2 (col-5): Bulletproof Failover -->
+          <div class="bento-card col-5 hud-bracket">
+            <div>
+              <div class="bento-badge">PILLAR // 02 · BULLETPROOF FAILOVER</div>
+              <h3 class="bento-title">Sub-Millisecond 429 Failover &amp; Sticky Sessions</h3>
+              <p class="bento-text">
+                Third-party API rate limits breaking your thought process? Clipal supports multi-key pools per provider. If an upstream hits 429, our circuit breaker seamlessly fails over across keys and providers in sub-milliseconds with session stickiness to prevent conversational context drift.
+              </p>
             </div>
-            <div class="bp-item">
-              <div class="bp-title">AI Desktop Apps</div>
-              <div class="bp-desc">Cherry Studio / OpenClaw / Chatwise. Unified behind one
-                stable gateway endpoint.</div>
-            </div>
-          </div>
-
-          <!-- Center: Core Container -->
-          <div class="bp-core">
-            <!-- Core 1 -->
-            <div class="bp-core-item">
-              <div class="bp-label">
-                <div class="bp-pulse" style="background:var(--green);box-shadow:0 0 8px var(--green)"></div>
-                <span>AST-Merge Engine</span>
-              </div>
-              <div class="bp-title">Non-Destructive Takeover</div>
-              <div class="bp-desc">Instead of overwriting settings.json, we parse the JSON
-                AST and surgically patch ANTHROPIC_BASE_URL. Your enabledPlugins and custom env variables remain 100%
-                untouched.</div>
-              <div class="bp-term" aria-hidden="true">
-                <div>"env": {</div>
-                <div class="diff-add">+ "ANTHROPIC_BASE_URL": <span class="str">"http://127.0.0.1:3333/clipal"</span>
+            <div class="pulse-flow-stage">
+              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); line-height:1.7">
+                <div style="display:flex; justify-content:space-between">
+                  <span>OpenRouter Key 1</span>
+                  <span class="text-signal-red">[429 RATE LIMIT]</span>
                 </div>
-                <div>}</div>
+                <div style="margin: 0.35rem 0; border-left: 2px solid var(--signal-amber); padding-left: 0.6rem; color:var(--signal-amber)">
+                  ↳ Sub-ms automatic rotation to Key 2...
+                </div>
+                <div style="display:flex; justify-content:space-between">
+                  <span>OpenRouter Key 2</span>
+                  <span class="text-signal-green">[200 OK · Session Locked]</span>
+                </div>
               </div>
-            </div>
-
-            <!-- Core 2 -->
-            <div class="bp-core-item">
-              <div class="bp-label">
-                <div class="bp-pulse" style="background:var(--gold);box-shadow:0 0 8px var(--gold)"></div>
-                <span>Protocol Normalizer</span>
-              </div>
-              <div class="bp-title">Socket-Level Header Scrubbing</div>
-              <div class="bp-desc">Tired of Login Loops? Clipal actively scrubs conflicting
-                Host headers and injects accurate API tokens at the proxy layer, enabling flawless AWS Bedrock / Google
-                Vertex connections.</div>
-              <svg viewBox="0 0 300 40" style="width:100%; height:40px; margin-top:1.2rem; display:block;"
-                aria-hidden="true">
-                <rect class="mini-bg" x="0" y="5" width="50" height="30" />
-                <text class="mini-txt" x="25" y="21" fill="#dcdcaa">Client</text>
-
-                <path class="mini-arr" d="M 50 20 L 95 20" />
-
-                <rect class="mini-bg m-scrub" x="95" y="5" width="85" height="30" stroke="rgba(168,85,247,0.3)"
-                  fill="rgba(168,85,247,0.15)" />
-                <text class="mini-txt" x="137.5" y="16" fill="#e9d5ff">Scrub 401</text>
-                <text class="mini-txt" x="137.5" y="28" fill="#e9d5ff">Inject Sig</text>
-
-                <path class="mini-arr" d="M 180 20 L 225 20" />
-
-                <rect class="mini-bg" x="225" y="5" width="60" height="30" />
-                <text class="mini-txt" x="255" y="21" fill="#ce9178">Upstream</text>
-
-                <circle class="m-dot1" cx="0" cy="20" r="2.5" />
-                <circle class="m-dot2" cx="0" cy="20" r="2.5" />
-              </svg>
-            </div>
-
-            <!-- Core 3 -->
-            <div class="bp-core-item">
-              <div class="bp-label">
-                <div class="bp-pulse" style="background:#3b82f6;box-shadow:0 0 8px #3b82f6"></div> <span>Routing
-                  Multi-Pool</span>
-              </div>
-              <div class="bp-title">Intelligent 429 & Sticky Sessions</div>
-              <div class="bp-desc">Built for 3rd-party APIs. When a single Key hits 429 rate
-                limits, Clipal instantly diverts to the next available Key within the same Provider, while enforcing
-                Context Sticky Sessions so conversations never lose state.</div>
-              <svg viewBox="0 0 300 65" style="width:100%; height:65px; margin-top:1.2rem; display:block;"
-                aria-hidden="true">
-                <rect class="mini-bg" x="0" y="5" width="75" height="30" />
-                <text class="mini-txt" x="37.5" y="21">Provider A</text>
-
-                <path class="mini-arr" d="M 75 20 L 120 20" />
-                <path class="mini-arr" d="M 125 30 L 125 40" />
-
-                <rect class="mini-bg b-k1" x="120" y="5" width="100" height="20" />
-                <text class="mini-txt" x="170" y="16" fill="#ef4444">Key 1 (429)</text>
-
-                <rect class="mini-bg b-k2" x="100" y="40" width="120" height="20" />
-                <text class="mini-txt" x="160" y="51" fill="#10b981">Key 2 (Sticky)</text>
-
-                <circle class="b-dot1" cx="0" cy="0" r="2.5" />
-                <circle class="b-dot2" cx="0" cy="0" r="2.5" />
-              </svg>
-            </div>
-
-            <!-- Core 4 -->
-            <div class="bp-core-item">
-              <div class="bp-label">
-                <div class="bp-pulse" style="background:#eab308;box-shadow:0 0 8px #eab308"></div> <span>Hierarchical
-                  Failover</span>
-              </div>
-              <div class="bp-title">Multi-Provider Fallback</div>
-              <div class="bp-desc">Total endpoint outage? If a Primary Provider exhausts all
-                keys or goes offline, priority-based hierarchical routing seamlessly cascades traffic to your Fallback
-                Provider. Zero downtime.</div>
-              <svg viewBox="0 0 300 40" style="width:100%; height:40px; margin-top:1.2rem; display:block;"
-                aria-hidden="true">
-                <rect class="mini-bg" x="0" y="5" width="60" height="30" />
-                <text class="mini-txt" x="30" y="21">App Req</text>
-
-                <path class="mini-arr" d="M 60 20 L 100 20" />
-
-                <rect class="mini-bg c-b1" x="100" y="5" width="90" height="30" />
-                <text class="mini-txt" x="145" y="21">Pri 1 (Dead)</text>
-
-                <path class="mini-arr" d="M 190 20 L 230 20" />
-
-                <rect class="mini-bg c-b2" x="230" y="5" width="70" height="30" />
-                <text class="mini-txt" x="265" y="21">Fallback 2</text>
-
-                <circle class="c-dot1" cx="0" cy="20" r="2.5" />
-                <circle class="c-dot2" cx="0" cy="20" r="2.5" />
-              </svg>
             </div>
           </div>
 
-          <!-- Right: Upstreams -->
-          <div class="bp-col">
-            <div class="bp-item">
-              <div class="bp-title">Anthropic / Bedrock</div>
-              <div class="bp-desc">Claude OAuth uses an Agent SDK-compatible envelope with Clipal-generated transport headers.
+          <!-- Pillar 3 (col-5): Native OAuth Subsystem -->
+          <div class="bento-card col-5 hud-bracket">
+            <div>
+              <div class="bento-badge">PILLAR // 03 · NATIVE OAUTH HUB</div>
+              <h3 class="bento-title">Claude, Codex &amp; Google Accounts Seamlessly Linked</h3>
+              <p class="bento-text">
+                Authorize your Claude Pro/Max, Codex, or Google (Antigravity) accounts directly in the Web UI. Clipal automatically refreshes access tokens, emulates Agent SDK transport layers, and handles authentication headers to eliminate infinite /login loops.
+              </p>
+            </div>
+            <div class="oauth-badge-grid">
+              <div class="oauth-box">
+                <div class="oauth-box-name">Claude OAuth</div>
+                <div class="oauth-box-meta">✓ Agent SDK Wire</div>
+              </div>
+              <div class="oauth-box">
+                <div class="oauth-box-name">Codex OAuth</div>
+                <div class="oauth-box-meta">✓ Auto Token Renewal</div>
+              </div>
+              <div class="oauth-box">
+                <div class="oauth-box-name">Antigravity OAuth</div>
+                <div class="oauth-box-meta">✓ Gemini Text &amp; Vision</div>
+              </div>
+              <div class="oauth-box">
+                <div class="oauth-box-name">Region Spoofing</div>
+                <div class="oauth-box-meta">US / America_NY</div>
               </div>
             </div>
-            <div class="bp-item">
-              <div class="bp-title">OpenAI / Custom Models</div>
-              <div class="bp-desc">Codex OAuth normalizes Responses requests into Agent SDK-compatible upstream shape.
-              </div>
+          </div>
+
+          <!-- Pillar 4 (col-7): Offline Micro-USD Pricing -->
+          <div class="bento-card col-7 hud-bracket">
+            <div>
+              <div class="bento-badge">PILLAR // 04 · PRECISION PRICING</div>
+              <h3 class="bento-title">Offline Embedded Pricing · Zero Latency Overhead</h3>
+              <p class="bento-text">
+                Never wait on external billing APIs. Clipal embeds an immutable snapshot of PAIArtCom/model-specs directly inside the binary. Computes standard rates, prompt caching discounts, 200K/272K context tiers, and Fast Mode multipliers with micro-USD precision (1 USD = 1,000,000 micros).
+              </p>
             </div>
-            <div class="bp-item">
-              <div class="bp-title">Google Vertex / AI Studio</div>
-              <div class="bp-desc">Rotating quotas softly, bypassing RPS limits
-                transparently.</div>
+            <div class="pricing-ticker-box">
+              <div>
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); text-transform:uppercase">Estimated Session Cost</div>
+                <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem">Claude 3.7 Sonnet (150K Tokens · 88% Cache Hit)</div>
+              </div>
+              <div class="pricing-ticker-val" id="pricing-ticker-val">$0.042189</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SECTION 4: SPATIAL WEB UI TOUR ===================== -->
+    <section id="tour" class="section">
+      <div class="container">
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-cyan"></span>
+            <span>LOCAL MISSION CONTROL</span>
+          </div>
+          <h2 class="section-title">A Real-World Local Mission Control</h2>
+          <p class="section-desc">Manage API providers, CLI takeovers, global proxies, and real-time request logs directly in your browser. All configuration updates are hot-reloaded instantly.</p>
+        </div>
+
+        <div class="tour-tabs" role="tablist">
+          <button type="button" class="tour-tab-btn active" data-tour="providers" role="tab">Providers Topology</button>
+          <button type="button" class="tour-tab-btn" data-tour="takeover" role="tab">CLI Takeover Bay</button>
+          <button type="button" class="tour-tab-btn" data-tour="settings" role="tab">Global Network</button>
+          <button type="button" class="tour-tab-btn" data-tour="status" role="tab">Real-Time Telemetry</button>
+        </div>
+
+        <div class="tour-viewport">
+          <div class="tour-viewport-bar">
+            <div class="console-dots">
+              <div class="console-dot console-dot-r"></div>
+              <div class="console-dot console-dot-y"></div>
+              <div class="console-dot console-dot-g"></div>
+            </div>
+            <span>http://127.0.0.1:3333/ — Clipal Mission Console</span>
+            <span class="tag-badge text-signal-green" id="tour-badge">Hot Reload · Multi-Key Pool</span>
+          </div>
+
+          <div class="tour-frame">
+            <img src="assets/screenshots/providers.png" alt="Clipal Providers Management Interface" class="tour-img active" data-tour-img="providers" loading="lazy">
+            <img src="assets/screenshots/takeover.png" alt="Clipal 18-CLI Takeover Center" class="tour-img" data-tour-img="takeover" loading="lazy">
+            <img src="assets/screenshots/settings.png" alt="Clipal Settings and Network Controls" class="tour-img" data-tour-img="settings" loading="lazy">
+            <img src="assets/screenshots/status.png" alt="Clipal Real-Time Telemetry and Request Dashboard" class="tour-img" data-tour-img="status" loading="lazy">
+          </div>
+
+          <div class="tour-caption">
+            <div class="tour-caption-text">
+              <h4 id="tour-title">Providers Topology &amp; Multi-Key Pool</h4>
+              <p id="tour-desc">Intelligently group and manage upstream providers by client. Seamlessly switch between Auto failover and Manual pinned modes, input multi-line keys per provider, and observe real-time health: active, standby, cooldown timer, and recovery probes.</p>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ===================== COMPARISON & CAPABILITIES ===================== -->
-    <section id="why-clipal" aria-labelledby="why-heading">
+    <!-- ===================== SECTION 5: COMPETITOR MATRIX ===================== -->
+    <section id="comparison" class="section">
       <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">The Competitive Edge</div>
-          <h2 id="why-heading" class="section-title">Why Developers Switch to Clipal</h2>
-          <p class="section-sub">Beyond simple proxying — Clipal is the infrastructure that
-            cc-switch and ccNexus users have been waiting for.</p>
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-amber"></span>
+            <span>ARCHITECTURAL SUPERIORITY</span>
+          </div>
+          <h2 class="section-title">Why Demanding Developers Anchor to Clipal</h2>
+          <p class="section-desc">A ruthlessly efficient balance between overhead, privacy, takeover depth, and sub-millisecond response times.</p>
         </div>
 
-        <div class="comparison-grid reveal">
-          <!-- Comparison Table -->
-          <div class="comp-table-wrap glass-card">
-            <table class="comp-table" role="grid">
-              <thead>
-                <tr>
-                  <th>Feature / Tool</th>
-                  <th>cc-switch</th>
-                  <th>ccNexus</th>
-                  <th class="col-clipal">Clipal</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Binary-only (No Docker)</td>
-                  <td>✗ (Script)</td>
-                  <td>✓</td>
-                  <td class="col-clipal">✓</td>
-                </tr>
-                <tr>
-                  <td>Claude / Codex / Antigravity CLI Takeover</td>
-                  <td>Limited</td>
-                  <td>✓</td>
-                  <td class="col-clipal">Unified</td>
-                </tr>
-                <tr>
-                  <td>API Provider Multi-key Pools</td>
-                  <td>✗</td>
-                  <td>✓</td>
-                  <td class="col-clipal">Bulletproof</td>
-                </tr>
-                <tr>
-                  <td>Universal Base-url Support</td>
-                  <td>✓</td>
-                  <td>✓</td>
-                  <td class="col-clipal">✓ (w/ Metrics)</td>
-                </tr>
-                <tr>
-                  <td>Non-destructive Config Merge</td>
-                  <td>✗ (Overwrites)</td>
-                  <td>✓</td>
-                  <td class="col-clipal">✓ (Safeguarded)</td>
-                </tr>
-                <tr>
-                  <td>Protocol Auth Emulation</td>
-                  <td>Limited</td>
-                  <td>✗</td>
-                  <td class="col-clipal">✓ (No Loops)</td>
-                </tr>
-                <tr>
-                  <td>Real-time Flow Monitoring</td>
-                  <td>✗ (Blackbox)</td>
-                  <td>✓</td>
-                  <td class="col-clipal">✓ (One-click)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Deep Integration Spotlights -->
-          <div class="why-highlights-header reveal">
-            <h5>Specialized Tool Optimizations</h5>
-          </div>
-          <div class="why-cards reveal">
-            <article class="why-card">
-              <div class="why-card-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-              </div>
-              <div class="why-card-tag">Deep Integration</div>
-              <h4>Claude Code Proxy: Native & Powerful</h4>
-              <p>Directly hijacking <code>ANTHROPIC_BASE_URL</code> without environment
-                pollution. Perfect for relaying requests to Bedrock, Vertex AI, or any 3rd-party Claude Mirror without
-                protocol header errors. OAuth requests use a lightweight Agent SDK envelope with transport fields
-                handled by Clipal.</p>
-            </article>
-
-            <article class="why-card">
-              <div class="why-card-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              </div>
-              <div class="why-card-tag">Quota Management</div>
-              <h4>Antigravity CLI: Bypass RPS Limits</h4>
-              <p>Distribute requests across multiple Google Gemini API keys. Automatically
-                fallback to Flash models via weighted pools when Pro quotas hit their ceiling.</p>
-            </article>
-          </div>
+        <div class="matrix-table-wrap">
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>Technical Dimension</th>
+                <th>Manual Config / Shell Aliases</th>
+                <th>Heavy Docker Proxy (e.g. LiteLLM)</th>
+                <th>Cloud Aggregator (e.g. One-API)</th>
+                <th class="th-clipal">Clipal Local Gateway (v0.31+)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Runtime Footprint</strong></td>
+                <td>0MB (Fragile &amp; error-prone)</td>
+                <td>Heavy (Docker + Python, &gt;300MB RAM)</td>
+                <td>Requires VPS, MySQL &amp; complex ops</td>
+                <td class="td-clipal">Ultra-light (Go binary, &lt;50MB RAM)</td>
+              </tr>
+              <tr>
+                <td><strong>Internal Routing Latency</strong></td>
+                <td>0ms</td>
+                <td>15ms ~ 45ms (Python runtime overhead)</td>
+                <td>Subject to public network hops (50-200ms)</td>
+                <td class="td-clipal">&lt; 1ms (Native goroutines zero overhead)</td>
+              </tr>
+              <tr>
+                <td><strong>CLI Local Takeover</strong></td>
+                <td>❌ Manual editing, easily corrupted</td>
+                <td>❌ No client configuration awareness</td>
+                <td>❌ No client configuration awareness</td>
+                <td class="td-clipal">✓ 18 CLI tools 1-click AST merge &amp; rollback</td>
+              </tr>
+              <tr>
+                <td><strong>Native OAuth Hub</strong></td>
+                <td>❌ Cannot maintain auto-refresh</td>
+                <td>❌ API Keys only</td>
+                <td>Unstable external plugins</td>
+                <td class="td-clipal">✓ Claude, Codex &amp; Google OAuth with biometrics</td>
+              </tr>
+              <tr>
+                <td><strong>Network &amp; DoH Fallback</strong></td>
+                <td>❌ Vulnerable to handshake resets</td>
+                <td>Manual container network bridging</td>
+                <td>Limited to external server network</td>
+                <td class="td-clipal">✓ SOCKS5/HTTP proxy inheritance + Cloudflare/Google DoH</td>
+              </tr>
+              <tr>
+                <td><strong>Offline Micro-USD Pricing</strong></td>
+                <td>❌ None</td>
+                <td>Requires live online catalog fetches</td>
+                <td>Depends on server-side pricing updates</td>
+                <td class="td-clipal">✓ Embedded model-specs offline calculation</td>
+              </tr>
+              <tr>
+                <td><strong>Privacy &amp; Key Security</strong></td>
+                <td>Exposed in plain text dotfiles</td>
+                <td>Exposed in container environments</td>
+                <td>Keys stored in remote third-party databases</td>
+                <td class="td-clipal">✓ 100% local, AES encrypted config.json</td>
+              </tr>
+              <tr>
+                <td><strong>System Background Daemon</strong></td>
+                <td>❌ Dies on terminal close</td>
+                <td>Depends on Docker daemon</td>
+                <td>Depends on remote hosting</td>
+                <td class="td-clipal">✓ Native `clipal service` background daemon</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <!-- ===================== INSTALL GUIDE ===================== -->
-    <section id="install" aria-labelledby="install-heading">
+    <!-- ===================== SECTION 6: INSTALLATION PROTOCOLS ===================== -->
+    <section id="install" class="section">
       <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">Quick Start</div>
-          <h2 id="install-heading" class="section-title">Up and Running Clipal in Minutes</h2>
-          <p class="section-sub">Choose your preferred installation method.</p>
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-green"></span>
+            <span>RAPID DEPLOYMENT PROTOCOLS</span>
+          </div>
+          <h2 class="section-title">Up and Running in 60 Seconds</h2>
+          <p class="section-desc">No Docker, no Python virtualenvs. Pick your preferred deployment protocol.</p>
         </div>
 
-        <div class="install-wrap reveal">
-          <div class="install-tabs-nav" role="tablist" aria-label="Install method">
-            <button class="itab active" role="tab" aria-selected="true" aria-controls="panel-ai" id="tab-ai"
-              data-tab="ai">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4l3 3" />
-              </svg>
-              <span>Let AI Install for Me</span>
-            </button>
-            <button class="itab" role="tab" aria-selected="false" aria-controls="panel-manual" id="tab-manual"
-              data-tab="manual">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                aria-hidden="true">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-              <span>Manual Install</span>
-            </button>
-            <button class="itab" role="tab" aria-selected="false" aria-controls="panel-script" id="tab-script"
-              data-tab="script">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                aria-hidden="true">
-                <path d="M4 17l6-6-6-6" />
-                <path d="M12 19h8" />
-              </svg>
-              <span>One-line Install</span>
-            </button>
+        <div style="max-width: 820px; margin: 0 auto">
+          <div class="install-tabs" role="tablist">
+            <button type="button" class="install-tab-btn active" data-install-tab="ai" role="tab">Let AI Install It (Agent-First)</button>
+            <button type="button" class="install-tab-btn" data-install-tab="npm" role="tab">npm One-Click</button>
+            <button type="button" class="install-tab-btn" data-install-tab="script" role="tab">Standalone Script / Binary</button>
           </div>
 
-          <!-- AI Install Panel -->
-          <div class="itab-panel active" id="panel-ai" role="tabpanel" aria-labelledby="tab-ai">
-            <p class="install-hint">Copy this prompt and paste it into <strong>Claude
-                Code</strong>, <strong>Aider</strong>, or <strong>Goose</strong> — it will handle the entire binary
-              installation and <code>PATH</code> setup for you:</p>
-            <div class="prompt-card">
-              <div class="prompt-header">
-                <span class="prompt-tag">PROMPT</span>
-                <button class="copy-btn" id="copy-ai-prompt">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    aria-hidden="true">
-                    <rect x="9" y="9" width="13" height="13" rx="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                  <span>Copy</span>
-                </button>
-              </div>
-              <pre class="prompt-text" id="ai-prompt-content">Please help me install and start Clipal. Project: https://github.com/PAIArtCom/Clipal
-
-Please use the recommended npm installation first: npm install -g clipal. Current Clipal npm packages use platform optional dependencies and do not need --allow-scripts on npm 12+. If optional dependencies are skipped, reinstall with npm install -g clipal --include=optional. If npm is unavailable, use the one-line installer: curl -fsSL https://clipal.paiart.com/install.sh | sh on macOS/Linux, or powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex" on Windows. You can also fall back to the GitHub Releases binary. Then start Clipal and confirm that I can open the Web UI successfully. Use these official links when needed:
-- npm package: https://www.npmjs.com/package/clipal
-- GitHub repository: https://github.com/PAIArtCom/Clipal
-- Releases fallback: https://github.com/PAIArtCom/Clipal/releases
-- Getting Started: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md
-- Web UI Guide: https://github.com/PAIArtCom/Clipal/blob/main/docs/en/web-ui.md
-
-After that, guide me through using the Web UI to enable CLI takeover and add my first provider.</pre>
-            </div>
-          </div>
-
-          <!-- Manual Install Panel -->
-          <div class="itab-panel" id="panel-manual" role="tabpanel" aria-labelledby="tab-manual">
-            <div class="manual-steps">
-
-              <div class="mstep">
-                <div class="mstep-num">1</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">Install from npm</h4>
-                  <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmd">npm install -g clipal</span>
-                  </div>
-                  <p class="mstep-desc" style="margin-top:10px">Current npm packages use platform optional
-                    dependencies and need no install scripts. If optional dependencies were skipped, run
-                    <code>npm install -g clipal --include=optional</code>.</p>
-                  <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
-                    class="btn-secondary" id="manual-dl-btn" style="margin-top:12px;display:inline-flex">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                      aria-hidden="true">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <span id="manual-dl-text">Standalone binaries</span>
-                  </a>
-                </div>
-              </div>
-
-              <div class="mstep">
-                <div class="mstep-num">2</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">Start Clipal</h4>
-                  <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmd">clipal service install</span><br>
-                    <span class="t-cmd">clipal service start</span><br>
-                    <span class="t-ok">✓ Running on http://127.0.0.1:3333</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mstep">
-                <div class="mstep-num">3</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">Open Web UI & Configure</h4>
-                  <p class="mstep-desc">Visit <code>http://127.0.0.1:3333</code> to add
-                    your API keys, apply CLI Takeover, and manage providers.</p>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- One-line Install Panel -->
-          <div class="itab-panel" id="panel-script" role="tabpanel" aria-labelledby="tab-script">
-            <div class="manual-steps">
-              <div class="mstep">
-                <div class="mstep-num">1</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">macOS &amp; Linux</h4>
-                  <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
-                  </div>
-                  <p class="mstep-desc" style="margin-top:10px">Downloads the matching release asset, verifies
-                    <code>checksums.txt</code>, and installs to <code>~/.local/bin</code>.</p>
-                </div>
-              </div>
-              <div class="mstep">
-                <div class="mstep-num">2</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">Windows</h4>
-                  <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmd">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</span>
-                  </div>
-                  <p class="mstep-desc" style="margin-top:10px">Installs to <code>%LOCALAPPDATA%\Programs\clipal</code>
-                    and adds it to your user <code>PATH</code>.</p>
-                </div>
-              </div>
-              <div class="mstep">
-                <div class="mstep-num">3</div>
-                <div class="mstep-body">
-                  <h4 class="mstep-title">Start Clipal</h4>
-                  <div class="code-block" style="margin-top:12px">
-                    <span class="t-cmd">clipal service install</span><br>
-                    <span class="t-cmd">clipal service start</span><br>
-                    <span class="t-ok">✓ Running on http://127.0.0.1:3333</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== FAQ ===================== -->
-    <section id="faq" aria-labelledby="faq-heading">
-      <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">F.A.Q.</div>
-          <h2 id="faq-heading" class="section-title">Frequently Asked Questions for Clipal</h2>
-        </div>
-
-        <div class="faq-grid reveal">
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Is Clipal a local SaaS or cloud proxy?</h4>
-            <p class="faq-a">Neither. Clipal is a standalone <strong>local binary</strong>. Your API
-              keys are stored in an encrypted <code>config.json</code> on your own machine. Zero cloud storage, zero
-              data leakage.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Can I use Clipal with OpenRouter, new-api, or sub2api for both Claude Code and
-              OpenAI-based tools?</h4>
-            <p class="faq-a">Yes. Clipal natively supports <strong>OpenAI-compatible</strong>, <strong>Anthropic
-                Claude</strong>, and <strong>Google Gemini</strong> protocols. You can route your Claude Code terminal,
-              OpenAI-powered <strong>Codex</strong>, and Antigravity CLI traffic through any third-party provider or local
-              endpoint effortlessly.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">How does Clipal solve the "429 Too Many Requests" error for aggregate APIs?</h4>
-            <p class="faq-a">Clipal provides a multi-dimensional reliability layer. Beyond single-provider
-              <strong>multi-key rotation</strong>, it supports <strong>multi-provider concurrency</strong> and
-              <strong>intelligent sticky sessions</strong>. If your primary OpenRouter key hits a rate limit, Clipal
-              instantly diverts to another key or provider while ensuring your session context remains consistent.
+          <!-- Panel 1: Agent Prompt -->
+          <div class="install-panel active" id="install-panel-ai">
+            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
+              Using <strong>Claude Code</strong>, <strong>Codex CLI</strong>, or any terminal-capable AI agent? Paste this prompt directly into your agent:
             </p>
+            <div class="prompt-copy-box">
+              <div class="prompt-copy-header">
+                <span>INSTALLATION PROMPT FOR CODING AGENTS</span>
+                <button type="button" class="tag-badge" style="cursor:pointer" data-copy="Please help me install and launch Clipal, the local LLM gateway. Official repo: https://github.com/PAIArtCom/Clipal
+
+Please follow these steps:
+1. Prefer global npm install: npm install -g clipal (the package uses platform optional dependencies, npm 12+ does not need --allow-scripts).
+2. If npm is not available, use the official standalone installer:
+   - macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
+   - Windows (PowerShell): powershell -ExecutionPolicy ByPass -c &quot;irm https://clipal.paiart.com/install.ps1 | iex&quot;
+3. Once installed, run clipal service install && clipal service start, and confirm http://127.0.0.1:3333 is reachable.
+4. Finally, guide me in the Web UI to enable 1-click CLI takeover and add my first provider or OAuth account.">Copy Prompt</button>
+              </div>
+              <div class="prompt-copy-content">Please help me install and launch Clipal, the local LLM gateway. Official repo: https://github.com/PAIArtCom/Clipal
+
+Please follow these steps:
+1. Prefer global npm install: npm install -g clipal (the package uses platform optional dependencies, npm 12+ does not need --allow-scripts).
+2. If npm is not available, use the official standalone installer:
+   - macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
+   - Windows (PowerShell): powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+3. Once installed, run clipal service install && clipal service start, and confirm http://127.0.0.1:3333 is reachable.
+4. Finally, guide me in the Web UI to enable 1-click CLI takeover and add my first provider or OAuth account.</div>
+            </div>
           </div>
 
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Does using Clipal for Codex affect my chat history or session stability?</h4>
-            <p class="faq-a">In fact, it makes it more stable. For <strong>Codex/OpenCode</strong>, Clipal uses a
-              standardized <code>model_provider = "clipal"</code> configuration. Unlike other proxies that force
-              provider changes (which resets history), Clipal keeps the provider constant while swapping the underlying
-              endpoints in the background, preserving all your context and history.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">How is Clipal different from cc-switch?</h4>
-            <p class="faq-a">While cc-switch manages multiple configs, Clipal is a
-              <strong>high-performance gateway</strong> that supports complex multi-key token pools, deep config
-              injection for <code>settings.json</code>, and real-time observability.
+          <!-- Panel 2: npm -->
+          <div class="install-panel" id="install-panel-npm">
+            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
+              Clipal npm packages distribute native binaries through platform optional dependencies. In npm 12+, no postinstall scripts are required.
             </p>
+            <div class="diff-viewer" style="margin-bottom:1rem">
+              <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">npm install -g clipal</span></div>
+              <div class="diff-line"><span class="diff-num">2</span><span class="diff-add">clipal service install</span></div>
+              <div class="diff-line"><span class="diff-num">3</span><span class="diff-add">clipal service start</span></div>
+            </div>
+            <button type="button" class="btn-primary" data-copy="npm install -g clipal && clipal service install && clipal service start">Copy Install Commands</button>
           </div>
 
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Does Clipal solve "Invalid API Key" for Bedrock?</h4>
-            <p class="faq-a">Yes. Most proxies break when talking to Bedrock/Vertex via Claude Code
-              due to header strictness. Clipal provides <strong>native protocol emulation</strong> to fix these issues
-              at the socket level.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Is there any performance overhead?</h4>
-            <p class="faq-a">Negligible. Written in Go, Clipal processes requests in microseconds. It
-              consumes less than 50MB of RAM, far more efficient than Node.js or Python-based proxies.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">How does Clipal protect my existing configuration?</h4>
-            <p class="faq-a">Unlike other tools that overwrite your settings, Clipal uses a
-              non-destructive AST-merging strategy to patch <strong>settings.json</strong>. We only update necessary
-              fields and preserve your
-              <code>enabledPlugins</code>, custom environment variables, and manual tweaks.
+          <!-- Panel 3: Scripts -->
+          <div class="install-panel" id="install-panel-script">
+            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
+              Detects your operating system architecture, downloads the release asset, and verifies integrity against <code>checksums.txt</code>.
             </p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">I'm tired of the "Login Loop" in Claude Code. Can Clipal fix this?</h4>
-            <p class="faq-a">Yes. Most Login Loops are caused by incorrect header handling when
-              proxying. Clipal's <strong>protocol emulation layer</strong> ensures headers are properly scrubbed and
-              injected, keeping
-              your session stable without repeated authentication prompts.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">How do I know if the proxy is actually working?</h4>
-            <p class="faq-a">Clipal provides a <strong>real-time observability dashboard</strong>.
-              You can see the full
-              request flow, response times, and error codes in one click. If a request fails, we'll tell you exactly if
-              it was a network timeout or an invalid key.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">npm 12 says install scripts were blocked. What should I do?</h4>
-            <p class="faq-a">Current Clipal npm packages no longer use install scripts: they ship the binary through
-              platform optional dependencies, so npm 12+ installs work without <code>--allow-scripts</code>. If you
-              install an older version that used a <code>postinstall</code> download, use
-              <code>npm install -g clipal --allow-scripts=clipal</code>.</p>
-          </div>
-
-          <div class="faq-item glass-card">
-            <h4 class="faq-q">Can I install Clipal without npm?</h4>
-            <p class="faq-a">Yes. Run <code>curl -fsSL https://clipal.paiart.com/install.sh | sh</code> on macOS or
-              Linux, or
-              <code>powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code>
-              on Windows. The installer downloads the matching release and verifies it against
-              <code>checksums.txt</code> before installing.</p>
+            <div style="display:flex; flex-direction:column; gap:1rem">
+              <div>
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.35rem">macOS &amp; Linux (curl)</div>
+                <div class="diff-viewer">
+                  <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">curl -fsSL https://clipal.paiart.com/install.sh | sh</span></div>
+                </div>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.35rem">Windows (PowerShell)</div>
+                <div class="diff-viewer">
+                  <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</span></div>
+                </div>
+              </div>
+              <div>
+                <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="margin-top:0.5rem">
+                  <span>Download Standalone Binary from GitHub Releases</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ===================== DOWNLOAD + COMMUNITY ===================== -->
-    <section id="download" aria-labelledby="download-heading">
+    <!-- ===================== SECTION 7: ZERO-TRUST FAQ ===================== -->
+    <section id="faq" class="section">
       <div class="container">
-        <div class="section-header reveal">
-          <div class="section-eyebrow">Get Clipal</div>
-          <h2 id="download-heading" class="section-title">Free & Open Source. Always.</h2>
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-cyan"></span>
+            <span>ZERO-TRUST SECURITY ARCHITECTURE</span>
+          </div>
+          <h2 class="section-title">Security Guarantees &amp; FAQ</h2>
+          <p class="section-desc">Transparent architectural documentation for discerning engineers.</p>
         </div>
 
-        <div class="download-grid reveal">
-
-          <!-- Download Panel -->
-          <div class="download-panel" id="download-panel">
-            <h3 class="download-panel-title">Install from npm</h3>
-
-            <div class="install-cmd-wrap">
-              <div class="install-label">Recommended install:</div>
-              <div class="code-block" style="margin-top:12px">
-                <span class="t-cmd">npm install -g clipal</span>
-              </div>
-              <p class="install-label" style="margin-top:10px">Current npm packages need no install scripts.
-                If optional dependencies were skipped, run
-                <code>npm install -g clipal --include=optional</code>.</p>
-              <div class="install-label" style="margin-top:16px">One-line install:</div>
-              <div class="code-block" style="margin-top:12px">
-                <span class="t-cmd">curl -fsSL https://clipal.paiart.com/install.sh | sh</span>
-              </div>
-              <div class="install-label" style="margin-top:16px">Prefer a standalone binary?</div>
-              <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
-                class="btn-primary download-btn" id="download-direct-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                <span id="download-btn-text">Download from GitHub Releases</span>
-              </a>
-            </div>
-
-            <div class="security-note">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                aria-hidden="true">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <span>100% local. Your keys never leave your machine. MIT License.</span>
-            </div>
+        <div class="faq-grid">
+          <div class="faq-card">
+            <h4 class="faq-q">Are my API keys and OAuth tokens sent to any cloud server?</h4>
+            <p class="faq-a">Never. Clipal is 100% a local standalone executable. All keys, OAuth credentials, and session configs are encrypted on your local machine in config.json. Zero external telemetry. Open source on GitHub for independent auditing.</p>
           </div>
 
-          <!-- Community Panel -->
-          <div class="community-panel" id="community-panel">
-            <h3 class="community-panel-title">Join the Community</h3>
-            <p class="community-sub">Get setup help, share configs, and discuss new providers
-              with other developers.</p>
-            <div class="qr-grid">
-              <div class="qr-wrap">
-                <img src="https://github.com/PAIArtCom/Clipal/raw/main/assets/wechat-group.jpeg"
-                  alt="Clipal WeChat Developer Community QR Code - Join for Claude Code and Antigravity CLI setup support"
-                  loading="lazy" width="180" height="180" class="qr-img">
-                <p class="qr-label">Scan to join WeChat group</p>
-              </div>
-              <div class="qr-wrap">
-                <img src="https://github.com/PAIArtCom/Clipal/raw/main/assets/wechat-supporter.jpeg"
-                  alt="Author's personal WeChat QR Code - Contact for support when the group QR code has expired"
-                  loading="lazy" width="180" height="180" class="qr-img">
-                <p class="qr-label">Group QR expired? Add the author</p>
-              </div>
-            </div>
+          <div class="faq-card">
+            <h4 class="faq-q">How does Clipal guarantee non-destructive configuration takeover?</h4>
+            <p class="faq-a">Unlike scripts that overwrite entire config files, Clipal parses and merges AST syntax trees for JSON, YAML, and TOML. It injects only the required Base URL and preserves all your existing plugins, options, and variables. An immutable baseline snapshot is captured before applying, enabling 1-click byte-exact rollback at any time.</p>
           </div>
 
+          <div class="faq-card">
+            <h4 class="faq-q">How does Clipal resolve handshake timeouts and DNS pollution?</h4>
+            <p class="faq-a">Clipal features native proxy chain inheritance and tiered DoH resolution. In standard proxy environments, domain names are preserved and passed to the proxy. In direct environments, Cloudflare and Google DNS-over-HTTPS (DoH) are prioritized, cleanly eliminating handshake resets.</p>
+          </div>
+
+          <div class="faq-card">
+            <h4 class="faq-q">What is the unified /clipal route?</h4>
+            <p class="faq-a">Starting with v0.25+, Clipal automatically detects incoming wire protocols. You simply set client endpoints to http://127.0.0.1:3333/clipal, and the gateway intelligently multiplexes Anthropic, OpenAI, and Gemini protocols.</p>
+          </div>
+
+          <div class="faq-card">
+            <h4 class="faq-q">Does using Clipal in Codex wipe my conversation history?</h4>
+            <p class="faq-a">No, it improves stability. Clipal establishes a standardized model_provider = 'clipal' configuration. Rather than flipping provider names (which resets conversation sessions), Clipal maintains a unified identifier and shifts keys or endpoints internally.</p>
+          </div>
+
+          <div class="faq-card">
+            <h4 class="faq-q">How does npm 12+ handle install scripts?</h4>
+            <p class="faq-a">Starting with v0.31, Clipal packages distribute binaries through platform optional dependencies rather than postinstall scripts. You can run <code>npm install -g clipal</code> directly without needing <code>--allow-scripts</code>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SECTION 8: COMMUNITY & FOOTER ===================== -->
+    <section class="section" style="border-bottom:none">
+      <div class="container">
+        <div class="section-head center">
+          <div class="section-eyebrow">
+            <span class="status-dot text-signal-green"></span>
+            <span>COMMUNITY NODE NETWORK</span>
+          </div>
+          <h2 class="section-title">Join the Clipal Developer Network</h2>
+          <p class="section-desc">Connect with engineers building on the cutting edge of AI coding agents and local infrastructure.</p>
+        </div>
+
+        <div class="community-grid">
+          <div class="qr-card">
+            <div class="qr-frame">
+              <img src="assets/community/wechat-group.jpeg" alt="Clipal WeChat Developer Community" loading="lazy">
+            </div>
+            <div class="qr-title">WeChat Developer Group</div>
+            <p class="qr-desc">Real-time release notices, model spec updates, and prompt engineering discussions.</p>
+          </div>
+
+          <div class="qr-card">
+            <div class="qr-frame">
+              <img src="assets/community/wechat-supporter.jpeg" alt="Author WeChat QR Code" loading="lazy">
+            </div>
+            <div class="qr-title">Author Direct Contact</div>
+            <p class="qr-desc">Group full or need technical troubleshooting? Reach out to the author directly.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -1151,59 +1012,82 @@ After that, guide me through using the Web UI to enable CLI takeover and add my 
 
   <!-- ===================== FOOTER ===================== -->
   <footer id="site-footer">
-    <div class="container footer-container">
-      <div class="footer-brand">
-        <a href="#" class="footer-logo" aria-label="Clipal Home">
-          <img src="assets/icons/clipal-icon.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Clipal</span>
-        </a>
-        <p class="footer-tagline">Your Local LLM Gateway</p>
-        <p class="footer-paiart">Part of the <a href="https://paiart.com" target="_blank"
-            rel="noopener noreferrer">PAIART</a> ecosystem — Empowering Personal AI Communities.</p>
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="nav-logo">
+            <img src="assets/icons/clipal-icon.svg" alt="" width="24" height="24" class="nav-logo-icon">
+            <span>CLIPAL</span>
+          </div>
+          <p>The universal local LLM gateway and mission control for coding agents. Lossless takeover, multi-key failover, native OAuth, and micro-USD pricing.</p>
+        </div>
+
+        <div class="footer-col">
+          <h5>Core Product</h5>
+          <a href="#matrix">18-CLI Matrix</a>
+          <a href="#pillars">Four Pillars</a>
+          <a href="#tour">Web UI Tour</a>
+          <a href="#comparison">Architecture</a>
+        </div>
+
+        <div class="footer-col">
+          <h5>Resources</h5>
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md" target="_blank" rel="noopener noreferrer">Getting Started</a>
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/cli-takeover.md" target="_blank" rel="noopener noreferrer">CLI Takeover Catalog</a>
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/pricing.md" target="_blank" rel="noopener noreferrer">Pricing Specification</a>
+          <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
+        </div>
+
+        <div class="footer-col">
+          <h5>Ecosystem</h5>
+          <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+          <a href="https://paiart.com" target="_blank" rel="noopener noreferrer">PAIART Ecosystem</a>
+          <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+        </div>
       </div>
 
-      <nav class="footer-links" aria-label="Footer navigation">
-        <div class="footer-link-col">
-          <div class="footer-link-heading">Product</div>
-          <a href="#features" class="footer-link">Features</a>
-          <a href="#how-it-works" class="footer-link">How It Works</a>
-          <a href="#download" class="footer-link">Download</a>
+      <div class="footer-bottom">
+        <div>© 2026 Clipal Contributors. Released under the MIT License.</div>
+        <div style="display:flex; align-items:center; gap:0.5rem">
+          <span class="status-dot text-signal-green"></span>
+          <span>100% Local Execution · Zero Cloud Telemetry</span>
         </div>
-        <div class="footer-link-col">
-          <div class="footer-link-heading">Resources</div>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md" target="_blank"
-            rel="noopener noreferrer" class="footer-link">Getting Started</a>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/config-reference.md" target="_blank"
-            rel="noopener noreferrer" class="footer-link">Config
-            Reference</a>
-          <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer"
-            class="footer-link">Release Notes</a>
-        </div>
-        <div class="footer-link-col">
-          <div class="footer-link-heading">Community</div>
-          <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer"
-            class="footer-link">GitHub</a>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
-            class="footer-link">MIT License</a>
-        </div>
-      </nav>
-    </div>
-
-    <div class="footer-bottom">
-      <div class="container footer-bottom-inner">
-        <p class="footer-copy">© 2025 Clipal Contributors. MIT License.</p>
-        <p class="footer-security">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <span>100% local. Your keys never leave your machine.</span>
-        </p>
       </div>
     </div>
   </footer>
 
-  <script src="js/main.js?v=copy-command" defer></script>
+  <!-- ===================== MODAL: TAKEOVER INSPECTOR ===================== -->
+  <div class="modal-overlay" id="takeover-modal" role="dialog" aria-modal="true" aria-labelledby="modal-cli-name">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <span class="tag-badge text-signal-cyan" style="margin-bottom:0.35rem">TAKEOVER CONTRACT INSPECTOR</span>
+          <h4 id="modal-cli-name">Claude Code</h4>
+        </div>
+        <button type="button" class="modal-close-btn" id="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">TARGET CONFIGURATION FILE</div>
+          <code id="modal-cli-target" style="color:var(--signal-cyan); font-size:0.85rem">~/.claude/settings.json</code>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">CONTRACT &amp; BOUNDARY SPECIFICATION</div>
+          <p id="modal-cli-desc" style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6"></p>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">AST SYNTAX MERGE DIFF PREVIEW</div>
+          <pre class="diff-viewer" id="modal-cli-diff" style="white-space:pre-wrap"></pre>
+        </div>
+        <div style="padding:0.75rem; background:rgba(0,255,157,0.05); border:1px solid rgba(0,255,157,0.2); border-radius:4px; font-family:var(--font-mono); font-size:0.75rem; color:var(--signal-green)">
+          ✓ Immutable baseline snapshot captured before apply · 1-click byte-exact rollback anytime
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="js/main.js?v=quantum-v0.31" defer></script>
 </body>
 
 </html>

@@ -1,424 +1,259 @@
 /**
  * Clipal Landing Page — js/main.js
- * Modules: page-text · terminal · scroll-reveal · os-detect · platform-tabs · install-tabs · clipboard
+ * Theme: Kinetic Structuralism & Quantum Control Plane
+ * Modules: 3D Tilt · 18-CLI Matrix Filter · Takeover Inspector ·
+ *          Web UI Tour · Copy Command · Real-time Telemetry Stream
  */
+
 'use strict';
 
-const PAGE_LANG = document.documentElement.lang.startsWith('zh') ? 'zh' : 'en';
-const PAGE_TEXT = {
-  en: {
-    copied: 'Copied!',
-    platform: {
-      'mac-arm': 'Apple Silicon',
-      'mac-intel': 'Intel Mac',
-      'linux-x64': 'Linux x86_64',
-      'linux-arm': 'Linux ARM64',
-      windows: 'Windows',
-    },
-  },
-  zh: {
-    copied: '已复制！',
-    platform: {
-      'mac-arm': '苹果芯片',
-      'mac-intel': 'Intel Mac',
-      'linux-x64': 'Linux x86_64',
-      'linux-arm': 'Linux ARM64',
-      windows: 'Windows',
-    },
-  },
-};
-
-const TEXT = PAGE_TEXT[PAGE_LANG];
-
-/* ============================================================
-   1. TERMINAL ANIMATION
-   ============================================================ */
-const TERMINAL_SCRIPT = [
-  { type: 'prompt', text: '$ clipal service start', delay: 400, speed: 42 },
-  {
-    type: 'ascii', text:
-      `  ██████╗██╗     ██╗██████╗  █████╗ ██╗
- ██╔════╝██║     ██║██╔══██╗██╔══██╗██║
- ██║     ██║     ██║██████╔╝███████║██║
- ██║     ██║     ██║██╔═══╝ ██╔══██║██║
- ╚██████╗███████╗██║██║     ██║  ██║███████╗
-  ╚═════╝╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝`, delay: 200, instant: true
-  },
-  { type: 'blank', text: '', delay: 100 },
-  { type: 'ok', text: '✓ Clipal running on http://127.0.0.1:3333', delay: 180, speed: 18 },
-  { type: 'ok', text: '✓ Providers loaded: Anthropic, OpenAI (3), Google (2)', delay: 160, speed: 18 },
-  { type: 'ok', text: '✓ Key pool: 5 keys active across 2 providers', delay: 500, speed: 18 },
-  { type: 'blank', text: '', delay: 200 },
-  { type: 'log', text: '→ [claude code]  POST /clipal  →  claude-4-6-sonnet  ✓  288ms', delay: 700, speed: 22 },
-  { type: 'log', text: '→ [opencode]        POST /clipal  →  gemini-3.1-flash-lite       ✓  341ms', delay: 450, speed: 22 },
-  { type: 'log-fail', text: '→ [codex]  POST /clipal  →  gpt-5.4 [QUOTA]   ✗', delay: 900, speed: 22 },
-  { type: 'log-fo', text: '                           →  OpenAI  [FAILOVER]  ✓  519ms', delay: 280, speed: 22 },
-];
-
-function escHtml(value) {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function buildLine(type, text) {
-  const el = document.createElement('div');
-  el.style.minHeight = '1.6em';
-
-  switch (type) {
-    case 'prompt':
-      el.innerHTML = `<span class="t-prompt">${escHtml(text)}</span>`;
-      break;
-    case 'ascii':
-      el.innerHTML = `<span class="t-ascii">${escHtml(text)}</span>`;
-      break;
-    case 'blank':
-      el.innerHTML = ' ';
-      break;
-    case 'ok':
-      el.innerHTML = `<span class="t-ok">${escHtml(text)}</span>`;
-      break;
-    case 'log': {
-      const parts = text.split('✓');
-      el.innerHTML = `<span class="t-arrow">→</span><span class="t-dim"> ${escHtml(parts[0].replace('→', '').trim())} </span>`
-        + (parts[1] ? `<span class="t-ok">✓${escHtml(parts[1])}</span>` : '');
-      break;
-    }
-    case 'log-fail':
-      el.innerHTML = `<span class="t-arrow">→</span><span class="t-dim"> ${escHtml(text.replace('→', '').replace('✗', '').trim())} </span><span class="t-err">✗</span>`;
-      break;
-    case 'log-fo':
-      el.innerHTML = '<span class="t-dim">                              </span><span class="t-arrow">→</span><span class="t-dim"> OpenAI </span><span class="t-tag">[FAILOVER]</span><span class="t-ok"> ✓  519ms</span>';
-      break;
-    default:
-      el.textContent = text;
-  }
-
-  return el;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function typewriteLine(el, outputEl, speed) {
-  const template = document.createElement('div');
-  template.innerHTML = el.innerHTML;
-  el.innerHTML = '';
-  outputEl.appendChild(el);
-
-  for (const node of [...template.childNodes]) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const textNode = document.createTextNode('');
-      el.appendChild(textNode);
-      for (let i = 0; i < node.textContent.length; i += 1) {
-        textNode.textContent = node.textContent.slice(0, i + 1);
-        await sleep(speed + Math.random() * 6 - 3);
-      }
-      continue;
-    }
-
-    const span = node.cloneNode(false);
-    el.appendChild(span);
-    const fullText = node.textContent;
-    for (let i = 0; i < fullText.length; i += 1) {
-      span.textContent = fullText.slice(0, i + 1);
-      await sleep(speed + Math.random() * 6 - 3);
-    }
-  }
-}
-
-async function runTerminal(outputEl) {
-  for (const line of TERMINAL_SCRIPT) {
-    await sleep(line.delay || 150);
-    const el = buildLine(line.type, line.text);
-
-    if (line.instant || line.type === 'blank' || line.type === 'ascii') {
-      outputEl.appendChild(el);
-    } else {
-      await typewriteLine(el, outputEl, line.speed || 28);
-    }
-
-    outputEl.scrollTop = outputEl.scrollHeight;
-  }
-
-  const cursor = document.createElement('span');
-  cursor.className = 't-cursor';
-  cursor.setAttribute('aria-hidden', 'true');
-  outputEl.appendChild(cursor);
-
-  await sleep(5500);
-  outputEl.innerHTML = '';
-  runTerminal(outputEl);
-}
-
-function initTerminal() {
-  const outputEl = document.getElementById('terminal-output');
-  if (!outputEl) {
-    return;
-  }
-
-  setTimeout(() => runTerminal(outputEl), 900);
-}
-
-/* ============================================================
-   2. SCROLL REVEAL
-   ============================================================ */
-function initScrollReveal() {
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) {
-        return;
-      }
-
-      const siblings = [...entry.target.parentElement.querySelectorAll('.reveal')];
-      const index = siblings.indexOf(entry.target);
-      setTimeout(() => entry.target.classList.add('visible'), index * 80);
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
-
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-}
-
-/* ============================================================
-   3. OS DETECTION & DOWNLOAD LINKS
-   ============================================================ */
-const RELEASE_BASE = 'https://github.com/PAIArtCom/Clipal/releases/latest/download';
-const PLATFORM_CONFIG = {
-  'mac-arm': { file: 'clipal-darwin-arm64', badge: 'Apple Silicon' },
-  'mac-intel': { file: 'clipal-darwin-amd64', badge: 'Intel Mac' },
-  'linux-x64': { file: 'clipal-linux-amd64', badge: 'Linux x86_64' },
-  'linux-arm': { file: 'clipal-linux-arm64', badge: 'Linux ARM64' },
-  windows: { file: 'clipal-windows-amd64.exe', badge: 'Windows' },
-};
-
-function detectPlatform() {
-  const userAgent = (navigator.userAgent || '').toLowerCase();
-  const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
-
-  if (userAgent.includes('win')) {
-    return 'windows';
-  }
-
-  if (userAgent.includes('mac') || platform.includes('mac')) {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl');
-    const debugInfo = gl && gl.getExtension('WEBGL_debug_renderer_info');
-    const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
-
-    return (renderer.toLowerCase().includes('apple') || navigator.maxTouchPoints > 0)
-      ? 'mac-arm'
-      : 'mac-intel';
-  }
-
-  if (userAgent.includes('linux')) {
-    return (userAgent.includes('arm') || userAgent.includes('aarch64')) ? 'linux-arm' : 'linux-x64';
-  }
-
-  return null;
-}
-
-function applyPlatform(key) {
-  const config = PLATFORM_CONFIG[key];
-  if (!config) {
-    return;
-  }
-
-  const url = `${RELEASE_BASE}/${config.file}`;
-
-  const platformLabel = TEXT.platform[key] || config.badge;
-  const binaryLabel = PAGE_LANG === 'zh'
-    ? `${platformLabel} 二进制下载`
-    : `Download ${platformLabel} binary`;
-
-  const downloadButton = document.getElementById('download-direct-btn');
-  const downloadText = document.getElementById('download-btn-text');
-  if (downloadButton) {
-    downloadButton.href = url;
-  }
-  if (downloadText) {
-    downloadText.textContent = binaryLabel;
-  }
-
-  const manualButton = document.getElementById('manual-dl-btn');
-  const manualText = document.getElementById('manual-dl-text');
-  if (manualButton) {
-    manualButton.href = url;
-  }
-  if (manualText) {
-    manualText.textContent = binaryLabel;
-  }
-
-  document.querySelectorAll('.ptab').forEach(tab => {
-    const active = tab.dataset.platform === key;
-    tab.classList.toggle('active', active);
-    tab.setAttribute('aria-selected', String(active));
-  });
-}
-
-function initOSDetection() {
-  const detectedPlatform = detectPlatform();
-  if (detectedPlatform) {
-    applyPlatform(detectedPlatform);
-  }
-}
-
-/* ============================================================
-   4. PLATFORM TABS
-   ============================================================ */
-function initPlatformTabs() {
-  document.querySelectorAll('.ptab').forEach(tab => {
-    tab.addEventListener('click', () => applyPlatform(tab.dataset.platform));
-  });
-}
-
-/* ============================================================
-   5. INSTALL TABS
-   ============================================================ */
-function initInstallTabs() {
-  const tabs = document.querySelectorAll('.itab');
-  const panels = document.querySelectorAll('.itab-panel');
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(item => {
-        item.classList.remove('active');
-        item.setAttribute('aria-selected', 'false');
-      });
-      panels.forEach(panel => panel.classList.remove('active'));
-
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      const target = document.getElementById(`panel-${tab.dataset.tab}`);
-      if (target) {
-        target.classList.add('active');
-      }
-    });
-  });
-}
-
-/* ============================================================
-   6. CLIPBOARD COPY BUTTON
-   ============================================================ */
-async function writeClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textArea = document.createElement('textarea');
-  textArea.value = text;
-  textArea.setAttribute('readonly', '');
-  textArea.style.position = 'fixed';
-  textArea.style.top = '-9999px';
-  document.body.appendChild(textArea);
-  textArea.select();
-  document.execCommand('copy');
-  textArea.remove();
-}
-
-function showCopiedState(button, label, restoreHtml = false) {
-  const original = restoreHtml ? label.innerHTML : label.textContent;
-  button.classList.add('copied');
-  label.textContent = TEXT.copied;
-
-  setTimeout(() => {
-    button.classList.remove('copied');
-    if (restoreHtml) {
-      label.innerHTML = original;
-    } else {
-      label.textContent = original;
-    }
-  }, 2000);
-}
-
-function initClipboard() {
-  const promptButton = document.getElementById('copy-ai-prompt');
-  if (promptButton) {
-    promptButton.addEventListener('click', async () => {
-      const textEl = document.getElementById('ai-prompt-content');
-      if (!textEl) {
-        return;
-      }
-
-      try {
-        await writeClipboard(textEl.textContent);
-        const label = promptButton.querySelector('span');
-        if (label) {
-          showCopiedState(promptButton, label);
-        }
-      } catch (error) {
-        console.warn('Clipboard API unavailable', error);
-      }
-    });
-  }
-
-  const commandButton = document.getElementById('cta-primary');
-  if (commandButton) {
-    commandButton.addEventListener('click', async () => {
-      const command = commandButton.dataset.copyCommand;
-      const label = document.getElementById('cta-primary-text');
-      if (!command || !label) {
-        return;
-      }
-
-      try {
-        await writeClipboard(command);
-        showCopiedState(commandButton, label, true);
-      } catch (error) {
-        console.warn('Clipboard API unavailable', error);
-      }
-    });
-  }
-}
-
-/* ============================================================
-   7. STICKY HEADER + NAV HIGHLIGHT
-   ============================================================ */
-function initHeaderScroll() {
-  const header = document.getElementById('site-header');
-  if (!header) {
-    return;
-  }
-
-  window.addEventListener('scroll', () => {
-    header.style.borderBottomColor = window.scrollY > 20
-      ? 'rgba(212,175,55,0.14)'
-      : 'rgba(255,255,255,0.08)';
-  }, { passive: true });
-}
-
-function initNavHighlight() {
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) {
-        return;
-      }
-
-      navLinks.forEach(link => {
-        link.style.color = link.getAttribute('href') === `#${entry.target.id}`
-          ? 'var(--text-primary)'
-          : '';
-      });
-    });
-  }, { threshold: 0.35 });
-
-  sections.forEach(section => observer.observe(section));
-}
-
-/* ============================================================
-   8. INIT
-   ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-  document.body.classList.remove('is-loading');
-  initTerminal();
-  initScrollReveal();
-  initOSDetection();
-  initPlatformTabs();
-  initInstallTabs();
-  initClipboard();
-  initHeaderScroll();
-  initNavHighlight();
+  const isZh = document.documentElement.lang.startsWith('zh');
+
+  /* ============================================================
+     1. 3D PERSPECTIVE KINETIC TILT (HERO STAGE)
+     ============================================================ */
+  const heroViewport = document.querySelector('.hero-console-viewport');
+  const heroStage = document.querySelector('.hero-3d-stage');
+
+  if (heroViewport && heroStage) {
+    let ticking = false;
+
+    heroViewport.addEventListener('mousemove', (e) => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const rect = heroViewport.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+
+          const rotateX = ((y - centerY) / centerY) * -12 + 6;
+          const rotateY = ((x - centerX) / centerX) * 12 - 6;
+
+          heroStage.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateZ(10px)`;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+
+    heroViewport.addEventListener('mouseleave', () => {
+      heroStage.style.transform = `rotateX(8deg) rotateY(-8deg) translateZ(0)`;
+    });
+  }
+
+  /* ============================================================
+     2. COPY TO CLIPBOARD WITH KINETIC FEEDBACK
+     ============================================================ */
+  const copyButtons = document.querySelectorAll('[data-copy]');
+  copyButtons.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const textToCopy = btn.getAttribute('data-copy');
+      if (!textToCopy) return;
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        const originalContent = btn.innerHTML;
+        const successMsg = isZh ? '✓ 已复制到剪贴板' : '✓ Copied to clipboard';
+
+        btn.innerHTML = `<span class="text-signal-green" style="font-weight:600">${successMsg}</span>`;
+        btn.style.borderColor = 'var(--signal-green)';
+
+        setTimeout(() => {
+          btn.innerHTML = originalContent;
+          btn.style.borderColor = '';
+        }, 2200);
+      } catch (err) {
+        console.error('Clipboard copy failed:', err);
+      }
+    });
+  });
+
+  /* ============================================================
+     3. 18-CLI ORBITAL MATRIX FILTER & INSPECTOR MODAL
+     ============================================================ */
+  const matrixFilterBtns = document.querySelectorAll('.matrix-tab-btn');
+  const cliCards = document.querySelectorAll('.cli-card');
+  const modalOverlay = document.getElementById('takeover-modal');
+  const modalTitle = document.getElementById('modal-cli-name');
+  const modalTarget = document.getElementById('modal-cli-target');
+  const modalDesc = document.getElementById('modal-cli-desc');
+  const modalDiff = document.getElementById('modal-cli-diff');
+  const modalClose = document.getElementById('modal-close');
+
+  // Filter tabs
+  matrixFilterBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      matrixFilterBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = btn.getAttribute('data-filter');
+      cliCards.forEach((card) => {
+        const category = card.getAttribute('data-category');
+        if (filter === 'all' || category === filter) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Modal open on card click
+  cliCards.forEach((card) => {
+    card.addEventListener('click', () => {
+      if (!modalOverlay) return;
+      const name = card.getAttribute('data-name');
+      const target = card.getAttribute('data-target');
+      const desc = card.getAttribute('data-details');
+      const diffCode = card.getAttribute('data-diff');
+
+      if (modalTitle) modalTitle.textContent = name;
+      if (modalTarget) modalTarget.textContent = target;
+      if (modalDesc) modalDesc.textContent = desc;
+      if (modalDiff) modalDiff.textContent = diffCode;
+
+      modalOverlay.classList.add('active');
+    });
+  });
+
+  if (modalClose && modalOverlay) {
+    modalClose.addEventListener('click', () => modalOverlay.classList.remove('active'));
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.remove('active');
+    });
+  }
+
+  /* ============================================================
+     4. SPATIAL WEB UI TOUR (TAB SWITCHER)
+     ============================================================ */
+  const tourBtns = document.querySelectorAll('.tour-tab-btn');
+  const tourImgs = document.querySelectorAll('.tour-img');
+  const tourTitle = document.getElementById('tour-title');
+  const tourDesc = document.getElementById('tour-desc');
+  const tourBadge = document.getElementById('tour-badge');
+
+  const tourData = {
+    providers: {
+      titleZh: '服务商与密钥拓扑（Providers Topology）',
+      titleEn: 'Providers Topology & Multi-Key Pool',
+      descZh: '按客户端智能分组管理所有 API 提供商。自由调整 Auto 自动容灾模式或 Manual 强制置顶模式；单 Provider 轻松录入多行 Key，直观查看当前运行态：使用中、待命、冷却中（精确倒计时）、不可用及恢复探测状态。',
+      descEn: 'Intelligently group and manage upstream providers by client. Seamlessly switch between Auto failover and Manual pinned modes, input multi-line keys per provider, and observe real-time health: active, standby, cooldown timer, and recovery probes.',
+      badgeZh: '实时热重载 · 多 Key 轮询池',
+      badgeEn: 'Hot Reload · Multi-Key Pool',
+    },
+    takeover: {
+      titleZh: '18 家 CLI 一键接管舱（CLI Takeover Bay）',
+      titleEn: '18-CLI Takeover Bay & Diff Inspector',
+      descZh: '可视化管理所有受支持的 CLI 助手。Apply 前直观预览“当前文件”与“写入后文件”的逐行 Diff；发生环境冲突或自定义目录遮蔽时给出主动告警；随时一键完整 Rollback，恢复初态。',
+      descEn: 'Visually manage all 18 supported CLI clients. Preview line-by-line Diff before applying; detect environment variable overrides or directory shadowing; rollback to the original byte-exact baseline with one click at any time.',
+      badgeZh: '无损 AST 注入 · 秒级原子回滚',
+      badgeEn: 'Lossless AST Merge · Atomic Rollback',
+    },
+    settings: {
+      titleZh: '全局网络与安全防护（Network & Global Settings）',
+      titleEn: 'Global Network & DoH Security',
+      descZh: '配置本地与局域网访问边界。精细控制 HTTP/HTTPS/SOCKS5 代理链与 Cloudflare / Google DoH 安全解析回退；配置断路器阈值、桌面通知、超时机制及日志保留周期。',
+      descEn: 'Configure network boundaries and remote access. Fine-tune SOCKS5/HTTP proxy inheritance, Cloudflare and Google DoH fallback, circuit breaker thresholds, desktop alerts, and audit log retentions.',
+      badgeZh: 'DoH 加密解析 · 代理链路继承',
+      badgeEn: 'Encrypted DoH · SOCKS5 / HTTP Proxy Chain',
+    },
+    status: {
+      titleZh: '实时用量与请求遥测（Real-Time Telemetry）',
+      titleEn: 'Real-Time Telemetry & Cost Engine',
+      descZh: '毫秒级观察每一次 LLM 交互链路。完整记录客户端来源、上游目标、端到端响应耗时、状态码、Token 吞吐量与微美元费用归因，彻底告别黑盒盲猜。',
+      descEn: 'Sub-millisecond observability for every LLM interaction. Real-time logging of client origins, upstream targets, end-to-end latency, status codes, token throughput, and exact micro-USD cost attribution.',
+      badgeZh: '微美元精准归因 · 零开销遥测',
+      badgeEn: 'Micro-USD Pricing · Zero Overhead',
+    },
+  };
+
+  tourBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tourBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const targetKey = btn.getAttribute('data-tour');
+      tourImgs.forEach((img) => {
+        if (img.getAttribute('data-tour-img') === targetKey) {
+          img.classList.add('active');
+        } else {
+          img.classList.remove('active');
+        }
+      });
+
+      const data = tourData[targetKey];
+      if (data) {
+        if (tourTitle) tourTitle.textContent = isZh ? data.titleZh : data.titleEn;
+        if (tourDesc) tourDesc.textContent = isZh ? data.descZh : data.descEn;
+        if (tourBadge) tourBadge.textContent = isZh ? data.badgeZh : data.badgeEn;
+      }
+    });
+  });
+
+  /* ============================================================
+     5. INSTALLATION PROTOCOL TABS
+     ============================================================ */
+  const installTabs = document.querySelectorAll('.install-tab-btn');
+  const installPanels = document.querySelectorAll('.install-panel');
+
+  installTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      installTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const targetId = tab.getAttribute('data-install-tab');
+      installPanels.forEach((panel) => {
+        if (panel.id === `install-panel-${targetId}`) {
+          panel.classList.add('active');
+        } else {
+          panel.classList.remove('active');
+        }
+      });
+    });
+  });
+
+  /* ============================================================
+     6. REAL-TIME TELEMETRY CONSOLE STREAM TICKER
+     ============================================================ */
+  const consoleBody = document.getElementById('hero-console-stream');
+  if (consoleBody) {
+    const logs = [
+      { text: '→ [claude-code]  POST /clipal  →  claude-3-7-sonnet  ✓  241ms', cls: 'success' },
+      { text: '→ [opencode]     POST /clipal  →  gemini-2.5-pro       ✓  312ms', cls: 'route' },
+      { text: '→ [codex]        POST /clipal  →  gpt-4.1 [429 LIMIT]  ✗  18ms', cls: 'warn' },
+      { text: '                 FAILOVER PIVOT → Azure_Backup [KEY_2] ✓  389ms', cls: 'accent' },
+      { text: '→ [aider]         POST /clipal  →  deepseek-chat        ✓  195ms', cls: 'route' },
+      { text: '→ [goose]         POST /clipal  →  claude-3-7-sonnet    ✓  278ms', cls: 'success' },
+    ];
+
+    let logIdx = 0;
+    setInterval(() => {
+      const log = logs[logIdx % logs.length];
+      logIdx++;
+
+      const line = document.createElement('div');
+      line.className = `terminal-line ${log.cls}`;
+      line.textContent = log.text;
+
+      consoleBody.appendChild(line);
+      if (consoleBody.children.length > 7) {
+        consoleBody.removeChild(consoleBody.children[0]);
+      }
+    }, 2800);
+  }
+
+  /* ============================================================
+     7. LIVE PRICING CALCULATION TICKER (PILLAR 4)
+     ============================================================ */
+  const pricingVal = document.getElementById('pricing-ticker-val');
+  if (pricingVal) {
+    let baseMicros = 42189;
+    setInterval(() => {
+      baseMicros += Math.floor(Math.random() * 120) + 15;
+      const dollars = (baseMicros / 1000000).toFixed(6);
+      pricingVal.textContent = `$${dollars}`;
+    }, 1800);
+  }
 });
