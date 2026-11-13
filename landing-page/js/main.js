@@ -112,7 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (modalTitle) modalTitle.textContent = name;
       if (modalTarget) modalTarget.textContent = target;
       if (modalDesc) modalDesc.textContent = desc;
-      if (modalDiff) modalDiff.textContent = diffCode;
+      if (modalDiff) {
+        modalDiff.innerHTML = diffCode.split('\n').map((line, idx) => {
+          const num = String(idx + 1).padStart(2, '0');
+          const isAdd = line.trim().startsWith('+');
+          const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return `<div class="diff-line ${isAdd ? 'diff-add' : 'diff-keep'}"><span class="diff-num">${num}</span><span>${safeLine}</span></div>`;
+        }).join('');
+      }
 
       modalOverlay.classList.add('active');
     });
