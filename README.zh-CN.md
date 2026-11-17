@@ -4,7 +4,7 @@
   <img src="assets/clipal-hancock5.jpeg" alt="Clipal" width="100%">
   <p><b>你的终极本地 LLM API 网关与管理器</b></p>
   <p>
-    <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
+    <a href="https://clipal.paiart.com/zh/"><b>官方网站</b></a> · <a href="docs/zh/README.md">文档</a> · <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
   </p>
 </div>
 

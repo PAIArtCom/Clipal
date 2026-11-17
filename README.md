@@ -4,7 +4,7 @@
   <img src="assets/Clipal-Hancock.jpeg" alt="Clipal" width="100%">
   <p><b>Your Ultimate Local LLM API Gateway & Manager</b></p>
   <p>
-    <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
+    <a href="https://clipal.paiart.com/"><b>Website</b></a> · <a href="docs/en/README.md">Docs</a> · <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
   </p>
 </div>
 
