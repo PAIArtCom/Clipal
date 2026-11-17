@@ -35,7 +35,7 @@
     <link rel="preload" href="fonts/eb-garamond-roman.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="fonts/eb-garamond-italic.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/style.css?v=2">
+    <link rel="stylesheet" href="css/style.css?v=3">
     <script src="js/main.js?v=2" defer></script>
     <script type="application/ld+json">
 {
@@ -488,13 +488,12 @@
               </div>
               <div class="install-step">
                 <div class="step-heading"><span class="step-count">2</span><h3>Start the gateway</h3></div>
-                <div class="command-box"><pre><code id="start-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="Copied" aria-label="Copy start command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
-                <p class="step-note">Keep this terminal running, or set up the background service.</p>
+                <div class="command-box"><pre><code id="start-command">clipal service install</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="Copied" aria-label="Copy service install command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
+                <p class="step-note">Registers the background service and starts Clipal immediately — no terminal to keep open.</p>
                 <details class="service-details">
-                  <summary>Prefer a background service?</summary>
-                  <p>Install the service, then start it:</p>
-                  <div class="command-box"><pre><code id="service-command"><span class="cmd-line">clipal service install</span>
-<span class="cmd-line">clipal service start</span></code></pre><button class="copy-button" type="button" data-copy-target="service-command" data-success="Copied" aria-label="Copy service commands"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
+                  <summary>Only want a temporary foreground run?</summary>
+                  <p>Run Clipal in the current terminal without installing a service:</p>
+                  <div class="command-box"><pre><code id="foreground-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="foreground-command" data-success="Copied" aria-label="Copy foreground command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                 </details>
               </div>
               <div class="install-step">
@@ -515,7 +514,7 @@
 2. If npm is unavailable, use the official installer for my platform:
    macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
    Windows PowerShell: powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
-3. Start Clipal with clipal, or set it up as a background service with clipal service install followed by clipal service start. Confirm that http://127.0.0.1:3333/ is reachable.
+3. Install and start Clipal in the background with: clipal service install (it registers the OS background service, starts Clipal immediately, and waits for the health check; fall back to foreground clipal only if background services are unavailable). Confirm that http://127.0.0.1:3333/ is reachable.
 4. Guide me through adding my first provider or OAuth account in the Web UI, previewing CLI takeover changes, and applying them. Explain when I need to open a new terminal and how to roll back.</pre>
                   <button class="copy-button" type="button" data-copy-target="ai-prompt-text" data-success="Copied" aria-label="Copy setup prompt"><span class="copy-text">Copy prompt</span><span data-copy-icon aria-hidden="true">⧉</span></button>
                 </div>

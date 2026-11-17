@@ -22,8 +22,8 @@ Claude Code, Codex CLI, OpenCode, Antigravity CLI, Continue, Aider, Goose, Pi, Q
 - **npm (macOS / Linux / Windows)**: `npm install -g clipal`
 - **macOS / Linux shell**: `curl -fsSL https://clipal.paiart.com/install.sh | sh`
 - **Windows PowerShell**: `powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"`
-- **Foreground run**: `clipal`
-- **Background service**: `clipal service install` followed by `clipal service start`
+- **Start & register background service (recommended)**: `clipal service install` (registers autostart, starts Clipal immediately, and waits for local health check)
+- **Temporary foreground run**: `clipal`
 - **Local Web UI**: `http://127.0.0.1:3333/`
 
 ## Documentation & Links

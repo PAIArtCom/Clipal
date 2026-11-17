@@ -54,6 +54,16 @@ clipal --version
 
 ## 2. Start Clipal
 
+Install and start Clipal as a background service (recommended):
+
+```bash
+clipal service install
+```
+
+`clipal service install` registers the OS background service (`launchd` on macOS, `systemd --user` on Linux, Task Scheduler on Windows), starts Clipal immediately, and waits for the local health check to pass.
+
+If you only want a temporary foreground run in the current terminal:
+
 ```bash
 clipal
 ```

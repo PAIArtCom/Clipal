@@ -67,7 +67,7 @@ Usage costs prefer upstream-reported values and otherwise use an offline, embedd
 
 ### ⚡ **Frictionless Background Service**
 Clipal runs as a single, cross-platform binary on macOS, Linux, and Windows. 
-Type `clipal service install` and `clipal service start` to keep it running silently in the background forever. Use `clipal status` or `clipal restart` for quick management.
+Run `clipal service install` once to register the background service and start Clipal immediately. Use `clipal status` or `clipal restart` for quick management.
 
 ---
 
@@ -139,14 +139,13 @@ chmod +x clipal*
 ```
 
 ### 2. Run & Manage
-Start Clipal in the foreground:
-```bash
-clipal
-```
-Or install it as a background service:
+Install and start Clipal as a background service (recommended):
 ```bash
 clipal service install
-clipal service start
+```
+Or run it temporarily in the foreground:
+```bash
+clipal
 ```
 
 ### 3. Open the Web UI

@@ -51,6 +51,16 @@ clipal --version
 
 ## 2. 启动 Clipal
 
+注册为系统后台服务并立即启动（推荐）：
+
+```bash
+clipal service install
+```
+
+`clipal service install` 会注册当前系统的后台服务（macOS `launchd`、Linux `systemd --user`、Windows 任务计划程序），立即在后台启动 Clipal，并等待本机健康检查通过后返回。
+
+如果只想在当前终端临时前台运行：
+
 ```bash
 clipal
 ```

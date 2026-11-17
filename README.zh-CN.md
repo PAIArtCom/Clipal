@@ -67,7 +67,7 @@ OAuth 账号请求配置在添加时默认 US / `America/New_York`，国家和 I
 
 ### ⚡ **无感知的后台守护服务**
 Clipal 编译为单文件二进制，跨平台支持 macOS、Linux 和 Windows。
-只需敲入 `clipal service install` 和 `clipal service start`，它就会静默在后台永远为你跑着。想要查看状态或重启？用 `clipal status` 和 `clipal restart` 瞬间搞定。
+只需执行一行 `clipal service install`，即可注册系统后台服务并立即启动网关。想要查看状态或重启？用 `clipal status` 和 `clipal restart` 瞬间搞定。
 
 ---
 
@@ -138,14 +138,13 @@ chmod +x clipal*
 ```
 
 ### 2. 运行与管理
-在前台直接启动：
-```bash
-clipal
-```
-或者将其安装为后台服务：
+注册为系统后台服务并立即启动（推荐）：
 ```bash
 clipal service install
-clipal service start
+```
+或者仅在当前终端临时前台启动：
+```bash
+clipal
 ```
 
 ### 3. 访问管理后台

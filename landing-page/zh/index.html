@@ -36,7 +36,7 @@
     <link rel="preload" href="../fonts/eb-garamond-roman.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="../fonts/eb-garamond-italic.woff2" as="font" type="font/woff2" crossorigin>
     <script>(()=>{const p=navigator.userAgentData?.platform||navigator.platform||'';document.documentElement.dataset.os=/Mac|iP(hone|od|ad)/i.test(p)?'apple':/Win/i.test(p)?'windows':'linux';})();</script>
-    <link rel="stylesheet" href="../css/style.css?v=2">
+    <link rel="stylesheet" href="../css/style.css?v=3">
     <script src="../js/main.js?v=2" defer></script>
     <script type="application/ld+json">{
   "@context": "https://schema.org",
@@ -547,13 +547,12 @@
               </div>
               <div class="install-step">
                 <div class="step-heading"><span class="step-count">2</span><h3>启动网关</h3></div>
-                <div class="command-box"><pre><code id="start-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="已复制" aria-label="复制启动命令"><span class="copy-text">复制</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
-                <p class="step-note">保持此终端运行，或配置为系统后台服务。</p>
+                <div class="command-box"><pre><code id="start-command">clipal service install</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="已复制" aria-label="复制后台服务安装并启动命令"><span class="copy-text">复制</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
+                <p class="step-note">一键注册系统后台服务并立即启动网关，无需一直开着终端窗口。</p>
                 <details class="service-details">
-                  <summary>想在后台运行？</summary>
-                  <p>先安装服务，再启动：</p>
-                  <div class="command-box"><pre><code id="service-command"><span class="cmd-line">clipal service install</span>
-<span class="cmd-line">clipal service start</span></code></pre><button class="copy-button" type="button" data-copy-target="service-command" data-success="已复制" aria-label="复制后台服务命令"><span class="copy-text">复制</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
+                  <summary>只想在当前终端临时前台运行？</summary>
+                  <p>不注册后台服务，直接在当前终端启动：</p>
+                  <div class="command-box"><pre><code id="foreground-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="foreground-command" data-success="已复制" aria-label="复制前台启动命令"><span class="copy-text">复制</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                 </details>
               </div>
               <div class="install-step">
@@ -574,7 +573,7 @@
 2. 如果没有 npm，使用对应平台的官方安装脚本：
    macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
    Windows PowerShell: powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
-3. 运行 clipal 启动网关，或依次运行 clipal service install 和 clipal service start 配置后台服务。确认 http://127.0.0.1:3333/ 可以访问。
+3. 运行 clipal service install 注册系统后台服务并立即启动网关（该命令会自动启动并校验健康检查；仅在环境不支持后台服务时改用前台运行 clipal）。确认 http://127.0.0.1:3333/ 可以访问。
 4. 引导我在 Web UI 添加第一个提供商或 OAuth 账号，预览并应用 CLI 接管。说明何时需要打开新终端，以及如何回滚。</pre>
                   <button class="copy-button" type="button" data-copy-target="ai-prompt-text" data-success="已复制" aria-label="复制安装提示词"><span class="copy-text">复制提示词</span><span data-copy-icon aria-hidden="true">⧉</span></button>
                 </div>
