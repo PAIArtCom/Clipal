@@ -11,6 +11,34 @@
     onScroll();
   }
 
+  // Keep the current section anchor when switching between English and Chinese.
+  document.querySelectorAll('a[hreflang]').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.location.hash && document.querySelector(window.location.hash)) {
+        const base = link.getAttribute('href').split('#')[0];
+        link.setAttribute('href', `${base}${window.location.hash}`);
+      }
+    });
+  });
+
+  // Highlight active section in navigation during scroll.
+  const navSectionLinks = [...document.querySelectorAll('.nav-links:first-child a[href^="#"]')];
+  if ('IntersectionObserver' in window && navSectionLinks.length) {
+    const sectionMap = new Map(
+      navSectionLinks
+        .map(link => [document.querySelector(link.getAttribute('href')), link])
+        .filter(([el]) => el)
+    );
+    const navObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        navSectionLinks.forEach(link => link.removeAttribute('aria-current'));
+        sectionMap.get(entry.target)?.setAttribute('aria-current', 'true');
+      });
+    }, { rootMargin: '-28% 0px -58% 0px' });
+    sectionMap.forEach((_, section) => navObserver.observe(section));
+  }
+
   // The ticker loops by translating two identical lists; the clone stays hidden from assistive tech.
   document.querySelectorAll('[data-ticker-clone]').forEach(clone => {
     clone.innerHTML = clone.previousElementSibling.innerHTML;
@@ -32,22 +60,23 @@
   document.querySelectorAll('[data-hero-demo]').forEach(demo => {
     const clients = [...demo.querySelectorAll('[data-hero-client]')];
     const protocols = [...demo.querySelectorAll('.protocols > span')];
-    const phases = [...demo.querySelectorAll('[data-hero-phase]')];
     const scenes = [...demo.querySelectorAll('[data-hero-scene]')];
+    const sceneButtons = [...demo.querySelectorAll('[data-hero-scene-btn]')];
     const markers = [...demo.querySelectorAll('.hero-phase-track i')];
-    const keys = [...demo.querySelectorAll('[data-hero-key]')];
     const providers = [...demo.querySelectorAll('[data-hero-provider]')];
     const toggle = demo.querySelector('[data-hero-toggle]');
     const incoming = [
-      'M65 0V26Q65 40 79 40H206Q220 40 220 54V82',
-      'M220 0V82',
-      'M375 0V26Q375 40 361 40H234Q220 40 220 54V82'
+      'M65 0V22Q65 34 77 34H208Q220 34 220 46V64',
+      'M220 0V64',
+      'M375 0V22Q375 34 363 34H232Q220 34 220 46V64'
     ];
     const outgoing = [
-      'M220 0V16Q220 30 206 30H79Q65 30 65 44V64',
-      'M220 0V64',
-      'M220 0V16Q220 30 234 30H361Q375 30 375 44V64'
+      'M220 0V14Q220 26 208 26H77Q65 26 65 38V52',
+      'M220 0V52',
+      'M220 0V14Q220 26 232 26H363Q375 26 375 38V52'
     ];
+    const protocolX = [65, 220, 375];
+    const providerX = [108, 332];
     const durations = [1500, 1500, 1900, 1800, 2400];
     let phase = 0;
     let scene = 0;
@@ -55,9 +84,9 @@
     let playing = !reducedMotion.matches;
     let visible = false;
     let timer;
-    const currentFrames = () => scenes.length
-      ? [...scenes[scene].querySelectorAll('[data-hero-frame]')]
-      : phases;
+
+    const currentFrames = () => [...scenes[scene].querySelectorAll('[data-hero-frame]')];
+
     const schedule = () => {
       clearTimeout(timer);
       const running = playing && visible && !document.hidden;
@@ -65,25 +94,36 @@
       const motion = Number(currentFrames()[phase]?.dataset.motion ?? phase);
       if (running) timer = setTimeout(advance, durations[motion]);
     };
+
     const render = () => {
       const frames = currentFrames();
       const frame = frames[phase];
+      const protocolIndex = Number(clients[client].dataset.protocol);
+      const px = protocolX[protocolIndex];
+      const useOauth = ['active', 'sticky', 'success'].includes(frame.dataset.oauth);
+      const tx = providerX[useOauth ? 1 : 0];
+
       demo.dataset.phase = frame?.dataset.motion ?? String(phase);
-      if (scenes.length) {
-        demo.dataset.scene = scenes[scene].dataset.heroScene;
-        scenes.forEach((item, index) => { item.hidden = index !== scene; });
-        demo.querySelector('[data-hero-scene-label]').textContent = scenes[scene].dataset.label;
-      }
+      demo.dataset.scene = scenes[scene].dataset.heroScene;
+      scenes.forEach((item, index) => { item.hidden = index !== scene; });
+      sceneButtons.forEach((btn, index) => btn.setAttribute('aria-pressed', String(index === scene)));
       clients.forEach((button, index) => button.setAttribute('aria-pressed', String(index === client)));
-      protocols.forEach((item, index) => item.classList.toggle('is-current', index === Number(clients[client].dataset.protocol)));
+      protocols.forEach((item, index) => item.classList.toggle('is-current', index === protocolIndex));
+
       demo.querySelectorAll('.incoming-lines .active-line, .incoming-lines .route-packet').forEach(path => path.setAttribute('d', incoming[client]));
-      demo.querySelectorAll('.outgoing-lines .active-line, .outgoing-lines .route-packet').forEach(path => path.setAttribute('d', outgoing[Number(clients[client].dataset.protocol)]));
+      demo.querySelectorAll('.outgoing-lines .active-line, .outgoing-lines .route-packet').forEach(path => path.setAttribute('d', outgoing[protocolIndex]));
+      const guideLine = demo.querySelector('.provider-lines .guide-line');
+      if (guideLine) guideLine.setAttribute('d', `M${px} 0V15H${providerX[0]}V30M${px} 15H${providerX[1]}V30`);
+      demo.querySelectorAll('.provider-lines .active-line, .provider-lines .route-packet').forEach(path => {
+        path.setAttribute('d', `M${px} 0V15H${tx}V30`);
+      });
+
       frames.forEach((caption, index) => { caption.hidden = index !== phase; });
       markers.forEach((marker, index) => {
         marker.hidden = index >= frames.length;
         marker.classList.toggle('is-done', index <= phase);
       });
-      demo.querySelector('.hero-phase-index').textContent = `${String(phase + 1).padStart(2, '0')} / ${String(frames.length).padStart(2, '0')}`;
+
       if (providers.length === 2) {
         demo.querySelectorAll('[data-provider-channel]').forEach(label => {
           label.textContent = clients[client].dataset.channel;
@@ -98,28 +138,29 @@
           provider.dataset.state = state;
           provider.querySelector('b').textContent = labels[state];
         });
-      } else if (keys.length === 2) {
-        // Compatibility for older page markup that may still be cached.
-        keys[0].dataset.state = phase >= 2 ? 'limited' : 'ready';
-        keys[0].querySelector('b').textContent = phase >= 2 ? '429' : 'READY';
-        keys[1].dataset.state = phase === 4 ? 'success' : phase === 3 ? 'active' : 'standby';
-        keys[1].querySelector('b').textContent = phase === 4 ? '200 OK' : phase === 3 ? 'RETRY' : 'STANDBY';
       }
+
       toggle.textContent = playing ? toggle.dataset.pauseLabel : toggle.dataset.playLabel;
       schedule();
     };
+
     function advance() {
       phase = (phase + 1) % currentFrames().length;
       if (phase === 0) {
-        scene = scenes.length ? (scene + 1) % scenes.length : 0;
-        // Retain one channel through normal → fallback → sticky, then rotate tools.
+        scene = (scene + 1) % scenes.length;
+        // Retain one channel through normal -> fallback -> sticky, then rotate tools.
         if (scene === 0) client = (client + 1) % clients.length;
       }
       render();
     }
+
     clients.forEach((button, index) => {
       button.disabled = false;
       button.addEventListener('click', () => { client = index; phase = 0; scene = 0; render(); });
+    });
+    sceneButtons.forEach((button, index) => {
+      button.disabled = false;
+      button.addEventListener('click', () => { scene = index; phase = 0; render(); });
     });
     toggle.addEventListener('click', () => { playing = !playing; render(); });
     demo.querySelector('[data-hero-next]').addEventListener('click', () => { playing = false; advance(); });
@@ -156,15 +197,21 @@
     document.addEventListener('click', event => {
       if (!header.contains(event.target)) setMenu(false);
     });
-    window.matchMedia('(min-width: 861px)').addEventListener('change', () => setMenu(false));
+    window.matchMedia('(min-width: 921px)').addEventListener('change', () => setMenu(false));
   }
 
+  const stackedConsoleMedia = window.matchMedia('(max-width: 1100px)');
   document.querySelectorAll('[data-tabs]').forEach(group => {
     const tablist = group.querySelector('.tab-list');
     const tabs = [...tablist.querySelectorAll('[data-tab]')];
     const panels = [...group.querySelectorAll('[data-tab-panel]')];
     if (!tabs.length || tabs.length !== panels.length) return;
     tablist.setAttribute('role', 'tablist');
+    if (group.classList.contains('console-tabs')) {
+      const syncOrientation = () => tablist.setAttribute('aria-orientation', stackedConsoleMedia.matches ? 'horizontal' : 'vertical');
+      stackedConsoleMedia.addEventListener('change', syncOrientation);
+      syncOrientation();
+    }
     const select = (index, focus = false) => {
       tabs.forEach((tab, i) => {
         tab.setAttribute('aria-selected', String(i === index));
@@ -206,7 +253,10 @@
     toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 4500);
   };
   document.querySelectorAll('[data-copy-target]').forEach(button => {
-    const initialContent = button.innerHTML;
+    const copyLabel = button.querySelector('.copy-text');
+    const copyIcon = button.querySelector('[data-copy-icon]');
+    const initialLabel = copyLabel?.textContent ?? '';
+    const initialIcon = copyIcon?.textContent ?? '⧉';
     button.addEventListener('click', async () => {
       const sequence = ++copySequence;
       const source = document.getElementById(button.dataset.copyTarget);
@@ -215,9 +265,15 @@
         await navigator.clipboard.writeText(source.textContent);
         if (sequence !== copySequence) return;
         clearTimeout(buttonTimers.get(button));
-        button.textContent = button.dataset.success;
+        if (copyLabel) copyLabel.textContent = button.dataset.success;
+        if (copyIcon) copyIcon.textContent = '✓';
+        button.classList.add('is-copied');
         announce(document.body.dataset.copySuccess);
-        buttonTimers.set(button, setTimeout(() => { button.innerHTML = initialContent; }, 2400));
+        buttonTimers.set(button, setTimeout(() => {
+          if (copyLabel) copyLabel.textContent = initialLabel;
+          if (copyIcon) copyIcon.textContent = initialIcon;
+          button.classList.remove('is-copied');
+        }, 2400));
       } catch {
         if (sequence !== copySequence) return;
         announce(document.body.dataset.copyFailure);

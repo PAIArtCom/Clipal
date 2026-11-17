@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clipal · Local LLM Gateway for Claude Code, Codex &amp; AI Coding CLIs</title>
-    <meta name="description" content="Clipal is an open-source local LLM gateway for AI coding tools. Connect Claude Code, Codex CLI and 16 more CLIs to one proxy with key failover, OAuth and cost tracking.">
+    <meta name="description" content="Clipal is an open-source local LLM gateway for AI coding tools. Connect Claude Code, Codex CLI, OpenCode and 15 more CLIs to one proxy with API key failover, OAuth accounts and cost tracking.">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta name="theme-color" content="#0a0a0a">
     <meta name="color-scheme" content="dark">
@@ -17,7 +17,7 @@
     <meta property="og:locale" content="en_US">
     <meta property="og:locale:alternate" content="zh_CN">
     <meta property="og:title" content="Clipal — Your coding tools. One local gateway.">
-    <meta property="og:description" content="Open-source local LLM gateway for Claude Code, Codex CLI and 16 more AI coding CLIs. Key failover, OAuth, previewable config takeover and cost tracking.">
+    <meta property="og:description" content="Open-source local LLM gateway for Claude Code, Codex CLI and 16 more AI coding CLIs. Automatic key and provider failover, OAuth accounts, previewable config takeover and cost tracking.">
     <meta property="og:url" content="https://clipal.paiart.com/">
     <meta property="og:image" content="https://clipal.paiart.com/assets/og/clipal-og-en.png">
     <meta property="og:image:width" content="1200">
@@ -25,7 +25,7 @@
     <meta property="og:image:alt" content="Clipal — Your coding tools. One local gateway.">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Clipal — Your coding tools. One local gateway.">
-    <meta name="twitter:description" content="Open-source local LLM gateway for Claude Code, Codex CLI and 16 more AI coding CLIs. Key failover, OAuth, previewable config takeover and cost tracking.">
+    <meta name="twitter:description" content="Open-source local LLM gateway for Claude Code, Codex CLI and 16 more AI coding CLIs. Automatic key and provider failover, OAuth accounts, previewable config takeover and cost tracking.">
     <meta name="twitter:image" content="https://clipal.paiart.com/assets/og/clipal-og-en.png">
     <meta name="twitter:image:alt" content="Clipal — Your coding tools. One local gateway.">
     <link rel="icon" href="assets/icons/favicon.ico" sizes="any">
@@ -33,8 +33,10 @@
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
     <link rel="manifest" href="site.webmanifest">
     <link rel="preload" href="fonts/eb-garamond-roman.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/style.css?v=bilingual-1">
-    <script src="js/main.js?v=bilingual-1" defer></script>
+    <link rel="preload" href="fonts/eb-garamond-italic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/style.css?v=2">
+    <script src="js/main.js?v=2" defer></script>
     <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -44,7 +46,12 @@
       "@id": "https://clipal.paiart.com/#org",
       "name": "PAIArtCom",
       "url": "https://github.com/PAIArtCom",
-      "logo": "https://clipal.paiart.com/assets/icons/apple-touch-icon.png"
+      "logo": "https://clipal.paiart.com/assets/icons/apple-touch-icon.png",
+      "sameAs": [
+        "https://github.com/PAIArtCom",
+        "https://github.com/PAIArtCom/Clipal",
+        "https://www.npmjs.com/package/clipal"
+      ]
     },
     {
       "@type": "WebSite",
@@ -56,14 +63,18 @@
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://clipal.paiart.com/#app",
+      "@id": "https://clipal.paiart.com/#app-en",
       "name": "Clipal",
+      "inLanguage": "en",
+      "softwareVersion": "0.31.1",
       "description": "Open-source local LLM gateway for AI coding tools. Connect Claude Code, Codex CLI and 16 more CLIs to one local proxy with automatic key and provider failover, OAuth accounts, previewable configuration takeover and request, token and cost tracking.",
       "url": "https://clipal.paiart.com/",
       "applicationCategory": "DeveloperApplication",
-      "applicationSubCategory": "LLM API gateway",
+      "applicationSubCategory": "Local LLM API gateway",
       "operatingSystem": "macOS, Linux, Windows",
       "downloadUrl": "https://github.com/PAIArtCom/Clipal/releases/latest",
+      "installUrl": "https://www.npmjs.com/package/clipal",
+      "codeRepository": "https://github.com/PAIArtCom/Clipal",
       "softwareHelp": "https://github.com/PAIArtCom/Clipal/blob/main/docs/en/",
       "license": "https://opensource.org/licenses/MIT",
       "isAccessibleForFree": true,
@@ -71,11 +82,12 @@
       "screenshot": [
         "https://clipal.paiart.com/assets/screenshots/providers.png",
         "https://clipal.paiart.com/assets/screenshots/takeover.png",
-        "https://clipal.paiart.com/assets/screenshots/status.png"
+        "https://clipal.paiart.com/assets/screenshots/status.png",
+        "https://clipal.paiart.com/assets/screenshots/settings.png"
       ],
       "featureList": [
         "Local gateway for Anthropic, OpenAI and Gemini native request families via /clipal/*",
-        "Automatic failover to the next key, then the next provider, in auto mode",
+        "Automatic failover to the next key, then the next provider, plus sticky routing in auto mode",
         "Preview, apply and roll back configuration for 18 AI coding CLIs",
         "OAuth accounts for Claude, Codex and Antigravity-backed Google accounts",
         "Request, token and cost visibility with clear pricing sources",
@@ -83,18 +95,23 @@
       ],
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "publisher": { "@id": "https://clipal.paiart.com/#org" },
-      "sameAs": ["https://github.com/PAIArtCom/Clipal"]
+      "sameAs": [
+        "https://github.com/PAIArtCom/Clipal",
+        "https://www.npmjs.com/package/clipal"
+      ]
     },
     {
       "@type": "FAQPage",
       "@id": "https://clipal.paiart.com/#faq",
       "inLanguage": "en",
       "mainEntity": [
-        { "@type": "Question", "name": "Does “local” mean my AI requests stay on my machine?", "acceptedAnswer": { "@type": "Answer", "text": "No. Clipal runs the gateway and management console locally, but sends API requests and necessary authentication information to the upstream providers you choose. It is not offline inference. The management UI only accepts loopback connections; the proxy’s listening boundary can be configured separately." } },
+        { "@type": "Question", "name": "Can I combine OAuth accounts (Claude, Codex, Antigravity) with pay-as-you-go API keys?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Add API-key providers and supported OAuth accounts to the same channel group. In auto mode, Clipal tries available keys on the current provider first, falls back across compatible API-key or OAuth providers when rate-limited, and reuses working routes for matching follow-up requests. You can also pin a single provider in manual mode." } },
+        { "@type": "Question", "name": "Does “local” mean my AI requests stay on my machine?", "acceptedAnswer": { "@type": "Answer", "text": "No. Clipal runs the gateway and management console locally, but sends API requests and necessary authentication information to the upstream providers you choose. It is not offline inference. By default, the management UI only accepts loopback connections; remote UI and proxy listening boundaries can be configured separately." } },
         { "@type": "Question", "name": "Where does Clipal keep configuration and credentials?", "acceptedAnswer": { "@type": "Answer", "text": "API-key providers are stored in YAML under ~/.clipal. OAuth credentials live separately in ~/.clipal/oauth/. Protect those files with appropriate permissions on your machine; Clipal does not promise that all stored credentials are encrypted." } },
         { "@type": "Question", "name": "What does rolling back CLI takeover restore?", "acceptedAnswer": { "@type": "Answer", "text": "Rollback restores the managed files to the original backup from the start of the current takeover cycle. Reapplying keeps that same backup. Project, session, and environment settings may still override the tool’s connection settings; open a new terminal after shell integration changes." } },
         { "@type": "Question", "name": "Does Clipal translate between model protocols?", "acceptedAnswer": { "@type": "Answer", "text": "Clipal preserves the native Anthropic, OpenAI, and Gemini request families and routes by request path through /clipal/*. Use an upstream compatible with the protocol your tool sends; this is not arbitrary protocol conversion." } },
-        { "@type": "Question", "name": "How should I read the cost figures?", "acceptedAnswer": { "@type": "Answer", "text": "Clipal prefers upstream-reported cost. If that is unavailable, it uses the embedded pricing catalog for exact model matches. Unknown pricing is left missing, and catalog updates do not recalculate historical costs. Catalog-based figures are estimates, not a billing guarantee." } }
+        { "@type": "Question", "name": "How should I read the cost figures?", "acceptedAnswer": { "@type": "Answer", "text": "Clipal prefers upstream-reported cost. If that is unavailable, it uses the embedded pricing catalog for exact model matches. Unknown pricing is left missing, and catalog updates do not recalculate historical costs. Catalog-based figures are estimates, not a billing guarantee." } },
+        { "@type": "Question", "name": "How do I roll back CLI changes or uninstall Clipal cleanly?", "acceptedAnswer": { "@type": "Answer", "text": "Use Rollback in the CLI Takeover tab to restore managed files to their pre-takeover backup. If you installed the background service, run clipal service uninstall, then remove the binary (for example npm uninstall -g clipal) and delete ~/.clipal when you no longer need saved settings or usage history." } }
       ]
     }
   ]
@@ -108,8 +125,8 @@
         <a class="wordmark" href="./" aria-label="Clipal home"><img src="assets/icons/clipal-icon.svg" width="30" height="30" alt=""><span>Clipal<span class="wordmark-dot">.</span></span></a>
         <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="navigation" aria-label="Open navigation" data-open-label="Open navigation" data-close-label="Close navigation"><span></span><span></span></button>
         <nav id="navigation" aria-label="Main navigation">
-          <div class="nav-links"><a href="#console">Console</a><a href="#features">Features</a><a href="#integrations">Integrations</a><a href="#install">Install</a><a href="#faq">FAQ</a></div>
-          <div class="nav-links"><a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/">Docs ↗</a><a href="zh/" lang="zh-CN" hreflang="zh-CN">中文</a><a class="github-nav" href="https://github.com/PAIArtCom/Clipal">GitHub ↗</a></div>
+          <div class="nav-links"><a href="#console">Console</a><a href="#features">Features</a><a href="#integrations">Integrations</a><a href="#faq">FAQ</a></div>
+          <div class="nav-links"><a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/">Docs ↗</a><a href="zh/" lang="zh-CN" hreflang="zh-CN">中文</a><a class="github-nav" href="https://github.com/PAIArtCom/Clipal">GitHub ↗</a><a class="nav-cta" href="#install">Get started</a></div>
         </nav>
       </div>
     </header>
@@ -119,15 +136,15 @@
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-watermark" aria-hidden="true">:3333</div>
         <div class="wrap">
-          <div class="hero-meta mono-label">
-            <span class="tag"><span class="pulse" aria-hidden="true"></span>Local LLM gateway</span>
-            <span>Open source · MIT</span>
-            <span class="meta-extra">macOS / Linux / Windows</span>
-          </div>
           <h1 id="hero-title" class="display"><span class="line">Your coding tools.</span><span class="line line-2">One local <em>gateway.</em></span></h1>
 
           <div class="hero-body">
             <div class="hero-copy">
+              <div class="hero-meta mono-label">
+                <span class="tag"><span class="pulse" aria-hidden="true"></span>Local LLM gateway</span>
+                <span>Open source · MIT</span>
+                <span class="meta-extra">macOS / Linux / Windows</span>
+              </div>
               <p class="hero-lead">Keep the tools you love. Bring every provider, key and account together.</p>
               <p class="hero-description">Clipal connects Claude Code, Codex CLI and 16 more AI coding tools to a local LLM gateway. Manage credentials, fail over between keys and providers, and follow requests, tokens and costs — in one browser console.</p>
               <div class="hero-actions">
@@ -136,28 +153,49 @@
               </div>
               <div class="quick-install">
                 <pre><code id="hero-command">npm install -g clipal</code></pre>
-                <button class="copy-button" type="button" data-copy-target="hero-command" data-success="Copied" aria-label="Copy install command"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button>
+                <button class="copy-button" type="button" data-copy-target="hero-command" data-success="Copied" aria-label="Copy install command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button>
               </div>
+              <p class="quick-install-note">Single native binary · also via curl, PowerShell or GitHub Releases</p>
             </div>
 
             <div class="routing-art" data-hero-demo role="group" aria-label="Illustration: coding tools connect to Clipal on your machine. Clipal routes native Anthropic, OpenAI and Gemini requests to compatible upstream providers.">
               <div class="art-topline"><span><i class="demo-indicator" aria-hidden="true"></i>ROUTING DEMO</span><span>ILLUSTRATIVE</span></div>
               <div class="routing-tools">
-                <button type="button" data-hero-client="0" data-protocol="0" data-channel="Claude" data-oauth-account="Claude account" aria-pressed="true" disabled><span class="client-logo"><img src="assets/logos/claude-code.svg" alt="" width="20" height="20"></span><span>Claude Code</span></button>
-                <button type="button" data-hero-client="1" data-protocol="1" data-channel="OpenAI" data-oauth-account="Codex account" aria-pressed="false" disabled><span class="client-logo"><img src="assets/logos/codex-cli.svg" alt="" width="20" height="20"></span><span>Codex CLI</span></button>
-                <button type="button" data-hero-client="2" data-protocol="2" data-channel="Google" data-oauth-account="Antigravity account" aria-pressed="false" disabled><span class="client-logo"><img class="on-dark" src="assets/logos/opencode.svg" alt="" width="20" height="20"></span><span>OpenCode</span></button>
+                <button type="button" data-hero-client="0" data-protocol="0" data-channel="Claude" data-oauth-account="Claude account" aria-pressed="true" disabled><span class="client-logo"><img src="assets/logos/claude-code.svg" alt="" width="18" height="18"></span><span>Claude Code</span></button>
+                <button type="button" data-hero-client="1" data-protocol="1" data-channel="OpenAI" data-oauth-account="Codex account" aria-pressed="false" disabled><span class="client-logo"><img src="assets/logos/codex-cli.svg" alt="" width="18" height="18"></span><span>Codex CLI</span></button>
+                <button type="button" data-hero-client="2" data-protocol="2" data-channel="Google" data-oauth-account="Antigravity account" aria-pressed="false" disabled><span class="client-logo"><img class="on-dark" src="assets/logos/opencode.svg" alt="" width="18" height="18"></span><span>OpenCode</span></button>
               </div>
-              <div class="incoming-lines"><svg viewBox="0 0 440 82" preserveAspectRatio="none" aria-hidden="true"><path d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82M220 0V82M375 0V26Q375 40 361 40H234Q220 40 220 54V82"/><path class="active-line" d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82"/><path class="route-packet" pathLength="1" d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82"/></svg></div>
+              <div class="incoming-lines"><svg viewBox="0 0 440 64" preserveAspectRatio="none" aria-hidden="true"><path d="M65 0V22Q65 34 77 34H208Q220 34 220 46V64M220 0V64M375 0V22Q375 34 363 34H232Q220 34 220 46V64"/><path class="active-line" d="M65 0V22Q65 34 77 34H208Q220 34 220 46V64"/><path class="route-packet" pathLength="1" d="M65 0V22Q65 34 77 34H208Q220 34 220 46V64"/></svg></div>
               <div class="gateway-core">
                 <div class="core-side"><span>127.0.0.1</span><span>:3333</span></div>
-                <div class="core-logo"><img src="assets/icons/clipal-icon.svg" width="76" height="76" alt=""></div>
+                <div class="core-center">
+                  <div class="core-logo"><img src="assets/icons/clipal-icon.svg" width="58" height="58" alt=""></div>
+                  <div class="core-caption"><strong>Clipal</strong><span>ON YOUR MACHINE</span></div>
+                </div>
                 <div class="core-side core-right"><span>/clipal/*</span><span>LOCAL</span></div>
               </div>
-              <div class="core-caption"><strong>Clipal</strong><span>ON YOUR MACHINE</span></div>
-              <div class="outgoing-lines"><svg viewBox="0 0 440 64" preserveAspectRatio="none" aria-hidden="true"><path d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64M220 0V64M220 0V16Q220 30 234 30H361Q375 30 375 44V64"/><path class="active-line" d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64"/><path class="route-packet" pathLength="1" d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64"/></svg></div>
+              <div class="outgoing-lines"><svg viewBox="0 0 440 52" preserveAspectRatio="none" aria-hidden="true"><path d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52M220 0V52M220 0V14Q220 26 232 26H363Q375 26 375 38V52"/><path class="active-line" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"/><path class="route-packet" pathLength="1" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"/></svg></div>
               <div class="protocols"><span class="is-current"><i class="protocol-dot"></i>Anthropic</span><span><i class="protocol-dot"></i>OpenAI</span><span><i class="protocol-dot"></i>Gemini</span></div>
+              <div class="provider-lines"><svg viewBox="0 0 440 30" preserveAspectRatio="none" aria-hidden="true"><path class="guide-line" d="M65 0V15H108V30M65 15H332V30"/><path class="active-line" d="M65 0V15H108V30"/><path class="route-packet" pathLength="1" d="M65 0V15H108V30"/></svg></div>
+              <div class="hero-provider-pool" aria-label="Illustrative API and OAuth providers">
+                <div data-hero-provider="0">
+                  <span class="provider-auth" aria-hidden="true">API</span>
+                  <div class="provider-identity"><strong><span data-provider-channel>Claude</span> Provider 01</strong><small>API key</small></div>
+                  <b>READY</b>
+                </div>
+                <div data-hero-provider="1">
+                  <span class="provider-auth" aria-hidden="true">OAuth</span>
+                  <div class="provider-identity"><strong><span data-provider-channel>Claude</span> Provider 02</strong><small data-provider-account>Claude account</small></div>
+                  <b>STANDBY</b>
+                </div>
+              </div>
               <div class="hero-demo-status">
-                <div class="hero-demo-heading"><span class="hero-phase-index" aria-hidden="true">01 / 03</span><span class="hero-scene-label" data-hero-scene-label>NORMAL ROUTING</span><span class="hero-demo-detail">AUTO MODE</span></div>
+                <div class="hero-scene-tabs" role="group" aria-label="Routing scenarios">
+                  <button type="button" data-hero-scene-btn="0" aria-pressed="true" disabled>01 Normal</button>
+                  <button type="button" data-hero-scene-btn="1" aria-pressed="false" disabled>02 Fallback</button>
+                  <button type="button" data-hero-scene-btn="2" aria-pressed="false" disabled>03 Sticky</button>
+                  <span class="hero-demo-detail">AUTO MODE</span>
+                </div>
                 <div class="hero-scene-captions" data-hero-scene="normal" data-label="NORMAL ROUTING">
                   <p data-hero-frame data-motion="0" data-api="ready" data-oauth="standby">A request enters your local gateway.</p>
                   <p data-hero-frame data-motion="1" data-api="active" data-oauth="standby" hidden>Route to a compatible API provider.</p>
@@ -176,18 +214,6 @@
                   <p data-hero-frame data-motion="4" data-api="cooldown" data-oauth="success" hidden>200 OK. Keep the route that works.</p>
                   <p data-hero-frame data-motion="0" data-api="cooldown" data-oauth="sticky" hidden>Next matched request. Same provider.</p>
                   <p data-hero-frame data-motion="4" data-api="cooldown" data-oauth="success" hidden>200 OK. No unnecessary provider hopping.</p>
-                </div>
-                <div class="hero-provider-pool" aria-label="Illustrative API and OAuth providers">
-                  <div data-hero-provider="0">
-                    <span class="provider-auth" aria-hidden="true">API</span>
-                    <div class="provider-identity"><strong><span data-provider-channel>Claude</span> API Provider 01</strong><small>API key authentication</small></div>
-                    <b>READY</b>
-                  </div>
-                  <div data-hero-provider="1">
-                    <span class="provider-auth" aria-hidden="true">OAuth</span>
-                    <div class="provider-identity"><strong><span data-provider-channel>Claude</span> OAuth Provider 02</strong><small data-provider-account>Claude account</small></div>
-                    <b>STANDBY</b>
-                  </div>
                 </div>
                 <div class="hero-demo-footer">
                   <div class="hero-phase-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -214,16 +240,16 @@
               <li><span class="client-logo"><img class="on-dark" src="assets/logos/continue.svg" alt="" width="22" height="22"></span>Continue</li>
               <li><span class="client-logo"><img src="assets/logos/aider.svg" alt="" width="22" height="22"></span>Aider</li>
               <li><span class="client-logo"><img class="on-dark" src="assets/logos/goose.svg" alt="" width="22" height="22"></span>Goose</li>
-              <li><span class="client-logo"><img src="assets/logos/pi.svg" alt="" width="22" height="22"></span>Pi</li>
-              <li><span class="client-logo"><img src="assets/logos/qwen.svg" alt="" width="22" height="22"></span>Qwen Code</li>
-              <li><span class="client-logo"><img src="assets/logos/kimi.svg" alt="" width="22" height="22"></span>Kimi Code CLI</li>
-              <li><span class="client-logo"><img src="assets/logos/copilot.svg" alt="" width="22" height="22"></span>Copilot CLI</li>
-              <li><span class="client-logo"><img src="assets/logos/kilo.svg" alt="" width="22" height="22"></span>Kilo CLI</li>
-              <li><span class="client-logo"><img src="assets/logos/codebuddy.svg" alt="" width="22" height="22"></span>CodeBuddy Code</li>
-              <li><span class="client-logo"><img src="assets/logos/crush.svg" alt="" width="22" height="22"></span>Crush</li>
-              <li><span class="client-logo"><img src="assets/logos/iflow.svg" alt="" width="22" height="22"></span>iFlow CLI</li>
-              <li><span class="client-logo"><img src="assets/logos/trae.svg" alt="" width="22" height="22"></span>TRAE Agent</li>
-              <li><span class="client-logo"><img src="assets/logos/grok.svg" alt="" width="22" height="22"></span>Grok Build</li>
+              <li><span class="client-logo"><img src="assets/logos/pi.svg?v=2" alt="" width="22" height="22"></span>Pi</li>
+              <li><span class="client-logo"><img src="assets/logos/qwen.svg?v=2" alt="" width="22" height="22"></span>Qwen Code</li>
+              <li><span class="client-logo"><img src="assets/logos/kimi.svg?v=2" alt="" width="22" height="22"></span>Kimi Code CLI</li>
+              <li><span class="client-logo"><img src="assets/logos/copilot.svg?v=2" alt="" width="22" height="22"></span>Copilot CLI</li>
+              <li><span class="client-logo"><img src="assets/logos/kilo.svg?v=2" alt="" width="22" height="22"></span>Kilo CLI</li>
+              <li><span class="client-logo"><img src="assets/logos/codebuddy.svg?v=2" alt="" width="22" height="22"></span>CodeBuddy Code</li>
+              <li><span class="client-logo"><img src="assets/logos/crush.svg?v=2" alt="" width="22" height="22"></span>Crush</li>
+              <li><span class="client-logo"><img src="assets/logos/iflow.svg?v=2" alt="" width="22" height="22"></span>iFlow CLI</li>
+              <li><span class="client-logo"><img src="assets/logos/trae.svg?v=2" alt="" width="22" height="22"></span>TRAE Agent</li>
+              <li><span class="client-logo"><img src="assets/logos/grok.svg?v=2" alt="" width="22" height="22"></span>Grok Build</li>
               <li><span class="client-logo"><img src="assets/logos/deepseek.svg" alt="" width="22" height="22"></span>DeepSeek Harness</li>
             </ul>
             <ul aria-hidden="true" data-ticker-clone></ul>
@@ -236,26 +262,26 @@
           <div class="section-head" data-reveal>
             <div class="section-index"><span class="num">01</span><span class="kicker">Web console</span></div>
             <div class="section-title">
-              <h2 id="console-title">Every provider, request and cost. <em>In one view.</em></h2>
-              <p class="section-intro">Providers, CLI setup and usage belong in the same conversation. Clipal puts them together in a local browser console at 127.0.0.1:3333.</p>
+              <h2 id="console-title">Providers, takeover and status. <em>In one local view.</em></h2>
+              <p class="section-intro">Upstream credentials, CLI configuration and gateway health belong in the same workspace. Clipal brings them together in a local browser console at 127.0.0.1:3333.</p>
             </div>
           </div>
           <div class="console-tabs console-layout tabs" data-tabs>
             <div class="tab-list" aria-label="Console views" aria-orientation="vertical">
               <button type="button" id="console-tab-0" data-tab="console-panel-0"><span class="tab-number">01</span>Providers</button>
               <button type="button" id="console-tab-1" data-tab="console-panel-1"><span class="tab-number">02</span>CLI takeover</button>
-              <button type="button" id="console-tab-2" data-tab="console-panel-2"><span class="tab-number">03</span>Usage</button>
+              <button type="button" id="console-tab-2" data-tab="console-panel-2"><span class="tab-number">03</span>System status</button>
               <button type="button" id="console-tab-3" data-tab="console-panel-3"><span class="tab-number">04</span>Settings</button>
             </div>
             <div class="console-panels">
               <div id="console-panel-0" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Providers"><img src="assets/screenshots/providers.png" alt="Clipal console Providers view: API-key and OAuth providers with auto and manual routing" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Providers"><img src="assets/screenshots/providers.png" alt="Clipal console Providers view: API-key and OAuth providers with auto/manual routing, token usage and spend" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
-                  <h3>Your providers, side by side.</h3>
-                  <p>Manage API-key and OAuth providers from one place. Choose automatic routing or pin a provider manually.<span class="screenshot-note">Product screenshot · example configuration</span></p>
+                  <h3>Providers, usage and spend — side by side.</h3>
+                  <p>Manage API-key and OAuth providers in one view, switch between automatic failover and manual pinning, and inspect per-provider token usage and spend.<span class="screenshot-note">Product screenshot · example configuration</span></p>
                 </div>
               </div>
               <div id="console-panel-1" class="tab-panel console-panel" data-tab-panel>
@@ -271,21 +297,21 @@
               <div id="console-panel-2" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Usage"><img src="assets/screenshots/status.png" alt="Clipal console usage view: requests, tokens and costs" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: System status"><img src="assets/screenshots/status.png" alt="Clipal console System Status view: setup checklist, uptime, circuit breaker state and active channel routing" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
-                  <h3>Follow the request. Understand the cost.</h3>
-                  <p>Inspect request activity, token usage, and reported or catalog-based costs without leaving the console.<span class="screenshot-note">Product screenshot · example configuration</span></p>
+                  <h3>Check gateway readiness at a glance.</h3>
+                  <p>Verify service readiness, uptime, circuit breaker activity and the active route for each protocol family from one status screen.<span class="screenshot-note">Product screenshot · example configuration</span></p>
                 </div>
               </div>
               <div id="console-panel-3" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Settings"><img src="assets/screenshots/settings.png" alt="Clipal console global settings view" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Settings"><img src="assets/screenshots/settings.png" alt="Clipal console global settings view: runtime port, circuit breaker thresholds and sticky session settings" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>Your gateway, set up your way.</h3>
-                  <p>Adjust the gateway from the browser. The management interface only accepts local loopback connections.<span class="screenshot-note">Product screenshot · example configuration</span></p>
+                  <p>Tune listen boundaries, circuit breakers and sticky session behavior in the browser. By default, the management UI only accepts local loopback connections.<span class="screenshot-note">Product screenshot · example configuration</span></p>
                 </div>
               </div>
             </div>
@@ -298,8 +324,8 @@
           <div class="section-head" data-reveal>
             <div class="section-index"><span class="num">02</span><span class="kicker">Features</span></div>
             <div class="section-title">
-              <h2 id="features-title">Less config. <em>More control.</em></h2>
-              <p class="section-intro">One place to set up every tool, so you can get back to the code.</p>
+              <h2 id="features-title">API keys, OAuth and failover. <em>Under local control.</em></h2>
+              <p class="section-intro">One place to set up every coding CLI and upstream account, so you can stay focused on the code.</p>
             </div>
           </div>
           <div class="bento">
@@ -400,16 +426,16 @@
             <li data-n="05"><span class="client-logo"><img class="on-dark" src="assets/logos/continue.svg" alt="" width="26" height="26" loading="lazy"></span>Continue</li>
             <li data-n="06"><span class="client-logo"><img src="assets/logos/aider.svg" alt="" width="26" height="26" loading="lazy"></span>Aider</li>
             <li data-n="07"><span class="client-logo"><img class="on-dark" src="assets/logos/goose.svg" alt="" width="26" height="26" loading="lazy"></span>Goose</li>
-            <li data-n="08"><span class="client-logo"><img src="assets/logos/pi.svg" alt="" width="26" height="26" loading="lazy"></span>Pi</li>
-            <li data-n="09"><span class="client-logo"><img src="assets/logos/qwen.svg" alt="" width="26" height="26" loading="lazy"></span>Qwen Code</li>
-            <li data-n="10"><span class="client-logo"><img src="assets/logos/kimi.svg" alt="" width="26" height="26" loading="lazy"></span>Kimi Code CLI</li>
-            <li data-n="11"><span class="client-logo"><img src="assets/logos/copilot.svg" alt="" width="26" height="26" loading="lazy"></span>Copilot CLI</li>
-            <li data-n="12"><span class="client-logo"><img src="assets/logos/kilo.svg" alt="" width="26" height="26" loading="lazy"></span>Kilo CLI</li>
-            <li data-n="13"><span class="client-logo"><img src="assets/logos/codebuddy.svg" alt="" width="26" height="26" loading="lazy"></span>CodeBuddy Code</li>
-            <li data-n="14"><span class="client-logo"><img src="assets/logos/crush.svg" alt="" width="26" height="26" loading="lazy"></span>Crush</li>
-            <li data-n="15"><span class="client-logo"><img src="assets/logos/iflow.svg" alt="" width="26" height="26" loading="lazy"></span>iFlow CLI</li>
-            <li data-n="16"><span class="client-logo"><img src="assets/logos/trae.svg" alt="" width="26" height="26" loading="lazy"></span>TRAE Agent</li>
-            <li data-n="17"><span class="client-logo"><img src="assets/logos/grok.svg" alt="" width="26" height="26" loading="lazy"></span>Grok Build</li>
+            <li data-n="08"><span class="client-logo"><img src="assets/logos/pi.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Pi</li>
+            <li data-n="09"><span class="client-logo"><img src="assets/logos/qwen.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Qwen Code</li>
+            <li data-n="10"><span class="client-logo"><img src="assets/logos/kimi.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Kimi Code CLI</li>
+            <li data-n="11"><span class="client-logo"><img src="assets/logos/copilot.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Copilot CLI</li>
+            <li data-n="12"><span class="client-logo"><img src="assets/logos/kilo.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Kilo CLI</li>
+            <li data-n="13"><span class="client-logo"><img src="assets/logos/codebuddy.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>CodeBuddy Code</li>
+            <li data-n="14"><span class="client-logo"><img src="assets/logos/crush.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Crush</li>
+            <li data-n="15"><span class="client-logo"><img src="assets/logos/iflow.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>iFlow CLI</li>
+            <li data-n="16"><span class="client-logo"><img src="assets/logos/trae.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>TRAE Agent</li>
+            <li data-n="17"><span class="client-logo"><img src="assets/logos/grok.svg?v=2" alt="" width="26" height="26" loading="lazy"></span>Grok Build</li>
             <li data-n="18"><span class="client-logo"><img src="assets/logos/deepseek.svg" alt="" width="26" height="26" loading="lazy"></span>DeepSeek Harness</li>
           </ul>
           <p class="integrations-note">Support and configuration scope vary by client. Configuration changes alone do not verify that a tool’s traffic reaches Clipal.</p>
@@ -418,17 +444,25 @@
 
       <section id="install" class="section acid" aria-labelledby="install-title">
         <div class="wrap">
-          <div class="section-head">
+          <div class="section-head" data-reveal>
             <div class="section-index"><span class="num">04</span><span class="kicker">Install</span></div>
             <div class="section-title">
               <h2 id="install-title">Install. Start. <em>Open localhost.</em></h2>
               <div class="section-intro">
-                <p>Install Clipal, start the gateway, and add your first provider. A single binary for macOS, Linux and Windows; the console runs in your browser.</p>
+                <p>Install Clipal, start the gateway, and add your first provider. A single native binary for macOS, Linux and Windows; the console runs in your browser.</p>
                 <a class="text-link" href="https://github.com/PAIArtCom/Clipal/releases/latest">Or download a release <span aria-hidden="true">↗</span></a>
               </div>
             </div>
           </div>
           <div class="install-layout">
+            <aside class="install-aside" aria-label="Runtime specifications" data-reveal>
+              <dl>
+                <div><dt>Runtime</dt><dd>Single Go binary · no Node runtime needed</dd></div>
+                <div><dt>Platforms</dt><dd>macOS · Linux · Windows</dd></div>
+                <div><dt>Console</dt><dd><code>127.0.0.1:3333</code> loopback by default</dd></div>
+                <div><dt>Storage</dt><dd><code>~/.clipal</code> YAML &amp; OAuth dir</dd></div>
+              </dl>
+            </aside>
             <div class="install-workflow">
               <div class="install-step">
                 <div class="step-heading"><span class="step-count">1</span><h3>Install</h3></div>
@@ -439,34 +473,37 @@
                     <button type="button" id="install-tab-2" data-tab="install-panel-2">Windows</button>
                   </div>
                   <div id="install-panel-0" class="tab-panel install-panel" data-tab-panel>
-                    <p>Install the native package with npm.</p>
-                    <div class="command-box"><pre><code id="install-command-0">npm install -g clipal</code></pre><button class="copy-button" type="button" data-copy-target="install-command-0" data-success="Copied" aria-label="Copy npm command"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button></div>
+                    <p>Install the platform-native binary via npm.</p>
+                    <div class="command-box"><pre><code id="install-command-0">npm install -g clipal</code></pre><button class="copy-button" type="button" data-copy-target="install-command-0" data-success="Copied" aria-label="Copy npm command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                   </div>
                   <div id="install-panel-1" class="tab-panel install-panel" data-tab-panel>
                     <p>Use the standalone installer for macOS or Linux.</p>
-                    <div class="command-box"><pre><code id="install-command-1">curl -fsSL https://clipal.paiart.com/install.sh | sh</code></pre><button class="copy-button" type="button" data-copy-target="install-command-1" data-success="Copied" aria-label="Copy macOS and Linux command"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button></div>
+                    <div class="command-box"><pre><code id="install-command-1">curl -fsSL https://clipal.paiart.com/install.sh | sh</code></pre><button class="copy-button" type="button" data-copy-target="install-command-1" data-success="Copied" aria-label="Copy macOS and Linux command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                   </div>
                   <div id="install-panel-2" class="tab-panel install-panel" data-tab-panel>
                     <p>Run the standalone installer in PowerShell.</p>
-                    <div class="command-box"><pre><code id="install-command-2">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code></pre><button class="copy-button" type="button" data-copy-target="install-command-2" data-success="Copied" aria-label="Copy Windows command"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button></div>
+                    <div class="command-box"><pre><code id="install-command-2">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code></pre><button class="copy-button" type="button" data-copy-target="install-command-2" data-success="Copied" aria-label="Copy Windows command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                   </div>
                 </div>
               </div>
               <div class="install-step">
                 <div class="step-heading"><span class="step-count">2</span><h3>Start the gateway</h3></div>
-                <div class="command-box"><pre><code id="start-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="Copied" aria-label="Copy start command"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button></div>
-                <p class="step-note">Keep this terminal running, or use the background service.</p>
+                <div class="command-box"><pre><code id="start-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="Copied" aria-label="Copy start command"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
+                <p class="step-note">Keep this terminal running, or set up the background service.</p>
                 <details class="service-details">
                   <summary>Prefer a background service?</summary>
                   <p>Install the service, then start it:</p>
-                  <div class="command-box"><pre><code id="service-command">clipal service install
-clipal service start</code></pre><button class="copy-button" type="button" data-copy-target="service-command" data-success="Copied" aria-label="Copy service commands"><span class="copy-text">Copy</span><span aria-hidden="true">⧉</span></button></div>
+                  <div class="command-box"><pre><code id="service-command"><span class="cmd-line">clipal service install</span>
+<span class="cmd-line">clipal service start</span></code></pre><button class="copy-button" type="button" data-copy-target="service-command" data-success="Copied" aria-label="Copy service commands"><span class="copy-text">Copy</span><span data-copy-icon aria-hidden="true">⧉</span></button></div>
                 </details>
               </div>
               <div class="install-step">
                 <div class="step-heading"><span class="step-count">3</span><h3>Open the console</h3></div>
-                <a class="local-url" href="http://127.0.0.1:3333/" target="_blank" rel="noopener">127.0.0.1:3333 <span aria-hidden="true">↗</span></a>
-                <p class="step-note">Add an API-key provider or OAuth account, then preview and enable CLI takeover for your tools.</p>
+                <div class="local-url-row">
+                  <a class="local-url" href="http://127.0.0.1:3333/" target="_blank" rel="noopener">127.0.0.1:3333 <span aria-hidden="true">↗</span></a>
+                  <span class="local-badge">Localhost · after Step 2</span>
+                </div>
+                <p class="step-note">Once Clipal is running on your machine, open the console to add an API-key provider or OAuth account, then preview and enable CLI takeover.</p>
               </div>
               <details class="ai-prompt">
                 <summary>Let your AI assistant handle the setup <span class="plus" aria-hidden="true">+</span></summary>
@@ -480,7 +517,7 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
    Windows PowerShell: powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
 3. Start Clipal with clipal, or set it up as a background service with clipal service install followed by clipal service start. Confirm that http://127.0.0.1:3333/ is reachable.
 4. Guide me through adding my first provider or OAuth account in the Web UI, previewing CLI takeover changes, and applying them. Explain when I need to open a new terminal and how to roll back.</pre>
-                  <button class="copy-button" type="button" data-copy-target="ai-prompt-text" data-success="Copied" aria-label="Copy setup prompt"><span class="copy-text">Copy prompt</span><span aria-hidden="true">⧉</span></button>
+                  <button class="copy-button" type="button" data-copy-target="ai-prompt-text" data-success="Copied" aria-label="Copy setup prompt"><span class="copy-text">Copy prompt</span><span data-copy-icon aria-hidden="true">⧉</span></button>
                 </div>
               </details>
             </div>
@@ -490,14 +527,18 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
 
       <section id="faq" class="section" aria-labelledby="faq-title">
         <div class="wrap faq-layout">
-          <div class="section-head">
+          <div class="section-head" data-reveal>
             <div class="section-index"><span class="num">05</span><span class="kicker">FAQ</span></div>
-            <h2 id="faq-title">Local, with <em>clear boundaries.</em></h2>
+            <h2 id="faq-title">Local gateway, <em>clear boundaries.</em></h2>
           </div>
-          <div class="faq-list">
+          <div class="faq-list" data-reveal>
+            <details>
+              <summary>Can I combine OAuth accounts (Claude, Codex, Antigravity) with pay-as-you-go API keys? <span class="plus" aria-hidden="true">+</span></summary>
+              <p>Yes. Add API-key providers and supported OAuth accounts to the same channel group. In auto mode, Clipal tries available keys on the current provider first, falls back across compatible API-key or OAuth providers when rate-limited, and reuses working routes for matching follow-up requests. You can also pin a single provider in manual mode.</p>
+            </details>
             <details>
               <summary>Does “local” mean my AI requests stay on my machine? <span class="plus" aria-hidden="true">+</span></summary>
-              <p>No. Clipal runs the gateway and management console locally, but sends API requests and necessary authentication information to the upstream providers you choose. It is not offline inference. The management UI only accepts loopback connections; the proxy’s listening boundary can be configured separately.</p>
+              <p>No. Clipal runs the gateway and management console locally, but sends API requests and necessary authentication information to the upstream providers you choose. It is not offline inference. By default, the management UI only accepts loopback connections; remote UI and proxy listening boundaries can be configured separately.</p>
             </details>
             <details>
               <summary>Where does Clipal keep configuration and credentials? <span class="plus" aria-hidden="true">+</span></summary>
@@ -515,11 +556,15 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
               <summary>How should I read the cost figures? <span class="plus" aria-hidden="true">+</span></summary>
               <p>Clipal prefers upstream-reported cost. If that is unavailable, it uses the embedded pricing catalog for exact model matches. Unknown pricing is left missing, and catalog updates do not recalculate historical costs. Catalog-based figures are estimates, not a billing guarantee.</p>
             </details>
+            <details>
+              <summary>How do I roll back CLI changes or uninstall Clipal cleanly? <span class="plus" aria-hidden="true">+</span></summary>
+              <p>Use Rollback in the CLI Takeover tab to restore managed files to their pre-takeover backup. If you installed the background service, run clipal service uninstall, then remove the binary (for example npm uninstall -g clipal) and delete ~/.clipal when you no longer need saved settings or usage history.</p>
+            </details>
           </div>
         </div>
       </section>
 
-      <section class="wrap community" aria-labelledby="community-title">
+      <section class="wrap community" aria-labelledby="community-title" data-reveal>
         <h2 id="community-title">A local tool. <em>A shared project.</em></h2>
         <div class="community-copy">
           <p>Read the code. Share an idea. Help make everyday AI tooling easier to live with.</p>
@@ -536,7 +581,7 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
       </section>
 
       <section class="closing" aria-labelledby="closing-title">
-        <div class="wrap closing-inner">
+        <div class="wrap closing-inner" data-reveal>
           <div>
             <h2 id="closing-title">Ready to bring it <em>together?</em></h2>
             <p>Start with one provider. Keep building from there.</p>
@@ -554,6 +599,7 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
         <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/en/">Docs</a>
         <a href="https://github.com/PAIArtCom/Clipal/releases/latest">Releases</a>
         <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE">MIT License</a>
+        <a href="llms.txt">llms.txt</a>
         <a href="zh/" lang="zh-CN" hreflang="zh-CN">中文</a>
         <a href="#top">Back to top ↑</a>
       </footer>
@@ -567,7 +613,7 @@ clipal service start</code></pre><button class="copy-button" type="button" data-
           <button type="button" class="dialog-close">Close ×</button>
         </div>
       </div>
-      <img alt="">
+      <img src="assets/screenshots/providers.png" alt="">
     </dialog>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>

@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 13 12" shape-rendering="crispEdges">
+  <title>Crush</title>
+  <defs>
+    <linearGradient id="crush-heart" x1="6.5" y1="0" x2="6.5" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF6EFF"/>
+      <stop offset="1" stop-color="#DC4CE8"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#crush-heart)" d="M2 0h3v1h1v1h1V1h1V0h3v1h1v1h1v5h-1v1h-1v1h-1v1H9v1H8v1H5v-1H4v-1H3V9H2V8H1V7H0V2h1V1h1V0z"/>
+  <rect x="4" y="4" width="1" height="2.4" fill="#19122B"/>
+  <rect x="8" y="4" width="1" height="2.4" fill="#19122B"/>
+  <rect x="5.8" y="6.3" width="1.4" height="0.7" fill="#19122B"/>
+  <rect x="2.6" y="5.8" width="1" height="0.9" fill="#FF2499"/>
+  <rect x="9.4" y="5.8" width="1" height="0.9" fill="#FF2499"/>
+</svg>

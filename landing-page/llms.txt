@@ -1,0 +1,41 @@
+# Clipal
+
+> Open-source local LLM gateway for AI coding tools. Connect Claude Code, Codex CLI, OpenCode, and 15 more coding CLIs to a single local proxy on macOS, Linux, and Windows, with automatic key/provider failover, OAuth accounts, previewable configuration takeover, and usage/cost visibility.
+
+Clipal runs as a single native binary on your machine (MIT licensed) with a browser management console at `http://127.0.0.1:3333/` (loopback-only by default).
+
+## Core Capabilities & Product Boundaries
+
+- **Native Protocol Routing (`/clipal/*`)**: Preserves native Anthropic (`Messages`), OpenAI (`Chat` / `Responses`), and Gemini (`generateContent`) request families and routes by request path to compatible upstreams. Does not perform arbitrary cross-protocol model translation.
+- **Auto Failover & Sticky Routing**: In `auto` mode, Clipal tries the next available API key on the current provider first, then falls back to the next compatible provider, and reuses learned working routes for matching follow-up requests. In `manual` mode, routing stays pinned to the chosen provider.
+- **API Keys & OAuth Accounts**: Supports YAML-configured API-key providers (`~/.clipal`) alongside OAuth accounts (`~/.clipal/oauth/`) for Claude, Codex, and Antigravity-backed Google accounts, with automatic refresh when refresh tokens are present.
+- **Previewable CLI Takeover (18 Clients)**: Preview targeted user-level configuration diffs, capture baseline backups before applying, and roll back managed files to their pre-takeover cycle baseline. Shell startup integrations require opening a new terminal after apply or rollback; project, session, or environment settings can still override user defaults.
+- **Usage & Cost Sources**: Tracks requests and token usage. Prefers upstream-reported cost when available, falls back to exact-model matches in the embedded pricing catalog, and leaves unknown model prices unpriced rather than guessing.
+- **Local Boundary**: Clipal runs the gateway and management UI locally, but forwards API requests and required credentials to the upstream providers you configure. It is not offline local model inference.
+
+## Supported AI Coding CLIs (18)
+
+Claude Code, Codex CLI, OpenCode, Antigravity CLI, Continue, Aider, Goose, Pi, Qwen Code, Kimi Code CLI, Copilot CLI, Kilo CLI, CodeBuddy Code, Crush, iFlow CLI, TRAE Agent, Grok Build, DeepSeek Harness.
+
+## Quick Install & Launch
+
+- **npm (macOS / Linux / Windows)**: `npm install -g clipal`
+- **macOS / Linux shell**: `curl -fsSL https://clipal.paiart.com/install.sh | sh`
+- **Windows PowerShell**: `powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"`
+- **Foreground run**: `clipal`
+- **Background service**: `clipal service install` followed by `clipal service start`
+- **Local Web UI**: `http://127.0.0.1:3333/`
+
+## Documentation & Links
+
+- [Website (English)](https://clipal.paiart.com/)
+- [Website (简体中文)](https://clipal.paiart.com/zh/)
+- [GitHub Repository](https://github.com/PAIArtCom/Clipal)
+- [Latest Releases](https://github.com/PAIArtCom/Clipal/releases/latest)
+- [npm Package](https://www.npmjs.com/package/clipal)
+- [Getting Started (EN)](https://github.com/PAIArtCom/Clipal/blob/main/docs/en/getting-started.md)
+- [Web UI Guide (EN)](https://github.com/PAIArtCom/Clipal/blob/main/docs/en/web-ui.md)
+- [Routing & Failover (EN)](https://github.com/PAIArtCom/Clipal/blob/main/docs/en/routing-and-failover.md)
+- [CLI Takeover Catalog](https://github.com/PAIArtCom/Clipal/blob/main/docs/cli-takeover.md)
+- [Pricing & Cost Sources (EN)](https://github.com/PAIArtCom/Clipal/blob/main/docs/en/pricing.md)
+- [中文文档入口 (ZH)](https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/README.md)
