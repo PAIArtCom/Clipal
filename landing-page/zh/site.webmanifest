@@ -1,0 +1,25 @@
+{
+  "name": "Clipal — 本地 LLM 网关",
+  "short_name": "Clipal",
+  "description": "为 AI 编程工具打造的本地 LLM 网关。",
+  "lang": "zh-CN",
+  "start_url": "/zh/",
+  "scope": "/zh/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "../assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

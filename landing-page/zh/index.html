@@ -1,1093 +1,620 @@
-<!DOCTYPE html>
-<html lang="zh-Hans">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipal — 专为 AI 编码助手打造的本地 LLM API 网关与控制中枢 | 18 款 CLI 一键无损接管</title>
-  <meta name="description"
-    content="Clipal 是一款面向全生态 AI 编程助手的极速本地 LLM API 网关与控制中枢。一键 AST 语法树级无损接管 Claude Code、Codex 等 18 款 CLI 工具，统一收口三协议，聚合多密钥池与 Claude/Codex/Google 全系 OAuth，实现毫秒级故障转移与离线微美元精准计费。100% 本地运行，零 Docker，零 Python 依赖。">
-  <meta name="keywords"
-    content="Clipal, LLM API 网关, Claude Code 代理, Codex CLI 接管, Antigravity CLI, OpenCode, 429 限流容灾, 本地大模型代理, AI 编程助手控制台, 离线 Token 计费, OAuth 刷新代理">
-  <link rel="canonical" href="https://clipal.paiart.com/zh/">
-  <link rel="alternate" hreflang="en" href="https://clipal.paiart.com/">
-  <link rel="alternate" hreflang="zh-Hans" href="https://clipal.paiart.com/zh/">
-  <link rel="alternate" hreflang="x-default" href="https://clipal.paiart.com/">
-
-  <!-- Favicon -->
-  <link rel="icon" href="../assets/icons/favicon.ico" sizes="any">
-  <link rel="icon" type="image/svg+xml" href="../assets/icons/clipal-icon.svg">
-
-  <!-- Typography: Outfit, Inter, JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
-    rel="stylesheet">
-
-  <!-- Core Design System -->
-  <link rel="stylesheet" href="../css/style.css?v=quantum-v0.31">
-
-  <!-- OpenGraph -->
-  <meta property="og:title" content="Clipal — 专为 AI 编码助手打造的本地 LLM API 网关与控制中枢">
-  <meta property="og:description"
-    content="一键无损接管 18 款开发工具，统一收口三协议，聚合多密钥池与全系 OAuth，毫秒级故障转移与离线微美元精准计费。">
-  <meta property="og:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
-  <meta property="og:url" content="https://clipal.paiart.com/zh/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Clipal">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Clipal — 专为 AI 编码助手打造的本地 LLM 网关">
-  <meta name="twitter:description" content="18 款 CLI 一键无损接管，全系 OAuth，毫秒级 429 容灾与离线微美元计费。">
-  <meta name="twitter:image" content="https://clipal.paiart.com/assets/screenshots/clipal-og-image.jpeg">
-
-  <!-- Structured Data: SoftwareApplication -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Clipal",
-    "description": "专为 AI 编码助手打造的本地大模型网关与控制中枢。一键 AST 语法树无损接管 18 款 CLI 工具，多协议收口，Claude/Codex/Google 全系 OAuth，毫秒级 429 容灾与微美元离线精准计费。",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "macOS, Linux, Windows",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "license": "https://opensource.org/licenses/MIT",
-    "url": "https://clipal.paiart.com/zh/",
-    "downloadUrl": "https://www.npmjs.com/package/clipal",
-    "softwareVersion": "0.31.1"
-  }
-  </script>
-
-  <!-- Structured Data: FAQPage -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "我的 API Key 和 OAuth 凭据会被上传到云端吗？",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "绝对不会。Clipal 是 100% 的本地独立程序。所有 Key、Token 及会话配置均加密持久化在本地 config.json 中，零数据外流，无第三方云端遥测。源代码完全开源于 GitHub 接受审计。"
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "为什么接管我的 CLI 配置不会造成破坏？",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "区别于粗暴的覆盖写入，Clipal 针对每一款 CLI 工具都建立了严格的配置契约。通过 JSON / YAML / TOML 的 AST 语法树合并，仅写入必须的 Base URL 等映射字段。接管前强制捕获不可变基线，任何时刻点击 Rollback 即可 100% 字节级还原。"
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "什么是统一路由 /clipal？我还需要配置旧的 /claudecode 吗？",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Clipal 已实现智能协议嗅探。你只需将所有客户端的 Base URL 统一指向 http://127.0.0.1:3333/clipal，网关会自动辨识 Anthropic、OpenAI 或 Gemini 协议并分发。旧别名仅为向下兼容历史客户端保留。"
-        }
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clipal · 为 Claude Code、Codex 等 AI 编程工具打造的本地 LLM 网关</title>
+    <meta name="description" content="Clipal 是开源的本地 LLM 网关，将 Claude Code、Codex CLI 等 18 种编程工具接入统一代理，支持故障转移、OAuth 账号及用量费用追踪。">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="color-scheme" content="dark">
+    <link rel="canonical" href="https://clipal.paiart.com/zh/">
+    <link rel="alternate" hreflang="en" href="https://clipal.paiart.com/">
+    <link rel="alternate" hreflang="zh-CN" href="https://clipal.paiart.com/zh/">
+    <link rel="alternate" hreflang="x-default" href="https://clipal.paiart.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Clipal">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:locale:alternate" content="en_US">
+    <meta property="og:title" content="Clipal — AI 编程工具，一个本地网关。">
+    <meta property="og:description" content="为 Claude Code、Codex CLI 等 18 种编程工具打造的开源本地网关，支持密钥故障转移、OAuth、可预览的配置接管及费用追踪。">
+    <meta property="og:url" content="https://clipal.paiart.com/zh/">
+    <meta property="og:image" content="https://clipal.paiart.com/assets/og/clipal-og-zh.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Clipal — AI 编程工具，一个本地网关。">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Clipal — AI 编程工具，一个本地网关。">
+    <meta name="twitter:description" content="为 Claude Code、Codex CLI 等 18 种编程工具打造的开源本地网关，支持密钥故障转移、OAuth、可预览的配置接管及费用追踪。">
+    <meta name="twitter:image" content="https://clipal.paiart.com/assets/og/clipal-og-zh.png">
+    <meta name="twitter:image:alt" content="Clipal — AI 编程工具，一个本地网关。">
+    <link rel="icon" href="../assets/icons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="../assets/icons/clipal-icon.svg">
+    <link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="preload" href="../fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/style.css?v=bilingual-1">
+    <script src="../js/main.js?v=bilingual-1" defer></script>
+    <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://clipal.paiart.com/#org",
+      "name": "PAIArtCom",
+      "url": "https://github.com/PAIArtCom",
+      "logo": "https://clipal.paiart.com/assets/icons/apple-touch-icon.png"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://clipal.paiart.com/#website",
+      "url": "https://clipal.paiart.com/",
+      "name": "Clipal",
+      "inLanguage": [
+        "en",
+        "zh-CN"
+      ],
+      "publisher": {
+        "@id": "https://clipal.paiart.com/#org"
       }
-    ]
-  }
-  </script>
-</head>
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://clipal.paiart.com/#app",
+      "name": "Clipal",
+      "description": "面向 AI 编程工具的开源本地 LLM 网关，支持 18 种 CLI 接管、密钥和提供商故障转移、OAuth 账号，以及请求、Token 与费用追踪。",
+      "url": "https://clipal.paiart.com/zh/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "本地 LLM API 网关",
+      "operatingSystem": "macOS, Linux, Windows",
+      "downloadUrl": "https://github.com/PAIArtCom/Clipal/releases/latest",
+      "softwareHelp": "https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "image": "https://clipal.paiart.com/assets/og/clipal-og-zh.png",
+      "screenshot": [
+        "https://clipal.paiart.com/assets/screenshots/providers.png",
+        "https://clipal.paiart.com/assets/screenshots/takeover.png",
+        "https://clipal.paiart.com/assets/screenshots/status.png"
+      ],
+      "featureList": [
+        "通过 /clipal/* 路由 Anthropic、OpenAI 和 Gemini 原生请求",
+        "自动模式先切换可用密钥，再切换提供商",
+        "预览、应用和回滚 18 种 AI 编程 CLI 的配置",
+        "支持 Claude、Codex 及基于 Antigravity 的 Google OAuth 账号",
+        "查看请求、Token 与费用，并区分费用来源",
+        "浏览器管理控制台：http://127.0.0.1:3333/"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "publisher": {
+        "@id": "https://clipal.paiart.com/#org"
+      },
+      "sameAs": [
+        "https://github.com/PAIArtCom/Clipal"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://clipal.paiart.com/zh/#faq",
+      "inLanguage": "zh-CN",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "“本地”意味着 AI 请求不会离开电脑吗？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "不是。Clipal 在本地运行网关和管理控制台，但会向你选择的上游提供商发送 API 请求及必要认证信息，不等于离线推理。管理界面仅接受本地回环连接，代理的监听范围可单独配置。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "配置和凭证保存在哪里？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "API Key 提供商保存在 ~/.clipal 下的 YAML 文件中，OAuth 凭证单独保存在 ~/.clipal/oauth/。请通过适当的本机文件权限保护它们；Clipal 不承诺所有已存储凭证均已加密。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "CLI 接管回滚会恢复什么？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "回滚会把受管理文件恢复为本轮接管最初保存的备份；重复应用仍保留同一份备份。项目、会话和环境设置仍可能覆盖工具的连接设置。修改 Shell 集成后，请打开新终端。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Clipal 会转换不同模型的协议吗？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Clipal 保留 Anthropic、OpenAI 和 Gemini 的原生请求格式，通过 /clipal/* 按请求路径路由。上游需要兼容工具发送的协议，不支持任意协议之间的自动转换。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "应该怎样理解费用数据？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Clipal 优先采用上游报告的费用；若不可用，则使用内置价格目录中精确匹配模型的价格。未知价格保持缺失，目录更新不会重算历史费用。目录计算结果是估算值，不是账单保证。"
+          }
+        }
+      ]
+    }
+  ]
+}</script>
+  </head>
+  <body id="top" data-copy-success="已复制到剪贴板。" data-copy-failure="复制失败，请手动选择并复制文本。">
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header">
+      <div class="nav-wrap wrap">
+        <a class="wordmark" href="./" aria-label="Clipal 首页"><img src="../assets/icons/clipal-icon.svg" width="30" height="30" alt=""><span>Clipal<span class="wordmark-dot">.</span></span></a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="navigation" aria-label="打开导航" data-open-label="打开导航" data-close-label="关闭导航"><span></span><span></span></button>
+        <nav id="navigation" aria-label="主导航">
+          <div class="nav-links"><a href="#console">控制台</a><a href="#features">功能</a><a href="#integrations">集成</a><a href="#install">安装</a><a href="#faq">常见问题</a></div>
+          <div class="nav-links"><a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/">文档 ↗</a><a href="../" lang="en" hreflang="en">EN</a><a class="github-nav" href="https://github.com/PAIArtCom/Clipal">GitHub ↗</a></div>
+        </nav>
+      </div>
+    </header>
 
-<body>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-watermark" aria-hidden="true">:3333</div>
+        <div class="wrap">
+          <div class="hero-meta mono-label">
+            <span class="tag"><span class="pulse" aria-hidden="true"></span>本地 LLM 网关</span>
+            <span>开源 · MIT</span>
+            <span class="meta-extra">macOS / Linux / Windows</span>
+          </div>
+          <h1 id="hero-title" class="display"><span class="line">AI 编程工具</span><span class="line line-2">一个<em>本地网关</em></span></h1>
 
-  <!-- ===================== NAVIGATION ===================== -->
-  <header id="site-header">
-    <div class="container nav-container">
-      <div class="nav-left">
-        <a href="/zh/" class="nav-logo" aria-label="Clipal 首页">
-          <img src="../assets/icons/clipal-icon.svg" alt="" width="28" height="28" class="nav-logo-icon" aria-hidden="true">
-          <span>CLIPAL</span>
-        </a>
-        <div class="nav-telemetry">
-          <span class="status-dot"></span>
-          <span>GATEWAY 3333 // ACTIVE</span>
+          <div class="hero-body">
+            <div class="hero-copy">
+              <p class="hero-lead">工具照常用，连接交给 Clipal。</p>
+              <p class="hero-description">把 Claude Code、Codex CLI 等 18 种编程工具接入本机网关。提供商和凭证集中管理，请求失败时自动尝试备用路线；请求、Token 和费用来源，打开浏览器就能查看。</p>
+              <div class="hero-actions">
+                <a class="button button-primary" href="#install">开始使用 <span aria-hidden="true">→</span></a>
+                <a class="text-link" href="#console">看看控制台 <span aria-hidden="true">↓</span></a>
+              </div>
+              <div class="quick-install">
+                <pre><code id="hero-command">npm install -g clipal</code></pre>
+                <button class="copy-button" type="button" data-copy-target="hero-command" data-success="已复制" aria-label="复制安装命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button>
+              </div>
+            </div>
+
+            <div class="routing-art" data-hero-demo role="group" aria-label="路由示意：编程工具连接本机 Clipal，再将 Anthropic、OpenAI 和 Gemini 原生请求路由到兼容上游。" data-state-ready="就绪" data-state-active="路由中" data-state-limited="429" data-state-cooldown="冷却中" data-state-success="200 OK" data-state-standby="备用" data-state-sticky="黏性">
+              <div class="art-topline"><span><i class="demo-indicator" aria-hidden="true"></i>路由演示</span><span>示意数据</span></div>
+              <div class="routing-tools">
+                <button type="button" data-hero-client="0" data-protocol="0" data-channel="Claude" data-oauth-account="Claude 账号" aria-pressed="true" disabled><span class="client-logo"><img src="../assets/logos/claude-code.svg" alt="" width="20" height="20"></span><span>Claude Code</span></button>
+                <button type="button" data-hero-client="1" data-protocol="1" data-channel="OpenAI" data-oauth-account="Codex 账号" aria-pressed="false" disabled><span class="client-logo"><img src="../assets/logos/codex-cli.svg" alt="" width="20" height="20"></span><span>Codex CLI</span></button>
+                <button type="button" data-hero-client="2" data-protocol="2" data-channel="Google" data-oauth-account="Antigravity 账号" aria-pressed="false" disabled><span class="client-logo"><img class="on-dark" src="../assets/logos/opencode.svg" alt="" width="20" height="20"></span><span>OpenCode</span></button>
+              </div>
+              <div class="incoming-lines"><svg viewBox="0 0 440 82" preserveAspectRatio="none" aria-hidden="true"><path d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82M220 0V82M375 0V26Q375 40 361 40H234Q220 40 220 54V82"></path><path class="active-line" d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82"></path><path class="route-packet" pathLength="1" d="M65 0V26Q65 40 79 40H206Q220 40 220 54V82"></path></svg></div>
+              <div class="gateway-core">
+                <div class="core-side"><span>127.0.0.1</span><span>:3333</span></div>
+                <div class="core-logo"><img src="../assets/icons/clipal-icon.svg" width="76" height="76" alt=""></div>
+                <div class="core-side core-right"><span>/clipal/*</span><span>本地</span></div>
+              </div>
+              <div class="core-caption"><strong>Clipal</strong><span>运行在你的电脑上</span></div>
+              <div class="outgoing-lines"><svg viewBox="0 0 440 64" preserveAspectRatio="none" aria-hidden="true"><path d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64M220 0V64M220 0V16Q220 30 234 30H361Q375 30 375 44V64"></path><path class="active-line" d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64"></path><path class="route-packet" pathLength="1" d="M220 0V16Q220 30 206 30H79Q65 30 65 44V64"></path></svg></div>
+              <div class="protocols"><span class="is-current"><i class="protocol-dot"></i>Anthropic</span><span><i class="protocol-dot"></i>OpenAI</span><span><i class="protocol-dot"></i>Gemini</span></div>
+              <div class="hero-demo-status">
+                <div class="hero-demo-heading"><span class="hero-phase-index" aria-hidden="true">01 / 03</span><span class="hero-scene-label" data-hero-scene-label>正常路由</span><span class="hero-demo-detail">自动模式</span></div>
+                <div class="hero-scene-captions" data-hero-scene="normal" data-label="正常路由">
+                  <p data-hero-frame data-motion="0" data-api="ready" data-oauth="standby">请求进入本地网关。</p>
+                  <p data-hero-frame data-motion="1" data-api="active" data-oauth="standby" hidden>路由到兼容的 API 提供商。</p>
+                  <p data-hero-frame data-motion="4" data-api="success" data-oauth="standby" hidden>200 OK，响应返回编程工具。</p>
+                </div>
+                <div class="hero-scene-captions" data-hero-scene="fallback" data-label="提供商兜底" hidden>
+                  <p data-hero-frame data-motion="0" data-api="ready" data-oauth="standby">新请求继续使用当前路线。</p>
+                  <p data-hero-frame data-motion="1" data-api="active" data-oauth="standby" hidden>尝试当前 API 提供商。</p>
+                  <p data-hero-frame data-motion="2" data-api="limited" data-oauth="standby" hidden>429，当前提供商已无可用 API 密钥。</p>
+                  <p data-hero-frame data-motion="3" data-api="cooldown" data-oauth="active" hidden>API 提供商冷却中，转向 OAuth。</p>
+                  <p data-hero-frame data-motion="4" data-api="cooldown" data-oauth="success" hidden>200 OK，备用提供商响应成功。</p>
+                </div>
+                <div class="hero-scene-captions" data-hero-scene="sticky" data-label="黏性路由" hidden>
+                  <p data-hero-frame data-motion="0" data-api="cooldown" data-oauth="sticky">后续请求匹配已学习的路由。</p>
+                  <p data-hero-frame data-motion="1" data-api="cooldown" data-oauth="sticky" hidden>复用已成功的 OAuth 提供商。</p>
+                  <p data-hero-frame data-motion="4" data-api="cooldown" data-oauth="success" hidden>200 OK，继续沿用成功的路线。</p>
+                  <p data-hero-frame data-motion="0" data-api="cooldown" data-oauth="sticky" hidden>下一次匹配请求，仍用同一提供商。</p>
+                  <p data-hero-frame data-motion="4" data-api="cooldown" data-oauth="success" hidden>200 OK，无需反复切换提供商。</p>
+                </div>
+                <div class="hero-provider-pool" aria-label="API 与 OAuth 提供商示意">
+                  <div data-hero-provider="0">
+                    <span class="provider-auth" aria-hidden="true">API</span>
+                    <div class="provider-identity"><strong><span data-provider-channel>Claude</span> API 提供商 01</strong><small>API 密钥认证</small></div>
+                    <b>就绪</b>
+                  </div>
+                  <div data-hero-provider="1">
+                    <span class="provider-auth" aria-hidden="true">OAuth</span>
+                    <div class="provider-identity"><strong><span data-provider-channel>Claude</span> OAuth 提供商 02</strong><small data-provider-account>Claude 账号</small></div>
+                    <b>备用</b>
+                  </div>
+                </div>
+                <div class="hero-demo-footer">
+                  <div class="hero-phase-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="hero-demo-controls" hidden>
+                    <button type="button" data-hero-toggle data-play-label="播放" data-pause-label="暂停">暂停</button>
+                    <button type="button" data-hero-next>下一步 →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <nav class="nav-links" role="navigation" aria-label="主导航">
-        <a href="#matrix" class="nav-link">18 星轨矩阵</a>
-        <a href="#pillars" class="nav-link">技术支柱</a>
-        <a href="#tour" class="nav-link">控制台实景</a>
-        <a href="#comparison" class="nav-link">架构对比</a>
-        <a href="#install" class="nav-link">快速启航</a>
-        <a href="#faq" class="nav-link">安全与FAQ</a>
-      </nav>
+      <section class="ticker" aria-label="支持的 AI 编程 CLI">
+        <a class="ticker-label" href="#integrations">18 种 CLI<span class="long"> · 支持配置接管</span> <span aria-hidden="true">↘</span></a>
+        <div class="ticker-viewport">
+          <div class="ticker-track">
+            <ul>
+              <li><span class="client-logo"><img src="../assets/logos/claude-code.svg" alt="" width="22" height="22"></span>Claude Code</li>
+              <li><span class="client-logo"><img src="../assets/logos/codex-cli.svg" alt="" width="22" height="22"></span>Codex CLI</li>
+              <li><span class="client-logo"><img class="on-dark" src="../assets/logos/opencode.svg" alt="" width="22" height="22"></span>OpenCode</li>
+              <li><span class="client-logo"><img src="../assets/logos/google.svg" alt="" width="22" height="22"></span>Antigravity CLI</li>
+              <li><span class="client-logo"><img class="on-dark" src="../assets/logos/continue.svg" alt="" width="22" height="22"></span>Continue</li>
+              <li><span class="client-logo"><img src="../assets/logos/aider.svg" alt="" width="22" height="22"></span>Aider</li>
+              <li><span class="client-logo"><img class="on-dark" src="../assets/logos/goose.svg" alt="" width="22" height="22"></span>Goose</li>
+              <li><span class="client-logo"><img src="../assets/logos/pi.svg" alt="" width="22" height="22"></span>Pi</li>
+              <li><span class="client-logo"><img src="../assets/logos/qwen.svg" alt="" width="22" height="22"></span>Qwen Code</li>
+              <li><span class="client-logo"><img src="../assets/logos/kimi.svg" alt="" width="22" height="22"></span>Kimi Code CLI</li>
+              <li><span class="client-logo"><img src="../assets/logos/copilot.svg" alt="" width="22" height="22"></span>Copilot CLI</li>
+              <li><span class="client-logo"><img src="../assets/logos/kilo.svg" alt="" width="22" height="22"></span>Kilo CLI</li>
+              <li><span class="client-logo"><img src="../assets/logos/codebuddy.svg" alt="" width="22" height="22"></span>CodeBuddy Code</li>
+              <li><span class="client-logo"><img src="../assets/logos/crush.svg" alt="" width="22" height="22"></span>Crush</li>
+              <li><span class="client-logo"><img src="../assets/logos/iflow.svg" alt="" width="22" height="22"></span>iFlow CLI</li>
+              <li><span class="client-logo"><img src="../assets/logos/trae.svg" alt="" width="22" height="22"></span>TRAE Agent</li>
+              <li><span class="client-logo"><img src="../assets/logos/grok.svg" alt="" width="22" height="22"></span>Grok Build</li>
+              <li><span class="client-logo"><img src="../assets/logos/deepseek.svg" alt="" width="22" height="22"></span>DeepSeek Harness</li>
+            </ul>
+            <ul aria-hidden="true" data-ticker-clone></ul>
+          </div>
+        </div>
+      </section>
 
-      <div class="nav-actions">
-        <a href="/" class="lang-toggle" aria-label="切换到英文版">
-          <span class="lang-label">EN</span>
-          <span>/</span>
-          <span class="lang-label active">中文</span>
-        </a>
-        <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="padding:0.45rem 0.9rem; font-size:0.8rem">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-          </svg>
-          <span>Star</span>
-        </a>
-      </div>
+      <section id="console" class="section" aria-labelledby="console-title">
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <div class="section-index"><span class="num">01</span><span class="kicker">本地控制台</span></div>
+            <div class="section-title">
+              <h2 id="console-title">上游、配置与用量，<em>放在一起看。</em></h2>
+              <p class="section-intro">添加上游、调整 CLI 连接、查看请求记录，不用在配置文件和终端之间来回找。管理入口就在本机：127.0.0.1:3333。</p>
+            </div>
+          </div>
+          <div class="console-tabs console-layout tabs" data-tabs>
+            <div class="tab-list" aria-label="控制台视图" aria-orientation="vertical">
+              <button type="button" id="console-tab-0" data-tab="console-panel-0"><span class="tab-number">01</span>提供商</button>
+              <button type="button" id="console-tab-1" data-tab="console-panel-1"><span class="tab-number">02</span>CLI 接管</button>
+              <button type="button" id="console-tab-2" data-tab="console-panel-2"><span class="tab-number">03</span>用量</button>
+              <button type="button" id="console-tab-3" data-tab="console-panel-3"><span class="tab-number">04</span>设置</button>
+            </div>
+            <div class="console-panels">
+              <div id="console-panel-0" class="tab-panel console-panel" data-tab-panel>
+                <div class="screen-frame">
+                  <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：提供商"><img src="../assets/screenshots/providers.png" alt="Clipal 提供商管理界面：API Key、OAuth 提供商和自动／手动路由" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                </div>
+                <div class="screen-caption">
+                  <h3>提供商，集中管理。</h3>
+                  <p>在一个地方管理 API Key 和 OAuth 提供商，选择自动路由，或在手动模式下固定提供商。<span class="screenshot-note">产品界面截图 · 示例配置</span></p>
+                </div>
+              </div>
+              <div id="console-panel-1" class="tab-panel console-panel" data-tab-panel>
+                <div class="screen-frame">
+                  <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：CLI 接管"><img src="../assets/screenshots/takeover.png" alt="Clipal CLI 接管界面：工具配置状态、差异预览与回滚" width="2018" height="1430" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                </div>
+                <div class="screen-caption">
+                  <h3>调整配置，保留原有设置。</h3>
+                  <p>先预览定向配置变更，再保存基线并应用，需要时回滚。<span class="screenshot-note">产品界面截图 · 示例配置</span></p>
+                </div>
+              </div>
+              <div id="console-panel-2" class="tab-panel console-panel" data-tab-panel>
+                <div class="screen-frame">
+                  <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：用量"><img src="../assets/screenshots/status.png" alt="Clipal 用量界面：请求、Token 与费用" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                </div>
+                <div class="screen-caption">
+                  <h3>追踪请求，看清费用。</h3>
+                  <p>在控制台内查看请求活动、Token 用量，以及上游报告或价格目录估算的费用。<span class="screenshot-note">产品界面截图 · 示例配置</span></p>
+                </div>
+              </div>
+              <div id="console-panel-3" class="tab-panel console-panel" data-tab-panel>
+                <div class="screen-frame">
+                  <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：设置"><img src="../assets/screenshots/settings.png" alt="Clipal 全局设置界面" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                </div>
+                <div class="screen-caption">
+                  <h3>网关设置，按需调整。</h3>
+                  <p>在浏览器中调整网关设置。管理界面仅允许本地回环连接。<span class="screenshot-note">产品界面截图 · 示例配置</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section paper" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <div class="section-index"><span class="num">02</span><span class="kicker">功能</span></div>
+            <div class="section-title">
+              <h2 id="features-title">集中配置，<em>专心写代码。</em></h2>
+              <p class="section-intro">从工具接入到请求路由，把分散的设置收拢到一处。</p>
+            </div>
+          </div>
+          <div class="bento">
+            <article class="cell cell-wide" data-reveal>
+              <div class="feature-copy">
+                <span class="cell-tag">CLI 接管</span>
+                <h3>改动先看清，接管有退路。</h3>
+                <p>不用逐个寻找工具的配置入口。先在控制台预览改动，再应用接管；Clipal 保存受管理文件的原始状态，需要时可以回滚。</p>
+                <a class="text-link" href="https://github.com/PAIArtCom/Clipal/blob/main/docs/cli-takeover.md">了解 CLI 接管 <span aria-hidden="true">↗</span></a>
+              </div>
+              <div class="steps">
+                <div class="step"><span class="n">01</span><h4>预览</h4><p>看清将要修改的配置。</p></div>
+                <div class="step"><span class="n">02</span><h4>应用</h4><p>保存基线，保留无关设置。</p></div>
+                <div class="step"><span class="n">03</span><h4>回滚</h4><p>恢复本轮接管前的文件状态。</p></div>
+                <p class="diagram-note">修改 Shell 集成后，请打开新终端。项目、会话或环境设置仍可能覆盖工具配置。</p>
+              </div>
+            </article>
+
+            <article class="cell cell-7 cell-dark" data-reveal>
+              <span class="cell-tag">自动故障转移</span>
+              <h3>主路线受限，还有备用路线。</h3>
+              <p>自动模式先尝试同一提供商的下一个可用密钥，再切换到其他提供商。需要固定路线时，可在手动模式下指定提供商。</p>
+              <div class="failover-demo" data-route-demo data-next="下一步" data-replay="重播" data-selected="已选中" data-tried="已尝试" data-standby="备用">
+                <div class="demo-top"><span>流程示意</span><button type="button" class="route-next">下一步 <span aria-hidden="true">→</span></button></div>
+                <div class="provider-route">
+                  <span class="provider-name">提供商 A</span>
+                  <div class="route-key is-current" data-route-key><span class="key-mark"></span><code>key_01</code><span class="key-state">已选中</span></div>
+                  <div class="route-key" data-route-key><span class="key-mark"></span><code>key_02</code><span class="key-state">备用</span></div>
+                </div>
+                <div class="provider-route second-provider">
+                  <span class="provider-name">提供商 B</span>
+                  <div class="route-key" data-route-key><span class="key-mark"></span><code>key_01</code><span class="key-state">备用</span></div>
+                </div>
+                <div class="route-captions" aria-live="polite">
+                  <p data-route-caption>01 / 从当前提供商和密钥开始。</p>
+                  <p data-route-caption hidden>02 / 必要时尝试该提供商的下一个可用密钥。</p>
+                  <p data-route-caption hidden>03 / 再尝试其他兼容提供商。</p>
+                </div>
+                <p class="diagram-note">手动模式保持固定，不会自动切换密钥或提供商。</p>
+              </div>
+            </article>
+
+            <article class="cell cell-5" data-reveal>
+              <span class="cell-tag">原生协议</span>
+              <h3>一个入口，接入三类原生协议。</h3>
+              <p>统一入口， <code>/clipal/*</code>。保留各协议的原生格式，按请求路径路由到兼容上游。</p>
+              <ul class="protocol-stack">
+                <li>Anthropic <code>Messages</code></li>
+                <li>OpenAI <code>Chat · Responses</code></li>
+                <li>Gemini <code>generateContent</code></li>
+              </ul>
+            </article>
+
+            <article class="cell cell-6" data-reveal>
+              <span class="cell-tag">OAuth 账号</span>
+              <h3>API 密钥之外，也能连接账号。</h3>
+              <p>通过 OAuth 连接 Claude、Codex，以及基于 Antigravity 的 Google 账号。具备刷新令牌的凭证可自动刷新。</p>
+              <div class="account-icons">
+                <span><span class="client-logo"><img src="../assets/logos/claude-code.svg" alt="" width="22" height="22" loading="lazy"></span>Claude</span>
+                <span><span class="client-logo"><img src="../assets/logos/codex-cli.svg" alt="" width="22" height="22" loading="lazy"></span>Codex</span>
+                <span><span class="client-logo"><img src="../assets/logos/google.svg" alt="" width="22" height="22" loading="lazy"></span>Antigravity</span>
+              </div>
+              <p class="fine-print">仍需满足账号和上游服务的使用条件。</p>
+            </article>
+
+            <article class="cell cell-6" data-reveal>
+              <span class="cell-tag">用量与费用</span>
+              <h3>用量看得见，费用有依据。</h3>
+              <p>优先采用上游报告的费用，否则使用内置目录中精确匹配模型的价格。价格未知时，保持未知。</p>
+              <div class="cost-sources">
+                <div><span><i></i>上游报告</span><span>优先来源</span></div>
+                <div><span><i></i>模型价格目录</span><span>备用估算</span></div>
+                <div><span><i></i>未知价格</span><span>不猜测价格</span></div>
+              </div>
+              <p class="fine-print">目录估算不等于提供商的实际账单。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="integrations" class="section" aria-labelledby="integrations-title">
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <div class="section-index"><span class="num">03</span><span class="kicker">集成</span></div>
+            <div class="section-title">
+              <h2 id="integrations-title">熟悉的工具，<em>统一接入。</em></h2>
+              <div class="section-intro">
+                <p>支持 18 种 CLI。在控制台预览配置变更、启用接管，或恢复原有配置。</p>
+                <a class="text-link" href="https://github.com/PAIArtCom/Clipal/blob/main/docs/cli-takeover.md">查看完整接管目录 <span aria-hidden="true">↗</span></a>
+              </div>
+            </div>
+          </div>
+          <ul class="client-grid" data-reveal>
+            <li data-n="01"><span class="client-logo"><img src="../assets/logos/claude-code.svg" alt="" width="26" height="26" loading="lazy"></span>Claude Code</li>
+            <li data-n="02"><span class="client-logo"><img src="../assets/logos/codex-cli.svg" alt="" width="26" height="26" loading="lazy"></span>Codex CLI</li>
+            <li data-n="03"><span class="client-logo"><img class="on-dark" src="../assets/logos/opencode.svg" alt="" width="26" height="26" loading="lazy"></span>OpenCode</li>
+            <li data-n="04"><span class="client-logo"><img src="../assets/logos/google.svg" alt="" width="26" height="26" loading="lazy"></span>Antigravity CLI</li>
+            <li data-n="05"><span class="client-logo"><img class="on-dark" src="../assets/logos/continue.svg" alt="" width="26" height="26" loading="lazy"></span>Continue</li>
+            <li data-n="06"><span class="client-logo"><img src="../assets/logos/aider.svg" alt="" width="26" height="26" loading="lazy"></span>Aider</li>
+            <li data-n="07"><span class="client-logo"><img class="on-dark" src="../assets/logos/goose.svg" alt="" width="26" height="26" loading="lazy"></span>Goose</li>
+            <li data-n="08"><span class="client-logo"><img src="../assets/logos/pi.svg" alt="" width="26" height="26" loading="lazy"></span>Pi</li>
+            <li data-n="09"><span class="client-logo"><img src="../assets/logos/qwen.svg" alt="" width="26" height="26" loading="lazy"></span>Qwen Code</li>
+            <li data-n="10"><span class="client-logo"><img src="../assets/logos/kimi.svg" alt="" width="26" height="26" loading="lazy"></span>Kimi Code CLI</li>
+            <li data-n="11"><span class="client-logo"><img src="../assets/logos/copilot.svg" alt="" width="26" height="26" loading="lazy"></span>Copilot CLI</li>
+            <li data-n="12"><span class="client-logo"><img src="../assets/logos/kilo.svg" alt="" width="26" height="26" loading="lazy"></span>Kilo CLI</li>
+            <li data-n="13"><span class="client-logo"><img src="../assets/logos/codebuddy.svg" alt="" width="26" height="26" loading="lazy"></span>CodeBuddy Code</li>
+            <li data-n="14"><span class="client-logo"><img src="../assets/logos/crush.svg" alt="" width="26" height="26" loading="lazy"></span>Crush</li>
+            <li data-n="15"><span class="client-logo"><img src="../assets/logos/iflow.svg" alt="" width="26" height="26" loading="lazy"></span>iFlow CLI</li>
+            <li data-n="16"><span class="client-logo"><img src="../assets/logos/trae.svg" alt="" width="26" height="26" loading="lazy"></span>TRAE Agent</li>
+            <li data-n="17"><span class="client-logo"><img src="../assets/logos/grok.svg" alt="" width="26" height="26" loading="lazy"></span>Grok Build</li>
+            <li data-n="18"><span class="client-logo"><img src="../assets/logos/deepseek.svg" alt="" width="26" height="26" loading="lazy"></span>DeepSeek Harness</li>
+          </ul>
+          <p class="integrations-note">各客户端的支持范围和配置方式有所不同。写入配置本身，并不代表已验证工具流量经过 Clipal。</p>
+        </div>
+      </section>
+
+      <section id="install" class="section acid" aria-labelledby="install-title">
+        <div class="wrap">
+          <div class="section-head">
+            <div class="section-index"><span class="num">04</span><span class="kicker">安装</span></div>
+            <div class="section-title">
+              <h2 id="install-title">三步启动，<em>从本机开始。</em></h2>
+              <div class="section-intro">
+                <p>选一种方式安装，启动 Clipal，再打开控制台添加上游。macOS、Linux、Windows 都可以使用，无需另行部署网页服务。</p>
+                <a class="text-link" href="https://github.com/PAIArtCom/Clipal/releases/latest">也可下载发行版 <span aria-hidden="true">↗</span></a>
+              </div>
+            </div>
+          </div>
+          <div class="install-layout">
+            <div class="install-workflow">
+              <div class="install-step">
+                <div class="step-heading"><span class="step-count">1</span><h3>安装</h3></div>
+                <div class="install-tabs tabs" data-tabs>
+                  <div class="tab-list" aria-label="安装方式">
+                    <button type="button" id="install-tab-0" data-tab="install-panel-0">npm</button>
+                    <button type="button" id="install-tab-1" data-tab="install-panel-1">macOS / Linux</button>
+                    <button type="button" id="install-tab-2" data-tab="install-panel-2">Windows</button>
+                  </div>
+                  <div id="install-panel-0" class="tab-panel install-panel" data-tab-panel>
+                    <p>通过 npm 安装原生程序。</p>
+                    <div class="command-box"><pre><code id="install-command-0">npm install -g clipal</code></pre><button class="copy-button" type="button" data-copy-target="install-command-0" data-success="已复制" aria-label="复制 npm 命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button></div>
+                  </div>
+                  <div id="install-panel-1" class="tab-panel install-panel" data-tab-panel>
+                    <p>使用 macOS 或 Linux 独立安装脚本。</p>
+                    <div class="command-box"><pre><code id="install-command-1">curl -fsSL https://clipal.paiart.com/install.sh | sh</code></pre><button class="copy-button" type="button" data-copy-target="install-command-1" data-success="已复制" aria-label="复制 macOS 和 Linux 命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button></div>
+                  </div>
+                  <div id="install-panel-2" class="tab-panel install-panel" data-tab-panel>
+                    <p>在 PowerShell 中运行 Windows 安装脚本。</p>
+                    <div class="command-box"><pre><code id="install-command-2">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</code></pre><button class="copy-button" type="button" data-copy-target="install-command-2" data-success="已复制" aria-label="复制 Windows 命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button></div>
+                  </div>
+                </div>
+              </div>
+              <div class="install-step">
+                <div class="step-heading"><span class="step-count">2</span><h3>启动网关</h3></div>
+                <div class="command-box"><pre><code id="start-command">clipal</code></pre><button class="copy-button" type="button" data-copy-target="start-command" data-success="已复制" aria-label="复制启动命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button></div>
+                <p class="step-note">保持此终端运行，或使用后台服务。</p>
+                <details class="service-details">
+                  <summary>想在后台运行？</summary>
+                  <p>先安装服务，再启动：</p>
+                  <div class="command-box"><pre><code id="service-command">clipal service install
+clipal service start</code></pre><button class="copy-button" type="button" data-copy-target="service-command" data-success="已复制" aria-label="复制后台服务命令"><span class="copy-text">复制</span><span aria-hidden="true">⧉</span></button></div>
+                </details>
+              </div>
+              <div class="install-step">
+                <div class="step-heading"><span class="step-count">3</span><h3>打开控制台</h3></div>
+                <a class="local-url" href="http://127.0.0.1:3333/" target="_blank" rel="noopener">127.0.0.1:3333 <span aria-hidden="true">↗</span></a>
+                <p class="step-note">添加 API Key 提供商或 OAuth 账号，然后为工具预览并启用 CLI 接管。</p>
+              </div>
+              <details class="ai-prompt">
+                <summary>让 AI 助手完成安装 <span class="plus" aria-hidden="true">+</span></summary>
+                <p>把这段提示词复制给能够操作终端的编程助手。</p>
+                <div class="prompt-box">
+                  <pre id="ai-prompt-text">请帮我安装并启动本地 LLM 网关 Clipal。官方仓库：https://github.com/PAIArtCom/Clipal
+
+1. 检查我的操作系统和 npm 是否可用。优先使用：npm install -g clipal
+2. 如果没有 npm，使用对应平台的官方安装脚本：
+   macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
+   Windows PowerShell: powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
+3. 运行 clipal 启动网关，或依次运行 clipal service install 和 clipal service start 配置后台服务。确认 http://127.0.0.1:3333/ 可以访问。
+4. 引导我在 Web UI 添加第一个提供商或 OAuth 账号，预览并应用 CLI 接管。说明何时需要打开新终端，以及如何回滚。</pre>
+                  <button class="copy-button" type="button" data-copy-target="ai-prompt-text" data-success="已复制" aria-label="复制安装提示词"><span class="copy-text">复制提示词</span><span aria-hidden="true">⧉</span></button>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="section" aria-labelledby="faq-title">
+        <div class="wrap faq-layout">
+          <div class="section-head">
+            <div class="section-index"><span class="num">05</span><span class="kicker">常见问题</span></div>
+            <h2 id="faq-title">本地运行，<em>边界清楚。</em></h2>
+          </div>
+          <div class="faq-list">
+            <details>
+              <summary>“本地”意味着 AI 请求不会离开电脑吗？ <span class="plus" aria-hidden="true">+</span></summary>
+              <p>不是。Clipal 在本地运行网关和管理控制台，但会向你选择的上游提供商发送 API 请求及必要认证信息，不等于离线推理。管理界面仅接受本地回环连接，代理的监听范围可单独配置。</p>
+            </details>
+            <details>
+              <summary>配置和凭证保存在哪里？ <span class="plus" aria-hidden="true">+</span></summary>
+              <p>API Key 提供商保存在 ~/.clipal 下的 YAML 文件中，OAuth 凭证单独保存在 ~/.clipal/oauth/。请通过适当的本机文件权限保护它们；Clipal 不承诺所有已存储凭证均已加密。</p>
+            </details>
+            <details>
+              <summary>CLI 接管回滚会恢复什么？ <span class="plus" aria-hidden="true">+</span></summary>
+              <p>回滚会把受管理文件恢复为本轮接管最初保存的备份；重复应用仍保留同一份备份。项目、会话和环境设置仍可能覆盖工具的连接设置。修改 Shell 集成后，请打开新终端。</p>
+            </details>
+            <details>
+              <summary>Clipal 会转换不同模型的协议吗？ <span class="plus" aria-hidden="true">+</span></summary>
+              <p>Clipal 保留 Anthropic、OpenAI 和 Gemini 的原生请求格式，通过 /clipal/* 按请求路径路由。上游需要兼容工具发送的协议，不支持任意协议之间的自动转换。</p>
+            </details>
+            <details>
+              <summary>应该怎样理解费用数据？ <span class="plus" aria-hidden="true">+</span></summary>
+              <p>Clipal 优先采用上游报告的费用；若不可用，则使用内置价格目录中精确匹配模型的价格。未知价格保持缺失，目录更新不会重算历史费用。目录计算结果是估算值，不是账单保证。</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap community" aria-labelledby="community-title">
+        <h2 id="community-title">开源的工具，<em>一起打磨。</em></h2>
+        <div class="community-copy">
+          <p>读读代码，分享想法，一起让日常 AI 工具用得更顺手。</p>
+          <div class="community-links"><a class="text-link" href="https://github.com/PAIArtCom/Clipal">在 GitHub 上支持项目 <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/">阅读文档 <span aria-hidden="true">↗</span></a></div>
+          <details class="community-details">
+            <summary>加入微信社区 <span class="plus" aria-hidden="true">+</span></summary>
+            <div class="qr-grid">
+              <figure><img src="../assets/community/wechat-group.jpeg" alt="微信交流群二维码" loading="lazy"><figcaption>微信交流群</figcaption></figure>
+              <figure><img src="../assets/community/wechat-supporter.jpeg" alt="作者微信二维码" loading="lazy"><figcaption>联系作者</figcaption></figure>
+            </div>
+            <p class="fine-print">使用微信扫码；群可用状态可能变化。</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="closing" aria-labelledby="closing-title">
+        <div class="wrap closing-inner">
+          <div>
+            <h2 id="closing-title">把连接理顺，<em>继续写代码。</em></h2>
+            <p>先接入一个上游，再配置你常用的编程工具。</p>
+          </div>
+          <a class="button button-primary" href="#install">开始使用 <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="footer-mega" aria-hidden="true">Clipal<span>.</span></p>
+      </section>
+    </main>
+
+    <div class="footer-bottom">
+      <footer class="site-footer wrap">
+        <p>Clipal，为你的编程工具打造的本地 LLM 网关。</p>
+        <a href="https://github.com/PAIArtCom/Clipal">GitHub</a>
+        <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/">文档</a>
+        <a href="https://github.com/PAIArtCom/Clipal/releases/latest">发行版</a>
+        <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE">MIT 许可证</a>
+        <a href="../" lang="en" hreflang="en">EN</a>
+        <a href="#top">返回顶部 ↑</a>
+      </footer>
     </div>
-  </header>
 
-  <main>
-    <!-- ===================== HERO SECTION ===================== -->
-    <section id="hero">
-      <div class="container hero-grid">
-        <div class="hero-content">
-          <div class="hero-eyebrow">
-            <span class="tag-badge">
-              <span class="status-dot text-signal-green"></span>
-              <span>LOCAL CONTROL PLANE · V0.31.1</span>
-            </span>
-          </div>
-
-          <h1 class="hero-title">
-            专为 AI 编码助手打造的<br>
-            <span class="hero-title-gradient">本地大模型网关与控制中枢</span>
-          </h1>
-
-          <p class="hero-lead">
-            告别繁琐的手动改配、环境变量污染与频控中断。Clipal 在本地构建工业级稳压网关：一键 AST 无损接管 Claude Code、Codex 等 18 款开发工具，统一收口三协议，聚合多密钥池与全系 OAuth，毫秒级故障转移与离线微美元精准计费。100% 运行于你的本地机器。
-          </p>
-
-          <div class="hero-actions">
-            <button type="button" class="btn-cmd" data-copy="npm install -g clipal" aria-label="一键复制 npm 全局安装命令">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <polyline points="4 17 10 11 4 5"></polyline>
-                <line x1="12" y1="19" x2="20" y2="19"></line>
-              </svg>
-              <span><code>npm i -g clipal</code></span>
-              <span class="tag-badge" style="padding:0.15rem 0.4rem; font-size:0.65rem">复制</span>
-            </button>
-
-            <a href="#matrix" class="btn-secondary">
-              <span>探索 18 家 CLI 接管矩阵</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </a>
-          </div>
-
-          <div class="hero-pills">
-            <div class="hero-pill-item">✓ 18 款 CLI 一键无损接管</div>
-            <div class="hero-pill-item">✓ 零 Docker / 零 Python 依赖</div>
-            <div class="hero-pill-item">✓ 单二进制 &lt;50MB / &lt;1ms 延迟</div>
-            <div class="hero-pill-item">✓ 100% 本地运行零隐私泄漏</div>
-          </div>
-        </div>
-
-        <!-- 3D Kinetic Console Viewport -->
-        <div class="hero-console-viewport" aria-hidden="true">
-          <div class="hero-3d-stage">
-            <!-- Satellite 1: Top Right -->
-            <div class="satellite-card sat-top-right">
-              <div class="satellite-label">AST Config Guard</div>
-              <div class="satellite-val">
-                <span class="status-dot text-signal-green"></span>
-                <span>~/.claude/settings.json · MERGED</span>
-              </div>
-            </div>
-
-            <!-- Satellite 2: Bottom Left -->
-            <div class="satellite-card sat-bot-left">
-              <div class="satellite-label">Failover Dynamic Pivot</div>
-              <div class="satellite-val">
-                <span class="status-dot text-signal-amber"></span>
-                <span>429 Sensed → Backup_02 (41ms)</span>
-              </div>
-            </div>
-
-            <!-- Chassis -->
-            <div class="console-chassis">
-              <div class="console-header">
-                <div class="console-dots">
-                  <div class="console-dot console-dot-r"></div>
-                  <div class="console-dot console-dot-y"></div>
-                  <div class="console-dot console-dot-g"></div>
-                </div>
-                <span>clipal-core // 127.0.0.1:3333</span>
-                <span class="text-signal-green">STABLE</span>
-              </div>
-              <div class="console-body" id="hero-console-stream">
-                <div class="terminal-line dim">[$] clipal service start --unified-route=/clipal</div>
-                <div class="terminal-line success">✓ Clipal Gateway listening on http://127.0.0.1:3333/clipal</div>
-                <div class="terminal-line success">✓ 18 CLI configuration adapters ready with AST safety baseline</div>
-                <div class="terminal-line accent">✓ Protocol Normalizer: Anthropic | OpenAI | Gemini multiplexed</div>
-                <div class="terminal-line route">→ [claude-code] POST /clipal → claude-3-7-sonnet ✓ 241ms</div>
-                <div class="terminal-line warn">→ [codex] POST /clipal → gpt-4.1 [429 LIMIT] ✗ 18ms</div>
-                <div class="terminal-line accent">&nbsp;&nbsp;&nbsp;&nbsp;FAILOVER PIVOT → Azure_Backup [KEY_2] ✓ 389ms</div>
-              </div>
-            </div>
-          </div>
+    <dialog class="screenshot-dialog" aria-label="放大截图">
+      <div class="dialog-toolbar">
+        <p>产品界面截图 · 示例配置</p>
+        <div class="dialog-actions">
+          <a class="full-image-link" href="../assets/screenshots/providers.png" target="_blank" rel="noopener">查看原图 ↗</a>
+          <button type="button" class="dialog-close">关闭 ×</button>
         </div>
       </div>
-    </section>
-
-    <!-- ===================== SECTION 2: 18-CLI ORBITAL MATRIX ===================== -->
-    <section id="matrix" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-cyan"></span>
-            <span>ECOSYSTEM INTEROP MATRIX</span>
-          </div>
-          <h2 class="section-title">十八星轨：全生态 CLI 一键接管与无损回滚</h2>
-          <p class="section-desc">
-            告别到处翻找隐藏配置文件。Clipal 解析真实语法树，实现原子级配置合并、基准文件秒级备份与零残留回滚。点击任意卡片查看接管契约与边界。
-          </p>
-        </div>
-
-        <div class="matrix-tabs" role="tablist" aria-label="CLI 类别筛选">
-          <button type="button" class="matrix-tab-btn active" data-filter="all" role="tab">全部客户端 (18)</button>
-          <button type="button" class="matrix-tab-btn" data-filter="core" role="tab">核心主力智能体 (4)</button>
-          <button type="button" class="matrix-tab-btn" data-filter="pairing" role="tab">终端结对助手 (5)</button>
-          <button type="button" class="matrix-tab-btn" data-filter="enterprise" role="tab">大厂与开源 CLI (9)</button>
-        </div>
-
-        <div class="matrix-grid" id="matrix-cards">
-
-          <!-- 01: Claude Code -->
-          <article class="cli-card" data-category="core" data-name="Claude Code" data-target="~/.claude/settings.json" data-details="精确合并 ANTHROPIC_BASE_URL 并保留用户全部 enabledPlugins。智能清洗 Bedrock/Vertex 握手 Header，终结死循环认证。" data-diff="  {&#10;    &quot;theme&quot;: &quot;dark&quot;,&#10;    &quot;enabledPlugins&quot;: [&quot;git-tools&quot;],&#10;+   &quot;env&quot;: {&#10;+     &quot;ANTHROPIC_BASE_URL&quot;: &quot;http://127.0.0.1:3333/clipal&quot;&#10;+   }&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/claude-code.svg" alt="Claude Code" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">核心主力</span>
-            </div>
-            <div class="cli-info">
-              <h3>Claude Code</h3>
-              <span class="cli-target-path">~/.claude/settings.json</span>
-              <p class="cli-desc">自动注入 ANTHROPIC_BASE_URL，Agent SDK 兼容传输仿真，告别死循环登录。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> AST 接管就绪</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 02: Codex CLI -->
-          <article class="cli-card" data-category="core" data-name="Codex CLI" data-target="~/.codex/config.toml" data-details="更新 model_providers.clipal 专用段，保留用户所有自定义选项与 Profile 设置，保持聊天历史完全连贯。" data-diff="  [model_providers.clipal]&#10;+ base_url = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ wire_protocol = &quot;chat_completions&quot;&#10;  temperature = 0.2">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/codex-cli.svg" alt="Codex CLI" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">核心主力</span>
-            </div>
-            <div class="cli-info">
-              <h3>Codex CLI</h3>
-              <span class="cli-target-path">~/.codex/config.toml</span>
-              <p class="cli-desc">注入 clipal 专属 provider，保留用户个性化参数，保持会话上下文稳定。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> TOML 保全就绪</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 03: OpenCode v2 -->
-          <article class="cli-card" data-category="core" data-name="OpenCode v2" data-target="opencode.json / 层级配置" data-details="全面适配 OpenCode v2 规范，重定向基础端点，检测并拒绝 provider.use 冲突策略，不篡改 models.dev。" data-diff="  {&#10;+   &quot;endpoint&quot;: &quot;http://127.0.0.1:3333/clipal&quot;,&#10;    &quot;model&quot;: &quot;clipal-routed-default&quot;&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/opencode.svg" alt="OpenCode" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">核心主力</span>
-            </div>
-            <div class="cli-info">
-              <h3>OpenCode v2</h3>
-              <span class="cli-target-path">opencode.json</span>
-              <p class="cli-desc">对齐 v2 配置规范，重定向基础端点，检测通配符安全策略，保护原生目录。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> v2 规范兼容</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 04: Antigravity CLI -->
-          <article class="cli-card" data-category="core" data-name="Antigravity CLI" data-target="Shell 启动文件 + 设置目录" data-details="管理 Bash/Zsh/sh 登录块，无侵入注销与预览，Gemini 文本流与 generateContent 图片生成全支持。" data-diff="  # === CLIPAL MANAGED BLOCK ===&#10;+ export ANTIGRAVITY_BASE_URL=&quot;http://127.0.0.1:3333/clipal&quot;&#10;  # === END CLIPAL MANAGED BLOCK ===">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/google.svg" alt="Antigravity CLI" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">核心主力</span>
-            </div>
-            <div class="cli-info">
-              <h3>Antigravity CLI</h3>
-              <span class="cli-target-path">.zshrc / .bashrc</span>
-              <p class="cli-desc">独立 Shell 环境变量隔离块管理，完美支持 Google Gemini 文本与图片模型。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> Shell 隔离写入</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 05: Goose -->
-          <article class="cli-card" data-category="pairing" data-name="Goose" data-target="config.yaml + custom_providers" data-details="生成 custom_providers/clipal.json 并同步激活 global active_provider，带环境变量冲突自检。" data-diff="  active_provider: clipal&#10;  providers:&#10;+   clipal:&#10;+     base_url: &quot;http://127.0.0.1:3333/clipal&quot;">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/goose.svg" alt="Goose" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">结对助手</span>
-            </div>
-            <div class="cli-info">
-              <h3>Goose</h3>
-              <span class="cli-target-path">~/.config/goose/config.yaml</span>
-              <p class="cli-desc">同步写入全局激活项与自定义 Provider，前置拦截环境变量冲突。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 双文件联动</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 06: Aider -->
-          <article class="cli-card" data-category="pairing" data-name="Aider" data-target=".aider.conf.yml" data-details="注入本地 OpenAI 兼容统一网关与模型指定，保留用户仓库文件上下文映射。" data-diff="  openai-api-base: http://127.0.0.1:3333/clipal/v1&#10;  model: openai/clipal-auto">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/aider.svg" alt="Aider" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">结对助手</span>
-            </div>
-            <div class="cli-info">
-              <h3>Aider</h3>
-              <span class="cli-target-path">~/.aider.conf.yml</span>
-              <p class="cli-desc">无缝对接 Git 结对智能体，保留原有代码库映射，稳定转发大模型流量。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> YAML 结构保留</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 07: Pi -->
-          <article class="cli-card" data-category="pairing" data-name="Pi" data-target="~/.pi/agent/settings.json" data-details="管理 models.json providers.clipal 与 completions 规范，保留已有鉴权与模型元数据。" data-diff="  &quot;providers&quot;: {&#10;+   &quot;clipal&quot;: { &quot;baseUrl&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/pi.svg" alt="Pi" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">结对助手</span>
-            </div>
-            <div class="cli-info">
-              <h3>Pi</h3>
-              <span class="cli-target-path">~/.pi/agent/settings.json</span>
-              <p class="cli-desc">自动配置专属 provider 与 completions 端点，完整保留鉴权凭证。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 自动端点补全</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 08: Continue -->
-          <article class="cli-card" data-category="pairing" data-name="Continue" data-target="~/.continue/config.json" data-details="注入独立 Clipal 路由通道，完全不干预既有模型列表与高级功能扩展。" data-diff="  &quot;models&quot;: [&#10;+   { &quot;title&quot;: &quot;Clipal&quot;, &quot;apiBase&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  ]">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/continue.svg" alt="Continue" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">结对助手</span>
-            </div>
-            <div class="cli-info">
-              <h3>Continue</h3>
-              <span class="cli-target-path">~/.continue/config.json</span>
-              <p class="cli-desc">添加独立模型项，不干扰用户其他既有通道，无缝并存。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 增量无损注入</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 09: Crush -->
-          <article class="cli-card" data-category="pairing" data-name="Crush" data-target="crush.json" data-details="管理官方 JSON 模型目录，主动侦测并拦截 sibling 可执行 crushrc 干扰。" data-diff="  {&#10;+   &quot;provider&quot;: &quot;clipal&quot;,&#10;+   &quot;base_url&quot;: &quot;http://127.0.0.1:3333/clipal&quot;&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/crush.svg" alt="Crush" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">结对助手</span>
-            </div>
-            <div class="cli-info">
-              <h3>Crush</h3>
-              <span class="cli-target-path">crush.json</span>
-              <p class="cli-desc">安全接管官方 JSON 配置，主动拦截重叠运行脚本，保障路径安全。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 冲突防卫</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 10: Qwen Code -->
-          <article class="cli-card" data-category="enterprise" data-name="Qwen Code" data-target="~/.qwen/settings.json" data-details="规范 modelProviders 数组并维护 OpenAI 鉴权选择，多层目录结构无损合并。" data-diff="  &quot;modelProviders&quot;: [&#10;+   { &quot;id&quot;: &quot;clipal&quot;, &quot;url&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  ]">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/qwen.svg" alt="Qwen Code" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">开源生态</span>
-            </div>
-            <div class="cli-info">
-              <h3>Qwen Code</h3>
-              <span class="cli-target-path">~/.qwen/settings.json</span>
-              <p class="cli-desc">通义开源编程智能体配置规范全适配，多层级配置精准合并。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 目录阵列合并</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 11: Kimi Code CLI -->
-          <article class="cli-card" data-category="enterprise" data-name="Kimi Code CLI" data-target="config.toml" data-details="精准管理目标 Provider 并提供 positive 上下文元数据支持，严格区分 kimi-code 规范。" data-diff="  [provider.clipal]&#10;+ endpoint = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ context_window = 131072">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/kimi.svg" alt="Kimi Code" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">大厂模型</span>
-            </div>
-            <div class="cli-info">
-              <h3>Kimi Code CLI</h3>
-              <span class="cli-target-path">config.toml</span>
-              <p class="cli-desc">支持月之暗面长上下文窗口元数据绑定，严格隔离旧版 kimi-cli。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 长文本元数据</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 12: Copilot CLI -->
-          <article class="cli-card" data-category="enterprise" data-name="Copilot CLI" data-target="Shell BYOK 规范块" data-details="严格遵循 GitHub 官方 BYOK 规范，自动安全注销高优先级命令干扰，保留用户鉴权。" data-diff="  # === CLIPAL COPILOT BYOK ===&#10;+ export COPILOT_MODEL_PROVIDER_URL=&quot;http://127.0.0.1:3333/clipal&quot;">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/copilot.svg" alt="Copilot CLI" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">官方规范</span>
-            </div>
-            <div class="cli-info">
-              <h3>Copilot CLI</h3>
-              <span class="cli-target-path">BYOK Shell Environment</span>
-              <p class="cli-desc">基于官方 BYOK 契约实现本地透明接管，原装凭证仓库毫发无损。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> BYOK 原生</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 13: Kilo CLI -->
-          <article class="cli-card" data-category="enterprise" data-name="Kilo CLI" data-target="kilo.json / opencode.json" data-details="多配置文件优先级侦测（kilo.json → kilo.jsonc → opencode.json），主动识别端点遮蔽。" data-diff="  {&#10;+   &quot;provider&quot;: { &quot;clipal&quot;: &quot;http://127.0.0.1:3333/clipal&quot; }&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/kilo.svg" alt="Kilo CLI" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">极客智能体</span>
-            </div>
-            <div class="cli-info">
-              <h3>Kilo CLI</h3>
-              <span class="cli-target-path">kilo.json</span>
-              <p class="cli-desc">兼容 OpenCode 多层配置层级探测，自动检测并拦截端点遮蔽冲突。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 多层级探针</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 14: CodeBuddy -->
-          <article class="cli-card" data-category="enterprise" data-name="CodeBuddy" data-target="settings.json + models.json" data-details="自动生成完整 Chat Completions 端点路径，完整保全已定义模型清单与凭据。" data-diff="  {&#10;+   &quot;endpoint&quot;: &quot;http://127.0.0.1:3333/clipal/v1/chat/completions&quot;&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/codebuddy.svg" alt="CodeBuddy" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">伴侣终端</span>
-            </div>
-            <div class="cli-info">
-              <h3>CodeBuddy</h3>
-              <span class="cli-target-path">~/.codebuddy/settings.json</span>
-              <p class="cli-desc">自动补全完整 Completions 端点路径，保留原生模型与验证通道。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 全路径适配</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 15: iFlow CLI -->
-          <article class="cli-card" data-category="enterprise" data-name="iFlow CLI" data-target="settings.json" data-details="自动映射 OpenAI 兼容协议基地址，精准适配大小写环境变量优先级。" data-diff="  {&#10;+   &quot;baseUrl&quot;: &quot;http://127.0.0.1:3333/clipal&quot;,&#10;+   &quot;authType&quot;: &quot;bearer&quot;&#10;  }">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/iflow.svg" alt="iFlow CLI" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">流式智能体</span>
-            </div>
-            <div class="cli-info">
-              <h3>iFlow CLI</h3>
-              <span class="cli-target-path">~/.iflow/settings.json</span>
-              <p class="cli-desc">自动写入 OpenAI 兼容基地址，自适应环境变量大小写优先策略。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 变量归一化</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 16: TRAE Agent -->
-          <article class="cli-card" data-category="enterprise" data-name="TRAE Agent" data-target="trae_config.yaml" data-details="通过显式绝对路径 YAML 精确接管，不捏造全局假目录，保护辅助 Provider 配置。" data-diff="  model_providers:&#10;+   - name: clipal&#10;+     base_url: http://127.0.0.1:3333/clipal">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/trae.svg" alt="TRAE Agent" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">大厂终端</span>
-            </div>
-            <div class="cli-info">
-              <h3>TRAE Agent</h3>
-              <span class="cli-target-path">trae_config.yaml</span>
-              <p class="cli-desc">字节跳动终端助手适配，显式绝对路径 YAML 接管，安全保留辅助通道。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> 显式路径保护</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 17: Grok Build -->
-          <article class="cli-card" data-category="enterprise" data-name="Grok Build" data-target="~/.grok/config.toml" data-details="写入 [model.clipal] 配置段，支持 OpenAI 兼容推理与多层配置覆盖判定规则。" data-diff="  [model.clipal]&#10;+ url = &quot;http://127.0.0.1:3333/clipal&quot;&#10;+ protocol = &quot;openai&quot;">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/grok.svg" alt="Grok Build" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">xAI 智能体</span>
-            </div>
-            <div class="cli-info">
-              <h3>Grok Build</h3>
-              <span class="cli-target-path">~/.grok/config.toml</span>
-              <p class="cli-desc">xAI 编程构建智能体深度适配，多层配置覆盖规则严格判定。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> TOML 模型段</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-          <!-- 18: DeepSeek Harness -->
-          <article class="cli-card" data-category="enterprise" data-name="DeepSeek Harness" data-target="cordis.patch.yml" data-details="注入根序列 llm-pi-ai Provider 适配器，保护原生插件与凭据引用，杜绝异常覆盖。" data-diff="  - patch: llm-pi-ai&#10;+   endpoint: http://127.0.0.1:3333/clipal&#10;    default_model: deepseek-chat">
-            <div class="cli-card-top">
-              <div class="cli-icon-wrap">
-                <img src="../assets/logos/deepseek.svg" alt="DeepSeek" width="28" height="28" loading="lazy">
-              </div>
-              <span class="cli-tag">官方推理套件</span>
-            </div>
-            <div class="cli-info">
-              <h3>DeepSeek Harness</h3>
-              <span class="cli-target-path">cordis.patch.yml</span>
-              <p class="cli-desc">官方推理套件 Cordis 根序列精准补丁，保留既有插件与凭据映射。</p>
-            </div>
-            <div class="cli-card-bottom">
-              <span class="cli-status-indicator"><span class="status-dot"></span> Cordis 补丁规范</span>
-              <span>点击查看契约 →</span>
-            </div>
-          </article>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 3: 4 DIMENSIONAL PILLARS ===================== -->
-    <section id="pillars" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-green"></span>
-            <span>HARDCORE ARCHITECTURE PILLARS</span>
-          </div>
-          <h2 class="section-title">四大硬核支柱：为严苛开发者构筑的技术护城河</h2>
-          <p class="section-desc">不搞虚无缥缈的概念堆砌。从 AST 语法树解析到微美元级离线计费，每一行代码都为高可用编码工作流而生。</p>
-        </div>
-
-        <div class="pillars-bento">
-
-          <!-- Pillar 1 (col-7): AST Lossless Merge -->
-          <div class="bento-card col-7 hud-bracket">
-            <div>
-              <div class="bento-badge">PILLAR // 01 · 语法树级无损接管</div>
-              <h3 class="bento-title">AST 语法树精准合并 · 拒绝粗暴配置覆盖</h3>
-              <p class="bento-text">
-                市面上简陋的切换脚本直接覆盖整个 settings.json，导致你的自定义插件、特殊环境变量全部丢失。Clipal 底层采用 JSON / YAML / TOML AST 语法树合并算法，仅精准切片写入必要的 Base URL。接管前强制创建不可变物理基准备份，支持秒级 100% 字节级回滚。
-              </p>
-            </div>
-            <div class="diff-viewer">
-              <div class="diff-line"><span class="diff-num">01</span><span>{</span></div>
-              <div class="diff-line"><span class="diff-num">02</span><span class="diff-keep">&nbsp;&nbsp;"theme": "dracula",</span></div>
-              <div class="diff-line"><span class="diff-num">03</span><span class="diff-keep">&nbsp;&nbsp;"enabledPlugins": ["git-guard@2.1", "rust-analyzer"],</span></div>
-              <div class="diff-line diff-add"><span class="diff-num">04</span><span>+ "env": { "ANTHROPIC_BASE_URL": "http://127.0.0.1:3333/clipal" }</span></div>
-              <div class="diff-line"><span class="diff-num">05</span><span>}</span></div>
-            </div>
-          </div>
-
-          <!-- Pillar 2 (col-5): Bulletproof Failover -->
-          <div class="bento-card col-5 hud-bracket">
-            <div>
-              <div class="bento-badge">PILLAR // 02 · 极速容灾稳压</div>
-              <h3 class="bento-title">毫秒级 429 容灾与智能会话粘性</h3>
-              <p class="bento-text">
-                第三方中转 API 频繁 429 限流？Clipal 支持单 Provider 多密钥并发轮询；一旦主用节点宕机，断路器会在毫秒级将流量切换至高优先级备用 Provider。内置智能会话粘性，确保同一轮长对话始终锚定稳定上下文。
-              </p>
-            </div>
-            <div class="pulse-flow-stage">
-              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); line-height:1.7">
-                <div style="display:flex; justify-content:space-between">
-                  <span>OpenRouter Key 1</span>
-                  <span class="text-signal-red">[429 RATE LIMIT]</span>
-                </div>
-                <div style="margin: 0.35rem 0; border-left: 2px solid var(--signal-amber); padding-left: 0.6rem; color:var(--signal-amber)">
-                  ↳ 毫秒无感切换至同一 Provider Key 2...
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                  <span>OpenRouter Key 2</span>
-                  <span class="text-signal-green">[200 OK · 会话已锁定]</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pillar 3 (col-5): Native OAuth Subsystem -->
-          <div class="bento-card col-5 hud-bracket">
-            <div>
-              <div class="bento-badge">PILLAR // 03 · 全系 OAuth 凭据中枢</div>
-              <h3 class="bento-title">Claude, Codex & Google 账号直连与刷新</h3>
-              <p class="bento-text">
-                原生支持导入和授权 Claude、Codex 与 Antigravity Google 账号。Clipal 自动管理 access_token 刷新周期，针对普通 Claude/Codex 客户端深度仿真 Agent SDK 通信包装层，从协议底层终结无限 /login 死循环。
-              </p>
-            </div>
-            <div class="oauth-badge-grid">
-              <div class="oauth-box">
-                <div class="oauth-box-name">Claude OAuth</div>
-                <div class="oauth-box-meta">✓ Agent SDK 仿真</div>
-              </div>
-              <div class="oauth-box">
-                <div class="oauth-box-name">Codex OAuth</div>
-                <div class="oauth-box-meta">✓ Token 自动刷新</div>
-              </div>
-              <div class="oauth-box">
-                <div class="oauth-box-name">Antigravity OAuth</div>
-                <div class="oauth-box-meta">✓ Gemini 文本/生图</div>
-              </div>
-              <div class="oauth-box">
-                <div class="oauth-box-name">网络环境拟态</div>
-                <div class="oauth-box-meta">US / America_NY</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pillar 4 (col-7): Offline Micro-USD Pricing -->
-          <div class="bento-card col-7 hud-bracket">
-            <div>
-              <div class="bento-badge">PILLAR // 04 · 离线微美元精准计费</div>
-              <h3 class="bento-title">离线嵌入式价格库 · 每一分算力纤毫毕现</h3>
-              <p class="bento-text">
-                绝不因计费查询增加任何外部网络耗时。Clipal 将 PAIArtCom/model-specs 价格快照直接嵌入二进制，支持标准费率、Prompt 缓存读写阶梯、200K/272K 超长上下文阶梯、Fast 模式倍率以及地域溢价的精确计量，单位精确至微美元（1 USD = 1,000,000 micros）。
-              </p>
-            </div>
-            <div class="pricing-ticker-box">
-              <div>
-                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); text-transform:uppercase">实时会话费用估算 (Real-Time Cost)</div>
-                <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem">Claude 3.7 Sonnet (150K Tokens · Cache 命中 88%)</div>
-              </div>
-              <div class="pricing-ticker-val" id="pricing-ticker-val">$0.042189</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 4: SPATIAL WEB UI TOUR ===================== -->
-    <section id="tour" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-cyan"></span>
-            <span>LOCAL MISSION CONTROL</span>
-          </div>
-          <h2 class="section-title">看得见、摸得着的生产力控制台</h2>
-          <p class="section-desc">无需死记硬背复杂命令行。在本地浏览器中直观管理模型提供商、CLI 接管状态、全局代理与实时请求日志。所有修改热重载生效。</p>
-        </div>
-
-        <div class="tour-tabs" role="tablist">
-          <button type="button" class="tour-tab-btn active" data-tour="providers" role="tab">服务商与密钥拓扑 (Providers)</button>
-          <button type="button" class="tour-tab-btn" data-tour="takeover" role="tab">18 家 CLI 接管舱 (Takeover)</button>
-          <button type="button" class="tour-tab-btn" data-tour="settings" role="tab">全局网络与防护 (Settings)</button>
-          <button type="button" class="tour-tab-btn" data-tour="status" role="tab">实时用量与遥测 (Status)</button>
-        </div>
-
-        <div class="tour-viewport">
-          <div class="tour-viewport-bar">
-            <div class="console-dots">
-              <div class="console-dot console-dot-r"></div>
-              <div class="console-dot console-dot-y"></div>
-              <div class="console-dot console-dot-g"></div>
-            </div>
-            <span>http://127.0.0.1:3333/ — Clipal Mission Console</span>
-            <span class="tag-badge text-signal-green" id="tour-badge">实时热重载 · 多 Key 轮询池</span>
-          </div>
-
-          <div class="tour-frame">
-            <img src="../assets/screenshots/providers.png" alt="Clipal 服务商管理界面" class="tour-img active" data-tour-img="providers" loading="lazy">
-            <img src="../assets/screenshots/takeover.png" alt="Clipal 18 家 CLI 接管中心" class="tour-img" data-tour-img="takeover" loading="lazy">
-            <img src="../assets/screenshots/settings.png" alt="Clipal 全局设置与代理配置" class="tour-img" data-tour-img="settings" loading="lazy">
-            <img src="../assets/screenshots/status.png" alt="Clipal 实时请求与系统状态监控" class="tour-img" data-tour-img="status" loading="lazy">
-          </div>
-
-          <div class="tour-caption">
-            <div class="tour-caption-text">
-              <h4 id="tour-title">服务商与密钥拓扑（Providers Topology）</h4>
-              <p id="tour-desc">按客户端智能分组管理所有 API 提供商。自由调整 Auto 自动容灾模式或 Manual 强制置顶模式；单 Provider 轻松录入多行 Key，直观查看当前运行态：使用中、待命、冷却中（精确倒计时）、不可用及恢复探测状态。</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 5: COMPETITOR MATRIX ===================== -->
-    <section id="comparison" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-amber"></span>
-            <span>ARCHITECTURAL SUPERIORITY</span>
-          </div>
-          <h2 class="section-title">为什么资深开发者将 Clipal 作为常驻基座？</h2>
-          <p class="section-desc">在开销、隐私、接管深度与并发响应之间，Clipal 做到了极其纯粹的极客平衡。</p>
-        </div>
-
-        <div class="matrix-table-wrap">
-          <table class="comp-table">
-            <thead>
-              <tr>
-                <th>技术对比维度</th>
-                <th>纯手动配置 / Shell 别名</th>
-                <th>传统容器代理 (如 LiteLLM)</th>
-                <th>云端/自建中转系统 (如 One-API)</th>
-                <th class="th-clipal">Clipal 本地网关 (v0.31+)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>运行开销与依赖</strong></td>
-                <td>0MB（但极度繁琐易错）</td>
-                <td>极臃肿（Docker + Python, &gt;300MB）</td>
-                <td>需公网服务器、MySQL 与复杂运维</td>
-                <td class="td-clipal">极轻（Go 单二进制, &lt;50MB 内存）</td>
-              </tr>
-              <tr>
-                <td><strong>内部代理转发延迟</strong></td>
-                <td>0ms</td>
-                <td>15ms ~ 45ms（Python 解释器损耗）</td>
-                <td>受公网节点物理延迟影响 (50ms ~ 200ms)</td>
-                <td class="td-clipal">&lt; 1ms（原生高并发协程零损耗）</td>
-              </tr>
-              <tr>
-                <td><strong>CLI 本地无损接管</strong></td>
-                <td>❌ 人工翻找目录，易改坏</td>
-                <td>❌ 无本地客户端配置文件感知</td>
-                <td>❌ 无客户端接管能力</td>
-                <td class="td-clipal">✓ 18 款工具一键 AST 注入与完整回滚</td>
-              </tr>
-              <tr>
-                <td><strong>原生 OAuth 上游接入</strong></td>
-                <td>❌ 无法维持 Token 自动刷新</td>
-                <td>❌ 仅支持常规 API Key</td>
-                <td>依赖外置脚本插件，易断连</td>
-                <td class="td-clipal">✓ Claude, Codex & Google 原生支持与环境拟态</td>
-              </tr>
-              <tr>
-                <td><strong>网络防踩坑与 DNS 优化</strong></td>
-                <td>❌ 易受环境污染导致握手超时</td>
-                <td>需手动配置容器代理参数</td>
-                <td>受限于中转服务器自身网络</td>
-                <td class="td-clipal">✓ 原生代理链继承 + Cloudflare/Google DoH</td>
-              </tr>
-              <tr>
-                <td><strong>微美元离线精准计费</strong></td>
-                <td>❌ 无统计</td>
-                <td>依赖在线模型库查询</td>
-                <td>依赖云端服务端计费规则更新</td>
-                <td class="td-clipal">✓ 嵌入式 model-specs 离线高精核算</td>
-              </tr>
-              <tr>
-                <td><strong>数据与密钥隐私保障</strong></td>
-                <td>存储在各种明文 config 中</td>
-                <td>容易通过环境变量泄露</td>
-                <td>密钥需托付给第三方云端数据库</td>
-                <td class="td-clipal">✓ 100% 本地运行，Key 本地安全加密</td>
-              </tr>
-              <tr>
-                <td><strong>系统级无感后台守护</strong></td>
-                <td>❌ 终端窗口关闭即失效</td>
-                <td>需守护 Docker 守护进程</td>
-                <td>依赖云服务器运行</td>
-                <td class="td-clipal">✓ 原生 `clipal service` 一键系统驻留</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 6: INSTALLATION PROTOCOLS ===================== -->
-    <section id="install" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-green"></span>
-            <span>RAPID DEPLOYMENT PROTOCOLS</span>
-          </div>
-          <h2 class="section-title">60 秒内启动你的本地折跃核心</h2>
-          <p class="section-desc">无需 Docker，无需 Python，选择你偏好的安装协议。</p>
-        </div>
-
-        <div style="max-width: 820px; margin: 0 auto">
-          <div class="install-tabs" role="tablist">
-            <button type="button" class="install-tab-btn active" data-install-tab="ai" role="tab">让 AI 帮我安装 (Agent-First)</button>
-            <button type="button" class="install-tab-btn" data-install-tab="npm" role="tab">npm 一键极速分发</button>
-            <button type="button" class="install-tab-btn" data-install-tab="script" role="tab">独立安装脚本 / 二进制</button>
-          </div>
-
-          <!-- Panel 1: Agent Prompt -->
-          <div class="install-panel active" id="install-panel-ai">
-            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
-              如果你正在使用 <strong>Claude Code</strong>、<strong>Codex CLI</strong> 或任何具备终端权限的 AI 助手，直接复制以下 Prompt 发给它：
-            </p>
-            <div class="prompt-copy-box">
-              <div class="prompt-copy-header">
-                <span>INSTALLATION PROMPT FOR CODING AGENTS</span>
-                <button type="button" class="tag-badge" style="cursor:pointer" data-copy="请帮我安装并启动 Clipal 本地大模型网关。项目官方地址：https://github.com/PAIArtCom/Clipal
-
-请按以下规范帮我安装并验证：
-1. 优先使用 npm 全局安装：npm install -g clipal（当前包已采用平台可选依赖，npm 12+ 无需 --allow-scripts）。
-2. 若无 node 环境，请使用官方独立安装脚本：
-   - macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
-   - Windows (PowerShell): powershell -ExecutionPolicy ByPass -c &quot;irm https://clipal.paiart.com/install.ps1 | iex&quot;
-3. 安装完成后执行 clipal service install && clipal service start，并验证 http://127.0.0.1:3333 是否可访问。
-4. 随后指导我在 Web UI 中一键启用 CLI 接管并绑定我的第一个 API 提供商或 OAuth 账号。">复制 Prompt</button>
-              </div>
-              <div class="prompt-copy-content">请帮我安装并启动 Clipal 本地大模型网关。项目官方地址：https://github.com/PAIArtCom/Clipal
-
-请按以下规范帮我安装并验证：
-1. 优先使用 npm 全局安装：npm install -g clipal（当前包已采用平台可选依赖，npm 12+ 无需 --allow-scripts）。
-2. 若无 node 环境，请使用官方独立安装脚本：
-   - macOS/Linux: curl -fsSL https://clipal.paiart.com/install.sh | sh
-   - Windows (PowerShell): powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"
-3. 安装完成后执行 clipal service install && clipal service start，并验证 http://127.0.0.1:3333 是否可访问。
-4. 随后指导我在 Web UI 中一键启用 CLI 接管并绑定我的第一个 API 提供商或 OAuth 账号。</div>
-            </div>
-          </div>
-
-          <!-- Panel 2: npm -->
-          <div class="install-panel" id="install-panel-npm">
-            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
-              当前 npm 包采用平台可选依赖分发二进制，在 npm 12+ 环境下完全无需 <code>--allow-scripts</code> 即可顺利安装。
-            </p>
-            <div class="diff-viewer" style="margin-bottom:1rem">
-              <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">npm install -g clipal</span></div>
-              <div class="diff-line"><span class="diff-num">2</span><span class="diff-add">clipal service install</span></div>
-              <div class="diff-line"><span class="diff-num">3</span><span class="diff-add">clipal service start</span></div>
-            </div>
-            <button type="button" class="btn-primary" data-copy="npm install -g clipal && clipal service install && clipal service start">复制全部安装命令</button>
-          </div>
-
-          <!-- Panel 3: Scripts -->
-          <div class="install-panel" id="install-panel-script">
-            <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem">
-              自动识别操作系统架构，下载对应 Release 资产并通过 <code>checksums.txt</code> 进行完整性校验。
-            </p>
-            <div style="display:flex; flex-direction:column; gap:1rem">
-              <div>
-                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.35rem">macOS &amp; Linux (curl)</div>
-                <div class="diff-viewer">
-                  <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">curl -fsSL https://clipal.paiart.com/install.sh | sh</span></div>
-                </div>
-              </div>
-              <div>
-                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.35rem">Windows (PowerShell)</div>
-                <div class="diff-viewer">
-                  <div class="diff-line"><span class="diff-num">1</span><span class="diff-add">powershell -ExecutionPolicy ByPass -c "irm https://clipal.paiart.com/install.ps1 | iex"</span></div>
-                </div>
-              </div>
-              <div>
-                <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="margin-top:0.5rem">
-                  <span>从 GitHub Releases 页面下载独立二进制文件</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 7: ZERO-TRUST FAQ ===================== -->
-    <section id="faq" class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-cyan"></span>
-            <span>ZERO-TRUST SECURITY ARCHITECTURE</span>
-          </div>
-          <h2 class="section-title">安全承诺与常见问题解答</h2>
-          <p class="section-desc">面向严苛工程师的透明架构说明。</p>
-        </div>
-
-        <div class="faq-grid">
-          <div class="faq-card">
-            <h4 class="faq-q">我的 API Key 和 OAuth 凭据会被上传到云端吗？</h4>
-            <p class="faq-a">绝对不会。Clipal 是一款 100% 的本地独立可执行程序。所有的 Key、Token 及会话配置均加密持久化在本地 config.json 中，零数据外流，无任何第三方云端遥测（Zero Telemetry）。源代码完全开放于 GitHub 接受全球开发者审计。</p>
-          </div>
-
-          <div class="faq-card">
-            <h4 class="faq-q">为什么接管我的 CLI 配置不会造成破坏？</h4>
-            <p class="faq-a">区别于粗暴的覆盖写入，Clipal 针对每一款 CLI 工具都建立了严格的配置契约。通过 JSON / YAML / TOML 的 AST 语法树合并，仅写入 Clipal 必须的 Base URL 等映射字段。接管前强制捕获文件基线，任何时刻点击 Rollback 即可 100% 字节级还原。</p>
-          </div>
-
-          <div class="faq-card">
-            <h4 class="faq-q">Clipal 如何解决网络污染与握手超时报错？</h4>
-            <p class="faq-a">Clipal 原生实现代理继承与分级 DoH 解析。在存在标准系统代理时直接保留域名移交代理；在直连环境下默认优先使用 Cloudflare 与 Google 的 DNS-over-HTTPS (DoH) 安全解析，失败时无缝降级回退系统 DNS，从底层消灭握手断连与污染问题。</p>
-          </div>
-
-          <div class="faq-card">
-            <h4 class="faq-q">什么是统一路由 /clipal？我还需要配置旧的 /claudecode 吗？</h4>
-            <p class="faq-a">自 v0.25+ 起，Clipal 已实现智能协议嗅探。你只需将所有客户端的 Base URL 统一指向 http://127.0.0.1:3333/clipal，网关会自动辨识 Anthropic、OpenAI 或 Gemini 协议并分发。旧别名仅为向下兼容历史客户端保留。</p>
-          </div>
-
-          <div class="faq-card">
-            <h4 class="faq-q">npm 12+ 提示安装脚本被拦截，该如何处理？</h4>
-            <p class="faq-a">自 v0.31 起，Clipal npm 包已全面采用平台可选依赖（Optional Dependencies）直接分发各系统二进制，不再使用 postinstall 安装脚本。因此在 npm 12+ 下直接执行 <code>npm install -g clipal</code> 即可顺畅安装，无需附加 <code>--allow-scripts</code> 参数。</p>
-          </div>
-
-          <div class="faq-card">
-            <h4 class="faq-q">在 Codex 中使用 Clipal 会导致会话历史丢失吗？</h4>
-            <p class="faq-a">不会，反而更加稳定。针对 Codex / OpenCode，Clipal 采用标准化的 model_provider = 'clipal'。不同于频繁更换 Provider 标识会导致会话重置的做法，Clipal 保持 Provider 标识永久一致，仅在内部调度 Key 或端点，从而完整保全历史会话上下文。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== SECTION 8: COMMUNITY & FOOTER ===================== -->
-    <section class="section" style="border-bottom:none">
-      <div class="container">
-        <div class="section-head center">
-          <div class="section-eyebrow">
-            <span class="status-dot text-signal-green"></span>
-            <span>COMMUNITY NODE NETWORK</span>
-          </div>
-          <h2 class="section-title">加入 Clipal 开发者生态网络</h2>
-          <p class="section-desc">与数千名追求极致开发效率的工程师一同探讨 AI Coding Agent 前沿与最佳配置实践。</p>
-        </div>
-
-        <div class="community-grid">
-          <div class="qr-card">
-            <div class="qr-frame">
-              <img src="../assets/community/wechat-group.jpeg" alt="Clipal 微信开发者交流群二维码" loading="lazy">
-            </div>
-            <div class="qr-title">微信开发者核心群</div>
-            <p class="qr-desc">一手获取最新版本动态、模型价格库更新与提示词心得。</p>
-          </div>
-
-          <div class="qr-card">
-            <div class="qr-frame">
-              <img src="../assets/community/wechat-supporter.jpeg" alt="作者微信二维码" loading="lazy">
-            </div>
-            <div class="qr-title">群满？添加作者直接协助</div>
-            <p class="qr-desc">二维码过期或满人时，添加作者微信获取一对一技术协助。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- ===================== FOOTER ===================== -->
-  <footer id="site-footer">
-    <div class="container">
-      <div class="footer-top">
-        <div class="footer-brand">
-          <div class="nav-logo">
-            <img src="../assets/icons/clipal-icon.svg" alt="" width="24" height="24" class="nav-logo-icon">
-            <span>CLIPAL</span>
-          </div>
-          <p>专为 AI 编码助手打造的本地大模型网关与控制中枢。极速无损接管、多密钥容灾、全系 OAuth 与微美元精准计费。</p>
-        </div>
-
-        <div class="footer-col">
-          <h5>核心产品</h5>
-          <a href="#matrix">18 星轨矩阵</a>
-          <a href="#pillars">四大硬核支柱</a>
-          <a href="#tour">Web UI 实景</a>
-          <a href="#comparison">架构维度对比</a>
-        </div>
-
-        <div class="footer-col">
-          <h5>技术资源</h5>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/getting-started.md" target="_blank" rel="noopener noreferrer">快速入门手册</a>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/cli-takeover.md" target="_blank" rel="noopener noreferrer">CLI 接管完整清单</a>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/docs/zh/pricing.md" target="_blank" rel="noopener noreferrer">用量费用计算规范</a>
-          <a href="https://github.com/PAIArtCom/Clipal/releases" target="_blank" rel="noopener noreferrer">Release 发版历史</a>
-        </div>
-
-        <div class="footer-col">
-          <h5>开源生态</h5>
-          <a href="https://github.com/PAIArtCom/Clipal" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
-          <a href="https://paiart.com" target="_blank" rel="noopener noreferrer">PAIART 生态官网</a>
-          <a href="https://github.com/PAIArtCom/Clipal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 开源协议</a>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <div>© 2026 Clipal Contributors. Released under the MIT License.</div>
-        <div style="display:flex; align-items:center; gap:0.5rem">
-          <span class="status-dot text-signal-green"></span>
-          <span>100% 本地运算 · 零云端隐私外泄</span>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <!-- ===================== MODAL: TAKEOVER INSPECTOR ===================== -->
-  <div class="modal-overlay" id="takeover-modal" role="dialog" aria-modal="true" aria-labelledby="modal-cli-name">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <div>
-          <span class="tag-badge text-signal-cyan" style="margin-bottom:0.35rem">TAKEOVER CONTRACT INSPECTOR</span>
-          <h4 id="modal-cli-name">Claude Code</h4>
-        </div>
-        <button type="button" class="modal-close-btn" id="modal-close" aria-label="关闭">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div>
-          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">目标受管配置文件路径 (MANAGED TARGET)</div>
-          <code id="modal-cli-target" style="color:var(--signal-cyan); font-size:0.85rem">~/.claude/settings.json</code>
-        </div>
-        <div>
-          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">接管契约与边界说明 (SPECIFICATION)</div>
-          <p id="modal-cli-desc" style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6"></p>
-        </div>
-        <div>
-          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem">AST 语法树合并示例 (DIFF PREVIEW)</div>
-          <pre class="diff-viewer" id="modal-cli-diff" style="white-space:pre-wrap"></pre>
-        </div>
-        <div style="padding:0.75rem; background:rgba(0,255,157,0.05); border:1px solid rgba(0,255,157,0.2); border-radius:4px; font-family:var(--font-mono); font-size:0.75rem; color:var(--signal-green)">
-          ✓ 首次 Apply 自动归档不可变快照 · 随时一键完整回滚至初始状态
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Main JavaScript -->
-  <script src="../js/main.js?v=quantum-v0.31" defer></script>
-</body>
-
+      <img alt="">
+    </dialog>
+    <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </body>
 </html>

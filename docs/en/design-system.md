@@ -1,83 +1,59 @@
-# Clipal Design System Specification
-## Kinetic Structuralism & Quantum Control Plane
+# Clipal landing-page design system
 
----
+## Current direction: Signal Brutalism
 
-## 1. Core Philosophy
+The English page uses a near-black canvas, warm paper sections and a single acid-green signal. Oversized headings, visible grids, numbered chapters and sharp dividers give the site its identity. Preserve the desktop composition and existing prose spacing; mobile adaptations should change component geometry rather than compress the reading rhythm.
 
-Clipal is a high-throughput local LLM API gateway and mission control for coding agents. Its visual language is established as **Kinetic Structuralism & Quantum Control Plane**:
-- **Sci-Fi Avant-Garde**: Evokes the precision, rigor, and mathematical discipline of deep-space telemetry and aerospace consoles.
-- **Elegance & Restraint**: Strictly forbids cheap blurry neon blooms ("glow soup") and fuzzy pastel gradient blobs. All luminosity originates from sharp physical reflections and high-definition vector indicators.
-- **Spatial 3D & Kinetic Motion**: Leverages genuine three-dimensional perspective (`perspective: 1200px ~ 1400px`), cursor-driven inertial parallax tilt, and mechanical spring damping.
-- **Bold Structural Expression**: Beveled titanium corners, HUD telemetry crosshairs, immutable AST diff viewers, and microsecond packet telemetry streams.
+Primary conversion: install Clipal. Secondary conversion: explore the real browser console. Explain the local gateway, compatible upstreams and how to start before introducing implementation details.
 
----
+## Typography and color
 
-## 2. Tokens & Materials
+- Main English headings use self-hosted EB Garamond variable roman and italic, with a shared weight of 500. `em` provides an italic variation within the same family rather than introducing a second typeface.
+- Body and UI use Geist; commands, route labels and metadata use Geist Mono. Font licenses are retained in `landing-page/fonts/`.
+- Hero display sizing and staggered desktop lines remain. Secondary section headings use `clamp(38px, 5.2vw, 84px)`; the install heading retains greater emphasis.
+- Background `#0a0a0a`; paper `#f1f0ea`; acid `#c8ff3d`; secondary text `#a3a39b`; rate-limit signal `#ff5a1f`.
+- The page remains plain HTML/CSS/JavaScript with no build requirement or externally hosted fonts at runtime.
 
-### 2.1 Surfaces & Depths
-| Token | Physical Value | Architectural Purpose |
-| :--- | :--- | :--- |
-| `--bg-deep` | `#050507` | Deepest obsidian void hosting the 32px coordinate grid |
-| `--bg-base` | `#07070a` | Viewport backdrop, cold carbon black |
-| `--bg-surface` | `#0c0d12` | Base structural panel, polarized titanium texture |
-| `--bg-surface-elevated` | `#12131a` | Elevated surface (modals, floating navbars, viewports) |
-| `--bg-terminal` | `#09090d` | Monospaced code frames, AST diff inspectors, terminal logs |
+## Hero demonstration
 
-### 2.2 Structural Dividers & High-Contrast Lines
-- Dismisses muddy dropshadows in favor of razor-sharp structural lines:
-  - `var(--border-subtle)`: `rgba(255, 255, 255, 0.08)` — Secondary data delimiters
-  - `var(--border-medium)`: `rgba(255, 255, 255, 0.15)` — Default card boundaries & button outlines
-  - `var(--border-bright)`: `rgba(255, 255, 255, 0.35)` — Active borders and specular highlights
-  - `var(--border-active)`: `#00ff9d` — Active terminal scanlines & focus rings
+The route illustration is explicitly labeled as illustrative. It follows a coding client through Clipal, a native protocol, and compatible upstream providers. Claude, OpenAI and Google channels have distinct API and OAuth provider examples; the associated OAuth account labels are Claude, Codex and Antigravity.
 
-### 2.3 Quantum Signal Colors (No Glows, Laser Precision)
-| Signal Token | Value | Semantics & Usage |
-| :--- | :--- | :--- |
-| **Tritium Green** | `#00FF9D` | Active node, AST verified, session lock, healthy state |
-| **Cobalt Cyan** | `#00E5FF` | Protocol multiplexing, diff highlights, telemetry metadata |
-| **Reactor Amber** | `#FFB800` | 429 failover pivot, cooldown timer, long-context tiers |
-| **Plasma Red** | `#FF3366` | Upstream circuit trip, key exhaustion, policy conflict |
+The illustration rotates through three stories on the same channel: normal routing directly to a successful API response; fallback from an API provider with no remaining available keys to a compatible OAuth provider; and follow-up requests that match the learned route and reuse that successful OAuth provider. Only the fallback story shows a 429. Each story has its own caption, provider states, packet direction and progress count. After all three stories, the next client/channel begins. Sticky routing illustrates matching requests and avoids claiming that every request is permanently pinned.
 
----
+Keep existing playback controls secondary. Do not add a prominent motion toolbar. Hero playback stops offscreen and in a background document; reduced-motion preferences start it paused. The illustration makes no network requests or live telemetry claims.
 
-## 3. 3D Spatial Depth & Motion Physics
+After the illustrative 429, the API provider enters `COOLDOWN` and retains that state throughout the remaining fallback and sticky stories. It does not immediately become `READY` when the backup succeeds. Only a new demonstration cycle resets the provider state; no fabricated cooldown countdown is shown.
 
-### 3.1 Inertial Parallax Tilt
-- Core viewports implement native 3D perspective:
-  ```css
-  .hero-console-viewport {
-    perspective: 1400px;
-  }
-  .hero-3d-stage {
-    transform-style: preserve-3d;
-  }
-  ```
-- Containers calculate rotational matrices from cursor offsets using `requestAnimationFrame`, smoothly returning to equilibrium on cursor departure.
+## Mobile layouts
 
-### 3.2 Z-Axis Layering
-- Auxiliary telemetry cards float in spatial orbits displaced at `translateZ(40px)` and `translateZ(50px)`, creating real depth against the parent chassis.
+- Hero actions remain in one horizontal row. Smaller button padding and type preserve both the install action and console link without changing the paragraph spacing.
+- Keep all 18 clients visible. Below 640px, use compact two-column rows of at least 64px instead of the desktop 150px tiles; omit decorative item numbers.
+- The installation workflow explicitly uses a `minmax(0, 1fr)` grid track and shrinkable children. The earlier implicit auto track inherited a roughly 321px content minimum inside a 265px available column at a 320px viewport.
+- Long commands scroll inside their code boxes. Never truncate the command text or solve content overflow by hiding it at the page edge.
+- The large footer mark is styled independently of closing-copy paragraphs so its font size is not overridden by a more specific selector.
+- Display the complete `Clipal.` wordmark on one line: use a 1.08 line height, positive vertical padding and no negative bottom margin. Scale it down with the viewport on phones; do not crop the letter outlines for a bleed effect.
 
-### 3.3 Kinetic Spring Damping
-- Kinetic easing: `--ease-kinetic: cubic-bezier(0.16, 1, 0.3, 1)`
-- Mechanical latching: `--ease-mechanical: cubic-bezier(0.2, 0.8, 0.2, 1)`
-- Tab switching and modal triggers utilize crisp micro-contractions and latching rather than limp opacity fades.
+## Product evidence and interaction
 
----
+Real screenshots are labeled as example configurations. Four console views are available, with an enlargement dialog and a full-size image link. Dialog dismissal restores trigger focus. Tabs support arrow keys, Home and End. Copy feedback uses a live region and selects text as a fallback on failure. FAQ, service setup, AI setup prompt and community disclosures use native details/summary.
 
-## 4. Typography & Information Density
+The client ticker is decorative evidence; the complete integration list remains available separately. Retain reduced-motion support without making motion controls a product focus.
 
-- **Display Typography**: `Outfit` / `Inter`, weight 700–800, tight tracking (`-0.02em` to `-0.03em`).
-- **Body & Labels**: `Inter`, line height 1.6, stark contrast against titanium surfaces.
-- **Code & Telemetry**: `JetBrains Mono` / `SF Mono`, enforced tabular figures:
-  ```css
-  font-variant-numeric: tabular-nums;
-  ```
-  Ensures real-time micro-dollar counters (`$0.042189`) tick without layout jitter.
+## Assets
 
----
+The English social card is `assets/og/clipal-og-en.png` at 1200×630. It follows the page typography and colors, uses the existing Clipal mark, and introduces no unverified performance claims. Apple Touch and 192/512px application icons derive from the same existing SVG. `site.webmanifest` references local assets and the English root route.
 
-## 5. Anti-Patterns (Strict Rules)
-- ❌ **No Glow Soup**: Never use `filter: blur(80px)` or diffuse neon gradient clouds.
-- ❌ **No Muddy Grays**: Never use opaque low-contrast grays; use alpha-based stark white borders.
-- ❌ **No Sluggish Transitions**: Keep interactions under 0.3s with snappy mechanical momentum.
+## Product claims
+
+- Preserve native Anthropic, OpenAI and Gemini request families; do not imply arbitrary protocol translation.
+- Auto mode tries available keys before compatible backup providers. Manual mode stays pinned.
+- Describe targeted configuration changes, previews, baselines and rollback accurately.
+- Local management does not imply offline inference or universal encryption of stored credentials.
+- Distinguish upstream-reported costs from catalog estimates; unknown prices remain missing.
+- Do not invent latency, memory, uptime or competitor benchmarks.
+
+## Language scope and verification
+
+Both locales now share the same structure, components and three routing stories. Chinese copy is independently written for Chinese readers; Chinese headings use a Songti-style system serif with normal emphasis rather than imitating Latin italics. Native-language state labels come from HTML data attributes. The Chinese page has its own social image, localized metadata and manifest entry point.
+
+Verify 1440, 1024, 768, 390, 360 and 320px. Check single-row hero actions, provider type/channel labels, installation panels with long commands and expanded details, compact integration rows, heading font loading, footer type size, local asset references, schema/manifest parsing and JavaScript syntax.

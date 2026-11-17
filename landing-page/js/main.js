@@ -1,266 +1,283 @@
-/**
- * Clipal Landing Page — js/main.js
- * Theme: Kinetic Structuralism & Quantum Control Plane
- * Modules: 3D Tilt · 18-CLI Matrix Filter · Takeover Inspector ·
- *          Web UI Tour · Copy Command · Real-time Telemetry Stream
- */
+/* Progressive enhancement. All factual and translated content lives in HTML. */
+(() => {
+  'use strict';
+  document.documentElement.classList.add('js');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-'use strict';
-
-document.addEventListener('DOMContentLoaded', () => {
-  const isZh = document.documentElement.lang.startsWith('zh');
-
-  /* ============================================================
-     1. 3D PERSPECTIVE KINETIC TILT (HERO STAGE)
-     ============================================================ */
-  const heroViewport = document.querySelector('.hero-console-viewport');
-  const heroStage = document.querySelector('.hero-3d-stage');
-
-  if (heroViewport && heroStage) {
-    let ticking = false;
-
-    heroViewport.addEventListener('mousemove', (e) => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const rect = heroViewport.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          const centerX = rect.width / 2;
-          const centerY = rect.height / 2;
-
-          const rotateX = ((y - centerY) / centerY) * -12 + 6;
-          const rotateY = ((x - centerX) / centerX) * 12 - 6;
-
-          heroStage.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateZ(10px)`;
-          ticking = false;
-        });
-        ticking = true;
-      }
-    });
-
-    heroViewport.addEventListener('mouseleave', () => {
-      heroStage.style.transform = `rotateX(8deg) rotateY(-8deg) translateZ(0)`;
-    });
+  const header = document.querySelector('.site-header');
+  if (header) {
+    const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 8);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   }
 
-  /* ============================================================
-     2. COPY TO CLIPBOARD WITH KINETIC FEEDBACK
-     ============================================================ */
-  const copyButtons = document.querySelectorAll('[data-copy]');
-  copyButtons.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const textToCopy = btn.getAttribute('data-copy');
-      if (!textToCopy) return;
-
-      try {
-        await navigator.clipboard.writeText(textToCopy);
-        const originalContent = btn.innerHTML;
-        const successMsg = isZh ? '✓ 已复制到剪贴板' : '✓ Copied to clipboard';
-
-        btn.innerHTML = `<span class="text-signal-green" style="font-weight:600">${successMsg}</span>`;
-        btn.style.borderColor = 'var(--signal-green)';
-
-        setTimeout(() => {
-          btn.innerHTML = originalContent;
-          btn.style.borderColor = '';
-        }, 2200);
-      } catch (err) {
-        console.error('Clipboard copy failed:', err);
-      }
-    });
+  // The ticker loops by translating two identical lists; the clone stays hidden from assistive tech.
+  document.querySelectorAll('[data-ticker-clone]').forEach(clone => {
+    clone.innerHTML = clone.previousElementSibling.innerHTML;
   });
 
-  /* ============================================================
-     3. 18-CLI ORBITAL MATRIX FILTER & INSPECTOR MODAL
-     ============================================================ */
-  const matrixFilterBtns = document.querySelectorAll('.matrix-tab-btn');
-  const cliCards = document.querySelectorAll('.cli-card');
-  const modalOverlay = document.getElementById('takeover-modal');
-  const modalTitle = document.getElementById('modal-cli-name');
-  const modalTarget = document.getElementById('modal-cli-target');
-  const modalDesc = document.getElementById('modal-cli-desc');
-  const modalDiff = document.getElementById('modal-cli-diff');
-  const modalClose = document.getElementById('modal-close');
-
-  // Filter tabs
-  matrixFilterBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      matrixFilterBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const filter = btn.getAttribute('data-filter');
-      cliCards.forEach((card) => {
-        const category = card.getAttribute('data-category');
-        if (filter === 'all' || category === filter) {
-          card.style.display = 'flex';
-        } else {
-          card.style.display = 'none';
-        }
+  const revealed = [...document.querySelectorAll('[data-reveal]')];
+  if ('IntersectionObserver' in window && !reducedMotion.matches) {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-in');
+        observer.unobserve(entry.target);
       });
-    });
-  });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    revealed.forEach(element => observer.observe(element));
+  } else revealed.forEach(element => element.classList.add('is-in'));
 
-  // Modal open on card click
-  cliCards.forEach((card) => {
-    card.addEventListener('click', () => {
-      if (!modalOverlay) return;
-      const name = card.getAttribute('data-name');
-      const target = card.getAttribute('data-target');
-      const desc = card.getAttribute('data-details');
-      const diffCode = card.getAttribute('data-diff');
-
-      if (modalTitle) modalTitle.textContent = name;
-      if (modalTarget) modalTarget.textContent = target;
-      if (modalDesc) modalDesc.textContent = desc;
-      if (modalDiff) {
-        modalDiff.innerHTML = diffCode.split('\n').map((line, idx) => {
-          const num = String(idx + 1).padStart(2, '0');
-          const isAdd = line.trim().startsWith('+');
-          const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          return `<div class="diff-line ${isAdd ? 'diff-add' : 'diff-keep'}"><span class="diff-num">${num}</span><span>${safeLine}</span></div>`;
-        }).join('');
-      }
-
-      modalOverlay.classList.add('active');
-    });
-  });
-
-  if (modalClose && modalOverlay) {
-    modalClose.addEventListener('click', () => modalOverlay.classList.remove('active'));
-    modalOverlay.addEventListener('click', (e) => {
-      if (e.target === modalOverlay) modalOverlay.classList.remove('active');
-    });
-  }
-
-  /* ============================================================
-     4. SPATIAL WEB UI TOUR (TAB SWITCHER)
-     ============================================================ */
-  const tourBtns = document.querySelectorAll('.tour-tab-btn');
-  const tourImgs = document.querySelectorAll('.tour-img');
-  const tourTitle = document.getElementById('tour-title');
-  const tourDesc = document.getElementById('tour-desc');
-  const tourBadge = document.getElementById('tour-badge');
-
-  const tourData = {
-    providers: {
-      titleZh: '服务商与密钥拓扑（Providers Topology）',
-      titleEn: 'Providers Topology & Multi-Key Pool',
-      descZh: '按客户端智能分组管理所有 API 提供商。自由调整 Auto 自动容灾模式或 Manual 强制置顶模式；单 Provider 轻松录入多行 Key，直观查看当前运行态：使用中、待命、冷却中（精确倒计时）、不可用及恢复探测状态。',
-      descEn: 'Intelligently group and manage upstream providers by client. Seamlessly switch between Auto failover and Manual pinned modes, input multi-line keys per provider, and observe real-time health: active, standby, cooldown timer, and recovery probes.',
-      badgeZh: '实时热重载 · 多 Key 轮询池',
-      badgeEn: 'Hot Reload · Multi-Key Pool',
-    },
-    takeover: {
-      titleZh: '18 家 CLI 一键接管舱（CLI Takeover Bay）',
-      titleEn: '18-CLI Takeover Bay & Diff Inspector',
-      descZh: '可视化管理所有受支持的 CLI 助手。Apply 前直观预览“当前文件”与“写入后文件”的逐行 Diff；发生环境冲突或自定义目录遮蔽时给出主动告警；随时一键完整 Rollback，恢复初态。',
-      descEn: 'Visually manage all 18 supported CLI clients. Preview line-by-line Diff before applying; detect environment variable overrides or directory shadowing; rollback to the original byte-exact baseline with one click at any time.',
-      badgeZh: '无损 AST 注入 · 秒级原子回滚',
-      badgeEn: 'Lossless AST Merge · Atomic Rollback',
-    },
-    settings: {
-      titleZh: '全局网络与安全防护（Network & Global Settings）',
-      titleEn: 'Global Network & DoH Security',
-      descZh: '配置本地与局域网访问边界。精细控制 HTTP/HTTPS/SOCKS5 代理链与 Cloudflare / Google DoH 安全解析回退；配置断路器阈值、桌面通知、超时机制及日志保留周期。',
-      descEn: 'Configure network boundaries and remote access. Fine-tune SOCKS5/HTTP proxy inheritance, Cloudflare and Google DoH fallback, circuit breaker thresholds, desktop alerts, and audit log retentions.',
-      badgeZh: 'DoH 加密解析 · 代理链路继承',
-      badgeEn: 'Encrypted DoH · SOCKS5 / HTTP Proxy Chain',
-    },
-    status: {
-      titleZh: '实时用量与请求遥测（Real-Time Telemetry）',
-      titleEn: 'Real-Time Telemetry & Cost Engine',
-      descZh: '毫秒级观察每一次 LLM 交互链路。完整记录客户端来源、上游目标、端到端响应耗时、状态码、Token 吞吐量与微美元费用归因，彻底告别黑盒盲猜。',
-      descEn: 'Sub-millisecond observability for every LLM interaction. Real-time logging of client origins, upstream targets, end-to-end latency, status codes, token throughput, and exact micro-USD cost attribution.',
-      badgeZh: '微美元精准归因 · 零开销遥测',
-      badgeEn: 'Micro-USD Pricing · Zero Overhead',
-    },
-  };
-
-  tourBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tourBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const targetKey = btn.getAttribute('data-tour');
-      tourImgs.forEach((img) => {
-        if (img.getAttribute('data-tour-img') === targetKey) {
-          img.classList.add('active');
-        } else {
-          img.classList.remove('active');
-        }
-      });
-
-      const data = tourData[targetKey];
-      if (data) {
-        if (tourTitle) tourTitle.textContent = isZh ? data.titleZh : data.titleEn;
-        if (tourDesc) tourDesc.textContent = isZh ? data.descZh : data.descEn;
-        if (tourBadge) tourBadge.textContent = isZh ? data.badgeZh : data.badgeEn;
-      }
-    });
-  });
-
-  /* ============================================================
-     5. INSTALLATION PROTOCOL TABS
-     ============================================================ */
-  const installTabs = document.querySelectorAll('.install-tab-btn');
-  const installPanels = document.querySelectorAll('.install-panel');
-
-  installTabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      installTabs.forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      const targetId = tab.getAttribute('data-install-tab');
-      installPanels.forEach((panel) => {
-        if (panel.id === `install-panel-${targetId}`) {
-          panel.classList.add('active');
-        } else {
-          panel.classList.remove('active');
-        }
-      });
-    });
-  });
-
-  /* ============================================================
-     6. REAL-TIME TELEMETRY CONSOLE STREAM TICKER
-     ============================================================ */
-  const consoleBody = document.getElementById('hero-console-stream');
-  if (consoleBody) {
-    const logs = [
-      { text: '→ [claude-code]  POST /clipal  →  claude-3-7-sonnet  ✓  241ms', cls: 'success' },
-      { text: '→ [opencode]     POST /clipal  →  gemini-2.5-pro       ✓  312ms', cls: 'route' },
-      { text: '→ [codex]        POST /clipal  →  gpt-4.1 [429 LIMIT]  ✗  18ms', cls: 'warn' },
-      { text: '                 FAILOVER PIVOT → Azure_Backup [KEY_2] ✓  389ms', cls: 'accent' },
-      { text: '→ [aider]         POST /clipal  →  deepseek-chat        ✓  195ms', cls: 'route' },
-      { text: '→ [goose]         POST /clipal  →  claude-3-7-sonnet    ✓  278ms', cls: 'success' },
+  // A local illustration only: no network requests or invented live telemetry.
+  document.querySelectorAll('[data-hero-demo]').forEach(demo => {
+    const clients = [...demo.querySelectorAll('[data-hero-client]')];
+    const protocols = [...demo.querySelectorAll('.protocols > span')];
+    const phases = [...demo.querySelectorAll('[data-hero-phase]')];
+    const scenes = [...demo.querySelectorAll('[data-hero-scene]')];
+    const markers = [...demo.querySelectorAll('.hero-phase-track i')];
+    const keys = [...demo.querySelectorAll('[data-hero-key]')];
+    const providers = [...demo.querySelectorAll('[data-hero-provider]')];
+    const toggle = demo.querySelector('[data-hero-toggle]');
+    const incoming = [
+      'M65 0V26Q65 40 79 40H206Q220 40 220 54V82',
+      'M220 0V82',
+      'M375 0V26Q375 40 361 40H234Q220 40 220 54V82'
     ];
-
-    let logIdx = 0;
-    setInterval(() => {
-      const log = logs[logIdx % logs.length];
-      logIdx++;
-
-      const line = document.createElement('div');
-      line.className = `terminal-line ${log.cls}`;
-      line.textContent = log.text;
-
-      consoleBody.appendChild(line);
-      if (consoleBody.children.length > 7) {
-        consoleBody.removeChild(consoleBody.children[0]);
+    const outgoing = [
+      'M220 0V16Q220 30 206 30H79Q65 30 65 44V64',
+      'M220 0V64',
+      'M220 0V16Q220 30 234 30H361Q375 30 375 44V64'
+    ];
+    const durations = [1500, 1500, 1900, 1800, 2400];
+    let phase = 0;
+    let scene = 0;
+    let client = 0;
+    let playing = !reducedMotion.matches;
+    let visible = false;
+    let timer;
+    const currentFrames = () => scenes.length
+      ? [...scenes[scene].querySelectorAll('[data-hero-frame]')]
+      : phases;
+    const schedule = () => {
+      clearTimeout(timer);
+      const running = playing && visible && !document.hidden;
+      demo.classList.toggle('is-playing', running);
+      const motion = Number(currentFrames()[phase]?.dataset.motion ?? phase);
+      if (running) timer = setTimeout(advance, durations[motion]);
+    };
+    const render = () => {
+      const frames = currentFrames();
+      const frame = frames[phase];
+      demo.dataset.phase = frame?.dataset.motion ?? String(phase);
+      if (scenes.length) {
+        demo.dataset.scene = scenes[scene].dataset.heroScene;
+        scenes.forEach((item, index) => { item.hidden = index !== scene; });
+        demo.querySelector('[data-hero-scene-label]').textContent = scenes[scene].dataset.label;
       }
-    }, 2800);
+      clients.forEach((button, index) => button.setAttribute('aria-pressed', String(index === client)));
+      protocols.forEach((item, index) => item.classList.toggle('is-current', index === Number(clients[client].dataset.protocol)));
+      demo.querySelectorAll('.incoming-lines .active-line, .incoming-lines .route-packet').forEach(path => path.setAttribute('d', incoming[client]));
+      demo.querySelectorAll('.outgoing-lines .active-line, .outgoing-lines .route-packet').forEach(path => path.setAttribute('d', outgoing[Number(clients[client].dataset.protocol)]));
+      frames.forEach((caption, index) => { caption.hidden = index !== phase; });
+      markers.forEach((marker, index) => {
+        marker.hidden = index >= frames.length;
+        marker.classList.toggle('is-done', index <= phase);
+      });
+      demo.querySelector('.hero-phase-index').textContent = `${String(phase + 1).padStart(2, '0')} / ${String(frames.length).padStart(2, '0')}`;
+      if (providers.length === 2) {
+        demo.querySelectorAll('[data-provider-channel]').forEach(label => {
+          label.textContent = clients[client].dataset.channel;
+        });
+        demo.querySelector('[data-provider-account]').textContent = clients[client].dataset.oauthAccount;
+        const labels = { ready: 'READY', active: 'ROUTING', limited: '429', cooldown: 'COOLDOWN', success: '200 OK', standby: 'STANDBY', sticky: 'STICKY' };
+        Object.keys(labels).forEach(state => {
+          labels[state] = demo.getAttribute(`data-state-${state}`) || labels[state];
+        });
+        providers.forEach((provider, index) => {
+          const state = frame.dataset[index === 0 ? 'api' : 'oauth'];
+          provider.dataset.state = state;
+          provider.querySelector('b').textContent = labels[state];
+        });
+      } else if (keys.length === 2) {
+        // Compatibility for older page markup that may still be cached.
+        keys[0].dataset.state = phase >= 2 ? 'limited' : 'ready';
+        keys[0].querySelector('b').textContent = phase >= 2 ? '429' : 'READY';
+        keys[1].dataset.state = phase === 4 ? 'success' : phase === 3 ? 'active' : 'standby';
+        keys[1].querySelector('b').textContent = phase === 4 ? '200 OK' : phase === 3 ? 'RETRY' : 'STANDBY';
+      }
+      toggle.textContent = playing ? toggle.dataset.pauseLabel : toggle.dataset.playLabel;
+      schedule();
+    };
+    function advance() {
+      phase = (phase + 1) % currentFrames().length;
+      if (phase === 0) {
+        scene = scenes.length ? (scene + 1) % scenes.length : 0;
+        // Retain one channel through normal → fallback → sticky, then rotate tools.
+        if (scene === 0) client = (client + 1) % clients.length;
+      }
+      render();
+    }
+    clients.forEach((button, index) => {
+      button.disabled = false;
+      button.addEventListener('click', () => { client = index; phase = 0; scene = 0; render(); });
+    });
+    toggle.addEventListener('click', () => { playing = !playing; render(); });
+    demo.querySelector('[data-hero-next]').addEventListener('click', () => { playing = false; advance(); });
+    document.addEventListener('visibilitychange', schedule);
+    reducedMotion.addEventListener('change', () => { playing = !reducedMotion.matches; render(); });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(entries => {
+        visible = entries[0].isIntersecting;
+        schedule();
+      }, { threshold: 0.15 }).observe(demo);
+    } else visible = true;
+    demo.querySelector('.hero-demo-controls').hidden = false;
+    demo.classList.add('hero-demo-ready');
+    render();
+  });
+
+  const menu = document.querySelector('.menu-toggle');
+  const navigation = document.querySelector('#navigation');
+  if (header && menu && navigation) {
+    header.classList.add('nav-ready');
+    const setMenu = (open, restoreFocus = false) => {
+      menu.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-label', open ? menu.dataset.closeLabel : menu.dataset.openLabel);
+      navigation.classList.toggle('is-open', open);
+      if (restoreFocus) menu.focus();
+    };
+    menu.addEventListener('click', () => setMenu(menu.getAttribute('aria-expanded') !== 'true'));
+    navigation.addEventListener('click', event => {
+      if (event.target.closest('a')) setMenu(false);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') setMenu(false, true);
+    });
+    document.addEventListener('click', event => {
+      if (!header.contains(event.target)) setMenu(false);
+    });
+    window.matchMedia('(min-width: 861px)').addEventListener('change', () => setMenu(false));
   }
 
-  /* ============================================================
-     7. LIVE PRICING CALCULATION TICKER (PILLAR 4)
-     ============================================================ */
-  const pricingVal = document.getElementById('pricing-ticker-val');
-  if (pricingVal) {
-    let baseMicros = 42189;
-    setInterval(() => {
-      baseMicros += Math.floor(Math.random() * 120) + 15;
-      const dollars = (baseMicros / 1000000).toFixed(6);
-      pricingVal.textContent = `$${dollars}`;
-    }, 1800);
+  document.querySelectorAll('[data-tabs]').forEach(group => {
+    const tablist = group.querySelector('.tab-list');
+    const tabs = [...tablist.querySelectorAll('[data-tab]')];
+    const panels = [...group.querySelectorAll('[data-tab-panel]')];
+    if (!tabs.length || tabs.length !== panels.length) return;
+    tablist.setAttribute('role', 'tablist');
+    const select = (index, focus = false) => {
+      tabs.forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === index));
+        tab.tabIndex = i === index ? 0 : -1;
+        panels[i].hidden = i !== index;
+      });
+      if (focus) tabs[index].focus();
+    };
+    tabs.forEach((tab, index) => {
+      const panel = document.getElementById(tab.dataset.tab);
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-controls', panel.id);
+      panel.setAttribute('role', 'tabpanel');
+      panel.setAttribute('aria-labelledby', tab.id);
+      panel.tabIndex = 0;
+      tab.addEventListener('click', () => select(index));
+      tab.addEventListener('keydown', event => {
+        const nextIndex = (index + 1) % tabs.length;
+        const previousIndex = (index + tabs.length - 1) % tabs.length;
+        const moves = { ArrowRight: nextIndex, ArrowDown: nextIndex, ArrowLeft: previousIndex, ArrowUp: previousIndex, Home: 0, End: tabs.length - 1 };
+        if (Object.hasOwn(moves, event.key)) {
+          event.preventDefault();
+          select(moves[event.key], true);
+        }
+      });
+    });
+    select(0);
+    group.classList.add('tabs-ready');
+  });
+
+  const toast = document.querySelector('.toast');
+  let toastTimer;
+  let copySequence = 0;
+  const buttonTimers = new WeakMap();
+  const announce = message => {
+    clearTimeout(toastTimer);
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+    toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 4500);
+  };
+  document.querySelectorAll('[data-copy-target]').forEach(button => {
+    const initialContent = button.innerHTML;
+    button.addEventListener('click', async () => {
+      const sequence = ++copySequence;
+      const source = document.getElementById(button.dataset.copyTarget);
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(source.textContent);
+        if (sequence !== copySequence) return;
+        clearTimeout(buttonTimers.get(button));
+        button.textContent = button.dataset.success;
+        announce(document.body.dataset.copySuccess);
+        buttonTimers.set(button, setTimeout(() => { button.innerHTML = initialContent; }, 2400));
+      } catch {
+        if (sequence !== copySequence) return;
+        announce(document.body.dataset.copyFailure);
+        const range = document.createRange();
+        range.selectNodeContents(source);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  const dialog = document.querySelector('.screenshot-dialog');
+  let zoomTrigger;
+  if (dialog && typeof dialog.showModal === 'function') {
+    const image = dialog.querySelector('img');
+    const fullImageLink = dialog.querySelector('.full-image-link');
+    document.querySelectorAll('[data-zoom]').forEach(button => {
+      button.addEventListener('click', () => {
+        const source = button.querySelector('img');
+        image.src = source.currentSrc || source.src;
+        image.alt = source.alt;
+        fullImageLink.href = image.src;
+        zoomTrigger = button;
+        dialog.showModal();
+        document.body.classList.add('dialog-open');
+        dialog.querySelector('.dialog-close').focus();
+      });
+    });
+    dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => {
+      if (event.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
+    });
+    dialog.addEventListener('close', () => {
+      document.body.classList.remove('dialog-open');
+      zoomTrigger?.focus({ preventScroll: true });
+    });
+  } else {
+    document.querySelectorAll('[data-zoom]').forEach(button => {
+      button.addEventListener('click', () => window.open(button.querySelector('img').src, '_blank', 'noopener'));
+    });
   }
-});
+
+  document.querySelectorAll('[data-route-demo]').forEach(demo => {
+    let step = 0;
+    const keys = [...demo.querySelectorAll('[data-route-key]')];
+    const captions = [...demo.querySelectorAll('[data-route-caption]')];
+    const next = demo.querySelector('.route-next');
+    demo.classList.add('route-demo-ready');
+    next.addEventListener('click', () => {
+      step = (step + 1) % keys.length;
+      keys.forEach((key, index) => {
+        key.classList.toggle('is-current', index === step);
+        key.classList.toggle('is-tried', index < step);
+        key.querySelector('.key-state').textContent = index === step ? demo.dataset.selected : index < step ? demo.dataset.tried : demo.dataset.standby;
+        captions[index].hidden = index !== step;
+      });
+      next.firstChild.textContent = (step === keys.length - 1 ? demo.dataset.replay : demo.dataset.next) + ' ';
+    });
+  });
+})();
