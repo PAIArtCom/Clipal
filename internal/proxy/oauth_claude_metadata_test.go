@@ -3,10 +3,10 @@ package proxy
 import "testing"
 
 func TestClaudeOAuthMetadataMatchesClaudeCodeRelease(t *testing.T) {
-	if claudeOAuthAppVersion != "2.1.302" {
-		t.Fatalf("claudeOAuthAppVersion = %q, want 2.1.302", claudeOAuthAppVersion)
+	if claudeOAuthAppVersion != "2.1.327" {
+		t.Fatalf("claudeOAuthAppVersion = %q, want 2.1.327", claudeOAuthAppVersion)
 	}
-	if claudeOAuthUserAgent != "claude-cli/2.1.302 (external, sdk-cli)" {
+	if claudeOAuthUserAgent != "claude-cli/2.1.327 (external, sdk-cli)" {
 		t.Fatalf("claudeOAuthUserAgent = %q", claudeOAuthUserAgent)
 	}
 	if claudeOAuthStainlessTimeout != "300" {
@@ -15,7 +15,7 @@ func TestClaudeOAuthMetadataMatchesClaudeCodeRelease(t *testing.T) {
 	if claudeOAuthStainlessRuntimeVersion != "v26.3.0" {
 		t.Fatalf("claudeOAuthStainlessRuntimeVersion = %q, want v26.3.0", claudeOAuthStainlessRuntimeVersion)
 	}
-	if got := claudeOAuthBillingVersionForText("hello"); got != "2.1.302.804" {
-		t.Fatalf("claudeOAuthBillingVersionForText(hello) = %q, want 2.1.302.804", got)
+	if got := claudeOAuthBillingVersionForText("hello"); got != "2.1.327.493" {
+		t.Fatalf("claudeOAuthBillingVersionForText(hello) = %q, want 2.1.327.493", got)
 	}
 }

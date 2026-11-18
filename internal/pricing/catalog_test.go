@@ -279,7 +279,7 @@ func TestCostMicrosUsesOneHourCacheWriteRate(t *testing.T) {
 
 func TestCostMicrosScalesOneHourCacheWriteForLongContext(t *testing.T) {
 	usage := Usage{CacheWrite1HTokens: 1_000_000}
-	cost, ok := CostMicros("claude-sonnet-4-5", PlatformAnthropic, usage)
+	cost, ok := CostMicros("claude-sonnet-4-5-20250929-v1:0", PlatformAnthropic, usage)
 	if !ok || cost != 12_000_000 {
 		t.Fatalf("long one-hour cache cost = %d, ok = %v", cost, ok)
 	}
@@ -287,9 +287,9 @@ func TestCostMicrosScalesOneHourCacheWriteForLongContext(t *testing.T) {
 
 func TestCostMicrosPrefersProviderSpecificEntry(t *testing.T) {
 	usage := Usage{UncachedInputTokens: 1_000_000, OutputTokens: 1_000_000}
-	cost, ok := CostMicrosForProvider("deepseek/deepseek-chat", PlatformOpenAI, "openrouter", usage)
-	if !ok || cost != 1_210_000 {
-		t.Fatalf("OpenRouter cost = %d, ok = %v", cost, ok)
+	cost, ok := CostMicrosForProvider("deepseek/deepseek-v3", PlatformOpenAI, "vercel_ai_gateway", usage)
+	if !ok || cost != 1_800_000 {
+		t.Fatalf("Vercel AI Gateway cost = %d, ok = %v", cost, ok)
 	}
 }
 

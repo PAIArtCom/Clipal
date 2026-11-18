@@ -339,14 +339,14 @@ func TestApplyUsageCostSnapshot_ExactModelDoesNotInheritFamilyPrice(t *testing.T
 	}
 }
 
-func TestApplyUsageCostSnapshot_OpenRouterUsesProviderSpecificPrice(t *testing.T) {
+func TestApplyUsageCostSnapshot_DashScopeUsesProviderSpecificPrice(t *testing.T) {
 	t.Parallel()
-	body := []byte(`{"model":"deepseek/deepseek-chat","messages":[]}`)
+	body := []byte(`{"model":"deepseek-v4-flash","messages":[]}`)
 	req := httptest.NewRequest(http.MethodPost, "http://proxy/clipal/v1/chat/completions", bytes.NewReader(body))
 	requestCtx := RequestContext{ClientType: ClientOpenAI, Family: ProtocolFamilyOpenAI, Capability: CapabilityOpenAIChatCompletions, UpstreamPath: "/v1/chat/completions"}
-	provider := config.Provider{Name: "fallback", BaseURL: "https://openrouter.ai/api", AuthType: config.ProviderAuthTypeAPIKey}
+	provider := config.Provider{Name: "fallback", BaseURL: "https://dashscope.aliyuncs.com/compatible-mode", AuthType: config.ProviderAuthTypeAPIKey}
 	snapshot := applyUsageCostSnapshot(req, requestCtx, provider, newRequestPayload(body), telemetry.UsageSnapshot{Usage: map[string]any{"prompt_tokens": 1_000_000.0, "completion_tokens": 1_000_000.0}})
-	if !snapshot.HasCost || snapshot.CostMicros != 1_210_000 {
+	if !snapshot.HasCost || snapshot.CostMicros != 600_000 {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 }
