@@ -44,6 +44,7 @@ for target in "${TARGETS[@]}"; do
     echo "Building for $os/$arch..."
 
     GOOS=$os GOARCH=$arch go build \
+        -trimpath \
         -ldflags "$LDFLAGS" \
         -o "$output_dir/$output_name" \
         ./cmd/clipal

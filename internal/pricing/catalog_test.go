@@ -23,10 +23,14 @@ func TestCatalogMetadataMatchesVendoredSnapshot(t *testing.T) {
 }
 
 func TestCatalogIntegrityRejectsModifiedContent(t *testing.T) {
-	if err := verifyCatalogIntegrity(embeddedCatalog, embeddedCatalogIntegrity); err != nil {
+	raw, err := decompressCatalog(embeddedCatalogGZ)
+	if err != nil {
 		t.Fatal(err)
 	}
-	tampered := append([]byte(nil), embeddedCatalog...)
+	if err := verifyCatalogIntegrity(raw, embeddedCatalogIntegrity); err != nil {
+		t.Fatal(err)
+	}
+	tampered := append([]byte(nil), raw...)
 	tampered[len(tampered)/2] ^= 1
 	if err := verifyCatalogIntegrity(tampered, embeddedCatalogIntegrity); err == nil {
 		t.Fatal("modified catalog passed integrity verification")
@@ -39,6 +43,10 @@ func TestUpdateScriptDoesNotExecuteUpstreamCode(t *testing.T) {
 	}
 	if _, err := exec.LookPath("node"); err != nil {
 		t.Skip("node is required")
+	}
+	embeddedCatalog, err := decompressCatalog(embeddedCatalogGZ)
+	if err != nil {
+		t.Fatal(err)
 	}
 	_, currentFile, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))

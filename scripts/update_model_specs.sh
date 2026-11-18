@@ -50,7 +50,9 @@ if [[ ! -s "$TEMP_DIR/artifacts/LICENSE" ]]; then
     exit 1
 fi
 
-install -m 0644 "$CATALOG_PATH" "$ROOT_DIR/internal/pricing/catalog.json"
+gzip -9 -n -c "$CATALOG_PATH" > "$ROOT_DIR/internal/pricing/catalog.json.gz"
+chmod 0644 "$ROOT_DIR/internal/pricing/catalog.json.gz"
+rm -f "$ROOT_DIR/internal/pricing/catalog.json"
 printf '%s\n' "$CATALOG_VERSION" > "$ROOT_DIR/internal/pricing/catalog.sha"
 install -m 0644 "$TEMP_DIR/artifacts/LICENSE" "$ROOT_DIR/internal/pricing/model-specs.LICENSE"
 printf '%s\n' "$MODEL_SPECS_COMMIT" > "$ROOT_DIR/internal/pricing/catalog.commit"

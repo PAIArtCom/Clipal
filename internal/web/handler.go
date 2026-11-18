@@ -13,7 +13,7 @@ import (
 	"github.com/PAIArtCom/Clipal/internal/transfer"
 )
 
-//go:embed static/*
+//go:embed static/index.html static/clipal-icon.svg static/app.js static/alpine.min.js static/environment-options.js static/form-controls.js static/sortable.min.js static/styles
 var staticFiles embed.FS
 
 const maxAPIRequestBytes = 1 << 20 // 1 MiB (WebUI requests are small)

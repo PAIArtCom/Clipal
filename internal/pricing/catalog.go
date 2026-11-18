@@ -1,10 +1,13 @@
 package pricing
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"strconv"
 	"strings"
@@ -13,8 +16,8 @@ import (
 
 // model-specs is vendored so pricing remains reproducible and works offline.
 //
-//go:embed catalog.json
-var embeddedCatalog []byte
+//go:embed catalog.json.gz
+var embeddedCatalogGZ []byte
 
 //go:embed catalog.sha
 var embeddedCatalogVersion string
@@ -202,11 +205,16 @@ var (
 
 func loadCatalog() (catalogFile, error) {
 	defaultCatalogOnce.Do(func() {
-		if err := verifyCatalogIntegrity(embeddedCatalog, embeddedCatalogIntegrity); err != nil {
+		raw, err := decompressCatalog(embeddedCatalogGZ)
+		if err != nil {
 			defaultCatalogErr = err
 			return
 		}
-		if err := json.Unmarshal(embeddedCatalog, &defaultCatalog); err != nil {
+		if err := verifyCatalogIntegrity(raw, embeddedCatalogIntegrity); err != nil {
+			defaultCatalogErr = err
+			return
+		}
+		if err := json.Unmarshal(raw, &defaultCatalog); err != nil {
 			defaultCatalogErr = fmt.Errorf("decode embedded model-specs catalog: %w", err)
 			return
 		}
@@ -220,6 +228,21 @@ func loadCatalog() (catalogFile, error) {
 		}
 	})
 	return defaultCatalog, defaultCatalogErr
+}
+
+func decompressCatalog(compressed []byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return nil, fmt.Errorf("open embedded model-specs catalog: %w", err)
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("decompress embedded model-specs catalog: %w", err)
+	}
+	return raw, nil
 }
 
 func verifyCatalogIntegrity(data []byte, expected string) error {
