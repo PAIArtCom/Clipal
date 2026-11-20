@@ -45,6 +45,7 @@ func (a *API) HandleProviderTest(w http.ResponseWriter, r *http.Request) {
 		reason := ""
 		upstreamStatus := 0
 		detail := ""
+		detailTruncated := false
 		var failure *proxy.ProviderTestFailure
 		switch {
 		case errors.Is(err, proxy.ErrProviderTestUnavailable):
@@ -64,14 +65,16 @@ func (a *API) HandleProviderTest(w http.ResponseWriter, r *http.Request) {
 			reason = "expired"
 		case errors.As(err, &failure):
 			reason, upstreamStatus, detail = failure.Reason, failure.UpstreamStatus, failure.Detail
+			detailTruncated = failure.DetailTruncated
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		writeJSON(w, struct {
 			ErrorResponse
-			UpstreamStatus int    `json:"upstream_status,omitempty"`
-			Detail         string `json:"detail,omitempty"`
-		}{ErrorResponse{Error: err.Error(), Status: status, Reason: reason}, upstreamStatus, detail})
+			UpstreamStatus  int    `json:"upstream_status,omitempty"`
+			Detail          string `json:"detail,omitempty"`
+			DetailTruncated bool   `json:"detail_truncated,omitempty"`
+		}{ErrorResponse{Error: err.Error(), Status: status, Reason: reason}, upstreamStatus, detail, detailTruncated})
 		return
 	}
 	writeJSON(w, result)

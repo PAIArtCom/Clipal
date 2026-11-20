@@ -161,14 +161,21 @@ func TestProviderTestOpenAIAPIUsesResponsesByDefault(t *testing.T) {
 
 func TestProviderTestErrorDetail(t *testing.T) {
 	const key = "configured-test-credential"
-	for _, tc := range []struct{ name, body, want string }{
-		{"message", `{"error":{"message":"Credential configured-test-credential and Bearer token-123 rejected"}}`, "Credential [redacted] and Bearer [redacted] rejected"},
-		{"raw body", "<html>Unexpected upstream diagnostic</html>", ""},
-		{"long message", `{"error":{"message":"` + strings.Repeat("错", 600) + `"}}`, strings.Repeat("错", 512) + "…"},
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"json", http.StatusUnauthorized, `{"error":{"message":"Credential configured-test-credential and Bearer token-123 rejected"},"request_id":"trace-123"}`},
+		{"plain text", http.StatusBadGateway, "  gateway failure\n  retry later\n"},
+		{"html", http.StatusServiceUnavailable, "<html>Unexpected upstream diagnostic</html>"},
+		{"long message", http.StatusForbidden, strings.Repeat("错", 12000)},
+		{"error in successful HTTP response", http.StatusOK, `{ "error" : {"code":"invalid_value","message":"see upstream trace"} }`},
+		{"oversized body", http.StatusBadGateway, strings.Repeat("x", providerTestLimit+10)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusUnauthorized)
+				w.WriteHeader(tc.status)
 				fmt.Fprint(w, tc.body)
 			}))
 			t.Cleanup(upstream.Close)
@@ -179,8 +186,8 @@ func TestProviderTestErrorDetail(t *testing.T) {
 			router := &Router{proxies: map[ClientType]*ClientProxy{ClientOpenAI: cp}}
 			_, err := router.FetchProviderTestModels(t.Context(), ClientOpenAI, "target", 0)
 			var failure *ProviderTestFailure
-			if !errors.As(err, &failure) || failure.Reason != "auth" || failure.Detail != tc.want {
-				t.Fatalf("unexpected catalog failure: %#v", err)
+			if !errors.As(err, &failure) || failure.UpstreamStatus != tc.status || failure.Detail != tc.body[:min(len(tc.body), providerTestLimit)] || failure.DetailTruncated != (len(tc.body) > providerTestLimit) {
+				t.Fatalf("did not preserve status and response body for %s", tc.name)
 			}
 		})
 	}
@@ -200,8 +207,11 @@ func TestProviderTestResponsesStreamRequiresSuccessEvent(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			w.Header().Set("Content-Type", "text/event-stream")
-			fmt.Fprintf(w, "event: %s\ndata: {\"type\":\"%s\"}\n\n", scenario.event, scenario.event)
-			if err := verifyProviderTestStream(ClientOpenAI, req, w.Result()); (err == nil) != scenario.ok {
+			body := fmt.Sprintf("event: %s\ndata: {\"type\":\"%s\"}\n\n", scenario.event, scenario.event)
+			fmt.Fprint(w, body)
+			err := verifyProviderTestStream(ClientOpenAI, req, w.Result())
+			var failure *ProviderTestFailure
+			if (err == nil) != scenario.ok || (!scenario.ok && (!errors.As(err, &failure) || failure.Detail != body)) {
 				t.Fatalf("event %q returned %v", scenario.event, err)
 			}
 		})

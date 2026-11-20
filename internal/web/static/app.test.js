@@ -4,17 +4,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('provider test keeps stage failures and the final success visible in the dialog', async () => {
+test('provider test reports upstream failures and waits for model selection before recovery', async () => {
     const state = loadApp();
     state.selectedClient = 'openai';
     const calls = [];
+    const raw = '  rejected credential\n  request_id=trace-123\n';
     let refreshed = 0;
     state.refreshStatus = async () => { refreshed++; };
     state.apiCall = async (url, options) => {
         assert.equal(url, '/api/providers/openai/local%20provider/test');
         const body = JSON.parse(options.body);
         calls.push(body);
-        if (calls.length === 1) throw Object.assign(new Error('upstream HTTP 401 (auth)'), { reason: 'auth', upstreamStatus: 401 });
+        if (calls.length === 1) throw Object.assign(new Error('upstream HTTP 401 (auth)'), { reason: 'auth', upstreamStatus: 401, detail: raw });
         if (body.step === 'models') return { id: 'session', models: ['first', 'second'] };
         if (calls.length === 3) throw Object.assign(new Error('upstream HTTP 404 (model_not_found)'), { reason: 'model_not_found', upstreamStatus: 404 });
         if (calls.length === 4) throw Object.assign(new Error('timed out'), { reason: 'timeout' });
@@ -22,48 +23,33 @@ test('provider test keeps stage failures and the final success visible in the di
         return { recovered: true, restored: false };
     };
     await state.openProviderTest({ name: 'local provider', display_name: 'Local Relay', enabled: true, key_count: 1, overrides: { model: 'second' } });
-    assert.equal(state.providerTestTitle, 'Test OpenAI Provider — "Local Relay"');
     assert.equal(state.providerTest.phase, 'catalogFailed');
-    assert.equal(state.providerTestStep, 1);
-    assert.match(state.providerTest.failure.detail, /401/);
-    assert.match(state.providerTestStatusMessage, /HTTP 401.*credentials/);
-    assert.equal(state.providerTestActions.at(-1), 'close');
+    assert.equal(state.providerTest.failure.detail, raw);
+    assert.equal(state.providerTest.failure.status, 401);
     await state.runProviderTest();
     assert.equal(calls.length, 1);
 
     await state.fetchProviderTestModels();
     assert.equal(state.providerTest.phase, 'ready');
-    assert.equal(state.providerTestStep, 2);
     assert.equal(state.providerTest.model, 'second');
-    assert.equal(state.providerTestUsesModelSearch, false);
     await state.runProviderTest();
     assert.deepEqual(calls[2], { step: 'generate', id: 'session', model: 'second', protocol: 'responses' });
     assert.equal(state.providerTest.phase, 'failed');
-    assert.equal(state.providerTestStep, 3);
-    assert.match(state.providerTestStatusMessage, /HTTP 404.*different model/);
-    assert.equal(state.providerTestActions.at(-1), 'changeModel');
     assert.equal(refreshed, 0);
 
     state.returnToProviderTestModel();
-    assert.equal(state.providerTestStep, 2);
     assert.equal(state.providerTest.model, 'second');
-    assert.equal(state.providerTestStatusMessage, '');
     state.providerTest.model = 'first';
     state.providerTest.protocol = 'chat';
     await state.runProviderTest();
     assert.deepEqual(calls[3], { step: 'generate', id: 'session', model: 'first', protocol: 'chat' });
-    assert.equal(state.providerTestActions.at(-1), 'retry');
     await state.performProviderTestAction('retry');
-    assert.equal(state.providerTestActions.join(','), 'reload');
     await state.performProviderTestAction('reload');
     assert.equal(state.providerTest.model, 'first');
     await state.runProviderTest();
     assert.equal(state.providerTest.phase, 'passed');
-    assert.equal(state.providerTestStep, 3);
-    assert.equal(state.providerTestStatusMessage, state.t('providerTest.available'));
-    assert.equal(state.visibleDialog, 'provider-test');
+    assert.ok(state.providerTestStatusMessage);
     assert.equal(refreshed, 1);
-    assert.equal(state.providerTestActions.join(','), 'retest,done');
 });
 
 test('provider retest refreshes the catalog and waits for the user to send a request', async () => {

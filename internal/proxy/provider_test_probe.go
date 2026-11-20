@@ -14,8 +14,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/PAIArtCom/Clipal/internal/diagnostic"
 )
 
 const (
@@ -34,13 +32,24 @@ var (
 )
 
 type ProviderTestFailure struct {
-	Reason         string
-	UpstreamStatus int
-	message        string
-	Detail         string
+	Reason          string
+	UpstreamStatus  int
+	message         string
+	Detail          string
+	DetailTruncated bool
 }
 
 func (failure *ProviderTestFailure) Error() string { return failure.message }
+
+func providerTestResponseFailure(status int, reason, message string, body []byte) *ProviderTestFailure {
+	return &ProviderTestFailure{
+		UpstreamStatus:  status,
+		Reason:          reason,
+		message:         message,
+		Detail:          string(body[:min(len(body), providerTestLimit)]),
+		DetailTruncated: len(body) > providerTestLimit,
+	}
+}
 
 type providerTestContextKey struct{}
 
@@ -248,7 +257,7 @@ func (s *providerTestSession) request(ctx context.Context, method, path, query s
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		defer func() { _ = resp.Body.Close() }()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, providerTestLimit+1))
 		_, reason, _, _ := classifyUpstreamFailure(resp.StatusCode, resp.Header, body, false)
 		if code := providerTestModelError(body); code != "" && (reason == "" || resp.StatusCode == http.StatusForbidden) {
 			reason = code
@@ -257,17 +266,7 @@ func (s *providerTestSession) request(ctx context.Context, method, path, query s
 		if reason != "" {
 			status += " (" + reason + ")"
 		}
-		var upstreamError any
-		var detail string
-		if json.Unmarshal(body, &upstreamError) == nil {
-			_, _, msg := extractErrorFields(upstreamError)
-			accessToken := ""
-			if resp.Request != nil {
-				accessToken = strings.TrimPrefix(resp.Request.Header.Get("Authorization"), "Bearer ")
-			}
-			detail = diagnostic.Message(msg, 512, s.proxy.providerKeys[s.provider][s.key], accessToken)
-		}
-		return nil, nil, &ProviderTestFailure{Reason: reason, UpstreamStatus: resp.StatusCode, message: status, Detail: detail}
+		return nil, nil, providerTestResponseFailure(resp.StatusCode, reason, status, body)
 	}
 	return req, resp, nil
 }
@@ -315,12 +314,13 @@ func (s *providerTestSession) fetchModels(ctx context.Context) ([]string, error)
 			return nil, err
 		}
 		var catalog providerCatalog
-		if err := decodeProviderTestJSON(resp, &catalog); err != nil {
+		body, err := decodeProviderTestJSON(resp, &catalog)
+		if err != nil {
 			return nil, err
 		}
 		gemini := s.proxy.clientType == ClientGoogle
 		if hasProviderTestError(catalog.Error) || (gemini && catalog.Models == nil) || (!gemini && catalog.Data == nil) {
-			return nil, errors.New("the upstream did not return a valid model list")
+			return nil, providerTestResponseFailure(resp.StatusCode, providerTestModelError(body), "the upstream did not return a valid model list", body)
 		}
 		if gemini {
 			for _, model := range catalog.Models {
@@ -362,16 +362,16 @@ func hasProviderTestError(value json.RawMessage) bool {
 	return len(value) != 0 && string(value) != "null"
 }
 
-func decodeProviderTestJSON(resp *http.Response, dest any) error {
+func decodeProviderTestJSON(resp *http.Response, dest any) ([]byte, error) {
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, providerTestLimit+1))
 	if errors.Is(err, context.DeadlineExceeded) {
-		return errProviderTestTimeout
+		return nil, providerTestResponseFailure(resp.StatusCode, "timeout", errProviderTestTimeout.Error(), body)
 	}
 	if err != nil || len(body) > providerTestLimit || json.Unmarshal(body, dest) != nil {
-		return errors.New("the upstream returned an incomplete, oversized or invalid JSON response")
+		return nil, providerTestResponseFailure(resp.StatusCode, "", "the upstream returned an incomplete, oversized or invalid JSON response", body)
 	}
-	return nil
+	return body, nil
 }
 
 func (s *providerTestSession) generate(ctx context.Context, model, protocol string) error {
@@ -434,7 +434,8 @@ func (s *providerTestSession) generate(ctx context.Context, model, protocol stri
 			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
 	}
-	if err := decodeProviderTestJSON(resp, &result); err != nil {
+	raw, err := decodeProviderTestJSON(resp, &result)
+	if err != nil {
 		return err
 	}
 	if !hasProviderTestError(result.Error) {
@@ -457,16 +458,18 @@ func (s *providerTestSession) generate(ctx context.Context, model, protocol stri
 			}
 		}
 	}
-	return &ProviderTestFailure{Reason: providerTestModelError(result.Error), message: "the upstream did not return a completed generation"}
+	return providerTestResponseFailure(resp.StatusCode, providerTestModelError(result.Error), "the upstream did not return a completed generation", raw)
 }
 
 func verifyProviderTestStream(client ClientType, req *http.Request, resp *http.Response) error {
 	defer func() { _ = resp.Body.Close() }()
 	tracker := newProtocolTracker(client, req, resp)
 	reader := &io.LimitedReader{R: resp.Body, N: providerTestLimit + 1}
+	var received bytes.Buffer
+	stream := io.TeeReader(reader, &received)
 	buffer := make([]byte, 8*1024)
 	for reader.N > 0 {
-		count, err := reader.Read(buffer)
+		count, err := stream.Read(buffer)
 		_, terminal := tracker.append(buffer[:count])
 		if terminal || err == io.EOF {
 			tracker.finishEOF()
@@ -474,16 +477,16 @@ func verifyProviderTestStream(client ClientType, req *http.Request, resp *http.R
 				return nil
 			}
 			if tracker.finalStatus() == protocolFailed {
-				return errors.New("the upstream reported a generation failure")
+				return providerTestResponseFailure(resp.StatusCode, "", "the upstream reported a generation failure", received.Bytes())
 			}
 			break
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			return errProviderTestTimeout
+			return providerTestResponseFailure(resp.StatusCode, "timeout", errProviderTestTimeout.Error(), received.Bytes())
 		}
 		if err != nil {
 			break
 		}
 	}
-	return errors.New("the upstream stream ended without a successful completion event")
+	return providerTestResponseFailure(resp.StatusCode, "", "the upstream stream ended without a successful completion event", received.Bytes())
 }

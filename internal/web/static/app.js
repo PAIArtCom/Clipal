@@ -255,6 +255,7 @@ function app() {
                     loading: 'Fetching models…',
                     loaded: '{count} models available',
                     catalogFailed: 'Could not fetch models',
+                    truncatedDetail: 'Only the first 2 MiB of the upstream response are shown.',
                     reload: 'Fetch models again',
                     settings: 'Test options',
                     key: 'API key',
@@ -839,6 +840,7 @@ function app() {
                     loading: '正在获取模型…',
                     loaded: '已获取 {count} 个模型',
                     catalogFailed: '获取模型失败',
+                    truncatedDetail: '上游响应仅显示前 2 MiB。',
                     reload: '重新获取模型',
                     settings: '测试选项',
                     key: 'API Key',
@@ -2952,7 +2954,8 @@ function app() {
             if (!failure) return '';
             const status = failure.status ? this.tf('providerTest.upstreamStatus', { status: failure.status }) : '';
             const hint = this.t('providerTest.diagnostics.' + (failure.kind || 'unexpected'));
-            return [status, hint].filter(Boolean).join(this.locale === 'zh-CN' ? '' : ' ');
+            const truncation = failure.detailTruncated ? this.t('providerTest.truncatedDetail') : '';
+            return [status, hint, truncation].filter(Boolean).join(this.locale === 'zh-CN' ? '' : ' ');
         },
         get providerTestActions() {
             const test = this.providerTest;
@@ -3001,8 +3004,8 @@ function app() {
             let kind = Object.hasOwn(categories, error.reason) ? categories[error.reason] : '';
             if (status === 408 || status === 504) kind = 'timeout';
             if (phase === 'catalogFailed' && kind === 'model') kind = '';
-            const detail = error.detail ? `${error.message}\n${error.detail}` : (error.message || '');
-            Object.assign(test, { phase, failure: { detail, status, kind } });
+            const detail = error.detail || error.message || '';
+            Object.assign(test, { phase, failure: { detail, status, kind, detailTruncated: error.detailTruncated } });
         },
         get providerTestUsesModelSearch() {
             return (this.providerTest?.models.length || 0) >= 8;
@@ -3156,7 +3159,8 @@ function app() {
                     throw Object.assign(new Error(error?.error || this.t('toast.requestFailed')), {
                         reason: error?.reason,
                         upstreamStatus: error?.upstream_status,
-                        detail: error?.detail
+                        detail: error?.detail,
+                        detailTruncated: error?.detail_truncated
                     });
                 }
 
@@ -3285,7 +3289,7 @@ function app() {
         },
 
         async copyToClipboard(text) {
-            const value = String(text || '').trim();
+            const value = String(text || '');
             if (!value) return false;
 
             try {
