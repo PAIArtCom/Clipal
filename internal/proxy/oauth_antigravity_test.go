@@ -13,8 +13,8 @@ import (
 )
 
 func TestAntigravityOAuthFallbackVersionMatchesCurrentRelease(t *testing.T) {
-	if antigravityOAuthFallbackVersion != "2.32.2" {
-		t.Fatalf("antigravityOAuthFallbackVersion = %q, want 2.32.2", antigravityOAuthFallbackVersion)
+	if antigravityOAuthFallbackVersion != "2.33.0" {
+		t.Fatalf("antigravityOAuthFallbackVersion = %q, want 2.33.0", antigravityOAuthFallbackVersion)
 	}
 }
 

@@ -65,6 +65,10 @@ Clipal 会根据上游失败类型决定是否临时跳过某个 provider：
 
 被临时跳过的 provider 会在 `reactivate_after` 到期后自动恢复。
 
+修复上游后，打开 Provider 详情并点击 **测试**。Clipal 先获取模型列表，选择模型后即可发送独立的推理请求。面板会显示每一步的结果。推理成功会解除该 Provider 的运行时冷却和熔断，并恢复本次验证通过的 Key。现有会话继续按原有黏性规则选路。
+
+OpenAI API Key Provider 默认使用 Responses 进行测试。若上游仅支持 Chat Completions，可在选择模型时通过「接口」切换。请求成功后，点击「重测」会重新获取模型列表。上次测试的模型如果仍在列表中，会被默认选中，确认后才会发送下一次请求。
+
 ## 多 Key 行为
 
 一个 provider 可以配置：

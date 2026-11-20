@@ -31,7 +31,7 @@ const (
 	defaultAntigravityFreeTierID         = "free-tier"
 	defaultAntigravityCloudCodeRetry     = defaultGoogleCloudCodeRetryAttempts
 	defaultAntigravityCloudCodeRetryWait = defaultGoogleCloudCodeRetryDelay
-	defaultAntigravityVersionLabel       = "2.32.2"
+	defaultAntigravityVersionLabel       = "2.33.0"
 	defaultAntigravityInfoPlist          = "/Applications/Antigravity.app/Contents/Info.plist"
 )
 

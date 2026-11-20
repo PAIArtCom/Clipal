@@ -102,6 +102,7 @@ function app() {
         integrationBusyProduct: '',
         integrationPreviewOpen: {},
         environmentVisible: false,
+        providerTest: null,
         environmentBusy: false,
         environmentSaving: false,
         environmentLoadError: '',
@@ -243,6 +244,62 @@ function app() {
                     system: 'System',
                     light: 'Light',
                     dark: 'Dark'
+                },
+                providerTest: {
+                    title: 'Test',
+                    dialogTitle: 'Test {client} Provider — "{provider}"',
+                    progress: 'Test progress',
+                    catalog: 'Fetch models',
+                    select: 'Choose model',
+                    request: 'Test request',
+                    loading: 'Fetching models…',
+                    loaded: '{count} models available',
+                    catalogFailed: 'Could not fetch models',
+                    reload: 'Fetch models again',
+                    settings: 'Test options',
+                    key: 'API key',
+                    automatic: 'Automatic',
+                    keyNumber: 'Key {number}',
+                    model: 'Model',
+                    searchModel: 'Search models…',
+                    noModelsMatch: 'No models match your search.',
+                    protocol: 'Endpoint',
+                    run: 'Send test request',
+                    running: 'Waiting for a response…',
+                    cost: 'The test may use a small amount of your quota.',
+                    passed: 'Test passed',
+                    available: 'The provider is available for routing.',
+                    recovered: 'The provider has recovered and is available for routing.',
+                    recoveredBadge: 'Circuit breaker reset',
+                    duration: 'Latency',
+                    durationMs: '{duration} ms',
+                    retest: 'Retest',
+                    retestModelMissing: 'The previous model is no longer listed. Choose an available model before testing.',
+                    stale: 'Request succeeded. Retest required.',
+                    staleHint: 'The provider changed or encountered a new fault during the test. Fetch models again to verify its current state.',
+                    failed: 'Test request failed',
+                    changeModel: 'Change model',
+                    retry: 'Retry request',
+                    details: 'Error details',
+                    upstreamStatus: 'Upstream returned HTTP {status}.',
+                    diagnostics: {
+                        auth: 'Check the credentials and permissions for this provider, then test again.',
+                        timeout: 'The upstream timed out. Try again.',
+                        model: 'The upstream could not use this model. Choose a different model.',
+                        protocol: 'Check whether this model supports the selected endpoint and request options.',
+                        expired: 'The test session expired or the provider changed. Fetch the model list again.',
+                        network: 'Check the connection to the upstream and your proxy settings.',
+                        prepare: 'Check the provider configuration and credentials.',
+                        quota: 'Check the upstream account’s balance and quota.',
+                        rateLimit: 'The upstream is limiting requests. Wait a moment before retrying.',
+                        server: 'The upstream is temporarily unavailable. Try again shortly.',
+                        emptyCatalog: 'The upstream returned no models suitable for testing.',
+                        unavailable: 'Check that the provider is enabled and has credentials.',
+                        testBusy: 'A test is already running for this provider.',
+                        unexpected: 'Expand the error details for more information.'
+                    },
+                    done: 'Done',
+                    close: 'Close'
                 },
                 providers: {
                     add: 'Add provider',
@@ -771,6 +828,62 @@ function app() {
                     system: '跟随系统',
                     light: '浅色',
                     dark: '深色'
+                },
+                providerTest: {
+                    title: '测试',
+                    dialogTitle: '测试 {client} Provider — 「{provider}」',
+                    progress: '测试进度',
+                    catalog: '获取模型',
+                    select: '选择模型',
+                    request: '测试请求',
+                    loading: '正在获取模型…',
+                    loaded: '已获取 {count} 个模型',
+                    catalogFailed: '获取模型失败',
+                    reload: '重新获取模型',
+                    settings: '测试选项',
+                    key: 'API Key',
+                    automatic: '自动选择',
+                    keyNumber: '第 {number} 个 Key',
+                    model: '模型',
+                    searchModel: '搜索模型…',
+                    noModelsMatch: '没有匹配的模型。',
+                    protocol: '接口',
+                    run: '发送测试请求',
+                    running: '正在等待上游响应…',
+                    cost: '测试可能消耗少量额度。',
+                    passed: '测试成功',
+                    available: 'Provider 当前可用。',
+                    recovered: 'Provider 已恢复，可以参与路由。',
+                    recoveredBadge: '已解除冷却/熔断',
+                    duration: '耗时',
+                    durationMs: '耗时 {duration} ms',
+                    retest: '重测',
+                    retestModelMissing: '上次测试的模型已不在列表中，请选择可用的模型再测试。',
+                    stale: '请求成功，需重新验证',
+                    staleHint: '测试期间 Provider 配置有变化或出现了新的故障。请重新获取模型，验证当前状态。',
+                    failed: '测试请求失败',
+                    changeModel: '更换模型',
+                    retry: '重试请求',
+                    details: '错误详情',
+                    upstreamStatus: '上游返回 HTTP {status}。',
+                    diagnostics: {
+                        auth: '请检查此 Provider 的 API Key 或 OAuth 授权及其权限，再重新测试。',
+                        timeout: '等待上游响应超时，可以重试。',
+                        model: '上游无法使用此模型，请更换模型。',
+                        protocol: '请确认此模型支持所选接口和请求参数。',
+                        expired: '测试已过期或 Provider 配置已变化，请重新获取模型。',
+                        network: '请检查到上游的网络连接和代理设置。',
+                        prepare: '请检查 Provider 的配置和凭据。',
+                        quota: '请检查上游账户的余额或额度。',
+                        rateLimit: '上游正在限制请求，请稍后重试。',
+                        server: '上游暂时无法处理请求，请稍后重试。',
+                        emptyCatalog: '上游没有返回适合测试的模型。',
+                        unavailable: '请确认 Provider 已启用并配置了凭据。',
+                        testBusy: '此 Provider 已有一个测试正在进行。',
+                        unexpected: '展开错误详情，查看具体原因。'
+                    },
+                    done: '完成',
+                    close: '关闭'
                 },
                 providers: {
                     add: '添加 Provider',
@@ -2793,10 +2906,182 @@ function app() {
             }
         },
 
+        openProviderTest(provider) {
+            if (!provider?.enabled || !this.canMutateProviders) return;
+            const client = this.selectedClient;
+            this.providerTest = {
+                client,
+                name: this.providerDisplayName(provider),
+                url: `/api/providers/${client}/${encodeURIComponent(provider.name)}/test`,
+                keyCount: this.providerUsesOAuth(provider) ? 0 : Number(provider.key_count) || 0,
+                key: 0,
+                usedKey: 0,
+                chooseProtocol: client === 'openai' && !this.providerUsesOAuth(provider),
+                protocol: 'responses',
+                phase: '',
+                models: [],
+                id: '',
+                model: '',
+                preferredModel: provider.overrides?.model || '',
+                restored: false,
+                duration: 0,
+                retestModelMissing: false,
+                failure: null
+            };
+            return this.fetchProviderTestModels();
+        },
+        get providerTestTitle() {
+            const test = this.providerTest;
+            if (!test) return '';
+            return this.tf('providerTest.dialogTitle', { client: this.clientLabel(test.client), provider: test.name });
+        },
+        get providerTestBusy() {
+            return ['loading', 'running'].includes(this.providerTest?.phase);
+        },
+        get providerTestStep() {
+            const phase = this.providerTest?.phase;
+            if (phase === 'ready') return 2;
+            if (['running', 'failed', 'passed', 'stale'].includes(phase)) return 3;
+            return 1;
+        },
+        get providerTestStatusMessage() {
+            const test = this.providerTest;
+            if (test?.phase === 'passed') return this.t(test.restored ? 'providerTest.recovered' : 'providerTest.available');
+            if (test?.phase === 'stale') return this.t('providerTest.staleHint');
+            const failure = test?.failure;
+            if (!failure) return '';
+            const status = failure.status ? this.tf('providerTest.upstreamStatus', { status: failure.status }) : '';
+            const hint = this.t('providerTest.diagnostics.' + (failure.kind || 'unexpected'));
+            return [status, hint].filter(Boolean).join(this.locale === 'zh-CN' ? '' : ' ');
+        },
+        get providerTestActions() {
+            const test = this.providerTest;
+            switch (test?.phase) {
+                case 'ready': return ['run'];
+                case 'passed': return ['retest', 'done'];
+                case 'stale': return ['reload'];
+                case 'catalogFailed':
+                    return ['auth', 'prepare', 'quota', 'unavailable'].includes(test.failure?.kind) ? ['reload', 'close'] : ['reload'];
+                case 'failed':
+                    switch (test.failure?.kind) {
+                        case 'expired': return ['reload'];
+                        case 'auth':
+                        case 'prepare':
+                        case 'quota':
+                        case 'unavailable': return ['retry', 'close'];
+                        case 'model':
+                        case 'protocol': return ['retry', 'changeModel'];
+                        default: return ['changeModel', 'retry'];
+                    }
+                default: return [];
+            }
+        },
+        performProviderTestAction(action) {
+            switch (action) {
+                case 'run':
+                case 'retry': return this.runProviderTest();
+                case 'reload': return this.fetchProviderTestModels();
+                case 'changeModel': return this.returnToProviderTestModel();
+                case 'retest':
+                    if (this.providerTest?.phase === 'passed') return this.fetchProviderTestModels({ retest: true });
+                    break;
+                case 'close':
+                case 'done': return this.closeProviderTest();
+            }
+        },
+        recordProviderTestFailure(test, phase, error) {
+            const status = error.upstreamStatus || 0;
+            const categories = {
+                auth: 'auth', timeout: 'timeout', model_not_found: 'model', unsupported_model: 'model',
+                unsupported_parameter: 'protocol', protocol: 'protocol', expired: 'expired', network: 'network',
+                prepare: 'prepare', billing: 'quota', quota: 'quota', rate_limit: 'rateLimit', busy: 'rateLimit',
+                overloaded: 'rateLimit', server: 'server', empty_catalog: 'emptyCatalog',
+                unavailable: 'unavailable', test_busy: 'testBusy'
+            };
+            let kind = Object.hasOwn(categories, error.reason) ? categories[error.reason] : '';
+            if (status === 408 || status === 504) kind = 'timeout';
+            if (phase === 'catalogFailed' && kind === 'model') kind = '';
+            const detail = error.detail ? `${error.message}\n${error.detail}` : (error.message || '');
+            Object.assign(test, { phase, failure: { detail, status, kind } });
+        },
+        get providerTestUsesModelSearch() {
+            return (this.providerTest?.models.length || 0) >= 8;
+        },
+        providerTestModelChoices() {
+            return this.providerTest?.models.map(model => ({ value: model, label: model })) || [];
+        },
+        focusProviderTestStage(dialog, phase) {
+            if (!phase) return;
+            let attempts = 0;
+            const focusStage = () => {
+                if (this.visibleDialog !== 'provider-test' || this.providerTest?.phase !== phase) return;
+                const selector = phase === 'ready' ? '#provider-test-model-label' : '#provider-test-status';
+                const target = dialog.querySelector(selector);
+                if (!target?.getClientRects().length) {
+                    if (attempts++ < 10) setTimeout(focusStage, 16);
+                    return;
+                }
+                if (typeof target.focus === 'function') {
+                    target.focus({ preventScroll: true });
+                }
+            };
+            this.$nextTick(focusStage);
+        },
+        closeProviderTest() {
+            if (!this.providerTestBusy) this.providerTest = null;
+        },
+        returnToProviderTestModel() {
+            if (this.providerTest?.phase !== 'failed') return;
+            Object.assign(this.providerTest, { phase: 'ready', failure: null, duration: 0 });
+        },
+        async fetchProviderTestModels({ retest = false } = {}) {
+            const test = this.providerTest;
+            if (!test || this.providerTestBusy) return;
+            const selectedModel = test.model;
+            const key = retest ? test.usedKey || test.key : test.key;
+            Object.assign(test, { phase: 'loading', id: '', models: [], usedKey: 0, retestModelMissing: false, failure: null });
+            try {
+                const data = await this.apiCall(test.url, {
+                    method: 'POST', body: JSON.stringify({ step: 'models', key: Number(key) })
+                }, true, true);
+                if (!data.id || !Array.isArray(data.models) || !data.models.length) {
+                    throw Object.assign(new Error(this.t('providerTest.catalogFailed')), { reason: 'empty_catalog' });
+                }
+                const model = [selectedModel, test.preferredModel].find(candidate => data.models.includes(candidate)) || data.models[0];
+                Object.assign(test, {
+                    id: data.id, models: data.models, model, usedKey: data.key || 0, phase: 'ready',
+                    retestModelMissing: retest && model !== selectedModel
+                });
+            } catch (error) {
+                this.recordProviderTestFailure(test, 'catalogFailed', error);
+            }
+        },
+        async runProviderTest() {
+            const test = this.providerTest;
+            if (!test?.id || !test.model || !['ready', 'failed'].includes(test.phase)) return;
+            Object.assign(test, { phase: 'running', failure: null, duration: 0 });
+            const startTime = Date.now();
+            try {
+                const data = await this.apiCall(test.url, {
+                    method: 'POST', body: JSON.stringify({
+                        step: 'generate', id: test.id, model: test.model, protocol: test.chooseProtocol ? test.protocol : ''
+                    })
+                }, true, true);
+                test.duration = Math.max(0, Date.now() - startTime);
+                test.restored = data.restored === true;
+                test.phase = data.recovered === true ? 'passed' : 'stale';
+            } catch (error) {
+                test.duration = Math.max(0, Date.now() - startTime);
+                this.recordProviderTestFailure(test, 'failed', error);
+                return;
+            }
+            await this.refreshStatus();
+        },
         get visibleDialog() {
             if (this.confirmDialog.visible) return 'confirm';
             if (this.showAddProviderModal || this.showEditProviderModal) return 'provider';
             if (this.environmentVisible) return 'environment';
+            if (this.providerTest) return 'provider-test';
             return this.showDataImportPreviewModal ? 'import' : '';
         },
         handleDialogChange(current, previous) {
@@ -2809,7 +3094,7 @@ function app() {
                 return;
             }
             // Confirm dialogs handle their own initial and return focus.
-            if (current === 'confirm' || previous === 'confirm') return;
+            if (current === 'confirm' || previous === 'confirm' || current === 'provider-test') return;
             let attempts = 0;
             const focusFirst = () => {
                 if (this.visibleDialog !== current) return;
@@ -2868,7 +3153,11 @@ function app() {
 
                 if (!response.ok) {
                     const error = await response.json().catch(() => ({}));
-                    throw new Error(error?.error || this.t('toast.requestFailed'));
+                    throw Object.assign(new Error(error?.error || this.t('toast.requestFailed')), {
+                        reason: error?.reason,
+                        upstreamStatus: error?.upstream_status,
+                        detail: error?.detail
+                    });
                 }
 
                 const data = await response.json();

@@ -68,6 +68,10 @@ Clipal classifies upstream failures and may temporarily skip a provider:
 
 Temporarily skipped providers come back after `reactivate_after`.
 
+After fixing the upstream, open its provider details and click **Test**. Clipal fetches the model list and lets you choose a model for a separate generation request. The dialog reports the result of each step. Successful generation clears the provider's runtime cooldown and circuit breaker and restores the tested key. Existing sessions continue to follow their sticky routing rules.
+
+OpenAI API-key providers default to Responses for this test. If your provider only supports Chat Completions, choose it in the **Endpoint** field when selecting the model. After a successful request, **Retest** fetches a fresh list, preselects the last model if it is still available, and waits for you to start the next request.
+
 ## Multi-Key Behavior
 
 A provider can use either:

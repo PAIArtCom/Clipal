@@ -71,6 +71,7 @@ type circuitBreaker struct {
 
 	consecutiveFailures  int
 	consecutiveSuccesses int
+	failureVersion       uint64
 
 	openedAt time.Time
 	// halfOpenInFlight tracks probe requests currently in flight in half-open state.
@@ -211,6 +212,7 @@ func (cb *circuitBreaker) recordFailure(now time.Time, usedProbe bool) {
 	if !cb.cfg.enabled {
 		return
 	}
+	cb.failureVersion++
 
 	if usedProbe && cb.halfOpenInFlight > 0 {
 		cb.halfOpenInFlight--

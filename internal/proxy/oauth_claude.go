@@ -24,7 +24,9 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 	switch requestCtx.Capability {
 	case CapabilityClaudeMessages, CapabilityClaudeCountTokens:
 	default:
-		return nil, fmt.Errorf("claude oauth does not support %s requests", requestCtx.Capability)
+		if !isProviderTest(original.Context()) || original.Method != http.MethodGet || path != "/v1/models" {
+			return nil, fmt.Errorf("claude oauth does not support %s requests", requestCtx.Capability)
+		}
 	}
 
 	account, err := cp.oauth.ResolveAccountRequestContext(original.Context(), provider.NormalizedOAuthProvider(), provider.NormalizedOAuthRef(), cp.oauthHTTPClientForProvider(provider, providerIndex))
@@ -32,7 +34,9 @@ func (cp *ClientProxy) createClaudeOAuthRequestWithPayloadForProvider(original *
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
 	cred := account.Credential
-	cp.recordAccountAttempt(account)
+	if !isProviderTest(original.Context()) {
+		cp.recordAccountAttempt(account)
+	}
 	accessToken := ""
 	if cred != nil {
 		accessToken = strings.TrimSpace(cred.AccessToken)

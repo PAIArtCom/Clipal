@@ -18,8 +18,8 @@ import (
 
 const (
 	defaultCodexOAuthBaseURL = "https://chatgpt.com/backend-api/codex"
-	codexOAuthVersion        = "0.169.1"
-	codexOAuthUserAgent      = "codex_cli_rs/0.169.1 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
+	codexOAuthVersion        = "0.171.0"
+	codexOAuthUserAgent      = "codex_cli_rs/" + codexOAuthVersion + " (Mac OS 26.5.1; arm64) iTerm.app/3.6.11"
 	codexOAuthOriginator     = "codex_cli_rs"
 )
 
@@ -141,7 +141,9 @@ func (cp *ClientProxy) createCodexOAuthRequestWithPayloadForProvider(original *h
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
 	cred := account.Credential
-	cp.recordAccountAttempt(account)
+	if !isProviderTest(original.Context()) {
+		cp.recordAccountAttempt(account)
+	}
 	accessToken := ""
 	if cred != nil {
 		accessToken = strings.TrimSpace(cred.AccessToken)
@@ -794,7 +796,7 @@ func (cp *ClientProxy) doProviderRequestWithPayload(original *http.Request, prov
 }
 
 func preferIdentityEncodingForStream(original *http.Request, proxyReq *http.Request, payload *requestPayload) {
-	if proxyReq == nil || !requestMayStreamEvents(original, proxyReq, payload) {
+	if proxyReq == nil || (!isProviderTest(original.Context()) && !requestMayStreamEvents(original, proxyReq, payload)) {
 		return
 	}
 	// Terminal detection and exact event-boundary forwarding operate on SSE

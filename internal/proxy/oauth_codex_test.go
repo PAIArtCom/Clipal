@@ -19,11 +19,11 @@ import (
 )
 
 func TestCodexOAuthMetadataMatchesInstalledRelease(t *testing.T) {
-	if codexOAuthVersion != "0.169.1" {
-		t.Fatalf("codexOAuthVersion = %q, want 0.169.1", codexOAuthVersion)
+	if codexOAuthVersion != "0.171.0" {
+		t.Fatalf("codexOAuthVersion = %q, want 0.171.0", codexOAuthVersion)
 	}
-	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.169.1 ") {
-		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.169.1 identity", codexOAuthUserAgent)
+	if !strings.HasPrefix(codexOAuthUserAgent, "codex_cli_rs/0.171.0 ") {
+		t.Fatalf("codexOAuthUserAgent = %q, want Codex 0.171.0 identity", codexOAuthUserAgent)
 	}
 }
 

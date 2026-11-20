@@ -27,7 +27,9 @@ func (cp *ClientProxy) createAntigravityOAuthRequestWithPayloadForProvider(origi
 		return nil, fmt.Errorf("load oauth credential: %w", err)
 	}
 	cred := account.Credential
-	cp.recordAccountAttempt(account)
+	if !isProviderTest(original.Context()) {
+		cp.recordAccountAttempt(account)
+	}
 	accessToken := ""
 	projectID := ""
 	if cred != nil {

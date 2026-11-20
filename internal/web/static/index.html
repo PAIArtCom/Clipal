@@ -329,6 +329,10 @@
                                         </div>
                                     </div>
                                     <div class="provider-inspector__actions">
+                                        <button type="button" class="row-icon" @click="openProviderTest(provider)"
+                                            :disabled="!canMutateProviders || !provider.enabled" :title="t('providerTest.title')" :aria-label="t('providerTest.title')">
+                                            <svg class="ic" aria-hidden="true"><use href="#i-pulse"/></svg>
+                                        </button>
                                         <button type="button" @click="pinProvider(provider.name)" class="row-icon provider-row__pin"
                                             :class="{'is-active': providerPinned(provider)}"
                                             :aria-pressed="providerPinned(provider)" :aria-label="providerPinTitle(provider)" :title="providerPinTitle(provider)"
@@ -1170,6 +1174,159 @@
         </div>
     </div>
 
+    <div class="modal-backdrop provider-test-backdrop" :class="{show: providerTest}" x-show="providerTest" x-cloak
+        @click.self="closeProviderTest()" @keydown.escape.window="closeProviderTest()">
+        <div class="modal provider-test-modal" role="dialog" aria-modal="true" aria-labelledby="provider-test-title" data-dialog="provider-test"
+            @keydown.tab="trapDialogFocus($event)" x-effect="focusProviderTestStage($el, providerTest?.phase)">
+            <div class="modal-header">
+                <h2 id="provider-test-title" class="provider-test-heading" x-text="providerTestTitle"></h2>
+                <button type="button" class="icon-btn provider-test-close" @click="closeProviderTest()" :disabled="providerTestBusy" :aria-label="t('providerTest.close')">
+                    <svg class="ic" aria-hidden="true"><use href="#i-close"/></svg>
+                </button>
+            </div>
+            <ol class="provider-test-steps" role="list" :aria-label="t('providerTest.progress')">
+                <template x-for="(step, index) in ['catalog', 'select', 'request']" :key="step">
+                    <li :aria-current="providerTestStep === index + 1 ? 'step' : null"
+                        :class="{
+                            'is-complete': (providerTestStep > index + 1 && !(index === 0 && providerTest?.phase === 'catalogFailed')) || providerTest?.phase === 'passed',
+                            'is-failed': (index === 0 && providerTest?.phase === 'catalogFailed') || (index === 2 && providerTest?.phase === 'failed')
+                        }">
+                        <span class="provider-test-step-marker" aria-hidden="true">
+                            <svg class="ic" x-show="(providerTestStep > index + 1 && !(index === 0 && providerTest?.phase === 'catalogFailed')) || providerTest?.phase === 'passed'"><use href="#i-check"/></svg>
+                            <span class="provider-test-step-fail-marker" x-show="(index === 0 && providerTest?.phase === 'catalogFailed') || (index === 2 && providerTest?.phase === 'failed')">!</span>
+                        </span>
+                        <span x-text="t('providerTest.' + step)"></span>
+                    </li>
+                </template>
+            </ol>
+            <template x-if="providerTest">
+                <div class="modal-body provider-test-body">
+                    <div class="provider-test-summary" x-show="providerTestStep === 3">
+                        <div class="provider-test-summary__tag">
+                            <span class="provider-test-summary__label" x-text="t('providerTest.model')"></span>:
+                            <span class="provider-test-summary__value is-mono" x-text="providerTest.model"></span>
+                        </div>
+                        <template x-if="providerTest.chooseProtocol && providerTest.protocol">
+                            <div class="provider-test-summary__tag">
+                                <span class="provider-test-summary__label" x-text="t('providerTest.protocol')"></span>:
+                                <span class="provider-test-summary__value" x-text="providerTest.protocol === 'responses' ? 'Responses' : 'Chat Completions'"></span>
+                            </div>
+                        </template>
+                        <template x-if="providerTest.keyCount > 1 && providerTest.usedKey">
+                            <div class="provider-test-summary__tag">
+                                <span class="provider-test-summary__label" x-text="t('providerTest.key')"></span>:
+                                <span class="provider-test-summary__value" x-text="tf('providerTest.keyNumber', { number: providerTest.usedKey })"></span>
+                            </div>
+                        </template>
+                        <template x-if="providerTest.phase === 'passed' && providerTest.duration">
+                            <div class="provider-test-summary__tag provider-test-summary__latency">
+                                <span class="provider-test-summary__label" x-text="t('providerTest.duration')"></span>:
+                                <span class="provider-test-summary__value" x-text="providerTest.duration + ' ms'"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="providerTest.phase === 'ready'">
+                        <div class="provider-test-fields" :class="{'has-protocol': providerTest.chooseProtocol}">
+                            <div class="provider-test-field">
+                                <div class="provider-test-field-heading">
+                                    <label id="provider-test-model-label" for="provider-test-model" class="form-label" tabindex="-1" x-text="t('providerTest.model')"></label>
+                                    <div class="provider-test-catalog-tools">
+                                        <span class="form-hint" id="provider-test-model-hint">
+                                            <span x-text="tf('providerTest.loaded', { count: providerTest.models.length })"></span>
+                                            <span x-show="providerTest.keyCount > 1 && providerTest.usedKey" x-text="' · ' + tf('providerTest.keyNumber', { number: providerTest.usedKey })"></span>
+                                        </span>
+                                        <button type="button" class="row-icon" @click="fetchProviderTestModels()"
+                                            :title="t('providerTest.reload')" :aria-label="t('providerTest.reload')">
+                                            <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <template x-if="providerTest?.phase === 'ready' && !providerTestUsesModelSearch">
+                                    <select id="provider-test-model" class="form-select" aria-describedby="provider-test-model-hint" x-model="providerTest.model">
+                                        <template x-for="model in providerTest?.models || []" :key="model">
+                                            <option :value="model" :selected="model === providerTest?.model" x-text="model"></option>
+                                        </template>
+                                    </select>
+                                </template>
+                                <template x-if="providerTest?.phase === 'ready' && providerTestUsesModelSearch">
+                                    <div class="choice-picker" x-data="choicePicker({ id: 'provider-test-model', label: 'providerTest.model', searchPlaceholder: 'providerTest.searchModel', emptyMessage: 'providerTest.noModelsMatch', openOnFocus: false, get: () => providerTest?.model, set: value => { providerTest.model = value }, options: () => providerTestModelChoices() })"
+                                        x-init="$nextTick(() => { if ($el.isConnected) mount($el) })"></div>
+                                </template>
+                            </div>
+                            <div class="provider-test-field" x-show="providerTest.chooseProtocol">
+                                <label class="form-label" for="provider-test-protocol" x-text="t('providerTest.protocol')"></label>
+                                <select id="provider-test-protocol" class="form-select" x-model="providerTest.protocol">
+                                    <option value="responses">Responses</option>
+                                    <option value="chat">Chat Completions</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="form-hint" role="status" x-show="providerTest.retestModelMissing" x-text="t('providerTest.retestModelMissing')"></p>
+                    </div>
+
+                    <div id="provider-test-status" class="provider-oauth-flow provider-test-status" x-show="providerTest.phase !== 'ready'"
+                        :class="{'is-error': ['catalogFailed', 'failed'].includes(providerTest.phase), 'is-warning': providerTest.phase === 'stale', 'is-success': providerTest.phase === 'passed'}"
+                        tabindex="-1" role="status" aria-labelledby="provider-test-status-title" aria-describedby="provider-test-status-message">
+                        <div class="provider-oauth-flow__visual" aria-hidden="true">
+                            <div class="spinner" x-show="providerTestBusy"></div>
+                            <div class="provider-oauth-flow__state-icon" x-show="!providerTestBusy">
+                                <svg class="ic" x-show="providerTest.phase === 'passed'"><use href="#i-check"/></svg>
+                                <span x-show="providerTest.phase !== 'passed'">!</span>
+                            </div>
+                        </div>
+                        <div class="provider-oauth-flow__content">
+                            <div class="provider-test-status-header">
+                                <h3 id="provider-test-status-title" class="provider-oauth-flow__title" x-text="t('providerTest.' + providerTest.phase)"></h3>
+                                <template x-if="providerTest.phase === 'passed' && providerTest.restored">
+                                    <span class="pill pill--primary provider-test-badge" x-text="t('providerTest.recoveredBadge')"></span>
+                                </template>
+                            </div>
+                            <p class="provider-oauth-flow__message" id="provider-test-status-message"
+                                x-text="providerTestStatusMessage" x-show="providerTestStatusMessage"></p>
+                        </div>
+                    </div>
+
+                    <template x-if="providerTest?.failure?.detail">
+                        <details class="provider-test-options" open>
+                            <summary tabindex="0" x-text="t('providerTest.details')"></summary>
+                            <div class="provider-test-error-box">
+                                <pre class="provider-test-error-detail form-hint is-mono" x-text="providerTest?.failure?.detail"></pre>
+                                <button type="button" class="row-icon provider-test-copy-btn" @click="copyValue(providerTest?.failure?.detail)"
+                                    :title="t('common.copy')" :aria-label="t('common.copy')">
+                                    <svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>
+                                </button>
+                            </div>
+                        </details>
+                    </template>
+                    <template x-if="['ready', 'catalogFailed'].includes(providerTest.phase) && providerTest.keyCount > 1">
+                        <details class="provider-test-options" :open="providerTest.phase === 'catalogFailed' && providerTest.keyCount > 1">
+                            <summary tabindex="0" x-text="t('providerTest.settings')"></summary>
+                            <div class="form-group">
+                                <label class="form-label" for="provider-test-key" x-text="t('providerTest.key')"></label>
+                                <select id="provider-test-key" class="form-select" @change="providerTest.key = Number($event.target.value); fetchProviderTestModels()">
+                                    <option value="0" :selected="providerTest.key === 0" x-text="t('providerTest.automatic')"></option>
+                                    <template x-for="number in providerTest.keyCount" :key="number">
+                                        <option :value="number" :selected="number === providerTest?.key" x-text="tf('providerTest.keyNumber', { number })"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </details>
+                    </template>
+                </div>
+            </template>
+            <div class="modal-footer provider-test-footer" x-show="providerTestActions.length">
+                <p class="form-hint" x-show="providerTest?.phase === 'ready'" x-text="t('providerTest.cost')"></p>
+                <div class="provider-test-actions">
+                    <template x-for="(action, index) in providerTestActions" :key="action">
+                        <button type="button" class="btn" :class="index === providerTestActions.length - 1 ? 'btn-primary' : 'btn-secondary'"
+                            @click="performProviderTestAction(action)" :disabled="action === 'run' && !providerTest?.model" x-text="t('providerTest.' + action)"></button>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" :class="{'show': showDataImportPreviewModal}"
         @keydown.escape.window="closeDataImportPreview()" @click.self="closeDataImportPreview()">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-preview-title" data-dialog="import" :inert="confirmDialog.visible" @keydown.tab="trapDialogFocus($event)">
@@ -1458,8 +1615,8 @@
                 :aria-controls="$id('choice-list')" :aria-activedescendant="open && active >= 0 ? $id('choice-list') + '-' + active : null"
                 :aria-describedby="$id('choice-help')"
                 :aria-label="t(labelKey)" :disabled="disabled" :value="open ? query : selectedLabel"
-                :placeholder="open ? t(labelKey === 'requestEnv.country' ? 'requestEnv.searchCountry' : 'requestEnv.searchTimezone') : ''" autocomplete="off" spellcheck="false"
-                @focus="show()" @click="show()" @blur="close()" @input="search($event.target.value)"
+                :placeholder="open ? t(searchPlaceholderKey) : ''" autocomplete="off" spellcheck="false"
+                @focus="focusInput($event)" @click="show()" @blur="close()" @input="search($event.target.value)"
                 @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
                 @keydown.home="if (open) { $event.preventDefault(); edge(false) }"
                 @keydown.end="if (open) { $event.preventDefault(); edge(true) }"
@@ -1479,7 +1636,7 @@
                         </div>
                     </template>
                 </div>
-                <p class="choice-picker__empty" role="status" x-show="!matches.length" x-text="t('requestEnv.noMatches')"></p>
+                <p class="choice-picker__empty" role="status" x-show="!matches.length" x-text="t(emptyMessageKey)"></p>
             </div>
         </div>
     </template>

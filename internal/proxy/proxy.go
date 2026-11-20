@@ -125,19 +125,20 @@ type upstreamProxyPolicyKey struct {
 
 // Router manages multiple client proxies
 type Router struct {
-	cfg        *config.Config
-	configDir  string
-	telemetry  *telemetry.Store
-	oauth      *oauthpkg.Service
-	proxies    map[ClientType]*ClientProxy
-	server     *http.Server
-	mu         sync.RWMutex
-	reloadMu   sync.Mutex
-	watchMu    sync.Mutex
-	watchStop  chan struct{}
-	watchDone  chan struct{}
-	lastMod    map[string]time.Time
-	watchEvery time.Duration
+	cfg           *config.Config
+	configDir     string
+	telemetry     *telemetry.Store
+	oauth         *oauthpkg.Service
+	proxies       map[ClientType]*ClientProxy
+	server        *http.Server
+	mu            sync.RWMutex
+	providerTests map[providerTestTarget]*providerTestSession
+	reloadMu      sync.Mutex
+	watchMu       sync.Mutex
+	watchStop     chan struct{}
+	watchDone     chan struct{}
+	lastMod       map[string]time.Time
+	watchEvery    time.Duration
 
 	oauthRefreshMu     sync.Mutex
 	oauthRefreshStop   chan struct{}
@@ -187,6 +188,7 @@ type ClientProxy struct {
 	deactivated           []providerDeactivation
 	keyDeactivated        [][]providerDeactivation
 	providerBusy          []providerBusyState
+	healthVersion         []uint64
 	reactivateAfter       time.Duration
 	upstreamIdle          time.Duration
 
@@ -367,6 +369,7 @@ func newClientProxyWithGlobalProxy(clientType ClientType, mode config.ClientMode
 		deactivated:            make([]providerDeactivation, len(providers)),
 		keyDeactivated:         keyDeactivated,
 		providerBusy:           make([]providerBusyState, len(providers)),
+		healthVersion:          make([]uint64, len(providers)),
 		reactivateAfter:        reactivateAfter,
 		upstreamIdle:           upstreamIdle,
 		stickyBindings:         make(map[string]stickyBinding),

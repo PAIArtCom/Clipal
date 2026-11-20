@@ -112,6 +112,7 @@ func (cp *ClientProxy) deactivateFor(index int, reason string, status int, msg s
 	if index < 0 || index >= len(cp.deactivated) {
 		return
 	}
+	cp.healthVersion[index]++
 	if !cp.deactivated[index].until.IsZero() && time.Now().Before(cp.deactivated[index].until) {
 		return
 	}
@@ -139,6 +140,7 @@ func (cp *ClientProxy) markProviderBusy(index int, reason string, backoffStep in
 	if index < 0 || index >= len(cp.providerBusy) {
 		return
 	}
+	cp.healthVersion[index]++
 	until := now.Add(wait)
 	busy := cp.providerBusy[index]
 	if backoffStep > busy.BackoffStep {
@@ -404,6 +406,7 @@ func (cp *ClientProxy) deactivateKeyFor(providerIndex int, keyIndex int, reason 
 	if keyIndex < 0 || keyIndex >= len(cp.keyDeactivated[providerIndex]) {
 		return
 	}
+	cp.healthVersion[providerIndex]++
 	now := time.Now()
 	if !cp.keyDeactivated[providerIndex][keyIndex].until.IsZero() && now.Before(cp.keyDeactivated[providerIndex][keyIndex].until) {
 		return

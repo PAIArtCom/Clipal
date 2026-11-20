@@ -197,6 +197,8 @@ function choicePicker(config) {
     return {
         inputId: config.id,
         labelKey: config.label,
+        searchPlaceholderKey: config.searchPlaceholder || (config.label === 'requestEnv.country' ? 'requestEnv.searchCountry' : 'requestEnv.searchTimezone'),
+        emptyMessageKey: config.emptyMessage || 'requestEnv.noMatches',
         open: false,
         query: '',
         active: -1,
@@ -216,6 +218,10 @@ function choicePicker(config) {
             });
         },
         isSelected(value) { return value === config.get(); },
+        focusInput(event) {
+            if (config.openOnFocus === false) event.target.select();
+            else this.show();
+        },
         mount(element) {
             element.appendChild(document.getElementById('choice-picker-template').content.cloneNode(true));
             reposition = () => { if (this.open) this.place(); };
