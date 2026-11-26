@@ -1380,6 +1380,7 @@ function app() {
         confirmResolver: null,
         confirmReturnFocus: null,
         dialogReturnFocus: null,
+        loadingOverlayTimer: null,
         providerSearch: '',
         selectedProviderName: '',
         providerDetailOpen: false,   // compact windows: the inspector replaces the list
@@ -2504,10 +2505,20 @@ function app() {
             }
 
             this.syncHash(true);
+            this.syncTopLayerOverlays();
             if (typeof this.$watch === 'function') {
                 this.$watch('activeTab', () => this.syncHash());
                 this.$watch('selectedClient', () => this.syncHash());
-                this.$watch('visibleDialog', (current, previous) => this.handleDialogChange(current, previous));
+                this.$watch('visibleDialog', (current, previous) => {
+                    if (!this.supportsNativeDialogs()) this.handleDialogChange(current, previous);
+                });
+                this.$watch('openDialogKey', () => {
+                    if (this.supportsNativeDialogs()) {
+                        this.closeInactiveNativeDialogs();
+                        this.$nextTick(() => this.syncNativeDialogs());
+                    }
+                });
+                this.$watch('isLoading', () => this.syncTopLayerOverlays({ repromoteToasts: true }));
             }
             if (typeof window.addEventListener === 'function') {
                 window.addEventListener('hashchange', () => this.applyHash());
@@ -2854,7 +2865,7 @@ function app() {
                 this.resolveConfirm(false);
             }
             this.confirmReturnFocus = (typeof document !== 'undefined' && document.activeElement) || null;
-            this.setBackgroundInert(true);
+            if (!this.supportsNativeDialogs()) this.setBackgroundInert(true);
             this.confirmDialog = {
                 visible: true,
                 title: title || this.t('common.confirmTitle'),
@@ -2890,10 +2901,10 @@ function app() {
             const resolve = this.confirmResolver;
             this.confirmResolver = null;
             this.confirmDialog = { ...this.confirmDialog, visible: false };
-            this.setBackgroundInert(!!this.visibleDialog);
+            if (!this.supportsNativeDialogs()) this.setBackgroundInert(!!this.visibleDialog);
             const target = this.confirmReturnFocus;
             this.confirmReturnFocus = null;
-            if (target && typeof target.focus === 'function') {
+            if (!this.supportsNativeDialogs() && target && typeof target.focus === 'function') {
                 this.$nextTick(() => target.focus());
             }
             if (resolve) resolve(!!result);
@@ -2905,6 +2916,120 @@ function app() {
             for (const selector of ['.toolbar', '.container']) {
                 const element = document.querySelector(selector);
                 if (element) element.inert = !!inert;
+            }
+        },
+
+        supportsNativeDialogs() {
+            return typeof HTMLDialogElement !== 'undefined'
+                && typeof HTMLDialogElement.prototype.showModal === 'function';
+        },
+
+        supportsPopover() {
+            return typeof HTMLElement !== 'undefined'
+                && typeof HTMLElement.prototype.showPopover === 'function'
+                && typeof HTMLElement.prototype.hidePopover === 'function';
+        },
+
+        openDialogNames() {
+            const names = [];
+            if (this.showAddProviderModal || this.showEditProviderModal) names.push('provider');
+            if (this.environmentVisible) names.push('environment');
+            if (this.providerTest) names.push('provider-test');
+            if (this.showDataImportPreviewModal) names.push('import');
+            if (this.confirmDialog.visible) names.push('confirm');
+            return names;
+        },
+
+        get openDialogKey() {
+            return this.openDialogNames().join(',');
+        },
+
+        closeInactiveNativeDialogs() {
+            if (!this.supportsNativeDialogs() || typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+            const openNames = new Set(this.openDialogNames());
+            document.querySelectorAll('[data-native-dialog]').forEach(dialog => {
+                if (!openNames.has(dialog.dataset.nativeDialog) && dialog.open) {
+                    dialog.close();
+                }
+            });
+        },
+
+        syncNativeDialogs() {
+            if (!this.supportsNativeDialogs() || typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+            const openNames = this.openDialogNames();
+            this.closeInactiveNativeDialogs();
+            let openedAny = false;
+            // Open active dialogs in stack order (parents first, confirm last) so confirm
+            // promotes above any open parent dialog without closing it.
+            for (const name of openNames) {
+                const dialog = typeof document.querySelector === 'function'
+                    ? document.querySelector(`[data-native-dialog="${name}"]`)
+                    : null;
+                if (dialog && !dialog.open) {
+                    dialog.showModal();
+                    openedAny = true;
+                }
+            }
+            if (openedAny) {
+                this.syncTopLayerOverlays({ repromoteToasts: true });
+            }
+        },
+
+        // Reconcile reactive state if the browser force-closes a native <dialog>
+        // (for example on repeated Escape presses without user activation).
+        handleNativeDialogClose(name) {
+            if (!this.openDialogNames().includes(name)) return;
+            switch (name) {
+                case 'confirm':
+                    this.resolveConfirm(false);
+                    break;
+                case 'provider-test':
+                    this.providerTest = null;
+                    break;
+                case 'import':
+                    this.showDataImportPreviewModal = false;
+                    break;
+                case 'provider':
+                    this.closeModals();
+                    break;
+                case 'environment':
+                    this.environmentVisible = false;
+                    this.environmentBusy = false;
+                    this.environmentFormSnapshot = null;
+                    ++this.environmentGeneration;
+                    break;
+            }
+        },
+
+        syncTopLayerOverlays({ repromoteToasts = false } = {}) {
+            if (!this.supportsPopover() || typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+            const isPopoverOpen = el => typeof el.matches === 'function' && el.matches(':popover-open');
+            const promote = el => {
+                if (isPopoverOpen(el)) el.hidePopover();
+                el.showPopover();
+            };
+
+            const loading = document.querySelector('.loading-overlay[popover]');
+            if (loading) {
+                if (this.loadingOverlayTimer) {
+                    clearTimeout(this.loadingOverlayTimer);
+                    this.loadingOverlayTimer = null;
+                }
+                if (this.isLoading) {
+                    promote(loading);
+                } else if (isPopoverOpen(loading)) {
+                    this.loadingOverlayTimer = setTimeout(() => {
+                        this.loadingOverlayTimer = null;
+                        if (!this.isLoading && isPopoverOpen(loading)) loading.hidePopover();
+                    }, 220);
+                }
+            }
+
+            const toastStack = document.querySelector('.toast-stack[popover]');
+            if (toastStack) {
+                if (repromoteToasts || !isPopoverOpen(toastStack)) {
+                    promote(toastStack);
+                }
             }
         },
 
@@ -3088,6 +3213,11 @@ function app() {
             return this.showDataImportPreviewModal ? 'import' : '';
         },
         handleDialogChange(current, previous) {
+            if (this.supportsNativeDialogs()) {
+                this.closeInactiveNativeDialogs();
+                this.$nextTick(() => this.syncNativeDialogs());
+                return;
+            }
             this.setBackgroundInert(!!current);
             if (!previous && current && current !== 'confirm') this.dialogReturnFocus = document.activeElement;
             if (!current) {
@@ -5736,6 +5866,11 @@ function app() {
 
             this.toasts = nextToasts;
             this.resumeToast(id);
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => this.syncTopLayerOverlays({ repromoteToasts: true }));
+            } else {
+                this.syncTopLayerOverlays({ repromoteToasts: true });
+            }
         },
 
         closeModals() {

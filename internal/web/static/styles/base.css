@@ -47,8 +47,17 @@ code, pre {
 }
 
 :focus-visible {
-    outline: none;
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
     box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+@media (forced-colors: active) {
+    :focus-visible {
+        outline: 2px solid CanvasText;
+        outline-offset: 2px;
+        box-shadow: none;
+    }
 }
 
 [x-cloak] {

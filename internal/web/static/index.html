@@ -85,7 +85,7 @@
     </svg>
 
     <!-- Loading Overlay -->
-    <div class="loading-overlay" :class="{'active': isLoading}">
+    <div class="loading-overlay" popover="manual" :class="{'active': isLoading}">
         <div class="spinner"></div>
     </div>
 
@@ -94,7 +94,7 @@
         <div class="toolbar__inner">
             <div class="brand" :title="t('header.subtitle')">
                 <span class="brand__mark"><img src="/static/clipal-icon.svg" alt=""></span>
-                <span class="brand__name">Clipal</span>
+                <h1 class="brand__name">Clipal</h1>
                 <span class="brand__version" x-show="status.version" x-text="status.version"></span>
             </div>
 
@@ -162,7 +162,7 @@
     </header>
 
     <!-- Toast Messages -->
-    <div class="toast-stack" aria-live="polite" aria-atomic="false">
+    <div class="toast-stack" popover="manual" aria-live="polite" aria-atomic="false">
         <template x-for="toast in toasts" :key="toast.id">
             <div class="toast" :class="`toast--${toast.type}`" :role="toast.type === 'error' ? 'alert' : 'status'"
                 @mouseenter="pauseToast(toast.id)" @mouseleave="resumeToast(toast.id)"
@@ -184,6 +184,7 @@
         </template>
     </div>
 
+    <main id="main">
     <div class="container">
         <template x-for="key in ['runtime', 'service']" :key="key">
             <div class="connection-banner" role="status" x-cloak
@@ -1173,11 +1174,12 @@
             </div>
         </div>
     </div>
+    </main>
 
-    <div class="modal-backdrop provider-test-backdrop" :class="{show: providerTest}" x-show="providerTest" x-cloak
-        @click.self="closeProviderTest()" @keydown.escape.window="closeProviderTest()">
-        <div class="modal provider-test-modal" role="dialog" aria-modal="true" aria-labelledby="provider-test-title" data-dialog="provider-test"
-            @keydown.tab="trapDialogFocus($event)" x-effect="focusProviderTestStage($el, providerTest?.phase)">
+    <dialog class="modal-backdrop provider-test-backdrop" data-native-dialog="provider-test" aria-labelledby="provider-test-title" :class="{show: providerTest}" x-show="providerTest" x-cloak
+        @click.self="closeProviderTest()" @cancel.prevent="closeProviderTest()" @close="handleNativeDialogClose('provider-test')">
+        <div class="modal provider-test-modal" data-dialog="provider-test"
+            x-effect="focusProviderTestStage($el, providerTest?.phase)">
             <div class="modal-header">
                 <h2 id="provider-test-title" class="provider-test-heading" x-text="providerTestTitle"></h2>
                 <button type="button" class="icon-btn provider-test-close" @click="closeProviderTest()" :disabled="providerTestBusy" :aria-label="t('providerTest.close')">
@@ -1325,11 +1327,11 @@
                 </div>
             </div>
         </div>
-    </div>
+    </dialog>
 
-    <div class="modal-backdrop" :class="{'show': showDataImportPreviewModal}"
-        @keydown.escape.window="closeDataImportPreview()" @click.self="closeDataImportPreview()">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-preview-title" data-dialog="import" :inert="confirmDialog.visible" @keydown.tab="trapDialogFocus($event)">
+    <dialog class="modal-backdrop" data-native-dialog="import" aria-labelledby="import-preview-title" :class="{'show': showDataImportPreviewModal}" x-show="showDataImportPreviewModal" x-cloak
+        @cancel.prevent="closeDataImportPreview()" @close="handleNativeDialogClose('import')" @click.self="closeDataImportPreview()">
+        <div class="modal" data-dialog="import">
             <div class="modal-header">
                 <h2 id="import-preview-title" x-text="t('settings.importPreviewTitle')"></h2>
                 <button @click="closeDataImportPreview()" :disabled="!!dataImportBusy" class="icon-btn"
@@ -1385,12 +1387,12 @@
                     :disabled="!!dataImportBusy || !dataImportPlan" x-text="dataImportBusy === 'apply' ? t('common.working') : t('settings.applyImport')"></button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!-- Modals -->
-    <div class="modal-backdrop" :class="{'show': showAddProviderModal || showEditProviderModal}"
-        @keydown.escape.window="requestCloseProvider($event)" @click.self="requestCloseProvider()">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-dialog="provider" @keydown.tab="trapDialogFocus($event)" :inert="confirmDialog.visible || providerSaving">
+    <dialog class="modal-backdrop" data-native-dialog="provider" aria-labelledby="modal-title" :class="{'show': showAddProviderModal || showEditProviderModal}" x-show="showAddProviderModal || showEditProviderModal" x-cloak
+        @cancel.prevent="requestCloseProvider($event)" @close="handleNativeDialogClose('provider')" @click.self="requestCloseProvider()">
+        <div class="modal" data-dialog="provider" :inert="providerSaving">
             <div class="modal-header">
                 <h2 id="modal-title" x-text="providerModalTitle()"></h2>
                 <button @click="requestCloseProvider()" class="icon-btn"
@@ -1583,15 +1585,13 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!-- Confirm Dialog -->
-    <div class="modal-backdrop modal-backdrop--confirm" :class="{'show': confirmDialog.visible}"
-        x-show="confirmDialog.visible" @keydown.escape.window="if (confirmDialog.visible) { $event.stopImmediatePropagation(); resolveConfirm(false) }"
+    <dialog class="modal-backdrop modal-backdrop--confirm" role="alertdialog" data-native-dialog="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-message" :class="{'show': confirmDialog.visible}"
+        x-show="confirmDialog.visible" @cancel.prevent="resolveConfirm(false)" @close="handleNativeDialogClose('confirm')"
         @click.self="resolveConfirm(false)">
-        <div class="modal modal--confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"
-            aria-describedby="confirm-message"
-            @keydown.tab="trapDialogFocus($event)">
+        <div class="modal modal--confirm" data-dialog="confirm">
             <div class="modal-header">
                 <h2 id="confirm-title" x-text="confirmDialog.title"></h2>
             </div>
@@ -1606,7 +1606,7 @@
                     @click="resolveConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <template id="choice-picker-template">
         <div x-id="['choice-list', 'choice-help']" @click.outside="close()">
@@ -1657,8 +1657,8 @@
     <script src="/static/environment-options.js"></script>
     <script src="/static/form-controls.js"></script>
     <script src="/static/app.js"></script>
-    <div class="modal-backdrop" :class="{show: environmentVisible}" x-show="environmentVisible" x-cloak @click.self="closeEnvironment()" @keydown.escape.window="closeEnvironment()">
-        <div class="modal modal--wide" role="dialog" aria-modal="true" :aria-label="t('requestEnv.title')" data-dialog="environment" @keydown.tab="trapDialogFocus($event)" :inert="confirmDialog.visible">
+    <dialog class="modal-backdrop" data-native-dialog="environment" aria-labelledby="environment-title" :class="{show: environmentVisible}" x-show="environmentVisible" x-cloak @click.self="closeEnvironment()" @cancel.prevent="closeEnvironment()" @close="handleNativeDialogClose('environment')">
+        <div class="modal modal--wide" data-dialog="environment">
             <div class="modal-header"><h2 id="environment-title" x-text="t('requestEnv.title')"></h2><button class="icon-btn" :disabled="environmentSaving" @click="closeEnvironment()" :aria-label="t('common.cancel')"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></div>
             <div class="modal-body">
                 <p class="form-hint" x-text="t('requestEnv.hint')"></p>
@@ -1697,7 +1697,7 @@
             </div>
             <div class="modal-footer"><button class="btn btn-primary" :disabled="environmentBusy || !environmentIdentity" @click="saveEnvironment()" x-text="t(environmentSaving ? 'common.working' : 'requestEnv.save')"></button><button class="btn btn-secondary" :disabled="environmentBusy || !environmentIdentity" @click="diagnoseEnvironment()" x-text="environmentBusy ? t('common.working') : t('requestEnv.diagnose')"></button></div>
         </div>
-    </div>
+    </dialog>
 
 
 </body>

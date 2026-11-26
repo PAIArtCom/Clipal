@@ -2840,6 +2840,71 @@ test('Escape opens provider discard confirmation without cancelling it on the sa
     assert.equal(state.providerForm.name, 'draft');
 });
 
+test('native dialogs stack confirm above parent without closing it and keep toast stack on top', async () => {
+    const events = [];
+    const makeDialog = name => ({
+        dataset: { nativeDialog: name },
+        open: false,
+        showModal() { this.open = true; events.push(`open:${name}`); },
+        close() { this.open = false; events.push(`close:${name}`); }
+    });
+    const makePopover = name => ({
+        open: false,
+        hasAttribute(attr) { return attr === 'popover'; },
+        matches(sel) { return sel === ':popover-open' && this.open; },
+        showPopover() { this.open = true; events.push(`show:${name}`); },
+        hidePopover() { this.open = false; events.push(`hide:${name}`); }
+    });
+    const providerDialog = makeDialog('provider');
+    const confirmDialog = makeDialog('confirm');
+    const toastStack = makePopover('toast');
+    const loadingOverlay = makePopover('loading');
+    const dialogs = [providerDialog, confirmDialog];
+
+    const state = loadApp({
+        context: {
+            HTMLDialogElement: { prototype: { showModal() {} } },
+            HTMLElement: { prototype: { showPopover() {}, hidePopover() {} } },
+            document: {
+                querySelectorAll(sel) { return sel === '[data-native-dialog]' ? dialogs : []; },
+                querySelector(sel) {
+                    if (sel === '[data-native-dialog="provider"]') return providerDialog;
+                    if (sel === '[data-native-dialog="confirm"]') return confirmDialog;
+                    if (sel === '.toast-stack[popover]') return toastStack;
+                    if (sel === '.loading-overlay[popover]') return loadingOverlay;
+                    return null;
+                }
+            }
+        }
+    });
+
+    state.showEditProviderModal = true;
+    state.syncNativeDialogs();
+    assert.equal(providerDialog.open, true);
+    assert.equal(confirmDialog.open, false);
+    assert.equal(toastStack.open, true);
+
+    const pending = state.askConfirm({ message: 'Discard?' });
+    state.syncNativeDialogs();
+    assert.equal(providerDialog.open, true, 'parent dialog must stay open when confirm stacks above it');
+    assert.equal(confirmDialog.open, true);
+    assert.deepEqual(events.slice(-3), ['open:confirm', 'hide:toast', 'show:toast']);
+
+    state.resolveConfirm(false);
+    state.syncNativeDialogs();
+    await pending;
+    assert.equal(confirmDialog.open, false);
+    assert.equal(providerDialog.open, true, 'parent dialog must remain open after confirm closes');
+    assert.equal(events.filter(e => e === 'open:provider').length, 1, 'parent dialog must not be reopened');
+
+    // Simulate a browser force-close (e.g. repeated Escape) syncing reactive state.
+    state.handleNativeDialogClose('provider');
+    assert.equal(state.showEditProviderModal, false);
+    state.providerTest = { phase: 'running' };
+    state.handleNativeDialogClose('provider-test');
+    assert.equal(state.providerTest, null);
+});
+
 
 test('mode and pin changes preserve the saved selection on failure and commit only on success', async () => {
     for (const [initialMode, action] of [['auto', s => s.setClientMode('manual')], ['manual', s => s.setClientMode('auto')], ['manual', s => s.pinProvider('backup')]]) {
