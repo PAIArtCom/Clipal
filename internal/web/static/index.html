@@ -1232,7 +1232,7 @@
                         <div class="provider-test-fields" :class="{'has-protocol': providerTest.chooseProtocol}">
                             <div class="provider-test-field">
                                 <div class="provider-test-field-heading">
-                                    <label id="provider-test-model-label" for="provider-test-model" class="form-label" tabindex="-1" x-text="t('providerTest.model')"></label>
+                                    <label id="provider-test-model-label" for="provider-test-model" class="form-label" x-text="t('providerTest.model')"></label>
                                     <div class="provider-test-catalog-tools">
                                         <span class="form-hint" id="provider-test-model-hint">
                                             <span x-text="tf('providerTest.loaded', { count: providerTest.models.length })"></span>
@@ -1244,16 +1244,12 @@
                                         </button>
                                     </div>
                                 </div>
-                                <template x-if="providerTest?.phase === 'ready' && !providerTestUsesModelSearch">
+                                <template x-if="providerTest?.phase === 'ready'">
                                     <select id="provider-test-model" class="form-select" aria-describedby="provider-test-model-hint" x-model="providerTest.model">
                                         <template x-for="model in providerTest?.models || []" :key="model">
                                             <option :value="model" :selected="model === providerTest?.model" x-text="model"></option>
                                         </template>
                                     </select>
-                                </template>
-                                <template x-if="providerTest?.phase === 'ready' && providerTestUsesModelSearch">
-                                    <div class="choice-picker" x-data="choicePicker({ id: 'provider-test-model', label: 'providerTest.model', searchPlaceholder: 'providerTest.searchModel', emptyMessage: 'providerTest.noModelsMatch', openOnFocus: false, get: () => providerTest?.model, set: value => { providerTest.model = value }, options: () => providerTestModelChoices() })"
-                                        x-init="$nextTick(() => { if ($el.isConnected) mount($el) })"></div>
                                 </template>
                             </div>
                             <div class="provider-test-field" x-show="providerTest.chooseProtocol">

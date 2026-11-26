@@ -382,18 +382,21 @@
     flex: none;
     gap: var(--space-sm);
     margin: 0 var(--inset-group);
-    padding: 0 0 var(--gap-item);
+    padding: 0;
     list-style: none;
-    border-bottom: 1px solid var(--separator);
 }
 
 .provider-test-steps li {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     font-size: var(--text-xs);
     line-height: var(--leading-tight);
+}
+
+.provider-test-steps li.is-complete {
+    color: var(--text-secondary);
 }
 
 .provider-test-steps li:not(:last-child) {
@@ -463,6 +466,7 @@
     display: grid;
     align-content: start;
     gap: var(--gap-item);
+    /* Steps and content form one group: the header gap separates the title, this one binds the steps. */
     padding-block: var(--gap-item) var(--gap-module);
     scrollbar-gutter: auto;
 }
@@ -543,6 +547,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-xs);
+}
+
+.provider-test-catalog-tools .row-icon {
+    width: var(--control-sm);
+    height: var(--control-sm);
 }
 
 .provider-test-catalog-tools .form-hint {

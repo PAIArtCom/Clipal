@@ -262,8 +262,6 @@ function app() {
                     automatic: 'Automatic',
                     keyNumber: 'Key {number}',
                     model: 'Model',
-                    searchModel: 'Search models…',
-                    noModelsMatch: 'No models match your search.',
                     protocol: 'Endpoint',
                     run: 'Send test request',
                     running: 'Waiting for a response…',
@@ -847,8 +845,6 @@ function app() {
                     automatic: '自动选择',
                     keyNumber: '第 {number} 个 Key',
                     model: '模型',
-                    searchModel: '搜索模型…',
-                    noModelsMatch: '没有匹配的模型。',
                     protocol: '接口',
                     run: '发送测试请求',
                     running: '正在等待上游响应…',
@@ -3132,18 +3128,12 @@ function app() {
             const detail = error.detail || error.message || '';
             Object.assign(test, { phase, failure: { detail, status, kind, detailTruncated: error.detailTruncated } });
         },
-        get providerTestUsesModelSearch() {
-            return (this.providerTest?.models.length || 0) >= 8;
-        },
-        providerTestModelChoices() {
-            return this.providerTest?.models.map(model => ({ value: model, label: model })) || [];
-        },
         focusProviderTestStage(dialog, phase) {
             if (!phase) return;
             let attempts = 0;
             const focusStage = () => {
                 if (this.visibleDialog !== 'provider-test' || this.providerTest?.phase !== phase) return;
-                const selector = phase === 'ready' ? '#provider-test-model-label' : '#provider-test-status';
+                const selector = phase === 'ready' ? '#provider-test-model' : '#provider-test-status';
                 const target = dialog.querySelector(selector);
                 if (!target?.getClientRects().length) {
                     if (attempts++ < 10) setTimeout(focusStage, 16);
