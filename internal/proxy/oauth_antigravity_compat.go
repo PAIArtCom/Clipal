@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	antigravityOAuthFallbackVersion = "2.33.0"
+	antigravityOAuthFallbackVersion = "2.35.2"
 	antigravityOAuthInfoPlist       = "/Applications/Antigravity.app/Contents/Info.plist"
 	antigravityOAuthGeneratePath    = "/v1internal:generateContent"
 	antigravityOAuthStreamPath      = "/v1internal:streamGenerateContent"

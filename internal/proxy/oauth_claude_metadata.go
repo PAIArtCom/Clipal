@@ -9,7 +9,7 @@ import (
 
 const (
 	claudeOAuthAnthropicVersion        = "2023-06-01"
-	claudeOAuthAppVersion              = "2.1.329"
+	claudeOAuthAppVersion              = "2.1.332"
 	claudeOAuthDefaultEntrypoint       = "sdk-cli"
 	claudeOAuthUserAgent               = "claude-cli/" + claudeOAuthAppVersion + " (external, " + claudeOAuthDefaultEntrypoint + ")"
 	claudeOAuthClientApp               = "claude-code"
@@ -23,7 +23,7 @@ const (
 	claudeOAuthStainlessLang           = "js"
 	claudeOAuthStainlessTimeout        = "300"
 	claudeOAuthStainlessPackageVersion = "0.208.0"
-	claudeOAuthStainlessRuntimeVersion = "v26.3.0"
+	claudeOAuthStainlessRuntimeVersion = "v26.13.1"
 	claudeOAuthStainlessOS             = "MacOS"
 	claudeOAuthStainlessArch           = "arm64"
 	claudeOAuthBillingVersionSalt      = "59cf53e54c78"

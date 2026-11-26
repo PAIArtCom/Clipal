@@ -17,8 +17,8 @@ import (
 const testAntigravityRedirectURI = "http://127.0.0.1:9876/oauth2callback"
 
 func TestAntigravityFallbackVersionMatchesCurrentRelease(t *testing.T) {
-	if defaultAntigravityVersionLabel != "2.33.0" {
-		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.33.0", defaultAntigravityVersionLabel)
+	if defaultAntigravityVersionLabel != "2.35.2" {
+		t.Fatalf("defaultAntigravityVersionLabel = %q, want 2.35.2", defaultAntigravityVersionLabel)
 	}
 }
 
