@@ -181,18 +181,45 @@
   const navigation = document.querySelector('#navigation');
   if (header && menu && navigation) {
     header.classList.add('nav-ready');
+    const inertTargets = [...document.querySelectorAll('main, .footer-bottom')];
+    let menuReturnFocus = null;
+    const menuFocusables = () => [menu, ...navigation.querySelectorAll('a[href], button:not([disabled])')];
     const setMenu = (open, restoreFocus = false) => {
+      if (open && menu.getAttribute('aria-expanded') !== 'true') menuReturnFocus = document.activeElement;
       menu.setAttribute('aria-expanded', String(open));
       menu.setAttribute('aria-label', open ? menu.dataset.closeLabel : menu.dataset.openLabel);
       navigation.classList.toggle('is-open', open);
-      if (restoreFocus) menu.focus();
+      inertTargets.forEach(el => { el.inert = open; });
+      if (open) {
+        requestAnimationFrame(() => navigation.querySelector('a[href], button:not([disabled])')?.focus());
+      } else if (restoreFocus) {
+        (menuReturnFocus && menuReturnFocus.isConnected ? menuReturnFocus : menu).focus();
+        menuReturnFocus = null;
+      }
     };
     menu.addEventListener('click', () => setMenu(menu.getAttribute('aria-expanded') !== 'true'));
     navigation.addEventListener('click', event => {
       if (event.target.closest('a')) setMenu(false);
     });
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') setMenu(false, true);
+      if (menu.getAttribute('aria-expanded') !== 'true') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenu(false, true);
+        return;
+      }
+      if (event.key === 'Tab') {
+        const focusables = menuFocusables();
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     });
     document.addEventListener('click', event => {
       if (!header.contains(event.target)) setMenu(false);

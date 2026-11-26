@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="text-scale" content="scale">
     <title>Clipal · 本地 LLM 网关与 API 代理 — 接入 Claude Code 与 Codex</title>
     <meta name="description" content="开源的本地 LLM 网关与 API 代理，统一接入 Claude Code、Codex CLI 等 18 种编程工具，支持多 Key 轮询、多账号 OAuth、429 限流故障转移与费用追踪。">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -238,7 +239,7 @@
               <div class="outgoing-lines"><svg viewBox="0 0 440 52" preserveAspectRatio="none" aria-hidden="true"><path d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52M220 0V52M220 0V14Q220 26 232 26H363Q375 26 375 38V52"></path><path class="active-line" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"></path><path class="route-packet" pathLength="1" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"></path></svg></div>
               <div class="protocols"><span class="is-current"><i class="protocol-dot"></i>Anthropic</span><span><i class="protocol-dot"></i>OpenAI</span><span><i class="protocol-dot"></i>Gemini</span></div>
               <div class="provider-lines"><svg viewBox="0 0 440 30" preserveAspectRatio="none" aria-hidden="true"><path class="guide-line" d="M65 0V15H108V30M65 15H332V30"></path><path class="active-line" d="M65 0V15H108V30"></path><path class="route-packet" pathLength="1" d="M65 0V15H108V30"></path></svg></div>
-              <div class="hero-provider-pool" aria-label="API 与 OAuth 提供商示意">
+              <section class="hero-provider-pool" aria-label="API 与 OAuth 提供商示意">
                 <div data-hero-provider="0">
                   <span class="provider-auth" aria-hidden="true">API</span>
                   <div class="provider-identity"><strong><span data-provider-channel>Claude</span> 提供商 01</strong><small>API 密钥</small></div>
@@ -249,7 +250,7 @@
                   <div class="provider-identity"><strong><span data-provider-channel>Claude</span> 提供商 02</strong><small data-provider-account>Claude 账号</small></div>
                   <b>备用</b>
                 </div>
-              </div>
+              </section>
               <div class="hero-demo-status">
                 <div class="hero-scene-tabs" role="group" aria-label="路由场景">
                   <button type="button" data-hero-scene-btn="0" aria-pressed="true" disabled>01 正常路由</button>
@@ -338,7 +339,7 @@
               <div id="console-panel-0" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：提供商"><img src="../assets/screenshots/providers.png" alt="Clipal 提供商管理界面：API Key、OAuth 提供商、自动／手动路由及各提供商 Token 用量与开销" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：提供商"><img src="../assets/screenshots/providers.png" srcset="../assets/screenshots/providers-mobile.jpg 1024w, ../assets/screenshots/providers.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal 提供商管理界面：API Key、OAuth 提供商、自动／手动路由及各提供商 Token 用量与开销" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>多账号、多 Key 与费用开销，并排管理。</h3>
@@ -348,7 +349,7 @@
               <div id="console-panel-1" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：CLI 接管"><img src="../assets/screenshots/takeover.png" alt="Clipal CLI 接管界面：工具配置状态、差异预览与回滚" width="2018" height="1430" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：CLI 接管"><img src="../assets/screenshots/takeover.png" srcset="../assets/screenshots/takeover-mobile.jpg 1024w, ../assets/screenshots/takeover.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal CLI 接管界面：工具配置状态、差异预览与回滚" width="2018" height="1430" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>CLI 配置差异预览与一键回滚。</h3>
@@ -358,7 +359,7 @@
               <div id="console-panel-2" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：系统状态"><img src="../assets/screenshots/status.png" alt="Clipal 系统状态界面：初始化检查项、运行时长、熔断器计数与各通道当前路由" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：系统状态"><img src="../assets/screenshots/status.png" srcset="../assets/screenshots/status-mobile.jpg 1024w, ../assets/screenshots/status.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal 系统状态界面：初始化检查项、运行时长、熔断器计数与各通道当前路由" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>网关健康、熔断器与实时路由状态。</h3>
@@ -368,7 +369,7 @@
               <div id="console-panel-3" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：设置"><img src="../assets/screenshots/settings.png" alt="Clipal 全局设置界面：监听边界、熔断器阈值与黏性会话设置" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="放大截图：设置"><img src="../assets/screenshots/settings.png" srcset="../assets/screenshots/settings-mobile.jpg 1024w, ../assets/screenshots/settings.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal 全局设置界面：监听边界、熔断器阈值与黏性会话设置" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">放大截图 ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>监听边界、熔断阈值与黏性会话设置。</h3>

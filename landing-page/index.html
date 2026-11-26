@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="text-scale" content="scale">
     <title>Clipal · Local LLM Gateway &amp; Proxy for Claude Code &amp; Codex</title>
     <meta name="description" content="Open-source local LLM gateway and API proxy for Claude Code, Codex and 18 AI coding CLIs. Multi-key rotation, 429 failover, OAuth accounts and cost tracking.">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -179,7 +180,7 @@
               <div class="outgoing-lines"><svg viewBox="0 0 440 52" preserveAspectRatio="none" aria-hidden="true"><path d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52M220 0V52M220 0V14Q220 26 232 26H363Q375 26 375 38V52"/><path class="active-line" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"/><path class="route-packet" pathLength="1" d="M220 0V14Q220 26 208 26H77Q65 26 65 38V52"/></svg></div>
               <div class="protocols"><span class="is-current"><i class="protocol-dot"></i>Anthropic</span><span><i class="protocol-dot"></i>OpenAI</span><span><i class="protocol-dot"></i>Gemini</span></div>
               <div class="provider-lines"><svg viewBox="0 0 440 30" preserveAspectRatio="none" aria-hidden="true"><path class="guide-line" d="M65 0V15H108V30M65 15H332V30"/><path class="active-line" d="M65 0V15H108V30"/><path class="route-packet" pathLength="1" d="M65 0V15H108V30"/></svg></div>
-              <div class="hero-provider-pool" aria-label="Illustrative API and OAuth providers">
+              <section class="hero-provider-pool" aria-label="Illustrative API and OAuth providers">
                 <div data-hero-provider="0">
                   <span class="provider-auth" aria-hidden="true">API</span>
                   <div class="provider-identity"><strong><span data-provider-channel>Claude</span> Provider 01</strong><small>API key</small></div>
@@ -190,7 +191,7 @@
                   <div class="provider-identity"><strong><span data-provider-channel>Claude</span> Provider 02</strong><small data-provider-account>Claude account</small></div>
                   <b>STANDBY</b>
                 </div>
-              </div>
+              </section>
               <div class="hero-demo-status">
                 <div class="hero-scene-tabs" role="group" aria-label="Routing scenarios">
                   <button type="button" data-hero-scene-btn="0" aria-pressed="true" disabled>01 Normal</button>
@@ -279,7 +280,7 @@
               <div id="console-panel-0" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Providers"><img src="assets/screenshots/providers.png" alt="Clipal console Providers view: API-key and OAuth providers with auto/manual routing, token usage and spend" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Providers"><img src="assets/screenshots/providers.png" srcset="assets/screenshots/providers-mobile.jpg 1024w, assets/screenshots/providers.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal console Providers view: API-key and OAuth providers with auto/manual routing, token usage and spend" width="2048" height="1268" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>Providers, usage and spend — side by side.</h3>
@@ -289,7 +290,7 @@
               <div id="console-panel-1" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: CLI takeover"><img src="assets/screenshots/takeover.png" alt="Clipal console CLI takeover view: per-tool configuration status, diffs and rollback" width="2018" height="1430" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: CLI takeover"><img src="assets/screenshots/takeover.png" srcset="assets/screenshots/takeover-mobile.jpg 1024w, assets/screenshots/takeover.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal console CLI takeover view: per-tool configuration status, diffs and rollback" width="2018" height="1430" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>Preview and roll back CLI configs.</h3>
@@ -299,7 +300,7 @@
               <div id="console-panel-2" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: System status"><img src="assets/screenshots/status.png" alt="Clipal console System Status view: setup checklist, uptime, circuit breaker state and active channel routing" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: System status"><img src="assets/screenshots/status.png" srcset="assets/screenshots/status-mobile.jpg 1024w, assets/screenshots/status.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal console System Status view: setup checklist, uptime, circuit breaker state and active channel routing" width="2018" height="1436" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>Gateway health and live routes at a glance.</h3>
@@ -309,7 +310,7 @@
               <div id="console-panel-3" class="tab-panel console-panel" data-tab-panel>
                 <div class="screen-frame">
                   <div class="screen-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="address">127.0.0.1:3333</span></div>
-                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Settings"><img src="assets/screenshots/settings.png" alt="Clipal console global settings view: runtime port, circuit breaker thresholds and sticky session settings" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
+                  <button type="button" class="screenshot-button" data-zoom aria-label="Enlarge screenshot: Settings"><img src="assets/screenshots/settings.png" srcset="assets/screenshots/settings-mobile.jpg 1024w, assets/screenshots/settings.png 2048w" sizes="(max-width: 1100px) 100vw, 60vw" alt="Clipal console global settings view: runtime port, circuit breaker thresholds and sticky session settings" width="2010" height="1690" loading="lazy" decoding="async"><span class="zoom-label">Enlarge ⤢</span></button>
                 </div>
                 <div class="screen-caption">
                   <h3>Listen boundaries, circuit breakers and sticky sessions.</h3>
