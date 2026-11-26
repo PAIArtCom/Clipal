@@ -1492,44 +1492,25 @@
                             x-text="providerForm.enabled ? t('common.enabled') : t('common.disabled')"></span>
                     </div>
 
-                    <div class="form-grid-full provider-overrides-group" x-show="providerHasAnyOverrideSupport()">
-                        <div class="provider-overrides-header">
-                            <span class="label-row"><span x-text="t('modal.provider.overridesTitle')"></span><span class="tooltip hint"><button type="button" class="hint__btn" :aria-label="t('modal.provider.overridesHint')"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button><span class="tooltip-content" role="tooltip" x-text="t('modal.provider.overridesHint')"></span></span></span>
-                        </div>
-
-                        <div class="provider-overrides-grid">
+                    <details class="form-grid-full provider-overrides" x-show="providerHasAnyOverrideSupport()"
+                        :open="providerOverridesOpen" @toggle="providerOverridesOpen = $el.open">
+                        <summary class="provider-overrides__summary">
+                            <svg class="ic provider-overrides__chevron" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                            <span class="provider-overrides__title" x-text="t('modal.provider.overridesTitle')"></span>
+                            <span class="pill pill--xs pill--primary provider-overrides__badge"
+                                x-show="!providerOverridesOpen && (providerForm.model || '').trim()"
+                                x-text="(providerForm.model || '').trim()"></span>
+                        </summary>
+                        <div class="provider-overrides__body">
                             <div class="provider-overrides-field" x-show="providerSupportsModelOverride()">
                                 <label class="form-label" for="providerForm-model" x-text="t('modal.provider.model')"></label>
                                 <input id="providerForm-model" type="text" x-model="providerForm.model" class="form-input"
+                                    autocapitalize="off" spellcheck="false"
                                     :placeholder="t('modal.provider.modelHint')">
-                            </div>
-
-                            <div class="provider-overrides-field" x-show="providerSupportsReasoningEffort()">
-                                <label class="form-label" for="providerForm-reasoning-effort" x-text="t('modal.provider.reasoningEffort')"></label>
-                                <select id="providerForm-reasoning-effort" x-model="providerForm.reasoning_effort" class="form-input">
-                                    <option value="" x-text="t('forms.inherit')"></option><option value="none">none</option><option value="minimal">minimal</option>
-                                    <option value="low">low</option><option value="medium">medium</option>
-                                    <option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option>
-                                </select>
-                                <p class="form-hint" x-text="t('modal.provider.reasoningEffortHint')"></p>
-                            </div>
-
-                            <div class="provider-overrides-field" x-show="providerSupportsClaudeEffort()">
-                                <label class="form-label" for="providerForm-claude-effort" x-text="t('modal.provider.claudeEffort')"></label>
-                                <select id="providerForm-claude-effort" x-model="providerForm.claude_effort" class="form-input">
-                                    <option value="" x-text="t('forms.inherit')"></option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option>
-                                </select>
-                                <p class="form-hint" x-text="t('modal.provider.claudeEffortHint')"></p>
-                            </div>
-                            <div class="provider-overrides-field" x-show="providerSupportsGoogleThinkingLevel()">
-                                <label class="form-label" for="providerForm-google-thinking-level" x-text="t('modal.provider.googleThinkingLevel')"></label>
-                                <select id="providerForm-google-thinking-level" x-model="providerForm.google_thinking_level" class="form-input">
-                                    <option value="" x-text="t('forms.inherit')"></option><option value="minimal">minimal</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
-                                </select>
-                                <p class="form-hint" x-text="t('modal.provider.googleThinkingLevelHint')"></p>
+                                <p class="form-hint" x-text="t('modal.provider.overridesHint')"></p>
                             </div>
                         </div>
-                    </div>
+                    </details>
                 </div>
                 <div class="modal-body" x-show="oauthAuthorizationActive()">
                     <div :class="oauthAuthorizationToneClass()">

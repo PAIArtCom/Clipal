@@ -123,7 +123,7 @@ function app() {
         serviceActionRequestPending: false,
         messages: {
             en: {
-                forms: {"unit": "Unit for {label}", "nonNegative": "Enter a non-negative number.", "wholeBytes": "Choose a size that is at least one whole byte.", "positiveDuration": "Enter a duration greater than zero.", "preserved": "Saved value: {value}. Enter a number to replace it.", "inherit": "Use provider default", "defaultValue": "Use default", "minimumSize": "The minimum request-body limit is 64 MiB.", "minimumTimeout": "Use zero to disable, or choose at least 5 minutes."},
+                forms: {"unit": "Unit for {label}", "nonNegative": "Enter a non-negative number.", "wholeBytes": "Choose a size that is at least one whole byte.", "positiveDuration": "Enter a duration greater than zero.", "preserved": "Saved value: {value}. Enter a number to replace it.", "defaultValue": "Use default", "minimumSize": "The minimum request-body limit is 64 MiB.", "minimumTimeout": "Use zero to disable, or choose at least 5 minutes."},
                 units: {"ns": "Nanoseconds", "us": "Microseconds", "µs": "Microseconds", "ms": "Milliseconds", "s": "Seconds", "m": "Minutes", "h": "Hours", "B": "Bytes", "KiB": "KiB", "MiB": "MiB", "GiB": "GiB"},
                 feedback: {
                     unsavedTitle: 'Discard unsaved changes?',
@@ -453,12 +453,6 @@ function app() {
                         keepExistingProxy: 'Leave empty to keep the current proxy ({proxy}).',
                         model: 'Model',
                         modelHint: 'model-id',
-                        reasoningEffort: 'Reasoning Effort',
-                        reasoningEffortHint: 'Leave empty to use the provider default. Availability depends on the selected model.',
-                        claudeEffort: 'Reasoning Effort',
-                        claudeEffortHint: 'Availability depends on the Claude model. Leave empty to use its default.',
-                        googleThinkingLevel: 'Thinking Level',
-                        googleThinkingLevelHint: 'Gemini supports different levels by model. Leave empty to use its default.',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: 'One API key per line',
@@ -706,7 +700,7 @@ function app() {
                 }
             },
             'zh-CN': {
-                forms: {"unit": "{label}的单位", "nonNegative": "请输入非负数。", "wholeBytes": "请选择至少为一个整数字节的大小。", "positiveDuration": "请输入大于零的时长。", "preserved": "已保存：{value}。输入数值后可替换。", "inherit": "使用上游默认值", "defaultValue": "使用默认值", "minimumSize": "请求体大小至少为 64 MiB。", "minimumTimeout": "设为零可关闭，否则请至少设置 5 分钟。"},
+                forms: {"unit": "{label}的单位", "nonNegative": "请输入非负数。", "wholeBytes": "请选择至少为一个整数字节的大小。", "positiveDuration": "请输入大于零的时长。", "preserved": "已保存：{value}。输入数值后可替换。", "defaultValue": "使用默认值", "minimumSize": "请求体大小至少为 64 MiB。", "minimumTimeout": "设为零可关闭，否则请至少设置 5 分钟。"},
                 units: {"ns": "纳秒", "us": "微秒", "µs": "微秒", "ms": "毫秒", "s": "秒", "m": "分钟", "h": "小时", "B": "字节", "KiB": "KiB", "MiB": "MiB", "GiB": "GiB"},
                 feedback: {
                     unsavedTitle: '丢弃未保存的修改？',
@@ -1036,12 +1030,6 @@ function app() {
                         keepExistingProxy: '留空则保留当前代理（{proxy}）。',
                         model: '模型',
                         modelHint: 'model-id',
-                        reasoningEffort: '思考强度',
-                        reasoningEffortHint: '留空时使用上游默认值。可用档位取决于所选模型。',
-                        claudeEffort: '推理强度',
-                        claudeEffortHint: '可用档位取决于 Claude 模型。留空时使用模型默认值。',
-                        googleThinkingLevel: '思考级别',
-                        googleThinkingLevelHint: 'Gemini 的可用级别因模型而异。留空时使用模型默认值。',
                         apiKeys: 'API Keys',
                         apiKeysRequired: 'API Keys *',
                         onePerLine: '每行一个 API Key',
@@ -1414,13 +1402,11 @@ function app() {
             proxy_url: '',
             proxy_url_hint: '',
             model: '',
-            reasoning_effort: '',
-            claude_effort: '',
-            google_thinking_level: '',
             api_keys_text: '',
             priority: 1,
             enabled: true
         },
+        providerOverridesOpen: false,
         editingProviderName: '',
         editingProviderKeyCount: 0,
 
@@ -4583,27 +4569,13 @@ function app() {
                 return this.defaultProviderOverrideSupport();
             }
             return {
-                model: !!support.model,
-                openai: {
-                    reasoning_effort: !!(support.openai && support.openai.reasoning_effort)
-                },
-                claude: {
-                    effort: !!(support.claude && support.claude.effort)
-                },
-                google: { thinking_level: !!(support.google && support.google.thinking_level) }
+                model: !!support.model
             };
         },
 
         defaultProviderOverrideSupport() {
             return {
-                model: false,
-                openai: {
-                    reasoning_effort: false
-                },
-                claude: {
-                    effort: false
-                },
-                google: { thinking_level: false }
+                model: false
             };
         },
 
@@ -4611,18 +4583,8 @@ function app() {
             return this.providerOverrideSupport().model;
         },
 
-        providerSupportsReasoningEffort() {
-            return this.providerOverrideSupport().openai.reasoning_effort;
-        },
-
-        providerSupportsClaudeEffort() { return this.providerOverrideSupport().claude.effort; },
-        providerSupportsGoogleThinkingLevel() { return this.providerOverrideSupport().google.thinking_level; },
-
         providerHasAnyOverrideSupport() {
-            return this.providerSupportsModelOverride()
-                || this.providerSupportsReasoningEffort()
-                || this.providerSupportsClaudeEffort()
-                || this.providerSupportsGoogleThinkingLevel();
+            return this.providerSupportsModelOverride();
         },
 
 
@@ -5156,13 +5118,6 @@ function app() {
                 if (this.providerSupportsModelOverride()) {
                     overrides.model = String(this.providerForm.model || '');
                 }
-                if (this.providerSupportsReasoningEffort()) {
-                    overrides.openai = {
-                        reasoning_effort: String(this.providerForm.reasoning_effort || '')
-                    };
-                }
-                if (this.providerSupportsClaudeEffort()) overrides.claude = { ...(overrides.claude || {}), effort: String(this.providerForm.claude_effort || '') };
-                if (this.providerSupportsGoogleThinkingLevel()) overrides.google = { thinking_level: String(this.providerForm.google_thinking_level || '') };
                 if (Object.keys(overrides).length > 0) {
                     payload.overrides = overrides;
                 }
@@ -5437,13 +5392,11 @@ function app() {
                 proxy_url: '',
                 proxy_url_hint: String(provider.proxy_url_hint || ''),
                 model: String((provider.overrides && provider.overrides.model) || ''),
-                reasoning_effort: String((provider.overrides && provider.overrides.openai && provider.overrides.openai.reasoning_effort) || ''),
-                claude_effort: String((provider.overrides && provider.overrides.claude && provider.overrides.claude.effort) || ''),
-                google_thinking_level: String((provider.overrides && provider.overrides.google && provider.overrides.google.thinking_level) || ''),
                 api_keys_text: '',
                 priority: provider.priority,
                 enabled: !!provider.enabled
             };
+            this.providerOverridesOpen = false;
             this.editingProviderName = provider.name;
             this.editingProviderKeyCount = Number(provider.key_count || 0);
             this.providerFormSnapshot = JSON.stringify(this.providerForm);
@@ -5517,13 +5470,11 @@ function app() {
                 proxy_url: '',
                 proxy_url_hint: '',
                 model: '',
-                reasoning_effort: '',
-                claude_effort: '',
-                google_thinking_level: '',
                 api_keys_text: '',
                 priority: maxPriority + 1,
                 enabled: true
             };
+            this.providerOverridesOpen = false;
             this.editingProviderName = '';
             this.editingProviderKeyCount = 0;
             this.providerFormSnapshot = JSON.stringify(this.providerForm);
@@ -5881,11 +5832,11 @@ function app() {
                 proxy_url: '',
                 proxy_url_hint: '',
                 model: '',
-                reasoning_effort: '',
                 api_keys_text: '',
                 priority: 1,
                 enabled: true
             };
+            this.providerOverridesOpen = false;
             this.editingProviderName = '';
             this.editingProviderKeyCount = 0;
         }
