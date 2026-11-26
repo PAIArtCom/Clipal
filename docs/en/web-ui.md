@@ -23,8 +23,7 @@ The current section and client are kept in the URL hash (for example `#/provider
 - Pin a provider in `manual` mode
 - Enter either a single `api_key` or multi-line `api_keys`
 - Configure provider-level proxy mode and custom proxy URL
-- Configure provider-level model overrides
-- Configure provider-level OpenAI reasoning effort, Claude effort, or Gemini thinking level
+- Configure provider-level model overrides (collapsed under **Overrides** by default)
 - Start OAuth authorization for supported client/provider combinations
 - Import OAuth credential files from the Add Provider dialog. Supported files are Codex CLI `auth.json` (`~/.codex/auth.json`), CLIProxyAPI single-account OAuth JSON files, and sub2api export JSON bundles; Clipal imports only accounts matching the selected service.
 - Route Claude and Codex OAuth requests through Agent SDK-compatible upstream wrapping by default, with required transport fields handled by Clipal.
@@ -200,7 +199,7 @@ Gateway status refreshes every three seconds while the Providers or System Statu
 
 Timeouts and routing durations use a numeric field with a unit selector; request-body limits use bytes, KiB, MiB or GiB. Optional routing durations can be cleared to use defaults. Request-body limits must be at least 64 MiB; idle and response-header timeouts must be zero (disabled) or at least five minutes. Smaller values are flagged before submission. Existing compound durations and fine-grained values are preserved until explicitly edited. Opening the form does not normalize saved configuration. Controls for disabled routing and circuit-breaker features are disabled without deleting their values.
 
-Reasoning effort offers common suggestions while allowing model-specific values; empty means no override. Provider names are validated before submission, and visible field labels focus their controls. Client tabs support left/right arrow navigation. Touch devices use larger action targets.
+Provider names are validated before submission, and visible field labels focus their controls. Client tabs support left/right arrow navigation. Touch devices use larger action targets.
 
 Dialogs move focus inside, keep Tab and Shift+Tab inside, isolate the background, and restore focus to the opening control. Account environment loading and diagnostics can be closed; late results do not change the closed dialog. Failed account preference loads provide an in-dialog retry. Account preference saves show a busy state and a success notification; errors from closed reads and diagnostics are ignored.
 
